@@ -4,7 +4,10 @@ use codepages::tables::CP437_TO_UNICODE;
 use tempfile::TempPath;
 use tokio::time::{Duration, Instant, timeout, timeout_at};
 
-use crate::icy_board::state::user_commands::pcb::u_upload_file::create_protocol;
+use crate::icy_board::state::{
+    local_transfer::{LocalFilePickerKind, stage_local_upload},
+    user_commands::pcb::u_upload_file::create_protocol,
+};
 
 use super::{EditState, IceText, IcyBoardState, Res, display_flags};
 
@@ -69,6 +72,41 @@ impl EditState {
             return Ok(());
         }
         state.display_text(IceText::UploadMode, display_flags::NEWLINE).await?;
+        if state.session.is_local {
+            let Some(source) = state.request_local_path(LocalFilePickerKind::UploadFile).await? else {
+                return Ok(());
+            };
+            if state.session.request_logoff {
+                return Ok(());
+            }
+            let result = tokio::task::spawn_blocking(move || -> Res<Vec<u8>> {
+                // Reject known oversized/special sources before copying. Only
+                // the bridge's temporary copy is ever owned by this command.
+                let metadata = std::fs::symlink_metadata(&source)?;
+                if !metadata.file_type().is_file() || metadata.len() > Self::MAX_UPLOAD_BYTES as u64 {
+                    return Err(std::io::Error::other("Invalid text upload file").into());
+                }
+                let staged = stage_local_upload(&source)?;
+                let mut bytes = Vec::new();
+                std::fs::File::open(&staged)?.take(Self::MAX_UPLOAD_BYTES as u64 + 1).read_to_end(&mut bytes)?;
+                Ok(bytes)
+            })
+            .await?;
+            let accepted = match result {
+                Ok(bytes) => !state.session.request_logoff && self.append_uploaded_text(&bytes),
+                Err(error) => {
+                    log::warn!("Local message text upload rejected: {error}");
+                    false
+                }
+            };
+            state
+                .display_text(
+                    if accepted { IceText::TransferSuccessful } else { IceText::TransferAborted },
+                    display_flags::NEWLINE,
+                )
+                .await?;
+            return Ok(());
+        }
         let answer = state.ask_transfer_protocol("N").await?;
         if answer.is_empty() || answer.eq_ignore_ascii_case("N") || state.session.request_logoff {
             return Ok(());
@@ -171,6 +209,104 @@ mod tests {
     use std::sync::Arc;
     use tokio::sync::Mutex;
 
+    async fn local_state() -> (IcyBoardState, ChannelConnection) {
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (peer, connection) = ChannelConnection::create_pair();
+        // No protocols configured: a local upload must not prompt for one.
+        let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
+        state.session.is_local = true;
+        state.session.is_sysop = false;
+        state.session.current_user = Some(User::default());
+        state.session.page_len = 0;
+        (state, peer)
+    }
+
+    fn draft() -> EditState {
+        EditState {
+            msg: vec!["existing draft".into()],
+            max_lines: 100,
+            max_line_length: 79,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn local_text_picker_cancel_and_missing_capability_preserve_draft() {
+        let (mut state, _peer) = local_state().await;
+        let mut editor = draft();
+        let cursor = editor.cursor;
+        timeout(Duration::from_secs(3), editor.upload_text(&mut state)).await.unwrap().unwrap();
+        assert_eq!(editor.msg, ["existing draft"]);
+        assert_eq!(editor.cursor, cursor);
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+        for disconnect in [false, true] {
+            let (result, ()) = timeout(Duration::from_secs(3), async {
+                tokio::join!(editor.upload_text(&mut state), async {
+                    let request = rx.recv().await.unwrap();
+                    assert_eq!(request.kind, LocalFilePickerKind::UploadFile);
+                    if !disconnect {
+                        request.response.send(None).unwrap();
+                    }
+                })
+            })
+            .await
+            .expect("local text cancellation must not enter protocol receive");
+            result.unwrap();
+            assert_eq!(editor.msg, ["existing draft"]);
+            assert_eq!(editor.cursor, cursor);
+        }
+    }
+
+    #[tokio::test]
+    async fn local_text_picker_preserves_original_and_enforces_byte_and_line_limits() {
+        for case in ["valid", "oversize", "line-limit", "directory", "missing"] {
+            let root = tempfile::tempdir().unwrap();
+            let source = root.path().join("body.txt");
+            let bytes = if case == "oversize" {
+                vec![b'x'; EditState::MAX_UPLOAD_BYTES + 1]
+            } else {
+                b"caf\x82\r\nsecond\tline\r\n\x1a".to_vec()
+            };
+            std::fs::write(&source, &bytes).unwrap();
+            let selected = match case {
+                "directory" => root.path().to_path_buf(),
+                "missing" => root.path().join("missing.txt"),
+                _ => source.clone(),
+            };
+            let (mut state, _peer) = local_state().await;
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+            let mut editor = draft();
+            if case == "line-limit" {
+                editor.max_lines = 2;
+            }
+            let cursor = editor.cursor;
+            let (result, ()) = timeout(Duration::from_secs(5), async {
+                tokio::join!(editor.upload_text(&mut state), async {
+                    let request = rx.recv().await.unwrap();
+                    assert_eq!(request.kind, LocalFilePickerKind::UploadFile);
+                    request.response.send(Some(selected)).unwrap();
+                })
+            })
+            .await
+            .expect("local text selection must not enter protocol receive");
+            result.unwrap();
+            if case == "valid" {
+                assert_eq!(editor.msg, ["existing draft", "café", "second  line"]);
+                assert_eq!(editor.cursor, icy_engine::Position::new(0, 3));
+            } else {
+                assert_eq!(editor.msg, ["existing draft"], "{case}");
+                assert_eq!(editor.cursor, cursor, "{case}");
+            }
+            assert_eq!(std::fs::read(&source).unwrap(), bytes, "{case}");
+            assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
+        }
+    }
+
     #[tokio::test]
     async fn native_zmodem_body_upload_appends_received_text_and_preserves_cancelled_draft() {
         for cancel in [false, true] {
@@ -185,7 +321,13 @@ mod tests {
             let mut board = IcyBoard::new();
             // Bare boards have no configured protocols, including Zmodem.
             board.protocols = SupportedProtocols::generate_pcboard_defaults();
+            // Deliberately asymmetric: uploads must use RECV, never SEND.
+            for protocol in board.protocols.iter_mut() {
+                protocol.send_command = icy_net::protocol::TransferProtocolType::None;
+            }
             let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(board)), nodes, node, Box::new(connection)).await;
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
             state.session.current_user = Some(User::default());
             state.session.page_len = 0;
             state.char_buffer.extend("Z\r".chars().map(|ch| KeyChar::new(KeySource::User, ch)));
@@ -226,6 +368,7 @@ mod tests {
             .await
             .expect("native body upload stalled");
             result.unwrap();
+            assert!(rx.try_recv().is_err(), "remote sessions must never request a host picker");
             if cancel {
                 assert_eq!(editor.msg, ["existing draft"]);
                 assert_eq!(editor.cursor, original_cursor);

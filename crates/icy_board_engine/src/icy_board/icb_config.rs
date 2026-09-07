@@ -114,7 +114,9 @@ impl UserCommandLevels {
             CommandType::AbandonConference => self.cmd_a.clone(),
             CommandType::BulletinList => self.cmd_b.clone(),
             CommandType::CommentToSysop => self.cmd_c.clone(),
-            CommandType::Download | CommandType::FlagFiles => self.cmd_d.clone(),
+            // Batch permission selects transfer behavior, not command access.
+            // Built-in dispatch checks this mapping before running the action.
+            CommandType::Download | CommandType::FlagFiles | CommandType::BatchDownload => self.cmd_d.clone(),
             CommandType::EnterMessage | CommandType::WriteEmail | CommandType::ReplyMessage => self.cmd_e.clone(),
             CommandType::FileDirectory => self.cmd_f.clone(),
             CommandType::Help => self.cmd_h.clone(),
@@ -132,7 +134,7 @@ impl UserCommandLevels {
             }
             CommandType::Survey => self.cmd_s.clone(),
             CommandType::SetTransferProtocol => self.cmd_t.clone(),
-            CommandType::UploadFile => self.cmd_u.clone(),
+            CommandType::UploadFile | CommandType::BatchUpload => self.cmd_u.clone(),
             CommandType::ViewSettings => self.cmd_v.clone(),
             CommandType::WriteSettings => self.cmd_w.clone(),
             CommandType::ExpertMode => self.cmd_x.clone(),
@@ -143,7 +145,6 @@ impl UserCommandLevels {
             CommandType::OpenDoor => self.cmd_open_door.clone(),
             CommandType::TestFile => self.cmd_test_file.clone(),
             CommandType::GroupChat => self.cmd_chat.clone(),
-            CommandType::BatchDownload | CommandType::BatchUpload => self.batch_file_transfer.clone(),
             _ => SecurityExpression::default(),
         }
     }
@@ -1728,6 +1729,18 @@ config_color_theme = "DEFAULT"
             ..Default::default()
         };
         assert_eq!(levels.security_for(&CommandType::FlagFiles).to_string(), "50");
+    }
+
+    #[test]
+    fn test_batch_commands_use_transfer_command_levels_not_batch_permission() {
+        let levels = UserCommandLevels {
+            cmd_d: SecurityExpression::from_req_security(50),
+            cmd_u: SecurityExpression::from_req_security(60),
+            batch_file_transfer: SecurityExpression::from_req_security(70),
+            ..Default::default()
+        };
+        assert_eq!(levels.security_for(&CommandType::BatchDownload).to_string(), "50");
+        assert_eq!(levels.security_for(&CommandType::BatchUpload).to_string(), "60");
     }
 
     #[test]

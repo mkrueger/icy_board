@@ -201,15 +201,20 @@ fn test_message_areas() -> AreaList {
 }
 
 pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, true, None, true)
+    test_session_output(cmd, init_fn, true, None, true, true)
+}
+
+/// Transfer prompts belong to remote sessions, not local sessions without a picker.
+pub fn test_remote_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
+    test_session_output(cmd, init_fn, true, None, true, false)
 }
 
 pub fn test_user_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, true, None, false)
+    test_session_output(cmd, init_fn, true, None, false, true)
 }
 
 pub fn test_login_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, false, None, true)
+    test_session_output(cmd, init_fn, false, None, true, true)
 }
 
 pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
@@ -248,10 +253,11 @@ pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &st
             args: Vec::new(),
         }),
         true,
+        true,
     )
 }
 
-fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool, ppe: Option<PPEExecute>, stuff_input: bool) -> String {
+fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool, ppe: Option<PPEExecute>, stuff_input: bool, local: bool) -> String {
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
@@ -316,6 +322,22 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
                     if size == 0 {
                         break;
                     }
+                    if !local {
+                        // detect_terminal always probes the connection, even with preset
+                        // capabilities. ChannelConnection preserves these small send packets.
+                        // Answer only the cursor probes; unsupported media probes time out.
+                        // In particular, do not record the deliberately invalid UTF-8 probe
+                        // as board text. Commands stay stuffed, away from probe reads.
+                        let reply: Option<&[u8]> = match &buffer[..size] {
+                            b"\x1b[999;999H\x1b[6n" => Some(b"\x1b[25;80R"),
+                            b"\x1b[1;1H\x01\xF6\x1c\x1b[6n" => Some(b"\x1b[1;1R"),
+                            _ => None,
+                        };
+                        if let Some(reply) = reply {
+                            ui_connection.send(reply).await.unwrap();
+                            continue;
+                        }
+                    }
                     let should_exit = {
                         let mut output = res.lock().await;
                         output.extend(&buffer[0..size]);
@@ -333,7 +355,7 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
             .name("Local mode handle".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let options = LoginOptions { login_sysop, ppe, local: true };
+                    let options = LoginOptions { login_sysop, ppe, local };
 
                     let stuffed_chars = if stuff_input { cmd.as_str() } else { "" };
                     if let Err(err) = internal_handle_client(state, Some(options), stuffed_chars).await {

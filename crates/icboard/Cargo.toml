@@ -27,6 +27,7 @@ icy_board_cli = { workspace = true }
 color-eyre = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
+ratatui-explorer = "0.3.0"
 ratatui-image = { workspace = true }
 image = { workspace = true }
 rodio = { workspace = true }

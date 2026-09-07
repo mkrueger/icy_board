@@ -885,6 +885,7 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         vm.pcb_node = Some(NodeState {
             sysop_connection: None,
             bbs_channel: None,
+            local_file_picker: None,
             cur_user: node.cur_user,
             cur_conference: node.cur_conference,
             graphics_mode: node.graphics_mode,
@@ -902,6 +903,7 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         vm.pcb_node = Some(NodeState {
             sysop_connection: None,
             bbs_channel: None,
+            local_file_picker: None,
             cur_user: -1,
             cur_conference: 0,
             graphics_mode: GraphicsMode::Graphics,

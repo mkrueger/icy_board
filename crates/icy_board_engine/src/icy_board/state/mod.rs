@@ -33,6 +33,7 @@ use crate::{
     vm::{DiskIO, TerminalTarget, run},
 };
 pub mod functions;
+pub mod local_transfer;
 pub mod menu_runner;
 pub mod ppl_array;
 pub mod ppl_audio;
@@ -261,6 +262,8 @@ pub struct Session {
     pub request_logoff: bool,
 
     pub time_limit: i32,
+    /// Sub-minute upload credit carried between transfers; never a caller/PPL environment value.
+    pub(crate) upload_credit_seconds: u64,
     /// Set when a pending event has cut the session short. ADJTIME may then only
     /// take time away, never give it back.
     pub time_adjusted_for_event: bool,
@@ -356,6 +359,7 @@ impl Session {
             op_text: String::new(),
             use_alias: false,
             time_limit: 1000,
+            upload_credit_seconds: 0,
             time_adjusted_for_event: false,
             keyboard_timer_check: true,
             keyboard_timer_started: Instant::now(),
@@ -558,6 +562,8 @@ impl NodeStatus {
 
 pub struct NodeState {
     pub sysop_connection: Option<ChannelConnection>,
+    /// Host picker capability, installed only by the local console before login.
+    pub local_file_picker: Option<tokio::sync::mpsc::Sender<local_transfer::LocalFilePickerRequest>>,
     pub bbs_channel: Option<tokio::sync::mpsc::Receiver<BBSMessage>>,
     pub cur_user: i32,
     pub cur_conference: u16,
@@ -581,6 +587,7 @@ impl NodeState {
     pub fn new(node_number: usize, connection_type: ConnectionType, rx: tokio::sync::mpsc::Receiver<BBSMessage>) -> Self {
         Self {
             sysop_connection: None,
+            local_file_picker: None,
             bbs_channel: Some(rx),
             status: NodeStatus::NoCaller,
             operation: String::new(),

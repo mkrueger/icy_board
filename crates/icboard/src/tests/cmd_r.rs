@@ -242,7 +242,7 @@ fn test_cmd_r_skip_leaves_the_read_loop() {
 /// reader, not reject the implemented command or start a transfer.
 #[test]
 fn test_cmd_r_export_protocol_prompt_can_be_cancelled() {
-    let (output, base) = persisted_read("R\nO 1\nX\nN\n\n\n", |board| {
+    let (output, base) = persisted_read_with_session("R\nO 1\nX\nN\n\n\n", false, |board| {
         // No usable default: exercise the export protocol prompt, not an
         // actual transfer (which would need a remote protocol peer).
         board.users[0].protocol = "?".to_string();
@@ -259,13 +259,22 @@ fn test_cmd_r_export_protocol_prompt_can_be_cancelled() {
 /// Keep the base path, not the running session, so these assert disk state after
 /// the reader has returned to the main command prompt.
 fn persisted_read(input: &str, setup: impl Fn(&mut icy_board_engine::icy_board::IcyBoard)) -> (String, jamjam::jam::JamMessageBase) {
+    persisted_read_with_session(input, true, setup)
+}
+
+fn persisted_read_with_session(input: &str, local: bool, setup: impl Fn(&mut icy_board_engine::icy_board::IcyBoard)) -> (String, jamjam::jam::JamMessageBase) {
     let path = std::sync::Mutex::new(None);
-    let output = test_output(input.to_string(), |board| {
+    let init = |board: &mut icy_board_engine::icy_board::IcyBoard| {
         crate::tests::setup_conference_with_messages(board);
         board.config.message.update_last_read_pointer = true;
         setup(board);
         *path.lock().unwrap() = Some(board.conferences[0].areas.as_ref().unwrap()[0].path.clone());
-    });
+    };
+    let output = if local {
+        test_output(input.to_string(), init)
+    } else {
+        crate::tests::test_remote_output(input.to_string(), init)
+    };
     (output, jamjam::jam::JamMessageBase::open(path.into_inner().unwrap().unwrap()).unwrap())
 }
 

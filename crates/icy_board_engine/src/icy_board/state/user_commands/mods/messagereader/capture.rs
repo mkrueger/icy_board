@@ -676,6 +676,24 @@ impl IcyBoardState {
             self.display_text(IceText::NoTimeForDownload, display_flags::NEWLINE).await?;
             return Ok(false);
         }
+        if self.session.is_local {
+            // Keep the same access/allowance gates and offer only the owned packet.
+            // The bridge additionally requires the local console's picker capability.
+            let started = std::time::Instant::now();
+            let state = match self.local_download_files(&[path.to_path_buf()]).await {
+                Ok(Some(state)) => state,
+                Ok(None) => return Ok(false),
+                Err(error) => {
+                    log::error!("Local reader capture failed: {error}");
+                    // finish_reader_capture displays TransferAborted without host paths.
+                    return Ok(false);
+                }
+            };
+            if self.session.request_logoff || !delivered(&state, path) {
+                return Ok(false);
+            }
+            return self.record_reader_capture_download(path, size, &state, "Local", started).await;
+        }
         let answer = self.ask_transfer_protocol(&default).await?;
         if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.request_logoff {
             return Ok(false);
@@ -720,6 +738,17 @@ impl IcyBoardState {
             let _ = timeout(Duration::from_secs(2), protocol.cancel_transfer(&mut *self.connection)).await;
             return Ok(false);
         }
+        self.record_reader_capture_download(path, size, &state, &answer, started).await
+    }
+
+    async fn record_reader_capture_download(
+        &mut self,
+        path: &Path,
+        size: u64,
+        state: &icy_net::protocol::TransferState,
+        protocol: &str,
+        started: std::time::Instant,
+    ) -> Res<bool> {
         self.transfer_statistics.downloaded_bytes = size as usize;
         self.transfer_statistics.downloaded_files = 1;
         if let Some(user) = &mut self.session.current_user {
@@ -733,10 +762,10 @@ impl IcyBoardState {
         let cps = crate::icy_board::state::functions::transfer_cps(state.send_state.total_bytes_transfered, started);
         // Logging failures do not turn a confirmed delivery into a failed
         // transfer or suppress the pending message-pointer commit.
-        let log_result = self.log_transfer(false, &sent, &answer, state.send_state.errors, cps).await;
+        let log_result = self.log_transfer(false, &sent, protocol, state.send_state.errors, cps).await;
         let statistics_result = {
             let mut board = self.get_board().await;
-            board.statistics.add_download(&state);
+            board.statistics.add_download(state);
             board.save_statistics()
         };
         if let Err(error) = &log_result {
@@ -888,6 +917,234 @@ mod tests {
         assert_eq!(message_limit(600, 900), 600);
         assert_eq!(message_limit(600, 10), 10);
         assert_eq!(message_limit(0, 10), 0);
+    }
+
+    mod local_capture_tests {
+        use super::*;
+        use crate::icy_board::{
+            IcyBoard,
+            bbs::BBS,
+            security_expr::SecurityExpression,
+            state::local_transfer::{LocalFilePickerKind, LocalFilePickerRequest},
+            user_base::User,
+        };
+        use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
+        use std::sync::Arc;
+        use tokio::sync::{Mutex, mpsc};
+
+        async fn fixture(root: &Path) -> (IcyBoardState, ChannelConnection, mpsc::Receiver<LocalFilePickerRequest>) {
+            let bbs = Arc::new(Mutex::new(BBS::new(1)));
+            let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+            let nodes = bbs.lock().await.open_connections.clone();
+            let (peer, connection) = ChannelConnection::create_pair();
+            let mut board = IcyBoard::new();
+            board.config.paths.statistics_file = root.join("statistics.toml");
+            board.config.paths.transfer_log = root.join("transfers.log");
+            board.config.switches.exclude_local_calls_stats = false;
+            board.config.system_control.enforce_transfer_limits = false;
+            board.config.message.update_last_read_pointer = true;
+            let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(board)), nodes, node, Box::new(connection)).await;
+            state.session.current_user = Some(User {
+                name: "READER".into(),
+                // No usable protocol and no terminal input: local must bypass selection.
+                protocol: "N".into(),
+                ..Default::default()
+            });
+            state.session.user_name = "READER".into();
+            state.session.cur_user_id = 1;
+            state.session.cur_security = 10;
+            state.session.user_command_level.cmd_d = SecurityExpression::from_req_security(0);
+            state.session.is_local = true;
+            state.session.is_sysop = false;
+            state.session.page_len = 0;
+            state.session.time_limit = 0;
+            state.session.bytes_remaining = 1_000_000;
+            let unrelated = root.join("unrelated.bin");
+            std::fs::write(&unrelated, b"not offered").unwrap();
+            state.session.flagged_files.push(unrelated);
+            let (sender, receiver) = mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(sender);
+            (state, peer, receiver)
+        }
+
+        async fn answer(picker: &mut mpsc::Receiver<LocalFilePickerRequest>, destination: Option<PathBuf>) {
+            let request = picker.recv().await.unwrap();
+            assert_eq!(request.kind, LocalFilePickerKind::DownloadDirectory);
+            request.response.send(destination).unwrap();
+        }
+
+        #[tokio::test]
+        async fn send_confirms_copy_or_cancel_and_cleans_owned_packet() {
+            for outcome in ["success", "cancel", "collision", "error"] {
+                let root = tempfile::tempdir().unwrap();
+                let destination = tempfile::tempdir().unwrap();
+                let (mut state, _peer, mut picker) = fixture(root.path()).await;
+                let flags = state.session.flagged_files.clone();
+                let mut capture = capture(false, false);
+                append(&mut capture, header(1), "Local capture café\nSecond line", true).unwrap();
+                let packet = capture.packet().unwrap();
+                let source = packet.path.clone();
+                let directory = source.parent().unwrap().to_path_buf();
+                let expected = std::fs::read(&source).unwrap();
+                let target = destination.path().join("messages.txt");
+                if outcome == "collision" {
+                    std::fs::write(&target, b"existing").unwrap();
+                }
+                let chosen = match outcome {
+                    "cancel" => None,
+                    "error" => Some(destination.path().join("missing-directory")),
+                    _ => Some(destination.path().to_path_buf()),
+                };
+                let (result, ()) = timeout(Duration::from_secs(5), async {
+                    tokio::join!(state.send_reader_capture(&source), answer(&mut picker, chosen))
+                })
+                .await
+                .expect("local capture send stalled");
+                let success = outcome == "success";
+                assert_eq!(result.unwrap(), success, "{outcome}");
+                assert_eq!(state.session.flagged_files, flags);
+                assert_eq!(std::fs::read(&flags[0]).unwrap(), b"not offered");
+                assert!(!destination.path().join("unrelated.bin").exists());
+                assert_eq!((state.session.last_msg_read, state.session.highest_msg_read), (0, 0));
+                let user = state.session.current_user.as_ref().unwrap();
+                assert_eq!(user.stats.num_downloads, u64::from(success));
+                assert_eq!(user.stats.total_dnld_bytes, if success { expected.len() as u64 } else { 0 });
+                assert_eq!(state.session.bytes_remaining, 1_000_000 - if success { expected.len() as i64 } else { 0 });
+                assert_eq!(root.path().join("transfers.log").exists(), success);
+                if success {
+                    assert_eq!(std::fs::read(&target).unwrap(), expected);
+                    assert_eq!(std::fs::read_dir(destination.path()).unwrap().count(), 1);
+                } else if outcome == "collision" {
+                    assert_eq!(std::fs::read(&target).unwrap(), b"existing");
+                    assert_eq!(std::fs::read_dir(destination.path()).unwrap().count(), 1);
+                } else {
+                    assert_eq!(std::fs::read_dir(destination.path()).unwrap().count(), 0);
+                }
+                assert_eq!(std::fs::read(&source).unwrap(), expected);
+                drop(packet);
+                assert!(!source.exists());
+                assert!(!directory.exists());
+                if success {
+                    assert_eq!(std::fs::read(&target).unwrap(), expected);
+                }
+            }
+        }
+
+        #[tokio::test]
+        async fn finish_commits_only_delivered_selected_mail_and_obeys_reader_options() {
+            for (outcome, status, pointer) in [
+                ("success", true, true),
+                ("success", false, false),
+                ("success", true, false),
+                ("success", false, true),
+                ("cancel", true, true),
+                ("error", true, true),
+                ("collision", true, true),
+            ] {
+                let root = tempfile::tempdir().unwrap();
+                let destination = tempfile::tempdir().unwrap();
+                let (mut state, mut peer, mut picker) = fixture(root.path()).await;
+                let flags = state.session.flagged_files.clone();
+                let mut base = JamMessageBase::create(root.path().join("mail")).unwrap();
+                for body in ["selected café", "unrelated message"] {
+                    base.write_message(
+                        &JamMessage::default()
+                            .with_from("AUTHOR".into())
+                            .with_to("READER".into())
+                            .with_attributes(attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ)
+                            .with_text(body.into()),
+                    )
+                    .unwrap();
+                }
+                base.write_jhr_header().unwrap();
+                let mut capture = capture(false, false);
+                append(&mut capture, base.read_header(1).unwrap(), "selected café", true).unwrap();
+                capture.effects[0].path = base.path().to_path_buf();
+                let expected = capture.data.clone();
+                let options = ReaderOptions {
+                    update_status: status,
+                    update_pointers: pointer,
+                    ..Default::default()
+                };
+                if outcome == "collision" {
+                    std::fs::write(destination.path().join("messages.txt"), b"existing").unwrap();
+                }
+                let chosen = match outcome {
+                    "cancel" => None,
+                    "error" => Some(destination.path().join("missing-directory")),
+                    _ => Some(destination.path().to_path_buf()),
+                };
+                let (result, ()) = timeout(Duration::from_secs(5), async {
+                    tokio::join!(state.finish_reader_capture(capture, &options), answer(&mut picker, chosen))
+                })
+                .await
+                .expect("local capture finish stalled");
+                result.unwrap();
+                let success = outcome == "success";
+                let mut base = JamMessageBase::open(base.path()).unwrap();
+                let selected = base.read_header(1).unwrap();
+                assert_eq!(selected.is_read(), success && status);
+                assert_eq!(selected.is_receipt_req(), !(success && status));
+                assert_eq!(base.highest_message_number(), if success && status { 3 } else { 2 });
+                assert!(!base.read_header(2).unwrap().is_read());
+                assert!(base.read_header(2).unwrap().is_receipt_req());
+                let last = base.find_last_read(JamMessageBase::crc(&"READER".into()), 1).unwrap();
+                assert_eq!(
+                    last.map(|last| (last.last_read_msg, last.high_read_msg)),
+                    (success && pointer).then_some((1, 1))
+                );
+                assert_eq!(
+                    (state.session.last_msg_read, state.session.highest_msg_read),
+                    if success && pointer { (1, 1) } else { (0, 0) }
+                );
+                assert_eq!(state.session.flagged_files, flags);
+                assert!(!state.session.request_logoff);
+                if success {
+                    assert_eq!(std::fs::read(destination.path().join("messages.txt")).unwrap(), expected);
+                }
+                let mut output = Vec::new();
+                let mut buffer = [0; 4096];
+                loop {
+                    let count = peer.try_read(&mut buffer).await.unwrap();
+                    if count == 0 {
+                        break;
+                    }
+                    output.extend_from_slice(&buffer[..count]);
+                }
+                let output = String::from_utf8_lossy(&output).to_lowercase();
+                assert_eq!(output.contains("transfer aborted"), !success, "{output}");
+            }
+        }
+
+        #[tokio::test]
+        async fn local_copy_keeps_login_access_allowance_and_capability_gates() {
+            for gate in ["login", "access", "allowance", "capability"] {
+                let root = tempfile::tempdir().unwrap();
+                let (mut state, _peer, mut picker) = fixture(root.path()).await;
+                match gate {
+                    "login" => state.session.current_user = None,
+                    "access" => state.session.user_command_level.cmd_d = SecurityExpression::from_req_security(20),
+                    "allowance" => {
+                        state.get_board().await.config.system_control.enforce_transfer_limits = true;
+                        state.session.bytes_remaining = 0;
+                    }
+                    _ => state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = None,
+                }
+                let mut capture = capture(false, false);
+                append(&mut capture, header(1), "not offered", false).unwrap();
+                let packet = capture.packet().unwrap();
+                assert!(
+                    !timeout(Duration::from_secs(5), state.send_reader_capture(&packet.path))
+                        .await
+                        .expect("denied local capture stalled")
+                        .unwrap(),
+                    "{gate}"
+                );
+                assert!(picker.try_recv().is_err(), "{gate}");
+                assert_eq!(state.session.flagged_files, vec![root.path().join("unrelated.bin")]);
+                assert!(!root.path().join("transfers.log").exists());
+            }
+        }
     }
 
     #[tokio::test]

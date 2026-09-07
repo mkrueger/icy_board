@@ -1,0 +1,78 @@
+LOG: Early LOG Init complete
+LOG: DOSBox-X's working directory: /home/mkrueger
+LOG: Logging init: beginning logging proper. This is the end of the early init logging
+LOG: Logging: No logfile was given. All further logging will be discarded.
+LOG: DOSBox-X version 2026.08.02 Commit e522642 (Linux SDL2 64-bit)
+LOG: Prevent capture: 0
+LOG: SDL: version 2.32.70, Video dummy, Audio dummy
+LOG: Host keyboard layout is now  ()
+LOG: Mapper keyboard layout is now  ()
+LOG: SDL2 reports desktop display mode 1024 x 768
+LOG: The default output for the video system: opengl
+LOG: WARNING: SDL2 unable to create GL context
+LOG: Could not initialize OpenGL, switching back to surface
+LOG: Configured windowposition: -
+LOG: SDL: Current window pixel format: SDL_PIXELFORMAT_RGB888
+LOG: SDL: You are running in 24 bpp mode, this will slow down things!
+LOG: Releasing keyboard
+LOG: Screen report: Method 'None' (-1.000 x -1.000 pixels) at (0.000 x 0.000) (-1.000 x -1.000 mm) (-0.039 x -0.039 in) (-1.000 x -1.000 DPI)
+LOG: ISA BCLK: 8333333.333Hz (25000000/3)
+LOG: monopal: green, 
+LOG: Active save slot: 1 [Empty]
+LOG: USING AVI+ZMBV
+LOG: Pentium CMPXCHG8B emulation is enabled
+LOG: Max 1073741824 sz 16384
+LOG: Final 16384
+LOG: Final arrangement: Below 4GB = 16384KB, Above 4GB = 0KB
+LOG: ALSA seq enum: id=0 name="System" ports=2 type="kernel"
+LOG: ALSA seq enum: id=14 name="Midi Through" ports=1 type="kernel"
+LOG: ALSA seq enum: id=128 name="Client-128" ports=0 type="user"
+LOG: ALSA seq enum: id=142 name="PipeWire-System" ports=1 type="user"
+LOG: ALSA seq enum: id=143 name="PipeWire-RT-Event" ports=1 type="user"
+LOG: SDLNet_TCP_Open: Couldn't connect to remote host
+LOG: TiMidity: can't open control connection (host=127.0.0.1, port=7777)
+LOG: MIDI:fluidsynth: SoundFont not specified, and no system SoundFont found
+LOG: MIDI:synth: Specify .SF2 sound font file with midiconfig=
+LOG: MT32: failed to locate ROMs.
+LOG: MT32 emulation requires the PCM and CONTROL ROM files.
+LOG: To eliminate this error message, check the DOSBox-X wiki.
+LOG: The ROM files are: CM32L_CONTROL.ROM and CM32L_PCM.ROM or MT32_CONTROL.ROM and MT32_PCM.ROM
+LOG: MIDI:Opened device:none
+LOG: VOODOO LFB now at d0000000
+LOG: Serial1: BASE 3f8h
+LOG: SDLNET: Initialized SDL network subsystem
+LOG: Serial1: Nullmodem server waiting for connection on TCP port 2323...
+LOG: Parallel1: BASE 378h
+LOG: MPU-401 Registering I/O ports as if IBM PC MPU-401 at base 330h
+LOG: Memory I/O complexity optimization enabled aka option 'memory io optimization 1'. If the game or demo is unable to draw to the screen properly, set the option to false.
+LOG: The 'scanline render on demand' option is available and may provide a modest boost in video render performance if set to true.
+LOG: Allocated APM BIOS pm entry point at f000:ce20
+LOG: Writing code to fce20
+LOG: Writing code to fce40
+LOG: ISA Plug & Play BIOS enabled
+LOG: VGA ROM BIOS init callback
+LOG: pixratio 1.000, dw false, dh false
+LOG: Aspect ratio: 640 x 480  xToY=1.333 yToX=0.750
+LOG: menuScale=1
+LOG: surface consider=640x497 final=640x497
+LOG: Serial1: A client (127.0.0.1) has connected.
+LOG: SDLNET: closed server TCP listening socket
+LOG: WARNING: No translation support (to host) for code page 0
+LOG: DOS keyboard layout loaded with main language code US for layout us
+LOG: XMS: 50 handles allocated for use by the DOS environment
+LOG: EMS page frame at 0xe000-0xefff
+LOG: COMMAND.COM env size:             720 bytes
+LOG: COMMAND.COM environment block:    0x0701 sz=0x002d
+LOG: COMMAND.COM main body (PSP):      0x072f sz=0x009a
+LOG: COMMAND.COM stack:                0x0749
+LOG:   15139568 ERROR EXEC:stack underflow/wrap at EXEC SS:SP=0000:0000
+LOG: BIOS INT14: Unhandled call AH=C0 DX=  14
+LOG: pixratio 1.350, dw false, dh false
+LOG: Aspect ratio: 720 x 540  xToY=1.333 yToX=0.750
+LOG: menuScale=1
+LOG: surface consider=720x417 final=720x417
+LOG:   37835324 ERROR BIOS:INT15:Unknown call ax=1022
+LOG: Serial1: Disconnected.
+LOG: SDLNET: Closed client TCP listening socket
+LOG: SHELL:Redirect output to c:\compat\EL.LOG
+LOG: SDLNET: closed server TCP listening socket

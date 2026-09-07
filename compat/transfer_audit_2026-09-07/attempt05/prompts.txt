@@ -1,0 +1,340 @@
+<PCB#1@09-07-26*07:51:27>                         CONNECT 115200 / 09/07/26 (07:51:27)
+
+«« PCBoard Professional Bulletin Board »»
+PCBoard (R) v15.4/M 250 (04-22-97 17:16) - Node 1
+ F       [!   
+Do you want graphics (Enter)=no? 
+--- SEND 'N' ---
+N
+ F                                  ,----------------------.                           ,----------------------.                           ,----------------------.                           ,----------------------.                           ,----------------------.
+                           | users node: 1        |                           | users node: 1        |                           | users node: 1        |                           | users node: 1        |                           | users node: 1        |
+                           | systemtime: 07:51:29 |                           | systemtime: 07:51:29 |                           | systemtime: 07:51:29 |                           | systemtime: 07:51:29 |                           | systemtime: 07:51:29 |
+                           | systemdate: 09/07/26 |                           | systemdate: 09/07/26 |                           | systemdate: 09/07/26 |                           | systemdate: 09/07/26 |                           | systemdate: 09/07/26 |
+                           | connection: telnet   |                           | connection: telnet   |                           | connection: telnet   |                           | connection: telnet   |                           | connection: telnet   |
+                           | disp. mode: ripscrip |                           | disp. mode: ripscrip |                           | disp. mode: ripscrip |                           | disp. mode: ripscrip |                           | disp. mode: ripscrip |
+                           `----------------------|                           `----------------------|                           `----------------------|                           `----------------------|                           `----------------------|
+                            | ip:                 |                            | ip:                 |                            | ip:                 |                            | ip:                 |                            | ip:                 |
+                            `---------------------'                            `---------------------'                            `---------------------'                            `---------------------'                            `---------------------'
+                         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀            
+                        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀             
+                       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀              
+                      ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀               
+      ┌────────────────────────────────────────────────────────────────┐       
+      │ ▄▄▄▄   ▄▄▄  ▄▄▄▄                     ▄               ▄   ▄▄▄▄▄ │       
+      │  █  █ █   ▀  █  █                    █              ▀█   █     │       
+      │  █▄▄▀ █      █▀▀▄ ▄▀▀▄ ▄▀▀▄  ▄▀▀▄ ▄▀▀█       █   █   █   █▀▀▀▄ │       
+      │  █    █   ▄  █  █ █  █ █  █  █    █  █        █ █    █   ▄   █ │       
+      │ ▀▀▀    ▀▀▀  ▀▀▀▀   ▀▀   ▀▀ ▀ ▀     ▀▀▀▀        ▀   ▀▀▀▀▀  ▀▀▀  │       
+      └────────────────────────────────────────────────────────────────┘       
+              ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                       
+             ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                        
+            ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                         
+           ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                          
+          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+
+What is your first name? 
+--- SEND 'ORACLE' ---
+ORACLE
+ What is your last name? 
+--- SEND 'TESTER' ---
+TESTER
+No Security Level Match in PWRD File!
+Password (Dots will echo)? 
+--- SEND [fixture password] ---
+........
+No Security Level Match in PWRD File!
+
+Scanning for new bulletins...
+
+Scan Message Base Since `Last Read' (Enter)=yes? 
+--- SEND 'N' ---
+N
+
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:51]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(9 min. left) Main Board Command? 
+=== D: empty filename abort ===
+--- SEND 'D' ---
+D
+
+Enter the filename to Download (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:51]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(9 min. left) Main Board Command? 
+=== BD: empty filename abort ===
+--- SEND 'BD' ---
+BD
+
+(1) Enter the filename to Download (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:51]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(9 min. left) Main Board Command? 
+=== U: empty filename abort ===
+--- SEND 'U' ---
+U
+
+Enter the Filename to Upload (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:51]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(9 min. left) Main Board Command? 
+=== BU: empty filename abort ===
+--- SEND 'BU' ---
+BU
+
+(1) Enter the Filename to Upload (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:51]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(9 min. left) Main Board Command? 
+=== D: missing stacked filename, protocol N ===
+--- SEND 'D N ZXN907.ZIP' ---
+D N ZXN907.ZIP
+Checking file transfer request.  Please wait, Oracle ...
+(ZXN907.ZIP) not found on disk!
+
+Enter the filename to Download (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:52]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(8 min. left) Main Board Command? 
+=== BD: missing stacked filename, protocol N ===
+--- SEND 'BD N ZXN907.ZIP' ---
+BD N ZXN907.ZIP
+Checking file transfer request.  Please wait, Oracle ...
+(ZXN907.ZIP) not found on disk!
+
+(1) Enter the filename to Download (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:52]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(8 min. left) Main Board Command? 
+=== U: empty first description cancels filename ===
+--- SEND 'U N ZXA907.TXT' ---
+U N ZXA907.TXT
+Checking file transfer request.  Please wait, Oracle ...
+
+Before beginning, enter a description of: ZXA907.TXT
+Begin description with (/) to make upload `Private'.
+Enter your text. (Enter) alone to end. (45 chars/line, 20 lines maximum)
+ (---------------------------------------------)
+? 
+--- SEND '' ---
+
+
+Enter the Filename to Upload (Enter)=none? 
+--- SEND '' ---
+
+
+Press (Enter) to continue? 
+--- SEND '' ---
+                           
+,-[date: 09/07/26]----------------{main menu}-------------------[time: 07:52]-.
+|▐[F]ile directiries   °▌|▐[L]ocate a filename     ▌|▐[T]ransfer protocol   z▌|
+|▐[D]ownload a file     ▌|▐[N]ew file scan         ▌|▐[I]nitial logon screen ▌|
+|▐[U]pload a file      ▐▌|▐[Z]ippy text search    ░▌|▐[TEST] online file test▌|
+|------------------------|--------------------------|-------------------------|
+|▐[R]ead messages       ▌|▐[C]omment to SysOp    ■ ▌|▐[TS] text search msgs  ▌|
+|▐[E]nter a message     ▌|▐[Q]uick message scan    ▌|▐[QWK] mail transfers   ▌|
+|▐[J]oin a conference  ░▌|▐[A]bandon conference   ░▌|▐[SELECT] confs. to scan▌|
+|------------------------|--------------------------|-------------------------|
+|▐[B]ulletins           ▌|▐[X]pert mode toggle     ▌|▐[O] call sysop to chat ▌|
+|▐[S]cript questionnaire▌|▐[G]oodbye [logoff]  '   ▌|▐[V]iew your statistics ▌|
+|▐[M] toggle ansi mode ░▌|▐[W]rite account info   ░▌|▐[P]age length setting ░▌|
+|-----------------------------------------------------------------------------|
+| [CHAT] with other users  [OPEN] a door / doorgame   [XTRA] add your own ppe |
+| [NEWS] display the news  [USER] member masterlist   [CMDS] from cmd.lst via |
+| [ALIAS] enable/disable   [LANG] change language     [HERE] pcbsetup > B > B |
+|---------------------------------{sysop cmd}---------------------------------|
+| [1] list caller's log  | [6] display any file       [11] view users online  |
+| [2] list user's log    | [7] user maintenance       [12] logoff a node      |
+| [3] pack message base  | [8] pack the user file     [13] view a node's log  |
+| [4] recover nuked mail | [9]  exit to dos remotely  [14] drop a node to dos |
+| [5] list message headr | [10] perform dos function  [15] recycle a node     |
+(8 min. left) Main Board Command? 
+=== U: description then explicit None cancellation ===
+--- SEND 'U N ZXB907.TXT' ---
+U N ZXB907.TXT
+Checking file transfer request.  Please wait, Oracle ...
+
+Before beginning, enter a description of: ZXB907.TXT
+Begin description with (/) to make upload `Private'.
+Enter your text. (Enter) alone to end. (45 chars/line, 20 lines maximum)
+ (---------------------------------------------)
+? 
+--- SEND 'Prompt-only audit; no payload.' ---
+Prompt-only audit; no payload.
+? 
+--- BLOCKER: RuntimeError: Prompt mismatch; sent nothing further. Expected '2[):.]?\\s*[:>]?' ---

@@ -36,6 +36,10 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use ratatui_image::{Image as RatatuiImage, Resize, picker::Picker, protocol::Protocol};
 use tokio::sync::{Mutex, mpsc};
 
+mod local_file_picker;
+use icy_board_engine::icy_board::state::local_transfer::LocalFilePickerRequest;
+use local_file_picker::LocalFilePicker;
+
 const STATUS_HELP: &str = "ALT-H=Help ALT-X=Exit";
 
 /// Rows the sysop status bar sits on, kept out of the session's own screen.
@@ -110,6 +114,8 @@ pub struct Tui {
     host_pixel_mouse: bool,
     display_visible: bool,
     pending_confirmation: Option<SysopCommand>,
+    local_picker_requests: Option<mpsc::Receiver<LocalFilePickerRequest>>,
+    local_picker: Option<LocalFilePicker>,
 }
 
 struct RenderedImage {
@@ -163,6 +169,9 @@ impl Tui {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
+        // Install the capability before login can run (also for non-SysOp local users).
+        let (picker_sender, picker_receiver) = mpsc::channel(1);
+        node_state.lock().await[node].as_mut().unwrap().local_file_picker = Some(picker_sender);
         let options = LoginOptions { login_sysop, ppe, local: true };
         let handle = std::thread::Builder::new()
             .name("Local mode handle".to_string())
@@ -195,6 +204,8 @@ impl Tui {
             host_pixel_mouse: false,
             display_visible: true,
             pending_confirmation: None,
+            local_picker_requests: Some(picker_receiver),
+            local_picker: None,
         })
     }
 
@@ -260,10 +271,21 @@ impl Tui {
             host_pixel_mouse: false,
             display_visible: true,
             pending_confirmation: None,
+            local_picker_requests: None,
+            local_picker: None,
         }))
     }
 
     pub async fn run(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
+        let result = self.run_session(bbs, board).await;
+        // Close the receiver even when run fails and the Tui itself is retained.
+        // Pending/queued oneshots then complete; no engine lock is needed.
+        self.local_picker_requests.take();
+        self.local_picker.take();
+        result
+    }
+
+    async fn run_session(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
         let mut last_status = Instant::now();
@@ -280,6 +302,9 @@ impl Tui {
         }));
         //   let mut redraw = true;
         loop {
+            if self.local_picker.is_some() && self.tx.is_closed() {
+                return Ok(());
+            }
             if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
@@ -295,12 +320,35 @@ impl Tui {
                     // thread has gone
                     return Ok(());
                 }
+            } else {
+                return Ok(());
+            }
+            if self.local_picker.as_ref().is_some_and(LocalFilePicker::is_closed) {
+                self.local_picker.take();
+                self.restore_after_picker(&mut terminal)?;
+                redraw = true;
+            }
+            if self.local_picker.is_none()
+                && let Some(receiver) = &mut self.local_picker_requests
+                && let Ok(request) = receiver.try_recv()
+                && !request.response.is_closed()
+            {
+                self.local_picker = Some(LocalFilePicker::new(request));
+                execute!(stdout(), event::EnableBracketedPaste)?;
+                terminal.clear()?;
+                redraw = true;
             }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             self.sync_host_mouse_mode()?;
             if event::poll(timeout)? {
                 redraw = true;
                 match event::read()? {
+                    event if self.local_picker.is_some() => {
+                        if self.local_picker.as_mut().unwrap().handle(event) {
+                            self.local_picker.take();
+                            self.restore_after_picker(&mut terminal)?;
+                        }
+                    }
                     Event::Key(key) if key.kind == KeyEventKind::Press => {
                         if !self.display_visible
                             && !(key.code == KeyCode::F(9) && !key.modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT))
@@ -393,6 +441,11 @@ impl Tui {
                 }
             }
 
+            if let Some(picker) = &self.local_picker {
+                terminal.draw(|frame| picker.render(frame))?;
+                last_tick = Instant::now();
+                continue;
+            }
             // Progressive image updates can be expensive; input must be serviced first.
             if !self.rendered_sixels.is_empty() && self.current_sixels().is_empty() {
                 terminal.clear()?;
@@ -417,6 +470,15 @@ impl Tui {
                 last_tick = Instant::now();
             }
         }
+    }
+
+    fn restore_after_picker(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Result<()> {
+        execute!(stdout(), event::DisableBracketedPaste)?;
+        terminal.clear()?;
+        self.rendered_sixels.clear();
+        self.rendered_images.clear();
+        self.rendered_image_context = None;
+        self.sync_host_mouse_mode()
     }
 
     fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
@@ -696,7 +758,10 @@ impl Tui {
     }
 
     fn sync_host_mouse_mode(&mut self) -> io::Result<()> {
-        let (enabled, pixel) = {
+        let (enabled, pixel) = if self.local_picker.is_some() {
+            // Consume host clicks without forwarding BBS mouse reports.
+            (true, false)
+        } else {
             let screen = self.screen.lock().unwrap();
             let mouse = &screen.buffer.terminal_state.mouse_state;
             (mouse.mouse_mode != MouseMode::OFF, mouse.extended_mode == ExtMouseMode::PixelPosition)
@@ -798,7 +863,12 @@ struct MouseCaptureGuard;
 
 impl Drop for MouseCaptureGuard {
     fn drop(&mut self) {
-        let _ = execute!(stdout(), crossterm::style::Print("\x1b[?1016l"), DisableMouseCapture);
+        let _ = execute!(
+            stdout(),
+            crossterm::style::Print("\x1b[?1016l"),
+            DisableMouseCapture,
+            event::DisableBracketedPaste
+        );
     }
 }
 

@@ -764,7 +764,7 @@ impl IcyBoardState {
                 self.select_conferences(SelectMode::SelectCmd).await?;
             }
             CommandType::BatchDownload => {
-                let sec = self.session.user_command_level.batch_file_transfer.clone();
+                let sec = self.session.user_command_level.cmd_d.clone();
                 if check_security && !self.check_sec("BD", &sec).await? {
                     return Ok(());
                 }
@@ -772,7 +772,7 @@ impl IcyBoardState {
                 self.batch_download_command().await?;
             }
             CommandType::BatchUpload => {
-                let sec = self.session.user_command_level.batch_file_transfer.clone();
+                let sec = self.session.user_command_level.cmd_u.clone();
                 if check_security && !self.check_sec("BU", &sec).await? {
                     return Ok(());
                 }

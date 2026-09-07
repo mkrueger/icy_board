@@ -7,7 +7,7 @@ use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
 use crate::icy_board::limits::{self, BatchSoFar, LimitVerdict, TransferHistory};
-use crate::icy_board::state::functions::{MASK_NUM, transfer_cps};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_NUM, transfer_cps};
 use crate::{Res, icy_board::state::IcyBoardState};
 
 use super::u_upload_file::create_protocol;
@@ -18,7 +18,20 @@ use crate::{
 
 impl IcyBoardState {
     pub async fn download(&mut self, ask_flagged_files: bool) -> Res<()> {
+        self.download_files(ask_flagged_files, false).await
+    }
+
+    pub(crate) async fn download_files(&mut self, ask_flagged_files: bool, explicit_batch: bool) -> Res<()> {
+        self.transfer_statistics.downloaded_bytes = 0;
+        self.transfer_statistics.downloaded_files = 0;
+        let mut protocol_str = self.session.current_user.as_ref().map(|user| user.protocol.clone()).unwrap_or_default();
+        let mut goodbye_after_dl = false;
         if ask_flagged_files {
+            // TRANSFER.C scans command-line names separately from prompt answers.
+            // In particular, DownloadTagged must not consume the first filename.
+            let stacked = std::mem::take(&mut self.session.tokens);
+            let mut batch = (explicit_batch && self.session.user_command_level.batch_file_transfer.session_can_access(&self.session))
+                || self.promotes_to_batch(!stacked.is_empty()).await;
             if !self.session.flagged_files.is_empty() {
                 let download_tagged = self
                     .input_field(
@@ -32,22 +45,33 @@ impl IcyBoardState {
                     .await?;
 
                 if download_tagged == self.session.no_char.to_uppercase().to_string() {
-                    return Ok(());
+                    self.session.flagged_files.clear();
                 }
             }
 
-            // PCBoard asks for another name until the caller answers nothing or the
-            // batch limit is reached, and outside a batch that limit is a single file.
-            let had_token = !self.session.tokens.is_empty();
-            let limit = if self.promotes_to_batch(had_token).await {
-                self.session.batch_limit.max(1)
-            } else {
-                1
-            };
-            while self.session.flagged_files.len() < limit {
-                if !self.flag_files_cmd(true).await? {
+            for token in stacked {
+                if token.len() == 1
+                    && self
+                        .get_board()
+                        .await
+                        .protocols
+                        .iter()
+                        .any(|p| p.is_enabled && p.char_code.eq_ignore_ascii_case(&token))
+                {
+                    protocol_str = token.to_ascii_uppercase();
+                } else if token.eq_ignore_ascii_case("GB") || token.eq_ignore_ascii_case("BYE") {
+                    goodbye_after_dl = true;
+                } else if !token.is_empty() {
+                    self.session.tokens.push_back(token);
+                    self.flag_files_cmd(true).await?;
+                }
+            }
+            batch |= self.session.flagged_files.len() > 1;
+            while self.session.flagged_files.is_empty() || (batch && !goodbye_after_dl && self.session.flagged_files.len() < self.session.batch_limit) {
+                if !self.download_names(&mut goodbye_after_dl, batch).await? {
                     break;
                 }
+                batch |= self.session.flagged_files.len() > 1;
             }
 
             if self.session.flagged_files.is_empty() {
@@ -57,17 +81,43 @@ impl IcyBoardState {
             self.new_line().await?;
         }
 
-        let mut protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
+        if self.session.flagged_files.is_empty() {
+            return Ok(());
+        }
+        if self.session.is_local {
+            let files = self.screen_transfer_limits(self.session.flagged_files.clone()).await?;
+            self.session.flagged_files.clone_from(&files);
+            if files.is_empty() {
+                return Ok(());
+            }
+            let offered: Vec<_> = files.iter().map(|path| (path.clone(), path.metadata().map_or(0, |m| m.len()))).collect();
+            let started = Instant::now();
+            if let Some(state) = self.local_download_files(&files).await? {
+                let cps = transfer_cps(state.send_state.total_bytes_transfered, started);
+                self.finish_download_batch(&offered, &state, "Local", cps).await?;
+                if state.send_state.errors > 0 {
+                    self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
+                    self.println(TerminalTarget::Both, "Some files were not copied (existing destination or unreadable source). Unsent files remain flagged.").await?;
+                }
+                if goodbye_after_dl {
+                    self.goodbye().await?;
+                }
+            }
+            return Ok(());
+        }
         let mut protocol;
         let mut p_descr;
 
-        let mut goodbye_after_dl = false;
         let mut do_dl = true;
         loop {
             protocol = None;
             p_descr = "None".to_string();
             for p in self.get_board().await.protocols.iter() {
-                if p.is_enabled && p.char_code == protocol_str {
+                if p.is_enabled
+                    && p.char_code.eq_ignore_ascii_case(&protocol_str)
+                    && !protocol_str.eq_ignore_ascii_case("N")
+                    && (self.session.flagged_files.len() <= 1 || p.is_batch)
+                {
                     p_descr = p.description.clone();
                     protocol = Some(p.send_command.clone());
                     break;
@@ -77,12 +127,18 @@ impl IcyBoardState {
             // PCBoard asks which protocol to use instead of starting a transfer
             // the caller has no protocol for.
             if protocol.is_none() {
-                let answer = self.ask_transfer_protocol(&protocol_str).await?;
+                // getxferprotocol resets an invalid/non-batch selection to N;
+                // accepting the default must abort, not loop on that selection.
+                let answer = self.ask_transfer_protocol("N").await?;
                 if answer.is_empty() || answer.eq_ignore_ascii_case("N") {
                     return Ok(());
                 }
                 protocol_str = answer;
                 continue;
+            }
+
+            if goodbye_after_dl {
+                break;
             }
 
             let mut total_size = 0;
@@ -119,6 +175,9 @@ impl IcyBoardState {
                 }
                 "E" => {
                     self.edit_dl_batch().await?;
+                    if self.session.flagged_files.is_empty() {
+                        return Ok(());
+                    }
                 }
                 "G" => {
                     goodbye_after_dl = true;
@@ -147,49 +206,30 @@ impl IcyBoardState {
                     self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                     return Ok(());
                 };
-                let files: Vec<PathBuf> = self.session.flagged_files.drain(..).collect();
-                for f in &files {
-                    if !f.exists() {
-                        log::error!("File not found: {}", f.display());
-                        self.session.op_text = f.file_name().unwrap().to_string_lossy().to_string();
-                        self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE).await?;
-                        return Ok(());
-                    }
-                }
-                let files = self.screen_transfer_limits(files).await?;
+                let files = self.screen_transfer_limits(self.session.flagged_files.clone()).await?;
+                // Keep offered files until the protocol confirms each completion.
+                // PCBoard removes rejected files now, but retains failed transfers.
+                self.session.flagged_files.clone_from(&files);
                 if files.is_empty() {
                     return Ok(());
                 }
+                let offered: Vec<_> = files.iter().map(|path| (path.clone(), path.metadata().map_or(0, |m| m.len()))).collect();
                 match prot.initiate_send(&mut *self.connection, &files).await {
                     Ok(mut state) => {
                         let started = Instant::now();
+                        let mut failed = false;
                         while !state.is_finished {
                             if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
                                 log::error!("Error while updating file transfer with {protocol:?} : {e}");
-                                self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
+                                failed = true;
                                 break;
                             }
                         }
-                        self.display_text(IceText::BatchTransferEnded, display_flags::LFBEFORE).await?;
-                        self.transfer_statistics.downloaded_bytes = state.send_state.total_bytes_transfered as usize;
-                        self.transfer_statistics.downloaded_files = state.send_state.finished_files.len();
-                        self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
-
-                        let sent: Vec<String> = state.send_state.finished_files.iter().map(|(name, _)| name.clone()).collect();
                         let cps = transfer_cps(state.send_state.total_bytes_transfered, started);
-                        self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
-
-                        self.count_downloads(&files, &sent).await;
-                        let (charged_files, charged_bytes) = self.charged_downloads(&state.send_state.finished_files);
-                        if let Some(user) = &mut self.session.current_user {
-                            user.stats.num_downloads = user.stats.num_downloads.saturating_add(charged_files);
-                            user.stats.today_num_downloads = user.stats.today_num_downloads.saturating_add(charged_files);
-                            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_add(charged_bytes);
-                            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_add(charged_bytes.min(i64::MAX as u64) as i64);
+                        self.finish_download_batch(&offered, &state, &protocol_str, cps).await?;
+                        if failed {
+                            self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                         }
-                        limits::adjust_bytes_remaining(&mut self.session.bytes_remaining, charged_bytes.min(i64::MAX as u64) as i64);
-                        self.board.lock().await.statistics.add_download(&state);
-                        self.board.lock().await.save_statistics()?;
                     }
                     Err(e) => {
                         log::error!("Error while initiating file transfer with {protocol:?} : {e}");
@@ -204,6 +244,82 @@ impl IcyBoardState {
                 self.goodbye().await?;
             }
         }
+        Ok(())
+    }
+
+    /// Prompt input may contain several names, but unlike command-line input a
+    /// single letter is a filename, not a protocol (TRANSFER.C scanfornames).
+    async fn download_names(&mut self, goodbye: &mut bool, batch: bool) -> Res<bool> {
+        let input = self
+            .input_field(
+                if batch { IceText::FileNameToDownloadBatch } else { IceText::FileNameToDownload },
+                60,
+                &MASK_ASCII,
+                "hlpd",
+                None,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE,
+            )
+            .await?;
+        if input.is_empty() {
+            return Ok(false);
+        }
+        for token in crate::tokens::tokenize(&input) {
+            if token.eq_ignore_ascii_case("GB") || token.eq_ignore_ascii_case("BYE") {
+                *goodbye = true;
+            } else if !token.is_empty() {
+                self.session.tokens.push_front(token);
+                self.flag_files_cmd(true).await?;
+            }
+        }
+        Ok(true)
+    }
+
+    async fn finish_download_batch(&mut self, offered: &[(PathBuf, u64)], state: &icy_net::protocol::TransferState, protocol: &str, cps: usize) -> Res<()> {
+        // A completed transfer session may include a partial or skipped file.
+        // Match exact offered paths, once each; do not charge another area's
+        // same-named file or include partial wire bytes in successful statistics.
+        let completed: Vec<_> = offered
+            .iter()
+            .filter(|(path, _)| state.send_state.finished_files.iter().any(|(_, sent)| sent == path))
+            .collect();
+        self.session.flagged_files.retain(|path| !completed.iter().any(|(sent, _)| sent == path));
+        let bytes = completed.iter().fold(0u64, |sum, (_, size)| sum.saturating_add(*size));
+        self.transfer_statistics.downloaded_bytes = bytes.min(usize::MAX as u64) as usize;
+        self.transfer_statistics.downloaded_files = completed.len();
+        if completed.is_empty() {
+            return Ok(());
+        }
+        let free_areas = self.free_download_areas();
+        let (charged_files, charged_bytes) = completed
+            .iter()
+            .filter(|(path, _)| !path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir)))
+            .fold((0u64, 0u64), |(files, bytes), (_, size)| (files.saturating_add(1), bytes.saturating_add(*size)));
+        if let Some(user) = &mut self.session.current_user {
+            user.stats.num_downloads = user.stats.num_downloads.saturating_add(charged_files);
+            user.stats.today_num_downloads = user.stats.today_num_downloads.saturating_add(charged_files);
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_add(charged_bytes);
+            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_add(charged_bytes.min(i64::MAX as u64) as i64);
+        }
+        limits::adjust_bytes_remaining(&mut self.session.bytes_remaining, charged_bytes.min(i64::MAX as u64) as i64);
+        let paths: Vec<_> = completed.iter().map(|(path, _)| path.clone()).collect();
+        let sent: Vec<_> = paths
+            .iter()
+            .map(|path| path.file_name().unwrap_or_default().to_string_lossy().to_string())
+            .collect();
+        self.count_downloads(&paths, &sent).await;
+        let mut successful = state.clone();
+        successful.send_state.total_bytes_transfered = bytes;
+        successful.send_state.finished_files = sent.iter().cloned().zip(paths).collect();
+        {
+            let mut board = self.board.lock().await;
+            board.statistics.add_download(&successful);
+            board.save_statistics()?;
+        }
+        // Commit completed-file accounting even if the connection subsequently
+        // fails while printing the summary or caller log.
+        self.log_transfer(false, &sent, protocol, state.send_state.errors, cps).await?;
+        self.display_text(IceText::BatchTransferEnded, display_flags::LFBEFORE).await?;
+        self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
         Ok(())
     }
 
@@ -235,18 +351,6 @@ impl IcyBoardState {
         }
     }
 
-    fn charged_downloads(&mut self, finished: &[(String, PathBuf)]) -> (u64, u64) {
-        let free_areas = self.free_download_areas();
-        finished
-            .iter()
-            .map(|(_, path)| path)
-            .filter(|path| !path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir)))
-            .fold((0u64, 0u64), |(files, bytes), path| {
-                let size = std::fs::metadata(path).map_or(0, |metadata| metadata.len());
-                (files.saturating_add(1), bytes.saturating_add(size))
-            })
-    }
-
     /// Drops the files the caller's limits will not cover.
     ///
     /// `PCBoard` judges every file on its own against what the batch has already taken, so
@@ -270,8 +374,18 @@ impl IcyBoardState {
         let mut seconds_so_far = 0i64;
         let mut so_far = BatchSoFar::default();
         let mut allowed = Vec::new();
+        let mut names = std::collections::HashSet::new();
         for path in files {
-            let size = std::fs::metadata(&path).map_or(0, |m| m.len());
+            self.session.op_text = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let Some(metadata) = std::fs::metadata(&path).ok().filter(|m| m.is_file()) else {
+                self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE).await?;
+                continue;
+            };
+            if names.contains(&self.session.op_text.to_ascii_uppercase()) {
+                self.display_text(IceText::DuplicateBatchFile, display_flags::NEWLINE).await?;
+                continue;
+            }
+            let size = metadata.len();
             let free = path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir));
             let verdict = if enforce_transfer_limits {
                 history
@@ -284,8 +398,13 @@ impl IcyBoardState {
                 if let Some(user) = &mut self.session.current_user {
                     user.stats.num_reach_dnld_lim += 1;
                 }
-                self.report_limit(&path, verdict).await?;
-                self.session.flagged_files.push(path);
+                // BYTESLEFT subtracts the flagged queue. While screening, only
+                // already accepted files belong in that subtotal, not this
+                // rejected file or the as-yet unchecked remainder of the batch.
+                let queued = std::mem::replace(&mut self.session.flagged_files, allowed.clone());
+                let report = self.report_limit(&path, verdict).await;
+                self.session.flagged_files = queued;
+                report?;
                 continue;
             }
 
@@ -299,12 +418,12 @@ impl IcyBoardState {
                     self.session.op_text = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                     self.display_text(IceText::NoTimeForDownload, display_flags::NEWLINE | display_flags::LOGIT | display_flags::BELL)
                         .await?;
-                    self.session.flagged_files.push(path);
                     continue;
                 }
             }
             seconds_so_far += seconds;
             so_far.accept(size, free);
+            names.insert(path.file_name().unwrap_or_default().to_string_lossy().to_ascii_uppercase());
             allowed.push(path);
         }
         Ok(allowed)
@@ -373,7 +492,8 @@ impl IcyBoardState {
             match input.as_str() {
                 "A" => {
                     self.new_line().await?;
-                    self.flag_files_cmd(true).await?;
+                    let mut goodbye = false;
+                    while self.session.flagged_files.len() < self.session.batch_limit && self.download_names(&mut goodbye, true).await? {}
                 }
                 "R" => {
                     self.remove_dl_batch().await?;
@@ -398,18 +518,19 @@ impl IcyBoardState {
                 &MASK_NUM,
                 "",
                 None,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE,
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::STACKED,
             )
             .await?;
-        self.session.push_tokens(&input);
-
         let mut remove = Vec::new();
-        while let Some(token) = self.session.tokens.pop_front() {
+        for token in crate::tokens::tokenize(&input) {
             if let Ok(num) = token.parse::<usize>() {
                 if num == 0 {
                     continue;
                 }
                 if let Some(path) = &self.session.flagged_files.get(num - 1) {
+                    if remove.contains(&(num - 1)) {
+                        continue;
+                    }
                     remove.push(num - 1);
                     self.session.op_text = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                     self.display_text(IceText::RemovedFile, display_flags::NEWLINE).await?;
@@ -444,6 +565,10 @@ impl IcyBoardState {
 
 const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
+
+#[cfg(test)]
+#[path = "download_tests.rs"]
+mod download_compatibility_tests;
 
 /// Ratios are held in tenths, and `PCBoard` shows them with the one decimal back.
 fn tenths(value: u64) -> String {

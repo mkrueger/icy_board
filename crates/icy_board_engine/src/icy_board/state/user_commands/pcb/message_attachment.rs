@@ -20,7 +20,11 @@ use crate::{
     Res,
     icy_board::{
         icb_text::IceText,
-        state::{IcyBoardState, Session, functions::display_flags},
+        state::{
+            IcyBoardState, Session,
+            functions::display_flags,
+            local_transfer::{LocalFilePickerKind, stage_local_upload},
+        },
     },
     vm::TerminalTarget,
 };
@@ -116,7 +120,7 @@ fn transfer_rejected(transfer: &TransferState, count: usize, logoff: bool) -> bo
 }
 
 /// Copy bounded contents into our configured directory. The source must be a
-/// native receive temporary, never a caller-supplied filesystem path. Random
+/// native receive temporary or a staged local copy, never an owned original. Random
 /// names and persist_noclobber prevent overwriting another message's enclosure.
 fn stage_attachment(root: &Path, source: &Path, display: &str) -> Res<(TempPath, MessageSubfield)> {
     if !safe_name(display) || root.as_os_str().is_empty() {
@@ -177,6 +181,30 @@ impl IcyBoardState {
                 return Err(std::io::Error::other("Attachment directory unavailable").into());
             }
             self.display_text(IceText::UploadMode, display_flags::NEWLINE).await?;
+            if self.session.is_local {
+                let Some(source) = self.request_local_path(LocalFilePickerKind::UploadFile).await? else {
+                    return Ok(None);
+                };
+                if self.session.request_logoff {
+                    return Ok(None);
+                }
+                return tokio::task::spawn_blocking(move || -> Res<_> {
+                    let display = source
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .filter(|name| safe_name(name))
+                        .ok_or_else(|| std::io::Error::other("Invalid attachment filename"))?;
+                    let metadata = std::fs::symlink_metadata(&source)?;
+                    if !metadata.file_type().is_file() || metadata.len() == 0 || metadata.len() > MAX_ATTACHMENT_BYTES {
+                        return Err(std::io::Error::other("Invalid local attachment file").into());
+                    }
+                    // Never adopt the selected original: both cleanup stages
+                    // own copies, including on rejection or future cancellation.
+                    let staged = stage_local_upload(&source)?;
+                    stage_attachment(&root, &staged, display).map(Some)
+                })
+                .await?;
+            }
             let answer = self.ask_transfer_protocol("N").await?;
             if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.request_logoff {
                 return Ok(None);
@@ -392,6 +420,153 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_attachment_picker_cancel_and_missing_capability_preserve_draft() {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = input_state(root.path(), "").await;
+        state.session.is_local = true;
+        state.session.is_sysop = false;
+        let mut draft = JamMessage::default().with_subject("original subject".into()).with_text("draft body".into());
+        assert!(!timeout(Duration::from_secs(3), state.attach_message_file(&mut draft)).await.unwrap().unwrap());
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+        for disconnect in [false, true] {
+            let (result, ()) = timeout(Duration::from_secs(3), async {
+                tokio::join!(state.attach_message_file(&mut draft), async {
+                    let request = rx.recv().await.unwrap();
+                    assert_eq!(request.kind, LocalFilePickerKind::UploadFile);
+                    if !disconnect {
+                        request.response.send(None).unwrap();
+                    }
+                })
+            })
+            .await
+            .expect("local attachment cancellation must not enter protocol receive");
+            assert!(!result.unwrap());
+            assert_eq!(draft.text(), &BString::from("draft body"));
+            assert_eq!(draft.header().subject().unwrap().to_string(), "original subject");
+            assert!(attachment_names(&draft).is_empty());
+            assert_eq!(draft.header().attributes & attributes::MSG_FILEATTACH, 0);
+            assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn local_attachment_picker_preserves_original_rejects_oversize_and_invalid_names_and_cleans_draft() {
+        for (name, size, accepted) in [
+            ("report.bin", 19, true),
+            ("large.bin", MAX_ATTACHMENT_BYTES + 1, false),
+            ("empty.bin", 0, false),
+            ("bad:name.bin", 19, false),
+            ("bad\\name.bin", 19, false),
+            ("bad\nname.bin", 19, false),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let sources = tempfile::tempdir().unwrap();
+            let source = sources.path().join(name);
+            std::fs::write(&source, b"attachment contents").unwrap();
+            std::fs::OpenOptions::new().write(true).open(&source).unwrap().set_len(size).unwrap();
+            let original = std::fs::read(&source).unwrap();
+            let (mut state, _peer) = input_state(root.path(), "").await;
+            state.session.is_local = true;
+            state.session.is_sysop = false;
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+            let mut draft = JamMessage::default().with_subject("original subject".into()).with_text("draft body".into());
+            let mut cleanup = state.message_attachment_cleanup(&draft);
+            let (result, ()) = timeout(Duration::from_secs(5), async {
+                tokio::join!(state.attach_message_file(&mut draft), async {
+                    let request = rx.recv().await.unwrap();
+                    assert_eq!(request.kind, LocalFilePickerKind::UploadFile);
+                    request.response.send(Some(source.clone())).unwrap();
+                })
+            })
+            .await
+            .expect("local attachment selection must not enter protocol receive");
+            assert_eq!(result.unwrap(), accepted, "{name}");
+            assert_eq!(draft.text(), &BString::from("draft body"));
+            assert_eq!(draft.header().subject().unwrap().to_string(), "original subject");
+            if accepted {
+                assert_ne!(draft.header().attributes & attributes::MSG_FILEATTACH, 0);
+                let field = draft
+                    .header()
+                    .sub_fields
+                    .iter()
+                    .find(|field| field.field_type() == SubfieldType::EnclFwAlias)
+                    .unwrap();
+                let parts: Vec<_> = std::str::from_utf8(field.content()).unwrap().split('\0').collect();
+                assert_eq!(parts.len(), 2);
+                assert_eq!(parts[1], name);
+                assert!(parts[0].starts_with(STORED_PREFIX));
+                assert!(safe_name(parts[0]));
+                assert_ne!(parts[0], name);
+                let stored = root.path().join(parts[0]);
+                assert_eq!(std::fs::read(&stored).unwrap(), original);
+                assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
+                cleanup.track(&draft).unwrap();
+                drop(cleanup);
+                assert!(!stored.exists(), "abandoning a local attachment must clean only its copy");
+            } else {
+                assert!(attachment_names(&draft).is_empty());
+                assert_eq!(draft.header().attributes & attributes::MSG_FILEATTACH, 0);
+            }
+            assert_eq!(std::fs::read(&source).unwrap(), original, "{name}");
+            assert_eq!(std::fs::read_dir(sources.path()).unwrap().count(), 1);
+            assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn local_attachment_permissions_are_checked_before_requesting_picker() {
+        for area_denied in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let (mut state, _peer) = input_state(root.path(), "").await;
+            state.session.is_local = true;
+            state.session.cur_security = 10;
+            if area_denied {
+                state.session.current_conference.sec_attachments = SecurityExpression::from_req_security(0);
+                state.session.current_conference.areas = Some(Arc::new(AreaList::new(vec![MessageArea {
+                    req_level_to_save_attach: SecurityExpression::from_req_security(50),
+                    ..Default::default()
+                }])));
+            } else {
+                state.session.current_conference.sec_attachments = SecurityExpression::from_req_security(50);
+            }
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+            let mut draft = JamMessage::default().with_text("draft body".into());
+            assert!(!timeout(Duration::from_secs(3), state.attach_message_file(&mut draft)).await.unwrap().unwrap());
+            assert!(rx.try_recv().is_err());
+            assert_eq!(draft.text(), &BString::from("draft body"));
+            assert!(attachment_names(&draft).is_empty());
+            assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn local_sa_picker_cancel_resumes_composition_without_losing_draft() {
+        use crate::icy_board::state::user_commands::mods::editor::EditResult;
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = input_state(root.path(), "draft before\r\rSA\rcontinued\r\rS\r").await;
+        state.session.is_local = true;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
+        let mut draft = JamMessage::default();
+        let (result, ()) = timeout(Duration::from_secs(3), async {
+            tokio::join!(state.edit_message_context(&mut draft, Vec::new()), async {
+                let request = rx.recv().await.unwrap();
+                assert_eq!(request.kind, LocalFilePickerKind::UploadFile);
+                request.response.send(None).unwrap();
+            })
+        })
+        .await
+        .expect("SA must resume composition directly after local picker cancellation");
+        assert_eq!(result.unwrap(), EditResult::SendMessage);
+        assert_eq!(draft.text(), &BString::from("draft before\ncontinued"));
+        assert!(attachment_names(&draft).is_empty());
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[tokio::test]
     async fn native_zmodem_attachment_transfers_bytes_rejects_names_and_cleans_cancelled_upload() {
         use crate::icy_board::xfer_protocols::SupportedProtocols;
         use icy_net::protocol::{Header, Protocol, ZFrameType, Zmodem};
@@ -412,6 +587,11 @@ mod tests {
             let (mut state, mut peer) = input_state(root.path(), "Z\r").await;
             // Bare boards have no configured protocols, including Zmodem.
             state.get_board().await.protocols = SupportedProtocols::generate_pcboard_defaults();
+            for protocol in state.get_board().await.protocols.iter_mut() {
+                protocol.send_command = icy_net::protocol::TransferProtocolType::None;
+            }
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+            state.node_state.lock().await[state.node].as_mut().unwrap().local_file_picker = Some(tx);
             let mut draft = JamMessage::default().with_subject("original subject".into()).with_text("draft body".into());
             let mut cleanup = state.message_attachment_cleanup(&draft);
 
@@ -447,6 +627,7 @@ mod tests {
             .await
             .expect("native attachment transfer stalled");
             assert_eq!(result.unwrap(), accepted, "{name}");
+            assert!(rx.try_recv().is_err(), "remote sessions must never request a host picker");
             assert_eq!(draft.text(), &BString::from("draft body"));
             assert_eq!(draft.header().subject().unwrap().to_string(), "original subject");
             assert_eq!(std::fs::read(&source).unwrap(), bytes, "sender source must be untouched");
