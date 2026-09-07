@@ -24,6 +24,184 @@ use super::{
     array_member, array_procedure, bytes_member, bytes_member_type, string_member, string_member_type, string_type_name, takes_whole_array,
 };
 
+impl SemanticVisitor {
+    fn check_source_condition(&mut self, expression: &Expression, negated_by_lowering: bool) {
+        let actual = self.visit_source_expression(expression);
+        self.reject_bare_array_value(expression);
+        // Structured branches/loops lower to an inverted test. Keep the existing
+        // enum restriction on that implicit NOT, without imposing BOOLEAN-only
+        // conditions on legacy scalar values. IF ... GOTO does not invert its test.
+        if negated_by_lowering && self.type_registry.is_enum_type(actual) {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(expression.get_span(), CompilationErrorType::InvalidEnumOperation);
+        }
+    }
+
+    fn check_implicit_binary(
+        &mut self,
+        left: &Expression,
+        left_type: VariableType,
+        token: Spanned<Token>,
+        right: &Expression,
+        right_type: VariableType,
+    ) -> VariableType {
+        let binary = crate::ast::BinaryExpression::new(left.clone(), token, right.clone());
+        // This temporary describes an implicit operation, not a source binary node.
+        // Lowering must attach enum metadata to the binary node it actually emits.
+        self.check_binary_operands(&binary, left_type, right_type, false)
+    }
+
+    fn compound_token(token: &Spanned<Token>) -> Option<Spanned<Token>> {
+        let operator = match token.token {
+            Token::AddAssign => Token::Add,
+            Token::SubAssign => Token::Sub,
+            Token::MulAssign => Token::Mul,
+            Token::DivAssign => Token::Div,
+            Token::ModAssign => Token::Mod,
+            Token::AndAssign => Token::And,
+            Token::OrAssign => Token::Or,
+            _ => return None,
+        };
+        Some(Spanned::new(operator, token.span.clone()))
+    }
+
+    /// Checks already-visited operands, preserving source call IDs and references.
+    fn check_binary_operands(&mut self, binary: &crate::ast::BinaryExpression, left: VariableType, right: VariableType, source_binary: bool) -> VariableType {
+        let left_array = self.array_shape(binary.get_left_expression());
+        let right_array = self.array_shape(binary.get_right_expression());
+        if left_array.is_some() || right_array.is_some() {
+            let compares_record_arrays = matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq)
+                && left_array
+                    .iter()
+                    .chain(right_array.iter())
+                    .any(|shape| matches!(shape.element_type, VariableType::UserData(_)));
+            if compares_record_arrays {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
+                return VariableType::None;
+            }
+            self.reject_bare_array_value(binary.get_left_expression());
+            self.reject_bare_array_value(binary.get_right_expression());
+            return VariableType::None;
+        }
+        let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
+        if has_enum && self.counts_a_loop(binary.get_left_expression()) {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(binary.get_left_expression().get_span(), CompilationErrorType::InvalidEnumOperation);
+            return VariableType::None;
+        }
+        if has_enum
+            && !matches!(
+                binary.get_op(),
+                crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq | crate::ast::BinOp::And | crate::ast::BinOp::Or
+            )
+        {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
+            );
+            return VariableType::None;
+        }
+        if has_enum && left != right {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
+            );
+            return VariableType::Boolean;
+        }
+        if has_enum && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
+            let VariableType::UserData(id) = left else { unreachable!() };
+            self.check_enum_binary_value(binary, id);
+            if self.runtime < 400 {
+                self.errors.lock().unwrap().report_error(
+                    binary.get_op_token().span.clone(),
+                    CompilationErrorType::BuiltinNeedsRuntime("Checked enum operation".to_string(), 400),
+                );
+            }
+            self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
+            if source_binary {
+                self.enum_binary_types.insert(binary.id, id);
+            }
+            return left;
+        }
+        let has_custom_type = matches!(left, VariableType::UserData(_)) || matches!(right, VariableType::UserData(_));
+        if has_custom_type && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
+            );
+            return VariableType::None;
+        }
+        if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            if self.is_whole_custom_type_array(binary.get_left_expression()) || self.is_whole_custom_type_array(binary.get_right_expression()) {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
+            } else if left != right {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::ComparisonTypeMismatch(left, right));
+            }
+            VariableType::Boolean
+        } else {
+            Self::scalar_binary_result(binary.get_op(), left, right)
+        }
+    }
+
+    fn scalar_binary_result(op: crate::ast::BinOp, left: VariableType, right: VariableType) -> VariableType {
+        use crate::ast::BinOp;
+        use VariableType::*;
+
+        if matches!(
+            op,
+            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq | BinOp::And | BinOp::Or
+        ) {
+            return Boolean;
+        }
+        // None is a genuinely runtime-typed value, not the result of every
+        // arithmetic expression. Keep that escape hatch for legacy MULTITYPE.
+        if matches!(left, None | Function | Procedure | Table | MessageAreaID | Password | Bytes | UserData(_))
+            || matches!(right, None | Function | Procedure | Table | MessageAreaID | Password | Bytes | UserData(_))
+        {
+            return None;
+        }
+        // Match VariableValue's arithmetic promotion without evaluating values
+        // (notably division, modulo and powers) during semantic checking.
+        let promoted = if left == right {
+            left
+        } else if matches!(left, String | BigStr | UnboundedString) && matches!(right, String | BigStr | UnboundedString) {
+            if left == UnboundedString || right == UnboundedString {
+                UnboundedString
+            } else {
+                BigStr
+            }
+        } else if matches!(left, Float | Double) || matches!(right, Float | Double) {
+            Double
+        } else if left == ULong || right == ULong {
+            ULong
+        } else if left == Long || right == Long {
+            Long
+        } else {
+            Integer
+        };
+        match promoted {
+            Boolean | Date | EDate | Money | Time | DDate => Integer,
+            String | BigStr | UnboundedString if op != BinOp::Add => Integer,
+            Float | Double if op == BinOp::Mod => Integer,
+            Unsigned | Byte | Word if op == BinOp::PoW => Integer,
+            _ => promoted,
+        }
+    }
+}
+
 impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_member_call_statement(&mut self, call: &MemberCallStatement) -> VariableType {
         let previous = self.statement_member_call;
@@ -37,7 +215,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_main(&mut self, main: &crate::ast::BlockStatement) -> VariableType {
-        self.visit_statement_sequence(main.get_statements());
+        self.visit_source_body(main.get_statements());
+        VariableType::None
+    }
+
+    fn visit_block_statement(&mut self, block: &crate::ast::BlockStatement) -> VariableType {
+        self.visit_statement_sequence(block.get_statements());
+        VariableType::None
+    }
+
+    fn visit_loop_statement(&mut self, loop_stmt: &crate::ast::LoopStatement) -> VariableType {
+        self.visit_statement_sequence(loop_stmt.get_statements());
         VariableType::None
     }
 
@@ -55,59 +243,92 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_if_statement(&mut self, if_stmt: &crate::ast::IfStatement) -> VariableType {
-        crate::ast::walk_if_stmt(self, if_stmt);
-        self.reject_bare_array_value(if_stmt.get_condition());
+        self.check_source_condition(if_stmt.get_condition(), !matches!(if_stmt.get_statement(), crate::ast::Statement::Goto(_)));
+        self.visit_source_statement(if_stmt.get_statement());
         VariableType::None
     }
 
     fn visit_if_then_statement(&mut self, if_then: &crate::ast::IfThenStatement) -> VariableType {
-        crate::ast::walk_if_then_stmt(self, if_then);
-        self.reject_bare_array_value(if_then.get_condition());
+        self.check_source_condition(if_then.get_condition(), true);
+        self.visit_statement_sequence(if_then.get_statements());
+        for block in if_then.get_else_if_blocks() {
+            self.check_source_condition(block.get_condition(), true);
+            self.visit_statement_sequence(block.get_statements());
+        }
+        if let Some(block) = if_then.get_else_block() {
+            self.visit_statement_sequence(block.get_statements());
+        }
         VariableType::None
     }
 
     fn visit_while_statement(&mut self, while_stmt: &crate::ast::WhileStatement) -> VariableType {
-        crate::ast::walk_while_stmt(self, while_stmt);
-        self.reject_bare_array_value(while_stmt.get_condition());
+        self.check_source_condition(while_stmt.get_condition(), true);
+        self.visit_source_statement(while_stmt.get_statement());
         VariableType::None
     }
 
     fn visit_while_do_statement(&mut self, while_do: &crate::ast::WhileDoStatement) -> VariableType {
-        crate::ast::walk_while_do_stmt(self, while_do);
-        self.reject_bare_array_value(while_do.get_condition());
+        self.check_source_condition(while_do.get_condition(), true);
+        self.visit_statement_sequence(while_do.get_statements());
         VariableType::None
     }
 
     fn visit_repeat_until_statement(&mut self, repeat_until: &crate::ast::RepeatUntilStatement) -> VariableType {
-        crate::ast::walk_repeat_until_stmt(self, repeat_until);
-        self.reject_bare_array_value(repeat_until.get_condition());
+        self.visit_statement_sequence(repeat_until.get_statements());
+        self.check_source_condition(repeat_until.get_condition(), true);
         VariableType::None
     }
 
     fn visit_select_statement(&mut self, select_stmt: &crate::ast::SelectStatement) -> VariableType {
-        crate::ast::walk_select_stmt(self, select_stmt);
-        self.reject_bare_array_value(select_stmt.get_expression());
+        let expression = select_stmt.get_expression();
+        let selected_type = self.visit_source_expression(expression);
+        if select_stmt.get_case_blocks().is_empty() {
+            self.reject_bare_array_value(expression);
+        }
+        for block in select_stmt.get_case_blocks() {
+            for specifier in block.get_case_specifiers() {
+                match specifier {
+                    crate::ast::CaseSpecifier::Expression(case) => {
+                        let case_type = self.visit_source_expression(case);
+                        self.check_implicit_binary(expression, selected_type, Spanned::new(Token::NotEq, case.get_span()), case, case_type);
+                    }
+                    crate::ast::CaseSpecifier::FromTo(from, to) => {
+                        let from_type = self.visit_source_expression(from);
+                        let to_type = self.visit_source_expression(to);
+                        self.check_implicit_binary(from, from_type, Spanned::new(Token::Greater, from.get_span()), expression, selected_type);
+                        self.check_implicit_binary(expression, selected_type, Spanned::new(Token::Greater, to.get_span()), to, to_type);
+                    }
+                }
+            }
+            self.visit_statement_sequence(block.get_statements());
+        }
+        self.visit_statement_sequence(select_stmt.get_default_statements());
         VariableType::None
     }
 
     fn visit_return_statement(&mut self, return_stmt: &crate::ast::ReturnStatement) -> VariableType {
-        crate::ast::walk_return_stmt(self, return_stmt);
         if let Some(expression) = return_stmt.get_expression() {
-            let array_result = self.cur_func_impl.and_then(|index| self.routine_container(index)).and_then(|container| {
-                let FunctionDeclaration::Function(function) = &container.functions else {
-                    return None;
-                };
-                (function.get_return_rank() > 0).then(|| ArrayShape {
-                    element_type: function.get_return_type(),
-                    rank: function.get_return_rank(),
-                    bounds: [0; 3],
-                    resizable: true,
-                    field_name: None,
-                })
-            });
-            if let Some(shape) = array_result {
-                self.check_array_target_assignment(&shape, expression, &expression.get_span());
+            if let Some(name) = self
+                .cur_func_impl
+                .and_then(|index| self.routine_container(index))
+                .filter(|container| matches!(container.functions, FunctionDeclaration::Function(_)))
+                .map(|container| container.name.clone())
+            {
+                // RETURN value lowers to an assignment to the function result.
+                // Check it here too, including nominal types, rank and result-write
+                // references; the original expression keeps its call IDs.
+                self.visit_let_statement(&LetStatement::new(
+                    None,
+                    Spanned::new(Token::Identifier(name), return_stmt.get_return_token().span.clone()),
+                    None,
+                    Vec::new(),
+                    None,
+                    Vec::new(),
+                    Spanned::new(Token::Eq, return_stmt.get_return_token().span.clone()),
+                    expression.clone(),
+                ));
             } else {
+                expression.visit(self);
                 self.reject_bare_array_value(expression);
             }
         }
@@ -186,88 +407,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> VariableType {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);
-        let left_array = self.array_shape(binary.get_left_expression());
-        let right_array = self.array_shape(binary.get_right_expression());
-        if left_array.is_some() || right_array.is_some() {
-            let compares_record_arrays = matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq)
-                && left_array
-                    .iter()
-                    .chain(right_array.iter())
-                    .any(|shape| matches!(shape.element_type, VariableType::UserData(_)));
-            if compares_record_arrays {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
-                return VariableType::None;
-            }
-            self.reject_bare_array_value(binary.get_left_expression());
-            self.reject_bare_array_value(binary.get_right_expression());
-            return VariableType::None;
-        }
-        let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
-        if has_enum && self.counts_a_loop(binary.get_left_expression()) {
-            self.errors
-                .lock()
-                .unwrap()
-                .report_error(binary.get_left_expression().get_span(), CompilationErrorType::InvalidEnumOperation);
-            return VariableType::None;
-        }
-        if has_enum
-            && !matches!(
-                binary.get_op(),
-                crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq | crate::ast::BinOp::And | crate::ast::BinOp::Or
-            )
-        {
-            self.errors.lock().unwrap().report_error(
-                binary.get_op_token().span.clone(),
-                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
-            );
-            return VariableType::None;
-        }
-        if has_enum && left != right {
-            self.errors.lock().unwrap().report_error(
-                binary.get_op_token().span.clone(),
-                CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
-            );
-            return VariableType::Boolean;
-        }
-        if has_enum && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
-            let VariableType::UserData(id) = left else { unreachable!() };
-            self.check_enum_binary_value(binary, id);
-            if self.runtime < 400 {
-                self.errors.lock().unwrap().report_error(
-                    binary.get_op_token().span.clone(),
-                    CompilationErrorType::BuiltinNeedsRuntime("Checked enum operation".to_string(), 400),
-                );
-            }
-            self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
-            self.enum_binary_types.insert(binary.id, id);
-            return left;
-        }
-        let has_custom_type = matches!(left, VariableType::UserData(_)) || matches!(right, VariableType::UserData(_));
-        if has_custom_type && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
-            self.errors.lock().unwrap().report_error(
-                binary.get_op_token().span.clone(),
-                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
-            );
-        }
-        if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
-            if self.is_whole_custom_type_array(binary.get_left_expression()) || self.is_whole_custom_type_array(binary.get_right_expression()) {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
-            } else if left != right {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::ComparisonTypeMismatch(left, right));
-            }
-            VariableType::Boolean
-        } else {
-            VariableType::None
-        }
+        self.check_binary_operands(binary, left, right, true)
     }
 
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> VariableType {
@@ -1210,8 +1350,22 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     return VariableType::None;
                 }
                 let expected = registry.fields.get(member.get_identifier()).copied().unwrap_or(VariableType::None);
-                self.check_enum_compound_operator(call.get_lpar_token(), expected, expected);
-                self.check_member_arg_types(&[expected], call.get_arguments());
+                if let Some(operator) = Self::compound_token(call.get_lpar_token()) {
+                    for (index, argument) in call.get_arguments().iter().enumerate() {
+                        let actual = argument.visit(self);
+                        if index == 0 {
+                            let result = self.check_implicit_binary(call.get_expression(), expected, operator.clone(), argument, actual);
+                            if expected != result && (matches!(expected, VariableType::UserData(_)) || matches!(result, VariableType::UserData(_))) {
+                                self.errors.lock().unwrap().report_error(
+                                    argument.get_span(),
+                                    CompilationErrorType::ArgumentTypeMismatch(1, self.source_type_name(expected), self.source_type_name(result)),
+                                );
+                            }
+                        }
+                    }
+                } else {
+                    self.check_member_arg_types(&[expected], call.get_arguments());
+                }
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::MemberSetterCall(member_id));
                 return VariableType::None;
             }
@@ -1489,7 +1643,21 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> VariableType {
         if let Some(target) = let_stmt.get_target_expression() {
             let target_type = target.visit(self);
-            if !self.is_assignable_explicit_target(target) {
+            self.compound_target_types.insert(let_stmt.get_identifier_token().span.start, target_type);
+            let value_type = let_stmt.get_value_expression().visit(self);
+            // The parser also uses explicit LET targets for Receiver().Field.
+            // Object fields are writable through returned handles, unlike record
+            // temporaries; the storage-path helper only recognizes the latter.
+            let object_field_writable = if let Expression::MemberReference(member) = target {
+                self.user_type_lookup
+                    .get(&member.get_identifier_token().span.start)
+                    .and_then(|type_id| self.type_registry.get_type_from_id(*type_id))
+                    .and_then(|registry| registry.get_member_id(member.get_identifier()).and_then(|id| registry.id_table.get(id)))
+                    .map(|entry| matches!(entry, crate::compiler::user_data::UserDataEntry::Field(_)))
+            } else {
+                None
+            };
+            if object_field_writable == Some(false) || (object_field_writable != Some(true) && !self.is_assignable_explicit_target(target)) {
                 if let Expression::MemberReference(member) = target
                     && let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()
                 {
@@ -1510,8 +1678,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 return VariableType::None;
             }
-            let value_type = let_stmt.get_value_expression().visit(self);
-            self.check_enum_compound_operator(let_stmt.get_eq_token(), target_type, value_type);
+            if let Some(operator) = Self::compound_token(let_stmt.get_eq_token()) {
+                self.check_implicit_binary(target, target_type, operator, let_stmt.get_value_expression(), value_type);
+                return VariableType::None;
+            }
             if let Some(target_shape) = self.array_shape(target) {
                 self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
                 return VariableType::None;
@@ -1539,6 +1709,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         let mut target_type = VariableType::None;
         let mut target_array_shape = None;
+        // Even an invalid destination must not hide source expressions from checking
+        // or leave their call metadata unpopulated.
+        for arg in let_stmt.get_arguments() {
+            arg.visit(self);
+            self.reject_bare_array_value(arg);
+        }
+        let value_type = let_stmt.get_value_expression().visit(self);
         if self.lookup_constant(let_stmt.get_identifier()).is_some() {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_identifier_token().span.clone(),
@@ -1707,12 +1884,35 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
             }
         }
-        for arg in let_stmt.get_arguments() {
-            arg.visit(self);
-            self.reject_bare_array_value(arg);
+        self.compound_target_types.insert(let_stmt.get_identifier_token().span.start, target_type);
+        if let Some(operator) = Self::compound_token(let_stmt.get_eq_token()) {
+            let mut target = if let (Some(left), Some(right)) = (let_stmt.get_lpar_token(), let_stmt.get_rpar_token()) {
+                Expression::Indexer(crate::ast::IndexerExpression::new(
+                    let_stmt.get_identifier_token().clone(),
+                    left.clone(),
+                    let_stmt.get_arguments().clone(),
+                    right.clone(),
+                ))
+            } else {
+                Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()))
+            };
+            if let Some(index) = self.lookup_variable(let_stmt.get_identifier())
+                && matches!(self.references[index].0, ReferenceType::Function(_) | ReferenceType::Procedure(_))
+            {
+                // The implicit read of a function's own result needs the same
+                // source-span metadata as an explicit result read.
+                target.visit(self);
+            }
+            for member in let_stmt.get_members() {
+                target = Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
+                    target,
+                    Spanned::create_empty(Token::Dot),
+                    member.clone(),
+                ));
+            }
+            self.check_implicit_binary(&target, target_type, operator, let_stmt.get_value_expression(), value_type);
+            return VariableType::None;
         }
-        let value_type = let_stmt.get_value_expression().visit(self);
-        self.check_enum_compound_operator(let_stmt.get_eq_token(), target_type, value_type);
         if let Some(target_shape) = target_array_shape {
             self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
             return VariableType::None;
@@ -1750,44 +1950,55 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) -> VariableType {
-        if let Some(idx) = self.lookup_variable(for_stmt.get_identifier()) {
-            if self.type_registry.is_enum_type(self.references[idx].1.variable_type) {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(for_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidEnumOperation);
-            }
-            if self.references_are_reachable {
-                self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
-            }
-            let (_rt, r) = &mut self.references[idx];
-            let identifier = for_stmt.get_identifier_token();
-            r.usages
-                .push((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
-        } else {
-            self.errors.lock().unwrap().report_error(
-                for_stmt.get_identifier_token().span.clone(),
-                CompilationErrorType::VariableNotFound(for_stmt.get_identifier().to_string()),
-            );
+        let identifier = for_stmt.get_identifier_token();
+        let inserted_counter = self.loop_counters.insert(identifier.span.start);
+
+        // FOR performs an ordinary assignment, comparisons, and an increment. Use
+        // those existing rules, including legacy coercions, rather than introducing
+        // a new numeric-only counter policy. Keep the real counter span for errors
+        // and for the implicit function-result read below.
+        self.with_source_expression(for_stmt.get_start_expr(), |visitor| {
+            visitor.visit_let_statement(&LetStatement::new(
+                None,
+                identifier.clone(),
+                None,
+                Vec::new(),
+                None,
+                Vec::new(),
+                for_stmt.get_eq_token().clone(),
+                for_stmt.get_start_expr().clone(),
+            ));
+        });
+        let counter = Expression::Identifier(IdentifierExpression::new(identifier.clone()));
+        let end = for_stmt.get_end_expr();
+        // The counter test can be reached through a jump into the body even
+        // when the initializer is dead. Synthetic reads inherit that test scope.
+        let counter_type = self.with_source_expression(end, |visitor| counter.visit(visitor));
+        let end_type = self.visit_source_expression(end);
+        self.check_implicit_binary(&counter, counter_type, Spanned::new(Token::Lower, end.get_span()), end, end_type);
+
+        let default_step = ConstantExpression::create_empty_expression(Constant::Integer(1, crate::ast::constant::NumberFormat::Default));
+        let step = for_stmt.get_step_expr().as_deref().unwrap_or(&default_step);
+        let step_type = self.visit_source_expression(step);
+        let zero = ConstantExpression::create_empty_expression(Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+        let zero_type = zero.visit(self);
+        let step_span = for_stmt
+            .get_step_expr()
+            .as_ref()
+            .map_or_else(|| identifier.span.clone(), |step| step.get_span());
+        self.check_implicit_binary(&zero, zero_type, Spanned::new(Token::Lower, step_span.clone()), step, step_type);
+        self.check_implicit_binary(&counter, counter_type, Spanned::new(Token::Add, step_span), step, step_type);
+        // Only the implicit operations need this marker. Do not leak a source
+        // offset into a later file, or erase markers supplied for a lowered AST.
+        if inserted_counter {
+            self.loop_counters.remove(&identifier.span.start);
         }
-        // The LSP visits FOR directly; compilation instead visits its desugared
-        // assignments/comparisons/arithmetic, which already reject enum operands.
-        self.reject_enum_argument(for_stmt.get_start_expr());
-        self.reject_enum_argument(for_stmt.get_end_expr());
-        self.reject_bare_array_value(for_stmt.get_start_expr());
-        self.reject_bare_array_value(for_stmt.get_end_expr());
-        if let Some(step) = for_stmt.get_step_expr() {
-            self.reject_enum_argument(step);
-            self.reject_bare_array_value(step);
-        }
-        for statement in for_stmt.get_statements() {
-            statement.visit(self);
-        }
+        self.visit_statement_sequence(for_stmt.get_statements());
         VariableType::None
     }
 
     fn visit_foreach_statement(&mut self, foreach_stmt: &crate::ast::ForEachStatement) -> VariableType {
-        foreach_stmt.get_collection().visit(self);
+        self.visit_source_expression(foreach_stmt.get_collection());
         let source = self.array_shape(foreach_stmt.get_collection());
         if source.is_none() {
             self.errors
@@ -1824,21 +2035,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 CompilationErrorType::VariableNotFound(foreach_stmt.get_identifier().to_string()),
             );
         }
-        for statement in foreach_stmt.get_statements() {
-            statement.visit(self);
-        }
+        self.visit_statement_sequence(foreach_stmt.get_statements());
         VariableType::None
     }
 
     fn visit_case_specifier(&mut self, case_specifier: &crate::ast::CaseSpecifier) -> VariableType {
         match case_specifier {
             crate::ast::CaseSpecifier::Expression(expression) => {
-                expression.visit(self);
+                self.visit_source_expression(expression);
                 self.reject_bare_array_value(expression);
             }
             crate::ast::CaseSpecifier::FromTo(from, to) => {
-                from.visit(self);
-                to.visit(self);
+                self.visit_source_expression(from);
+                self.visit_source_expression(to);
                 self.reject_bare_array_value(from);
                 self.reject_bare_array_value(to);
             }
@@ -1956,29 +2165,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 continue;
             }
-            let (dims, vs) = if let Some(Expression::ArrayInitializer(arr_expr)) = v.get_initalizer() {
-                for expr in arr_expr.get_expressions() {
-                    expr.visit(self);
-                }
+            let (dims, vs) = if let Some(Expression::ArrayInitializer(arr_expr)) = v.get_initalizer()
+                && !v.get_dimensions().first().is_some_and(crate::ast::DimensionSpecifier::is_dynamic)
+            {
                 (1, arr_expr.get_expressions().len().saturating_sub(1))
             } else {
-                if let Some(initializer) = v.get_initalizer() {
-                    let actual = initializer.visit(self);
-                    let declared = var_decl.get_variable_type();
-                    // Compiler initializer lowering creates a LET and checks
-                    // nominal assignment there. The LSP keeps this declaration.
-                    if v.get_dimensions().is_empty()
-                        && (self.type_registry.is_enum_type(declared) || self.type_registry.is_enum_type(actual))
-                        && actual != declared
-                    {
-                        self.errors.lock().unwrap().report_error(
-                            initializer.get_span(),
-                            CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(declared), self.source_type_name(actual)),
-                        );
-                    }
-                }
                 (v.get_dimensions().len() as u8, v.get_vector_size())
             };
+            // Initializers execute after the declaration. Register storage first,
+            // then check exactly the assignments that lowering will emit.
             self.add_variable(
                 var_decl.get_variable_type(),
                 v.get_identifier_token(),
@@ -1987,6 +2182,38 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 v.get_matrix_size(),
                 v.get_cube_size(),
             );
+            if let Some(initializer) = v.get_initalizer() {
+                let values: Vec<_> = if let Expression::ArrayInitializer(array) = initializer {
+                    array
+                        .get_expressions()
+                        .iter()
+                        .enumerate()
+                        .map(|(index, value)| {
+                            (
+                                vec![ConstantExpression::create_empty_expression(Constant::Integer(
+                                    index as i32,
+                                    crate::ast::constant::NumberFormat::Default,
+                                ))],
+                                value,
+                            )
+                        })
+                        .collect()
+                } else {
+                    vec![(Vec::new(), initializer)]
+                };
+                for (arguments, value) in values {
+                    self.visit_let_statement(&LetStatement::new(
+                        None,
+                        v.get_identifier_token().clone(),
+                        None,
+                        arguments,
+                        None,
+                        Vec::new(),
+                        Spanned::new(Token::Eq, value.get_span()),
+                        value.clone(),
+                    ));
+                }
+            }
         }
         VariableType::None
     }
@@ -2214,7 +2441,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let end_parameter = self.references.len();
 
         let start_locals = self.references.len();
-        self.visit_statement_sequence(function.get_statements());
+        self.visit_source_body(function.get_statements());
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;
@@ -2339,7 +2566,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let end_parameter = self.references.len();
 
         let start_locals = self.references.len();
-        self.visit_statement_sequence(procedure.get_statements());
+        self.visit_source_body(procedure.get_statements());
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;

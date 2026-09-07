@@ -7,13 +7,38 @@ use crate::{
         LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement, Statement,
         VariableDeclarationStatement, VariableSpecifier, const_enum_value, const_expression, constant::NumberFormat,
     },
-    decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
-    executable::{VariableType, VariableValue},
+    decompiler::evaluation_visitor::ConstantFolder,
+    executable::{FuncOpCode, VariableType, VariableValue},
+    hir::CallId,
     parser::{
-        EnumDefinition,
+        EnumDefinition, UserTypeRegistry,
         lexer::{Spanned, Token},
     },
+    semantic::SemanticInfo,
 };
+
+/// Authoritative SOURCE annotations for one module-bound file. No expression is
+/// semantically revisited during lowering. Span-keyed maps must belong to this file.
+pub(crate) struct TransformationSemanticInput<'a> {
+    pub function_type_lookup: &'a HashMap<CallId, SemanticInfo>,
+    pub enum_binary_types: &'a HashMap<u64, u8>,
+    pub user_type_lookup: &'a HashMap<usize, u8>,
+    /// Resolved assignment target types, keyed by LetStatement's identifier span.start.
+    /// Include scalar/array/function-result targets as well as member targets.
+    /// MemberCall targets are resolved from user_type_lookup and the registry.
+    pub compound_target_types: &'a HashMap<usize, VariableType>,
+    pub type_registry: &'a UserTypeRegistry,
+}
+
+/// Only declarations/annotations introduced by this visitor, never source symbols.
+/// Drain after each file and merge before structural constant collection/codegen.
+#[derive(Default)]
+pub(crate) struct GeneratedTransformationInfo {
+    /// None is global/main scope; Some(name) is a module-bound routine name.
+    pub temporaries: HashMap<Option<unicase::Ascii<String>>, Vec<(VariableType, VariableSpecifier)>>,
+    pub function_type_lookup: HashMap<CallId, SemanticInfo>,
+    pub enum_binary_types: HashMap<u64, u8>,
+}
 
 pub struct AstTransformationVisitor {
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
@@ -28,31 +53,17 @@ pub struct AstTransformationVisitor {
     loop_counters: HashSet<usize>,
     compound_receiver_types: HashMap<usize, u8>,
     compound_record_types: HashSet<u8>,
+    compound_members: HashMap<(u8, unicase::Ascii<String>), (usize, VariableType)>,
+    function_type_lookup: HashMap<CallId, SemanticInfo>,
+    enum_binary_types: HashMap<u64, u8>,
+    compound_target_types: HashMap<usize, VariableType>,
+    routine_scope: Option<unicase::Ascii<String>>,
+    generated: GeneratedTransformationInfo,
     temporaries: usize,
     language: u16,
 }
 
 impl AstTransformationVisitor {
-    pub(crate) fn needs_compound_receiver_types(program: &Ast) -> bool {
-        #[derive(Default)]
-        struct FindMemberCompound(bool);
-        impl crate::ast::AstVisitor<()> for FindMemberCompound {
-            fn visit_let_statement(&mut self, statement: &LetStatement) {
-                self.0 |= AstTransformationVisitor::compound_operator(statement.get_let_variant()).is_some()
-                    && (!statement.get_members().is_empty() || statement.get_target_expression().is_some());
-            }
-
-            fn visit_member_call_statement(&mut self, statement: &crate::ast::MemberCallStatement) {
-                if let Expression::FunctionCall(call) = statement.get_expression() {
-                    self.0 |= AstTransformationVisitor::compound_operator(&call.get_lpar_token().token).is_some();
-                }
-            }
-        }
-        let mut visitor = FindMemberCompound::default();
-        program.visit(&mut visitor);
-        visitor.0
-    }
-
     pub fn new(optimize_output: bool, enums: Vec<EnumDefinition>) -> Self {
         Self {
             continue_break_labels: Vec::new(),
@@ -67,24 +78,87 @@ impl AstTransformationVisitor {
             loop_counters: HashSet::new(),
             compound_receiver_types: HashMap::new(),
             compound_record_types: HashSet::new(),
+            compound_members: HashMap::new(),
+            function_type_lookup: HashMap::new(),
+            enum_binary_types: HashMap::new(),
+            compound_target_types: HashMap::new(),
+            routine_scope: None,
+            generated: GeneratedTransformationInfo::default(),
             temporaries: 0,
             language: 400,
         }
     }
 
-    /// Receiver types come from a non-emitting semantic pass. Records must keep
+    /// Receiver types come from source semantic analysis. Records must keep
     /// their storage path; reference objects must instead keep their identity.
     pub(crate) fn set_compound_receiver_types(&mut self, types: HashMap<usize, u8>, registry: &crate::parser::UserTypeRegistry) {
         self.compound_record_types = types.values().copied().filter(|id| registry.is_record_type(*id)).collect();
+        self.compound_members.clear();
+        for id in types.values() {
+            if let Some(members) = registry.get_type_from_id(*id) {
+                for (name, variable_type) in &members.fields {
+                    if let Some(field) = members.member_id_lookup.get(name) {
+                        self.compound_members.insert((*id, name.clone()), (*field, *variable_type));
+                    }
+                }
+            } else if let Some(record) = registry.get_record_type_from_id(*id) {
+                for (field, (name, definition)) in record.fields.iter().enumerate() {
+                    self.compound_members.insert((*id, name.clone()), (field, definition.variable_type));
+                }
+            }
+        }
         self.compound_receiver_types = types;
+    }
+
+    pub(crate) fn set_semantic_input(&mut self, input: TransformationSemanticInput<'_>) {
+        self.function_type_lookup.clone_from(input.function_type_lookup);
+        self.enum_binary_types.clone_from(input.enum_binary_types);
+        self.compound_target_types.clone_from(input.compound_target_types);
+        self.set_compound_receiver_types(input.user_type_lookup.clone(), input.type_registry);
+    }
+
+    pub(crate) fn take_generated_info(&mut self) -> GeneratedTransformationInfo {
+        std::mem::take(&mut self.generated)
+    }
+
+    fn register_temporary(&mut self, variable_type: VariableType, variable: &VariableSpecifier) {
+        self.generated
+            .temporaries
+            .entry(self.routine_scope.clone())
+            .or_default()
+            .push((variable_type, variable.clone()));
+    }
+
+    fn compound_member(&self, target: &Expression) -> Option<(usize, VariableType)> {
+        let member = match target {
+            Expression::MemberReference(member) => member,
+            Expression::FunctionCall(call) => return self.compound_member(call.get_expression()),
+            Expression::Parens(parens) => return self.compound_member(parens.get_expression()),
+            _ => return None,
+        };
+        let receiver = self.compound_receiver_types.get(&member.get_identifier_token().span.start)?;
+        self.compound_members.get(&(*receiver, member.get_identifier().clone())).copied()
+    }
+
+    fn compound_binary(&mut self, op: crate::ast::BinOp, target: Expression, value: Expression, target_type: Option<VariableType>) -> Expression {
+        let binary = BinaryExpression::empty(target, op, value);
+        if matches!(op, crate::ast::BinOp::And | crate::ast::BinOp::Or)
+            && let Some(VariableType::UserData(id)) = target_type
+            && self.enums.iter().any(|definition| definition.id == id)
+        {
+            self.generated.enum_binary_types.insert(binary.id, id);
+        }
+        Expression::Binary(binary)
     }
 
     fn capture_compound_value(&mut self, value: Expression, variable_type: VariableType, statements: &mut Vec<Statement>) -> Expression {
         let name = unicase::Ascii::new(format!("*(compound{})", self.temporaries));
         self.temporaries += 1;
+        let variable = VariableSpecifier::empty(name.clone(), Vec::new());
+        self.register_temporary(variable_type, &variable);
         statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::empty(
             variable_type,
-            vec![VariableSpecifier::empty(name.clone(), Vec::new())],
+            vec![variable],
         )));
         statements.push(LetStatement::create_empty_statement(name.clone(), Token::Eq, Vec::new(), value));
         IdentifierExpression::create_empty_expression(name)
@@ -101,11 +175,14 @@ impl AstTransformationVisitor {
                     // may change it. Make the VM's integer index conversion
                     // explicit so enum indices don't become illegal enum-to-int
                     // assignments merely because lowering introduced a temp.
-                    let index = crate::ast::FunctionCallExpression::create_empty_expression(
+                    let index = crate::ast::FunctionCallExpression::empty(
                         IdentifierExpression::create_empty_expression(unicase::Ascii::new("ToInteger".to_string())),
                         vec![argument.clone()],
                     );
-                    self.capture_compound_value(index, VariableType::Integer, statements)
+                    self.generated
+                        .function_type_lookup
+                        .insert(CallId(index.id), SemanticInfo::PredefinedFunc(FuncOpCode::TOINTEGER));
+                    self.capture_compound_value(Expression::FunctionCall(index), VariableType::Integer, statements)
                 }
             })
             .collect()
@@ -120,6 +197,10 @@ impl AstTransformationVisitor {
 
     fn capture_compound_target(&mut self, target: Expression, statements: &mut Vec<Statement>) -> Expression {
         match target {
+            Expression::Parens(mut parens) => {
+                *parens.get_expression_mut() = self.capture_compound_target(parens.get_expression().clone(), statements);
+                Expression::Parens(parens)
+            }
             Expression::Indexer(mut indexer) => {
                 let arguments = self.capture_compound_indices(indexer.get_arguments(), statements);
                 indexer.set_arguments(arguments);
@@ -173,21 +254,138 @@ impl AstTransformationVisitor {
         label
     }
 
-    /// The `Enum.Member` a value stands for, so an enum constant keeps its type until
-    /// the members are lowered.
-    fn enum_member_expression(&self, id: u8, value: i32) -> Option<Expression> {
-        let definition = self.enums.iter().find(|definition| definition.id == id)?;
-        let Some(member) = definition.variant_name(value) else {
-            // Unnamed valid values keep their nominal type until semantic checking.
-            return Some(crate::ast::FunctionCallExpression::create_empty_expression(
-                IdentifierExpression::create_empty_expression(definition.name.clone()),
-                vec![const_expression(&VariableValue::new_int(value), VariableType::Integer)?],
-            ));
+    /// Source semantics already checked the nominal type and domain, including
+    /// unnamed valid values. Like Enum.Member, a known value needs no runtime
+    /// cast. Enclosing bitwise expressions retain their checked binary IDs.
+    fn enum_constant_expression(&self, id: u8, value: i32, token: &Spanned<Token>) -> Option<Expression> {
+        self.enums.iter().find(|definition| definition.id == id)?;
+        Some(Expression::Const(ConstantExpression::new(
+            token.clone(),
+            Constant::Integer(value, NumberFormat::Default),
+        )))
+    }
+
+    /// The generic folders rebuild children with fresh identities and implement
+    /// boolean AND/OR, not enum bitwise operations. Only let them consume trees
+    /// with no surviving source nodes and no enum operations.
+    fn foldable_scalar(&self, expression: &Expression) -> bool {
+        match expression {
+            Expression::Const(constant) => !matches!(constant.get_constant_value(), Constant::Builtin(_)),
+            Expression::Parens(parens) => self.foldable_scalar(parens.get_expression()),
+            Expression::Unary(unary) => self.foldable_scalar(unary.get_expression()),
+            Expression::Binary(binary) => {
+                !self.enum_binary_types.contains_key(&binary.id)
+                    && !self.generated.enum_binary_types.contains_key(&binary.id)
+                    && self.foldable_scalar(binary.get_left_expression())
+                    && self.foldable_scalar(binary.get_right_expression())
+            }
+            _ => false,
+        }
+    }
+
+    fn negate_condition(&mut self, expression: &Expression) -> Expression {
+        let expression = expression.visit_mut(self);
+        let negated = self.negate_checked_condition(&expression);
+        negated.visit_mut(self)
+    }
+
+    /// Negate only boolean contexts, retaining the identities and spans of
+    /// surviving source nodes. Never apply De Morgan to checked enum AND/OR.
+    fn negate_checked_condition(&self, expression: &Expression) -> Expression {
+        use crate::ast::{BinOp, ExpressionDepthVisitor, UnaryExpression, UnaryOp};
+        let explicit = UnaryExpression::create_empty_expression(UnaryOp::Not, expression.clone());
+        let rewritten = match expression {
+            Expression::Parens(parens) => self.negate_checked_condition(parens.get_expression()),
+            Expression::Unary(unary) if unary.get_op() == UnaryOp::Not => unary.get_expression().clone(),
+            Expression::Const(constant) if matches!(constant.get_constant_value(), Constant::Boolean(_)) => {
+                ConstantExpression::create_empty_expression(Constant::Boolean(!constant.get_constant_value().get_value().as_bool()))
+            }
+            Expression::Binary(binary) if !self.enum_binary_types.contains_key(&binary.id) && !self.generated.enum_binary_types.contains_key(&binary.id) => {
+                let token = match binary.get_op() {
+                    BinOp::Eq => Token::NotEq,
+                    BinOp::NotEq => Token::Eq,
+                    BinOp::Lower => Token::GreaterEq,
+                    BinOp::LowerEq => Token::Greater,
+                    BinOp::Greater => Token::LowerEq,
+                    BinOp::GreaterEq => Token::Lower,
+                    BinOp::And => Token::Or,
+                    BinOp::Or => Token::And,
+                    _ => return explicit,
+                };
+                let (left, right) = if matches!(binary.get_op(), BinOp::And | BinOp::Or) {
+                    (
+                        self.negate_checked_condition(binary.get_left_expression()),
+                        self.negate_checked_condition(binary.get_right_expression()),
+                    )
+                } else {
+                    (binary.get_left_expression().clone(), binary.get_right_expression().clone())
+                };
+                let mut rewritten = BinaryExpression::new(left, Spanned::new(token, binary.get_op_token().span.clone()), right);
+                rewritten.id = binary.id;
+                Expression::Binary(rewritten)
+            }
+            _ => return explicit,
         };
-        Some(MemberReferenceExpression::create_empty_expression(
-            IdentifierExpression::create_empty_expression(definition.name.clone()),
-            member.clone(),
-        ))
+        if rewritten.visit(&mut ExpressionDepthVisitor::default()) <= explicit.visit(&mut ExpressionDepthVisitor::default()) {
+            rewritten
+        } else {
+            explicit
+        }
+    }
+
+    /// Simplify generated FOR direction guards in a boolean context only.
+    /// Unlike the old general optimizer, do not discard calls, member/index
+    /// access or potentially faulting arithmetic, or rebuild surviving IDs.
+    fn simplify_for_condition(&self, expression: Expression) -> Expression {
+        use crate::ast::BinOp;
+        fn scalar(expression: &Expression) -> bool {
+            match expression {
+                Expression::Const(_) | Expression::Identifier(_) => true,
+                Expression::Parens(parens) => scalar(parens.get_expression()),
+                _ => false,
+            }
+        }
+        fn total(expression: &Expression) -> bool {
+            if scalar(expression) {
+                return true;
+            }
+            match expression {
+                Expression::Binary(binary) => match binary.get_op() {
+                    BinOp::And | BinOp::Or => total(binary.get_left_expression()) && total(binary.get_right_expression()),
+                    BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq => {
+                        scalar(binary.get_left_expression()) && scalar(binary.get_right_expression())
+                    }
+                    _ => false,
+                },
+                _ => false,
+            }
+        }
+        let Expression::Binary(mut binary) = expression else {
+            return expression;
+        };
+        if !matches!(binary.get_op(), BinOp::And | BinOp::Or)
+            || self.enum_binary_types.contains_key(&binary.id)
+            || self.generated.enum_binary_types.contains_key(&binary.id)
+        {
+            return Expression::Binary(binary);
+        }
+        let left = self.simplify_for_condition(binary.get_left_expression().clone());
+        let right = self.simplify_for_condition(binary.get_right_expression().clone());
+        let absorbing = binary.get_op() == BinOp::Or;
+        for (constant, other) in [(&left, &right), (&right, &left)] {
+            if let Expression::Const(constant) = constant {
+                let truth = constant.get_constant_value().get_value().as_bool();
+                if truth != absorbing {
+                    return other.clone();
+                }
+                if total(other) {
+                    return ConstantExpression::create_empty_expression(Constant::Boolean(absorbing));
+                }
+            }
+        }
+        *binary.get_left_expression_mut() = left;
+        *binary.get_right_expression_mut() = right;
+        Expression::Binary(binary)
     }
 
     fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(crate::executable::VariableType, VariableValue)> {
@@ -252,25 +450,44 @@ impl AstTransformationVisitor {
 
 impl AstVisitorMut for AstTransformationVisitor {
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Expression {
-        let transformed = crate::ast::UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self));
-        if self.optimize_output {
-            ConstantFolder::default().visit_unary_expression(&transformed)
-        } else {
-            Expression::Unary(transformed)
+        let transformed = crate::ast::UnaryExpression::new(unary.get_op_token().clone(), unary.get_expression().visit_mut(self));
+        if self.optimize_output && self.foldable_scalar(transformed.get_expression()) {
+            let folded = ConstantFolder::default().visit_unary_expression(&transformed);
+            if matches!(folded, Expression::Const(_)) {
+                return folded;
+            }
         }
+        Expression::Unary(transformed)
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> Expression {
-        let transformed = BinaryExpression::empty(
-            binary.get_left_expression().visit_mut(self),
-            binary.get_op(),
-            binary.get_right_expression().visit_mut(self),
-        );
-        if self.optimize_output {
-            ConstantFolder::default().visit_binary_expression(&transformed)
-        } else {
-            Expression::Binary(transformed)
+        let mut transformed = binary.clone();
+        *transformed.get_left_expression_mut() = binary.get_left_expression().visit_mut(self);
+        *transformed.get_right_expression_mut() = binary.get_right_expression().visit_mut(self);
+        if self.optimize_output
+            && !self.enum_binary_types.contains_key(&binary.id)
+            && !self.generated.enum_binary_types.contains_key(&binary.id)
+            && self.foldable_scalar(transformed.get_left_expression())
+            && self.foldable_scalar(transformed.get_right_expression())
+        {
+            let folded = ConstantFolder::default().visit_binary_expression(&transformed);
+            if matches!(folded, Expression::Const(_)) {
+                return folded;
+            }
         }
+        Expression::Binary(transformed)
+    }
+
+    fn visit_parens_expression(&mut self, parens: &crate::ast::ParensExpression) -> Expression {
+        let mut transformed = parens.clone();
+        *transformed.get_expression_mut() = parens.get_expression().visit_mut(self);
+        Expression::Parens(transformed)
+    }
+
+    fn visit_array_expression(&mut self, array: &crate::ast::ArrayInitializerExpression) -> Expression {
+        let mut transformed = array.clone();
+        *transformed.get_expressions_mut() = array.get_expressions().iter().map(|expression| expression.visit_mut(self)).collect();
+        Expression::ArrayInitializer(transformed)
     }
 
     fn visit_continue_statement(&mut self, _continue_stmt: &crate::ast::ContinueStatement) -> Statement {
@@ -296,15 +513,18 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_if_statement(&mut self, if_stmt: &IfStatement) -> Statement {
         if matches!(if_stmt.get_statement(), Statement::Goto(_)) {
-            return Statement::If(IfStatement::empty(
+            return Statement::If(IfStatement::new(
+                if_stmt.get_if_token().clone(),
+                if_stmt.get_lpar_token().clone(),
                 if_stmt.get_condition().visit_mut(self),
+                if_stmt.get_rpar_token().clone(),
                 if_stmt.get_statement().visit_mut(self),
             ));
         }
         let mut statements = Vec::new();
         let if_exit_label = self.next_label();
         statements.push(IfStatement::create_empty_statement(
-            if_stmt.get_condition().negate_expression().visit_mut(self),
+            self.negate_condition(if_stmt.get_condition()),
             GotoStatement::create_empty_statement(if_exit_label.clone()),
         ));
         statements.push(if_stmt.get_statement().visit_mut(self));
@@ -319,7 +539,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut if_exit_label = self.next_label();
 
         statements.push(IfStatement::create_empty_statement(
-            if_then.get_condition().negate_expression().visit_mut(self),
+            self.negate_condition(if_then.get_condition()),
             GotoStatement::create_empty_statement(if_exit_label.clone()),
         ));
         statements.extend(if_then.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -333,7 +553,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
             if_exit_label = self.next_label();
             statements.push(IfStatement::create_empty_statement(
-                else_if.get_condition().negate_expression().visit_mut(self),
+                self.negate_condition(else_if.get_condition()),
                 GotoStatement::create_empty_statement(if_exit_label.clone()),
             ));
             statements.extend(else_if.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -363,7 +583,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
         statements.push(IfStatement::create_empty_statement(
-            while_stmt.get_condition().negate_expression().visit_mut(self),
+            self.negate_condition(while_stmt.get_condition()),
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
         statements.push(while_stmt.get_statement().visit_mut(self));
@@ -383,7 +603,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
         statements.push(IfStatement::create_empty_statement(
-            while_do.get_condition().negate_expression().visit_mut(self),
+            self.negate_condition(while_do.get_condition()),
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
         statements.extend(while_do.get_statements().iter().map(|s| s.visit_mut(self)));
@@ -408,7 +628,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
 
         statements.push(IfStatement::create_empty_statement(
-            repeat_until.get_condition().negate_expression().visit_mut(self),
+            self.negate_condition(repeat_until.get_condition()),
             GotoStatement::create_empty_statement(loop_label.clone()),
         ));
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
@@ -434,7 +654,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_select_statement(&mut self, select_stmt: &SelectStatement) -> Statement {
         let mut statements = Vec::new();
-        let expr = select_stmt.get_expression().clone();
+        let expr = select_stmt.get_expression().visit_mut(self);
         let case_exit_label = self.next_label();
 
         for case_block in select_stmt.get_case_blocks() {
@@ -445,12 +665,12 @@ impl AstVisitorMut for AstTransformationVisitor {
             for spec in case_block.get_case_specifiers() {
                 let cond = match spec {
                     crate::ast::CaseSpecifier::Expression(spec_expr) => {
-                        BinaryExpression::create_empty_expression(crate::ast::BinOp::NotEq, expr.clone(), *spec_expr.clone())
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::NotEq, expr.clone(), spec_expr.visit_mut(self))
                     }
                     crate::ast::CaseSpecifier::FromTo(from_expr, to_expr) => BinaryExpression::create_empty_expression(
                         crate::ast::BinOp::Or,
-                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, *from_expr.clone(), expr.clone()),
-                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, expr.clone(), *to_expr.clone()),
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, from_expr.visit_mut(self), expr.clone()),
+                        BinaryExpression::create_empty_expression(crate::ast::BinOp::Greater, expr.clone(), to_expr.visit_mut(self)),
                     ),
                 };
                 if matches!(condition, Expression::Const(_)) {
@@ -525,12 +745,14 @@ impl AstVisitorMut for AstTransformationVisitor {
         );
 
         let condition = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, lower_bound, upper_bound);
+        let condition = if self.optimize_output {
+            let folded = condition.visit_mut(self);
+            self.simplify_for_condition(folded)
+        } else {
+            condition
+        };
         statements.push(IfStatement::create_empty_statement(
-            if self.optimize_output {
-                condition.visit_mut(&mut OptimizationVisitor::default())
-            } else {
-                condition
-            },
+            condition,
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
 
@@ -571,6 +793,7 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
         let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
         let transformed_target = let_stmt.get_target_expression().map(|target| target.visit_mut(self));
+        let arguments: Vec<_> = let_stmt.get_arguments().iter().map(|argument| argument.visit_mut(self)).collect();
 
         // A compound assignment reads the same place it writes, including indices and members.
         let mut target = if let Some(target) = &transformed_target {
@@ -579,7 +802,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             Expression::Indexer(crate::ast::IndexerExpression::new(
                 let_stmt.get_identifier_token().clone(),
                 left.clone(),
-                let_stmt.get_arguments().iter().map(|argument| argument.visit_mut(self)).collect(),
+                arguments.clone(),
                 right.clone(),
             ))
         } else {
@@ -598,16 +821,25 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut statements = Vec::new();
         let compound = Self::compound_operator(let_stmt.get_let_variant());
         if let Some(op) = compound {
+            let target_type = self
+                .compound_target_types
+                .get(&let_stmt.get_identifier_token().span.start)
+                .copied()
+                .or_else(|| self.compound_member(&target).map(|(_, variable_type)| variable_type));
             target = self.capture_compound_target(target, &mut statements);
-            val_expr = BinaryExpression::create_empty_expression(op, target.clone(), val_expr);
+            val_expr = self.compound_binary(op, target.clone(), val_expr, target_type);
             if let Expression::MemberReference(member) = &target
                 && self.compound_object_receiver_type(member).is_some()
+                && let Some((field, _)) = self.compound_member(&target)
             {
-                // Keep object writes on the setter path, including its normal
-                // writable-property/type diagnostics.
-                statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(
-                    crate::ast::FunctionCallExpression::new(target, Spanned::create_empty(Token::Eq), vec![val_expr], Spanned::create_empty(Token::Eq)),
-                ))));
+                // Source semantics already checked writability and operand types.
+                // This call did not exist in the source, so attach its field now.
+                let eq = Spanned::new(Token::Eq, let_stmt.get_eq_token().span.clone());
+                let call = crate::ast::FunctionCallExpression::new(target, eq.clone(), vec![val_expr], eq);
+                self.generated
+                    .function_type_lookup
+                    .insert(CallId(call.id), SemanticInfo::MemberSetterCall(field));
+                statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(call))));
                 return Statement::Block(BlockStatement::empty(statements));
             }
         }
@@ -619,10 +851,10 @@ impl AstVisitorMut for AstTransformationVisitor {
                 token: Token::Identifier(self.visit_identifier(let_stmt.get_identifier())),
             },
             let_stmt.get_lpar_token().clone(),
-            let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
+            arguments,
             let_stmt.get_rpar_token().clone(),
             let_stmt.get_members().clone(),
-            Spanned::create_empty(Token::Eq),
+            Spanned::new(Token::Eq, let_stmt.get_eq_token().span.clone()),
             val_expr,
         );
         let statement = Statement::Let(if compound.is_some() && !matches!(target, Expression::Identifier(_)) {
@@ -650,17 +882,25 @@ impl AstVisitorMut for AstTransformationVisitor {
             && call.get_arguments().len() == 1
         {
             let mut statements = Vec::new();
+            let target_type = self.compound_member(call.get_expression()).map(|(_, variable_type)| variable_type);
             let target = self.capture_compound_target(call.get_expression().clone(), &mut statements);
-            let value = BinaryExpression::create_empty_expression(op, target.clone(), call.get_arguments()[0].clone());
-            statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(
-                crate::ast::FunctionCallExpression::new(target, Spanned::create_empty(Token::Eq), vec![value], Spanned::create_empty(Token::Eq)),
-            ))));
+            let value = self.compound_binary(op, target.clone(), call.get_arguments()[0].clone(), target_type);
+            let mut setter = crate::ast::FunctionCallExpression::new(
+                target,
+                Spanned::new(Token::Eq, call.get_lpar_token().span.clone()),
+                vec![value],
+                Spanned::new(Token::Eq, call.get_rpar_token().span.clone()),
+            );
+            // The source MemberSetterCall annotation remains authoritative.
+            setter.id = call.id;
+            statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(setter))));
             return Statement::Block(BlockStatement::empty(statements));
         }
         Statement::MemberCall(crate::ast::MemberCallStatement::new(expression))
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {
+        let previous_scope = self.routine_scope.replace(function.get_identifier().clone());
         self.cur_function = Some(function.get_identifier().clone());
         self.local_constants = Some(HashMap::new());
         self.collect_local_bindings(function.get_parameters(), function.get_statements());
@@ -686,12 +926,14 @@ impl AstVisitorMut for AstTransformationVisitor {
         );
 
         self.cur_function = None;
+        self.routine_scope = previous_scope;
         self.local_constants = None;
         self.local_bindings = None;
         res
     }
 
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> AstNode {
+        let previous_scope = self.routine_scope.replace(procedure.get_identifier().clone());
         self.local_constants = Some(HashMap::new());
         self.collect_local_bindings(procedure.get_parameters(), procedure.get_statements());
         self.collect_constants(procedure.get_statements(), true);
@@ -713,23 +955,51 @@ impl AstVisitorMut for AstTransformationVisitor {
         );
         self.local_constants = None;
         self.local_bindings = None;
+        self.routine_scope = previous_scope;
         res
     }
 
     /// The value takes the place of the name everywhere it is used. The declaration
-    /// itself stays for the checks that come after; the code generator skips it.
+    /// itself stays as source provenance; it has already been checked and codegen skips it.
     fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> Statement {
         Statement::ConstDeclaration(const_decl.clone())
     }
 
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> Expression {
-        if let Some((variable_type, value)) = self.lookup_constant(identifier.get_identifier()) {
+        if let Some((variable_type, value)) = self.lookup_constant(identifier.get_identifier()).cloned() {
             if let crate::executable::VariableType::UserData(id) = variable_type {
-                if let Some(expr) = self.enum_member_expression(*id, value.as_int()) {
+                if let Some(expr) = self.enum_constant_expression(id, value.as_int(), identifier.get_identifier_token()) {
                     return expr;
                 }
-            } else if let Some(expr) = const_expression(value, *variable_type) {
-                return expr;
+            } else if let Some(expression) = const_expression(&value, variable_type) {
+                match expression {
+                    Expression::Const(expr) => {
+                        return Expression::Const(ConstantExpression::new(
+                            identifier.get_identifier_token().clone(),
+                            expr.get_constant_value().clone(),
+                        ));
+                    }
+                    Expression::FunctionCall(call) => {
+                        // Typed constants use compiler-generated conversions (e.g.
+                        // DOUBLE uses ToDReal(string) to avoid f32 literal rounding).
+                        // These calls did not exist during source analysis, so bind
+                        // their built-in opcode here, never a same-named source symbol.
+                        let Expression::Identifier(conversion) = call.get_expression() else {
+                            unreachable!("constant conversions have a built-in identifier")
+                        };
+                        let definition = crate::executable::FUNCTION_DEFINITIONS
+                            .iter()
+                            .find(|definition| {
+                                definition.name.eq_ignore_ascii_case(conversion.get_identifier().as_str()) && definition.return_type == variable_type
+                            })
+                            .expect("constant conversion must have a matching built-in result type");
+                        self.generated
+                            .function_type_lookup
+                            .insert(CallId(call.id), SemanticInfo::PredefinedFunc(definition.opcode));
+                        return Expression::FunctionCall(call);
+                    }
+                    _ => unreachable!("scalar constants lower to literals or built-in conversions"),
+                }
             }
         }
         Expression::Identifier(IdentifierExpression::new(Spanned {
@@ -755,8 +1025,10 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> Expression {
         let is_enum_namespace = matches!(call.get_expression(), Expression::Identifier(base)
             if self.enums.iter().any(|definition| definition.name == *base.get_identifier()));
+        let is_bound_name = matches!(call.get_expression(), Expression::Identifier(_))
+            && (self.function_type_lookup.contains_key(&CallId(call.id)) || self.generated.function_type_lookup.contains_key(&CallId(call.id)));
         Expression::FunctionCall(call.preserving_id(
-            if is_enum_namespace {
+            if is_enum_namespace || is_bound_name {
                 call.get_expression().clone()
             } else {
                 call.get_expression().visit_mut(self)
@@ -807,7 +1079,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                 expr.visit_mut(self),
             )));
         }
-        statements.push(ReturnStatement::create_empty_statement(None));
+        statements.push(Statement::Return(ReturnStatement::new(return_stmt.get_return_token().clone(), None)));
         Statement::Block(BlockStatement::empty(statements))
     }
 
@@ -822,13 +1094,13 @@ impl AstVisitorMut for AstTransformationVisitor {
                         var_decl.get_variable_type(),
                         vec![VariableSpecifier::new(
                             var.get_identifier_token().clone(),
-                            None,
+                            var.get_leftpar_token().clone(),
                             if dynamic {
                                 var.get_dimensions().clone()
                             } else {
                                 vec![DimensionSpecifier::empty(array.get_expressions().len().saturating_sub(1))]
                             },
-                            None,
+                            var.get_rightpar_token().clone(),
                             None,
                             None,
                         )],
@@ -852,17 +1124,19 @@ impl AstVisitorMut for AstTransformationVisitor {
                         // just the storage allocated when this frame was created.
                         let empty_name = unicase::Ascii::new(format!("*(empty_array{})", self.temporaries));
                         self.temporaries += 1;
+                        let variable = VariableSpecifier::new(
+                            Spanned::create_empty(Token::Identifier(empty_name.clone())),
+                            None,
+                            var.get_dimensions().clone(),
+                            None,
+                            None,
+                            None,
+                        );
+                        self.register_temporary(var_decl.get_variable_type(), &variable);
                         statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::new(
                             var_decl.get_type_token().clone(),
                             var_decl.get_variable_type(),
-                            vec![VariableSpecifier::new(
-                                Spanned::create_empty(Token::Identifier(empty_name.clone())),
-                                None,
-                                var.get_dimensions().clone(),
-                                None,
-                                None,
-                                None,
-                            )],
+                            vec![variable],
                         )));
                         statements.push(LetStatement::create_empty_statement(
                             var.get_identifier().clone(),
@@ -893,9 +1167,9 @@ impl AstVisitorMut for AstTransformationVisitor {
                         var_decl.get_variable_type(),
                         vec![VariableSpecifier::new(
                             var.get_identifier_token().clone(),
-                            None,
+                            var.get_leftpar_token().clone(),
                             var.get_dimensions().clone(),
-                            None,
+                            var.get_rightpar_token().clone(),
                             None,
                             None,
                         )],
@@ -917,17 +1191,471 @@ impl AstVisitorMut for AstTransformationVisitor {
                 statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::new(
                     var_decl.get_type_token().clone(),
                     var_decl.get_variable_type(),
-                    vec![VariableSpecifier::new(
-                        var.get_identifier_token().clone(),
-                        None,
-                        var.get_dimensions().clone(),
-                        None,
-                        None,
-                        None,
-                    )],
+                    vec![var.clone()],
                 )));
             }
         }
         Statement::Block(BlockStatement::empty(statements))
+    }
+}
+
+#[cfg(test)]
+mod semantics_before_lowering_tests {
+    use super::*;
+    use crate::ast::{AstVisitor, BinOp, FunctionCallExpression, MemberCallStatement, ParensExpression, UnaryExpression, UnaryOp};
+    use crate::compiler::user_data::{UserDataMemberRegistry, UserDataRegistry};
+
+    fn name(value: &str) -> unicase::Ascii<String> {
+        unicase::Ascii::new(value.to_string())
+    }
+
+    fn identifier(value: &str, start: usize) -> Expression {
+        Expression::Identifier(IdentifierExpression::new(Spanned::new(
+            Token::Identifier(name(value)),
+            start..start + value.len(),
+        )))
+    }
+
+    fn integer(value: i32) -> Expression {
+        ConstantExpression::create_empty_expression(Constant::Integer(value, NumberFormat::Default))
+    }
+
+    fn flags() -> EnumDefinition {
+        EnumDefinition {
+            id: 200,
+            name: name("Flags"),
+            variants: vec![(name("One"), 1), (name("Two"), 2)],
+            domain: vec![0, 1, 2, 3],
+        }
+    }
+
+    #[derive(Default)]
+    struct Ids {
+        calls: Vec<u64>,
+        binaries: Vec<u64>,
+    }
+
+    impl AstVisitor<()> for Ids {
+        fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) {
+            self.calls.push(call.id);
+            call.get_expression().visit(self);
+            for argument in call.get_arguments() {
+                argument.visit(self);
+            }
+        }
+
+        fn visit_binary_expression(&mut self, binary: &BinaryExpression) {
+            self.binaries.push(binary.id);
+            binary.get_left_expression().visit(self);
+            binary.get_right_expression().visit(self);
+        }
+    }
+
+    #[test]
+    fn surviving_nested_expressions_keep_ids_and_tokens_with_or_without_folding() {
+        let binary = BinaryExpression::new(identifier("x", 20), Spanned::new(Token::Add, 22..23), integer(1));
+        let binary_id = binary.id;
+        let call = FunctionCallExpression::new(
+            identifier("f", 10),
+            Spanned::new(Token::LPar, 11..12),
+            vec![Expression::Binary(binary)],
+            Spanned::new(Token::RPar, 24..25),
+        );
+        let call_id = call.id;
+        let source = Expression::Unary(UnaryExpression::new(
+            Spanned::new(Token::Sub, 8..9),
+            Expression::Parens(ParensExpression::new(
+                Spanned::new(Token::LPar, 9..10),
+                Expression::FunctionCall(call),
+                Spanned::new(Token::RPar, 25..26),
+            )),
+        ));
+        for optimize in [false, true] {
+            let lowered = source.visit_mut(&mut AstTransformationVisitor::new(optimize, Vec::new()));
+            assert_eq!(lowered, source);
+            let mut ids = Ids::default();
+            lowered.visit(&mut ids);
+            assert_eq!(ids.calls, vec![call_id]);
+            assert_eq!(ids.binaries, vec![binary_id]);
+        }
+    }
+
+    #[test]
+    fn enum_binary_is_not_boolean_folded_or_demorgan_rewritten() {
+        let binary = BinaryExpression::empty(integer(1), BinOp::Or, integer(2));
+        let id = binary.id;
+        let mut visitor = AstTransformationVisitor::new(true, vec![flags()]);
+        visitor.set_semantic_input(TransformationSemanticInput {
+            function_type_lookup: &HashMap::new(),
+            enum_binary_types: &HashMap::from([(id, 200)]),
+            user_type_lookup: &HashMap::new(),
+            compound_target_types: &HashMap::new(),
+            type_registry: &UserTypeRegistry::default(),
+        });
+        let source = Expression::Binary(binary);
+        assert_eq!(source.visit_mut(&mut visitor), source);
+        let negated = visitor.negate_condition(&source);
+        let Expression::Unary(negated) = negated else {
+            panic!("expected explicit NOT")
+        };
+        assert_eq!(negated.get_op(), UnaryOp::Not);
+        let Expression::Binary(inner) = negated.get_expression() else {
+            panic!("lost enum binary")
+        };
+        assert_eq!(inner.id, id);
+        assert_eq!(inner.get_op(), BinOp::Or);
+        assert!(visitor.take_generated_info().enum_binary_types.is_empty());
+        let scalar = BinaryExpression::create_empty_expression(BinOp::Add, integer(1), integer(2));
+        assert_eq!(scalar.visit_mut(&mut visitor), integer(3));
+    }
+
+    #[test]
+    fn typed_constant_conversions_are_preserved_and_annotated_with_or_without_optimization() {
+        for optimize in [false, true] {
+            for (variable_type, opcode) in [
+                (VariableType::Byte, FuncOpCode::TOBYTE),
+                (VariableType::SByte, FuncOpCode::TOSBYTE),
+                (VariableType::Word, FuncOpCode::TOWORD),
+                (VariableType::SWord, FuncOpCode::TOSWORD),
+                (VariableType::Float, FuncOpCode::TOREAL),
+                (VariableType::Double, FuncOpCode::TODREAL),
+                (VariableType::Long, FuncOpCode::TOLONG64),
+                (VariableType::ULong, FuncOpCode::TOULONG64),
+                (VariableType::Date, FuncOpCode::TODATE),
+                (VariableType::EDate, FuncOpCode::TOEDATE),
+                (VariableType::DDate, FuncOpCode::TODDATE),
+                (VariableType::Time, FuncOpCode::TOTIME),
+            ] {
+                let mut visitor = AstTransformationVisitor::new(optimize, Vec::new());
+                let value = VariableValue::new_int(42).convert_to(variable_type);
+                visitor.global_constants.insert(name("answer"), (variable_type, value));
+                let Expression::FunctionCall(call) = identifier("answer", 10).visit_mut(&mut visitor) else {
+                    panic!("lost {variable_type} constant with optimize={optimize}")
+                };
+                assert_eq!(
+                    visitor.take_generated_info().function_type_lookup.get(&CallId(call.id)),
+                    Some(&SemanticInfo::PredefinedFunc(opcode)),
+                    "{variable_type} with optimize={optimize}"
+                );
+                assert_eq!(call.get_arguments().len(), 1);
+                assert!(matches!(call.get_arguments()[0], Expression::Const(_)));
+            }
+        }
+    }
+
+    #[test]
+    fn checked_enum_constants_need_no_cast_and_index_conversions_are_annotated() {
+        let mut visitor = AstTransformationVisitor::new(true, vec![flags()]);
+        for (symbol, value) in [("named", 1), ("unnamed", 3)] {
+            visitor
+                .global_constants
+                .insert(name(symbol), (VariableType::UserData(200), VariableValue::new_int(value)));
+            for optimize in [false, true] {
+                visitor.optimize_output = optimize;
+                assert_eq!(
+                    identifier(symbol, 10).visit_mut(&mut visitor),
+                    Expression::Const(ConstantExpression::new(
+                        Spanned::new(Token::Identifier(name(symbol)), 10..10 + symbol.len()),
+                        Constant::Integer(value, NumberFormat::Default),
+                    ))
+                );
+                assert!(visitor.generated.function_type_lookup.is_empty());
+            }
+        }
+        let source_call = FunctionCallExpression::empty(identifier("nextIndex", 30), Vec::new());
+        let source_id = source_call.id;
+        let mut statements = Vec::new();
+        visitor.capture_compound_indices(&[Expression::FunctionCall(source_call)], &mut statements);
+        let Statement::Let(assignment) = &statements[1] else {
+            panic!("expected index capture")
+        };
+        let Expression::FunctionCall(conversion) = assignment.get_value_expression() else {
+            panic!("expected ToInteger")
+        };
+        let Expression::FunctionCall(original) = &conversion.get_arguments()[0] else {
+            panic!("lost original call")
+        };
+        assert_eq!(original.id, source_id);
+        let generated = visitor.take_generated_info();
+        assert_eq!(
+            generated.function_type_lookup.get(&CallId(conversion.id)),
+            Some(&SemanticInfo::PredefinedFunc(FuncOpCode::TOINTEGER))
+        );
+        assert!(!generated.function_type_lookup.contains_key(&CallId(source_id)));
+        assert_eq!(generated.temporaries[&None][0].0, VariableType::Integer);
+    }
+
+    #[test]
+    fn condition_negation_keeps_comparison_and_call_metadata() {
+        for optimize in [false, true] {
+            for (token, inverse) in [
+                (Token::Eq, BinOp::NotEq),
+                (Token::NotEq, BinOp::Eq),
+                (Token::Lower, BinOp::GreaterEq),
+                (Token::LowerEq, BinOp::Greater),
+                (Token::Greater, BinOp::LowerEq),
+                (Token::GreaterEq, BinOp::Lower),
+            ] {
+                let call = FunctionCallExpression::empty(identifier("nextValue", 10), Vec::new());
+                let call_id = call.id;
+                let binary = BinaryExpression::new(Expression::FunctionCall(call), Spanned::new(token, 22..24), integer(3));
+                let binary_id = binary.id;
+                let mut visitor = AstTransformationVisitor::new(optimize, Vec::new());
+                let Expression::Binary(negated) = visitor.negate_condition(&Expression::Binary(binary)) else {
+                    panic!("comparison must invert without an extra NOT")
+                };
+                assert_eq!(negated.id, binary_id);
+                assert_eq!(negated.get_op(), inverse);
+                assert_eq!(negated.get_op_token().span, 22..24);
+                let mut ids = Ids::default();
+                Expression::Binary(negated).visit(&mut ids);
+                assert_eq!(ids.calls, vec![call_id]);
+                assert!(visitor.take_generated_info().function_type_lookup.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn demorgan_keeps_checked_enum_operands_and_source_ids() {
+        let bits = BinaryExpression::empty(integer(1), BinOp::Or, integer(2));
+        let bits_id = bits.id;
+        let comparison = BinaryExpression::new(Expression::Binary(bits), Spanned::new(Token::Eq, 20..21), integer(3));
+        let comparison_id = comparison.id;
+        let other = BinaryExpression::empty(identifier("x", 30), BinOp::Lower, integer(4));
+        let other_id = other.id;
+        let condition = BinaryExpression::new(Expression::Binary(comparison), Spanned::new(Token::And, 25..26), Expression::Binary(other));
+        let condition_id = condition.id;
+        let mut visitor = AstTransformationVisitor::new(true, vec![flags()]);
+        visitor.enum_binary_types.insert(bits_id, 200);
+        let negated = visitor.negate_condition(&Expression::Binary(condition));
+        let Expression::Binary(binary) = &negated else {
+            panic!("expected compact De Morgan condition")
+        };
+        assert_eq!(binary.get_op(), BinOp::Or);
+        assert_eq!(binary.get_op_token().span, 25..26);
+        let Expression::Binary(comparison) = binary.get_left_expression() else {
+            panic!("lost comparison")
+        };
+        assert_eq!(comparison.get_op(), BinOp::NotEq);
+        let Expression::Binary(bits) = comparison.get_left_expression() else {
+            panic!("lost enum bits")
+        };
+        assert_eq!(bits.get_op(), BinOp::Or);
+        let mut ids = Ids::default();
+        negated.visit(&mut ids);
+        assert_eq!(ids.binaries, vec![condition_id, comparison_id, bits_id, other_id]);
+    }
+
+    #[test]
+    fn negation_removes_double_not_but_keeps_arithmetic_signs() {
+        let mut visitor = AstTransformationVisitor::new(true, Vec::new());
+        let operand = identifier("x", 10);
+        let double_not = UnaryExpression::create_empty_expression(UnaryOp::Not, operand.clone());
+        assert_eq!(visitor.negate_condition(&double_not), operand);
+        for op in [UnaryOp::Plus, UnaryOp::Minus] {
+            let signed = UnaryExpression::create_empty_expression(op, operand.clone());
+            let Expression::Unary(negated) = visitor.negate_condition(&signed) else {
+                panic!("expected NOT")
+            };
+            assert_eq!(negated.get_op(), UnaryOp::Not);
+            assert_eq!(negated.get_expression(), &signed);
+        }
+    }
+
+    #[test]
+    fn for_direction_guards_fold_without_losing_effectful_bounds() {
+        for (step, op) in [(1, BinOp::Greater), (-1, BinOp::Lower)] {
+            let source = ForStatement::empty(name("i"), integer(0), identifier("limit", 20), Some(Box::new(integer(step))), Vec::new());
+            for optimize in [false, true] {
+                let mut visitor = AstTransformationVisitor::new(optimize, Vec::new());
+                let Statement::Block(block) = visitor.visit_for_statement(&source) else {
+                    panic!("expected lowered FOR")
+                };
+                let Statement::If(condition) = &block.get_statements()[2] else {
+                    panic!("expected loop guard")
+                };
+                let Expression::Binary(binary) = condition.get_condition() else {
+                    panic!("expected comparison")
+                };
+                assert_eq!(binary.get_op(), if optimize { op } else { BinOp::And });
+                if optimize {
+                    assert_eq!(binary.get_right_expression(), &identifier("limit", 20));
+                }
+            }
+        }
+        let call = FunctionCallExpression::empty(identifier("nextLimit", 20), Vec::new());
+        let call_id = call.id;
+        let bound = BinaryExpression::empty(Expression::FunctionCall(call), BinOp::Add, integer(1));
+        let bound_id = bound.id;
+        let source = ForStatement::empty(name("i"), integer(0), Expression::Binary(bound), None, Vec::new());
+        let mut visitor = AstTransformationVisitor::new(true, Vec::new());
+        let Statement::Block(block) = visitor.visit_for_statement(&source) else {
+            panic!("expected lowered FOR")
+        };
+        let Statement::If(condition) = &block.get_statements()[2] else {
+            panic!("expected loop guard")
+        };
+        let mut ids = Ids::default();
+        condition.get_condition().visit(&mut ids);
+        assert_eq!(ids.calls, vec![call_id, call_id], "both eager bound evaluations must survive");
+        assert_eq!(ids.binaries.iter().filter(|id| **id == bound_id).count(), 2);
+    }
+
+    fn member_fixture() -> (AstTransformationVisitor, Expression) {
+        let mut registry = UserTypeRegistry::default();
+        let mut object = UserDataRegistry::default();
+        object.add_property(name("Flags"), VariableType::UserData(200), true);
+        registry.types.insert(30, object);
+        let mut visitor = AstTransformationVisitor::new(false, vec![flags()]);
+        visitor.set_semantic_input(TransformationSemanticInput {
+            function_type_lookup: &HashMap::new(),
+            enum_binary_types: &HashMap::new(),
+            user_type_lookup: &HashMap::from([(20, 30)]),
+            compound_target_types: &HashMap::new(),
+            type_registry: &registry,
+        });
+        let target = Expression::MemberReference(MemberReferenceExpression::new(
+            identifier("object", 10),
+            Spanned::new(Token::Dot, 19..20),
+            Spanned::new(Token::Identifier(name("Flags")), 20..25),
+        ));
+        (visitor, target)
+    }
+
+    fn last_setter(statement: &Statement) -> &FunctionCallExpression {
+        let Statement::Block(block) = statement else {
+            panic!("expected compound block")
+        };
+        let Some(Statement::MemberCall(setter)) = block.get_statements().last() else {
+            panic!("expected setter")
+        };
+        let Expression::FunctionCall(setter) = setter.get_expression() else {
+            panic!("expected setter call")
+        };
+        setter
+    }
+
+    #[test]
+    fn source_member_setter_keeps_call_id_and_generated_binary_gets_enum_type() {
+        let (mut visitor, target) = member_fixture();
+        let call = FunctionCallExpression::new(
+            target,
+            Spanned::new(Token::OrAssign, 26..28),
+            vec![identifier("mask", 30)],
+            Spanned::new(Token::Eq, 34..34),
+        );
+        let source_id = call.id;
+        visitor.function_type_lookup.insert(CallId(source_id), SemanticInfo::MemberSetterCall(0));
+        let lowered = visitor.visit_member_call_statement(&MemberCallStatement::new(Expression::FunctionCall(call)));
+        let setter = last_setter(&lowered);
+        assert_eq!(setter.id, source_id);
+        assert_eq!(setter.get_lpar_token(), &Spanned::new(Token::Eq, 26..28));
+        let Expression::Binary(binary) = &setter.get_arguments()[0] else {
+            panic!("expected compound binary")
+        };
+        let generated = visitor.take_generated_info();
+        assert_eq!(generated.enum_binary_types.get(&binary.id), Some(&200));
+        assert!(!generated.function_type_lookup.contains_key(&CallId(source_id)));
+        assert_eq!(generated.temporaries[&None].len(), 1);
+    }
+
+    #[test]
+    fn let_member_setter_gets_registry_annotation_without_visiting_semantics() {
+        let (mut visitor, target) = member_fixture();
+        let source = LetStatement::new(
+            None,
+            Spanned::new(Token::Identifier(name("object")), 10..16),
+            None,
+            Vec::new(),
+            None,
+            Vec::new(),
+            Spanned::new(Token::AndAssign, 26..28),
+            identifier("mask", 30),
+        )
+        .with_target_expression(target);
+        let lowered = visitor.visit_let_statement(&source);
+        let setter = last_setter(&lowered);
+        let Expression::Binary(binary) = &setter.get_arguments()[0] else {
+            panic!("expected compound binary")
+        };
+        let generated = visitor.take_generated_info();
+        assert_eq!(generated.function_type_lookup.get(&CallId(setter.id)), Some(&SemanticInfo::MemberSetterCall(0)));
+        assert_eq!(generated.enum_binary_types.get(&binary.id), Some(&200));
+    }
+
+    #[test]
+    fn scalar_and_array_compounds_use_resolved_source_target_type() {
+        for indexed in [false, true] {
+            let mut visitor = AstTransformationVisitor::new(true, vec![flags()]);
+            visitor.set_semantic_input(TransformationSemanticInput {
+                function_type_lookup: &HashMap::new(),
+                enum_binary_types: &HashMap::new(),
+                user_type_lookup: &HashMap::new(),
+                compound_target_types: &HashMap::from([(10, VariableType::UserData(200))]),
+                type_registry: &UserTypeRegistry::default(),
+            });
+            let source = LetStatement::new(
+                None,
+                Spanned::new(Token::Identifier(name("bits")), 10..14),
+                indexed.then(|| Spanned::new(Token::LPar, 14..15)),
+                if indexed { vec![integer(0)] } else { Vec::new() },
+                indexed.then(|| Spanned::new(Token::RPar, 16..17)),
+                Vec::new(),
+                Spanned::new(Token::OrAssign, 18..20),
+                identifier("mask", 21),
+            );
+            let Statement::Let(lowered) = visitor.visit_let_statement(&source) else {
+                panic!("unexpected captures")
+            };
+            let Expression::Binary(binary) = lowered.get_value_expression() else {
+                panic!("expected compound binary")
+            };
+            assert_eq!(visitor.take_generated_info().enum_binary_types.get(&binary.id), Some(&200));
+        }
+    }
+
+    #[test]
+    fn only_generated_declarations_are_drained_in_their_routine_scope() {
+        let declaration = Statement::VariableDeclaration(VariableDeclarationStatement::empty(
+            VariableType::Integer,
+            vec![VariableSpecifier::new(
+                Spanned::new(Token::Identifier(name("items")), 10..15),
+                None,
+                vec![DimensionSpecifier::dynamic()],
+                None,
+                None,
+                Some(Expression::ArrayInitializer(crate::ast::ArrayInitializerExpression::empty(Vec::new()))),
+            )],
+        ));
+        let mut program = Ast::new();
+        program.nodes = vec![
+            AstNode::Function(FunctionImplementation::empty(
+                0,
+                name("__M0_f"),
+                Vec::new(),
+                VariableType::Integer,
+                vec![declaration.clone()],
+            )),
+            AstNode::Procedure(ProcedureImplementation::empty(1, name("__M0_p"), Vec::new(), vec![declaration.clone()])),
+            AstNode::TopLevelStatement(declaration),
+        ];
+        let mut visitor = AstTransformationVisitor::new(false, Vec::new());
+        let _ = visitor.visit_ast(&program);
+        let generated = visitor.take_generated_info();
+        assert_eq!(generated.temporaries.len(), 3);
+        let mut names = HashSet::new();
+        for scope in [None, Some(name("__M0_f")), Some(name("__M0_p"))] {
+            let declarations = &generated.temporaries[&scope];
+            assert_eq!(declarations.len(), 1);
+            assert_eq!(declarations[0].0, VariableType::Integer);
+            assert!(declarations[0].1.get_dimensions()[0].is_dynamic());
+            assert!(declarations[0].1.get_identifier().starts_with("*(empty_array"));
+            names.insert(declarations[0].1.get_identifier().clone());
+        }
+        assert_eq!(names.len(), 3);
+        let drained = visitor.take_generated_info();
+        assert!(drained.temporaries.is_empty());
+        assert!(drained.function_type_lookup.is_empty());
+        assert!(drained.enum_binary_types.is_empty());
     }
 }

@@ -79,6 +79,13 @@ releases.
 
 ### Fixed
 
+- PPL compiler and language server now share source-level semantic analysis
+  before executable lowering and constant folding. Invalid expressions and
+  calls in dead branches are still diagnosed at their original source spans.
+  Lowering consumes checked annotations rather than rerunning source semantics;
+  generated HIR is validated before executable serialization. See the
+  [compiler architecture](docs/ppl_compiler_architecture.md).
+
 - `ppld` preserves expression grouping (including raw output), fractional
   arithmetic and function-call side effects. FOR reconstruction validates the
   counter, step direction and increment target; nested loops retain cross-loop

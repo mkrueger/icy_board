@@ -11,7 +11,7 @@ use icy_board_engine::ast::{
     PredefinedCallStatement, ProcedureCallStatement, RecordLiteralExpression, walk_function_call_expression, walk_function_declaration,
     walk_function_implementation, walk_predefined_call_statement, walk_procedure_call_statement, walk_variable_declaration_statement,
 };
-use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, lower_modules, workspace::CompilerData, workspace::Workspace};
+use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, workspace::CompilerData, workspace::Workspace};
 use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
@@ -1069,26 +1069,16 @@ impl Backend {
                 asts.push(ast);
             }
 
-            let mut semantic_visitor = SemanticVisitor::new(&ws, errors.clone(), registry);
-            semantic_visitor.set_modules(&asts.iter().collect::<Vec<_>>());
-            let lowered = lower_modules(&asts.iter().collect::<Vec<_>>(), errors, &semantic_visitor.type_registry);
-            semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
+            let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
+            // The editor keeps the original trees and visitor, not the lowering input.
+            semantic_visitor.analyze_sources(&asts.iter().collect::<Vec<_>>());
             // A file the manifest no longer names must not linger from an earlier read.
             self.workspace_map.clear();
-            for ast in lowered
-                .iter()
-                .filter(|ast| ast.module.is_some())
-                .chain(lowered.iter().filter(|ast| ast.module.is_none()))
-            {
-                semantic_visitor.set_file_name(&ast.file_name);
-                ast.visit(&mut semantic_visitor);
-            }
             for ast in asts {
                 if let Ok(uri) = Url::from_file_path(&ast.file_name) {
                     self.workspace_map.insert(uri, ast);
                 }
             }
-            semantic_visitor.finish();
 
             *self.workspace_visitor.lock().unwrap() = semantic_visitor;
             *self.workspace.lock().unwrap() = ws;
@@ -1145,10 +1135,13 @@ impl Backend {
 
     pub fn get_ast<T>(&self, uri: &Url, f: impl FnOnce(&Ast, &SemanticVisitor) -> T) -> Result<T> {
         if let Some(ast) = self.workspace_map.get(uri) {
-            return Ok(f(&ast, &self.workspace_visitor.lock().unwrap()));
+            let mut visitor = self.workspace_visitor.lock().unwrap();
+            visitor.select_source_file(&ast.file_name);
+            return Ok(f(&ast, &visitor));
         }
 
-        if let Some(result) = self.ast_map.lock().unwrap().get(uri) {
+        if let Some(result) = self.ast_map.lock().unwrap().get_mut(uri) {
+            result.1.select_source_file(&result.0.file_name);
             Ok(f(&result.0, &result.1))
         } else {
             Err(tower_lsp::jsonrpc::Error::internal_error())
@@ -1237,24 +1230,9 @@ impl Backend {
                     asts.push((cur_uri, ast));
                 }
 
-                let mut semantic_visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
-                let mut parsed = Vec::new();
-                semantic_visitor.set_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>());
-                let lowered = lower_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>(), errors, &semantic_visitor.type_registry);
-                semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
-                for ast in lowered
-                    .iter()
-                    .filter(|ast| ast.module.is_some())
-                    .chain(lowered.iter().filter(|ast| ast.module.is_none()))
-                {
-                    semantic_visitor.set_file_name(&ast.file_name);
-                    ast.visit(&mut semantic_visitor);
-                }
-                for (cur_uri, ast) in asts {
-                    parsed.push((cur_uri, ast));
-                }
-                semantic_visitor.finish();
-                (semantic_visitor, parsed)
+                let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
+                semantic_visitor.analyze_sources(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>());
+                (semantic_visitor, asts)
             };
 
             // The editor has moved on while this was being read; that edit brings
@@ -1276,12 +1254,8 @@ impl Backend {
             preparse_type_declarations(path.clone(), errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
             let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
 
-            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
-            semantic_visitor.set_modules(&[&ast]);
-            let lowered = lower_modules(&[&ast], errors, &semantic_visitor.type_registry);
-            semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
-            lowered[0].visit(&mut semantic_visitor);
-            semantic_visitor.finish();
+            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
+            semantic_visitor.analyze_sources(&[&ast]);
 
             if !self.is_current(uri, params.version) {
                 return None;

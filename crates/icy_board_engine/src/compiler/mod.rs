@@ -3,7 +3,9 @@ use workspace::Workspace;
 pub mod ast_transform;
 mod enum_lowering;
 mod hir_lowering;
-mod modules;
+#[cfg(test)]
+mod hir_validation_tests;
+pub(crate) mod modules;
 pub use modules::lower_modules;
 pub mod optimizer;
 pub mod user_data;
@@ -34,6 +36,12 @@ use optimizer::optimize_statements;
 
 #[derive(Error, Debug)]
 pub enum CompilationErrorType {
+    #[error("Cannot create an executable while source errors are present")]
+    SourceErrors,
+
+    #[error("Invalid lowered program at command {command_index}: {reason}")]
+    InvalidLoweredProgram { command_index: usize, reason: String },
+
     #[error("Label already used ({0})")]
     LabelAlreadyDefined(String),
 
@@ -269,6 +277,7 @@ struct LabelDescriptor {
 }
 
 pub struct PPECompiler {
+    source_valid: bool,
     runtime: u16,
     optimize: bool,
     lookup_table: LookupVariabeleTable,
@@ -282,14 +291,13 @@ pub struct PPECompiler {
 
     hir_program: HirProgram,
     commands: PPEScript,
-    compound_type_probe: SemanticVisitor,
 }
 
 impl PPECompiler {
     pub fn new(workspace: &Workspace, type_registry: UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
-        let compound_type_probe = SemanticVisitor::new(workspace, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
         let semantic_visitor = SemanticVisitor::new(workspace, errors, type_registry);
         Self {
+            source_valid: false,
             lookup_table: LookupVariabeleTable::default(),
             semantic_visitor,
             optimize: true,
@@ -300,7 +308,6 @@ impl PPECompiler {
             runtime: workspace.runtime(),
             hir_program: HirProgram::default(),
             commands: PPEScript::default(),
-            compound_type_probe,
         }
     }
 
@@ -326,110 +333,56 @@ impl PPECompiler {
     ///
     /// Panics if .
     pub fn compile(&mut self, asts: &[&Ast]) {
-        self.semantic_visitor.set_modules(asts);
-        let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone(), &self.semantic_visitor.type_registry);
-        let asts = lowered.iter().collect::<Vec<_>>();
-        self.semantic_visitor.prepare_legacy_call_signatures(&asts);
-        // Before introducing typed receiver temporaries, resolve whether a member
-        // belongs to a value record or a reference object. Probe diagnostics are
-        // discarded: the transformed AST receives the normal, authoritative check.
-        // Keep each file's span map separate, just as generated names stay unique
-        // across the whole package.
-        let mut compound_receiver_types = HashMap::new();
-        if asts.iter().any(|program| AstTransformationVisitor::needs_compound_receiver_types(program)) {
-            std::mem::swap(&mut self.compound_type_probe.type_registry, &mut self.semantic_visitor.type_registry);
-            self.compound_type_probe.set_modules(&asts);
-            self.compound_type_probe.prepare_legacy_call_signatures(&asts);
-            for program in asts
-                .iter()
-                .filter(|program| program.module.is_some())
-                .chain(asts.iter().filter(|program| program.module.is_none()))
-            {
-                self.compound_type_probe.set_file_name(&program.file_name);
-                self.compound_type_probe.user_type_lookup.clear();
-                program.visit(&mut self.compound_type_probe);
-                compound_receiver_types.insert(program.file_name.clone(), self.compound_type_probe.user_type_lookup.clone());
-            }
-            std::mem::swap(&mut self.compound_type_probe.type_registry, &mut self.semantic_visitor.type_registry);
+        let mut checked = self.semantic_visitor.analyze_sources(asts);
+        self.source_valid = checked.is_valid();
+        if !checked.is_valid() {
+            return;
         }
-        let mut visted = Vec::new();
-        // One transformer for the whole package, so its generated labels stay unique across files.
+        // One lowering context for the package keeps generated names unique.
+        // It consumes source annotations, never repeats source semantic analysis.
         let mut transformer = AstTransformationVisitor::new(self.optimize, self.semantic_visitor.type_registry.enums());
-        // Match semantic declaration order so imported constants are available
-        // when transforming root code, even when the root file is listed first.
-        for (index, prg) in asts
-            .iter()
-            .enumerate()
-            .filter(|(_, ast)| ast.module.is_some())
-            .chain(asts.iter().enumerate().filter(|(_, ast)| ast.module.is_none()))
-        {
-            self.semantic_visitor.set_file_name(&prg.file_name);
-            transformer.set_compound_receiver_types(
-                compound_receiver_types.remove(&prg.file_name).unwrap_or_default(),
-                &self.semantic_visitor.type_registry,
-            );
-            let prg = prg.visit_mut(&mut transformer);
-            visted.push((index, prg, transformer.take_loop_counters()));
+        let order: Vec<_> = (0..checked.files.len())
+            .filter(|&index| checked.files[index].ast.module.is_some())
+            .chain((0..checked.files.len()).filter(|&index| checked.files[index].ast.module.is_none()))
+            .collect();
+        for index in order {
+            let file = &mut checked.files[index];
+            self.semantic_visitor.set_file_name(&file.ast.file_name);
+            transformer.set_semantic_input(TransformationSemanticInput {
+                function_type_lookup: &self.semantic_visitor.function_type_lookup,
+                enum_binary_types: &self.semantic_visitor.enum_binary_types,
+                user_type_lookup: &file.annotations.user_types,
+                compound_target_types: &file.annotations.compound_targets,
+                type_registry: &self.semantic_visitor.type_registry,
+            });
+            file.ast = file.ast.visit_mut(&mut transformer);
+            let generated = transformer.take_generated_info();
+            self.semantic_visitor.register_lowering_temporaries(generated.temporaries);
+            self.semantic_visitor.function_type_lookup.extend(generated.function_type_lookup);
+            self.semantic_visitor.enum_binary_types.extend(generated.enum_binary_types);
+            file.ast = file
+                .ast
+                .visit_mut(&mut enum_lowering::EnumLoweringVisitor::new(&self.semantic_visitor.type_registry));
         }
-        // Transformation order must not change the root/function emission order.
-        visted.sort_by_key(|(index, _, _)| *index);
-        let mut visted: Vec<_> = visted.into_iter().map(|(_, prg, counters)| (prg, counters)).collect();
-        // Imported module declarations must be known before the root program is
-        // checked, but the root file must remain first when code is emitted.
-        let mut member_lookups = HashMap::new();
-        for (prg, loop_counters) in visted
-            .iter()
-            .filter(|(program, _)| program.module.is_some())
-            .chain(visted.iter().filter(|(program, _)| program.module.is_none()))
-        {
-            self.semantic_visitor.set_file_name(&prg.file_name);
-            self.semantic_visitor.set_loop_counters(loop_counters.clone());
-            prg.visit(&mut self.semantic_visitor);
-            // These keys are file-local source offsets. Keep the authoritative
-            // maps with their file until that file's statements/routines emit.
-            member_lookups.insert(
-                prg.file_name.clone(),
-                (
-                    std::mem::take(&mut self.semantic_visitor.user_type_lookup),
-                    std::mem::take(&mut self.semantic_visitor.member_receiver_type_lookup),
-                    std::mem::take(&mut self.semantic_visitor.instance_provider_lookup),
-                    std::mem::take(&mut self.semantic_visitor.static_receiver_lookup),
-                ),
-            );
+        self.lookup_table = self.semantic_visitor.generate_storage_table();
+        for file in checked.files.iter().filter(|file| file.ast.module.is_some()) {
+            self.semantic_visitor.set_file_name(&file.ast.file_name);
+            file.annotations.restore(&mut self.semantic_visitor);
+            self.compile_program_statements(&file.ast);
         }
-        self.semantic_visitor.finish();
-
-        for (program, _) in &mut visted {
-            *program = program.visit_mut(&mut enum_lowering::EnumLoweringVisitor::new(&self.semantic_visitor.type_registry));
-        }
-
-        self.lookup_table = self.semantic_visitor.generate_variable_table();
-        for (program, _) in visted.iter().filter(|(program, _)| program.module.is_some()) {
-            let (types, receivers, instances, statics) = &member_lookups[&program.file_name];
-            self.semantic_visitor.user_type_lookup.clone_from(types);
-            self.semantic_visitor.member_receiver_type_lookup.clone_from(receivers);
-            self.semantic_visitor.instance_provider_lookup.clone_from(instances);
-            self.semantic_visitor.static_receiver_lookup.clone_from(statics);
-            self.compile_program_statements(program);
-        }
-        for (prg, _) in visted {
-            self.semantic_visitor.set_file_name(&prg.file_name);
-            let (types, receivers, instances, statics) = member_lookups.remove(&prg.file_name).unwrap();
-            self.semantic_visitor.user_type_lookup = types;
-            self.semantic_visitor.member_receiver_type_lookup = receivers;
-            self.semantic_visitor.instance_provider_lookup = instances;
-            self.semantic_visitor.static_receiver_lookup = statics;
-            if prg.module.is_none() {
-                self.compile_program_statements(&prg);
+        for file in checked.files {
+            self.semantic_visitor.set_file_name(&file.ast.file_name);
+            file.annotations.restore(&mut self.semantic_visitor);
+            if file.ast.module.is_none() {
+                self.compile_program_statements(&file.ast);
             }
-
             if !matches!(self.hir_program.commands.last(), Some(HirCommand::End)) {
                 self.add_hir_command(HirCommand::End);
             }
-
-            self.compile_functions(&prg);
+            self.compile_functions(&file.ast);
         }
         self.fill_labels();
+        self.source_valid = !self.semantic_visitor.errors.lock().unwrap().has_errors();
     }
 
     fn compile_program_statements(&mut self, program: &Ast) {
@@ -525,9 +478,7 @@ impl PPECompiler {
             let body_start = (self.cur_offset + hir_lowering::lower_command(&command).get_size()) * 2;
             self.add_hir_command(command);
             self.foreach_stack.push((body_start, end_label));
-            for statement in foreach_stmt.get_statements() {
-                self.compile_add_statement(statement);
-            }
+            self.compile_statement_sequence(foreach_stmt.get_statements());
             self.foreach_stack.pop();
             self.add_hir_command(HirCommand::NextForEach(CodeOffset(body_start)));
             self.label_table[end_label].offset = Some(self.cur_offset);
@@ -776,13 +727,23 @@ impl PPECompiler {
         true
     }
 
-    /// .
+    /// Create output only when source diagnostics and lowered structure are valid.
     ///
     /// # Errors
     ///
-    /// This function will return an error if .
+    /// Returns `SourceErrors` for existing source errors, `InvalidLoweredProgram`
+    /// for malformed HIR, or an executable format/runtime limit error.
     pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
+        if !self.source_valid {
+            return Err(CompilationErrorType::SourceErrors);
+        }
         let declaration_count = self.lookup_table.variable_table.len();
+        self.hir_program
+            .validate(declaration_count, self.label_table.len())
+            .map_err(|error| CompilationErrorType::InvalidLoweredProgram {
+                command_index: error.command_index,
+                reason: error.reason,
+            })?;
         if declaration_count > i16::MAX as usize {
             return Err(CompilationErrorType::TooManyDeclarations(declaration_count, i16::MAX as usize));
         }

@@ -395,6 +395,8 @@ pub fn walk_block_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, block: &Bl
     }
 }
 
+/// Source-preserving traversal: defaults retain tokens and parse-assigned IDs
+/// while transforming children. Synthetic lowering belongs in visitor overrides.
 #[allow(unused_variables)]
 pub trait AstVisitorMut: Sized {
     fn visit_identifier(&mut self, id: &unicase::Ascii<String>) -> unicase::Ascii<String> {
@@ -429,14 +431,17 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> Expression {
-        let left = binary.get_left_expression().visit_mut(self);
-        let right = binary.get_right_expression().visit_mut(self);
-        Expression::Binary(BinaryExpression::empty(left, binary.get_op(), right))
+        let mut result = binary.clone();
+        *result.get_left_expression_mut() = binary.get_left_expression().visit_mut(self);
+        *result.get_right_expression_mut() = binary.get_right_expression().visit_mut(self);
+        Expression::Binary(result)
     }
 
     fn visit_array_expression(&mut self, array_expr: &ArrayInitializerExpression) -> Expression {
-        Expression::ArrayInitializer(ArrayInitializerExpression::empty(
+        Expression::ArrayInitializer(ArrayInitializerExpression::new(
+            array_expr.get_lbrace_token().clone(),
             array_expr.get_expressions().iter().map(|arg| arg.visit_mut(self)).collect(),
+            array_expr.get_rbrace_token().clone(),
         ))
     }
     fn visit_record_literal_expression(&mut self, record: &RecordLiteralExpression) -> Expression {
@@ -455,15 +460,13 @@ pub trait AstVisitorMut: Sized {
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> Expression {
         let expr = unary.get_expression().visit_mut(self);
-        Expression::Unary(UnaryExpression::empty(unary.get_op(), expr))
+        Expression::Unary(UnaryExpression::new(unary.get_op_token().clone(), expr))
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Expression {
-        Expression::FunctionCall(FunctionCallExpression::new(
+        Expression::FunctionCall(call.preserving_id(
             call.get_expression().visit_mut(self),
-            call.get_lpar_token().clone(),
             call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
-            call.get_rpar_token().clone(),
         ))
     }
 
@@ -480,7 +483,11 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_parens_expression(&mut self, parens: &ParensExpression) -> Expression {
-        Expression::Parens(ParensExpression::empty(parens.get_expression().visit_mut(self)))
+        Expression::Parens(ParensExpression::new(
+            parens.get_lpar_token().clone(),
+            parens.get_expression().visit_mut(self),
+            parens.get_rpar_token().clone(),
+        ))
     }
 
     // visit statements
@@ -493,42 +500,46 @@ pub trait AstVisitorMut: Sized {
         block.with_statements(block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect())
     }
     fn visit_if_statement(&mut self, if_stmt: &IfStatement) -> Statement {
-        Statement::If(IfStatement::empty(
-            self.visit_condition(if_stmt.get_condition()),
-            if_stmt.get_statement().visit_mut(self),
-        ))
+        let mut result = if_stmt.clone();
+        *result.get_condition_mut() = self.visit_condition(if_stmt.get_condition());
+        *result.get_statement_mut() = if_stmt.get_statement().visit_mut(self);
+        Statement::If(result)
     }
 
     fn visit_if_then_statement(&mut self, if_then: &IfThenStatement) -> Statement {
-        Statement::IfThen(IfThenStatement::empty(
-            self.visit_condition(if_then.get_condition()),
-            if_then.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            if_then.get_else_if_blocks().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            if_then.get_else_block().as_ref().map(|else_block| else_block.visit_mut(self)),
-        ))
+        let mut result = if_then.clone();
+        *result.get_condition_mut() = self.visit_condition(if_then.get_condition());
+        *result.get_statements_mut() = if_then.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        *result.get_else_if_blocks_mut() = if_then.get_else_if_blocks().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        *result.get_else_block_mut() = if_then.get_else_block().as_ref().map(|else_block| else_block.visit_mut(self));
+        Statement::IfThen(result)
     }
 
     fn visit_else_if_block(&mut self, else_if: &ElseIfBlock) -> ElseIfBlock {
-        ElseIfBlock::empty(
-            self.visit_condition(else_if.get_condition()),
-            else_if.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-        )
+        let mut result = else_if.clone();
+        *result.get_condition_mut() = self.visit_condition(else_if.get_condition());
+        *result.get_statements_mut() = else_if.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        result
     }
 
     fn visit_else_block(&mut self, else_block: &ElseBlock) -> ElseBlock {
-        ElseBlock::empty(else_block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect())
+        ElseBlock::new(
+            else_block.get_else_token().clone(),
+            else_block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+        )
     }
 
     fn visit_select_statement(&mut self, select_stmt: &SelectStatement) -> Statement {
-        Statement::Select(SelectStatement::empty(
-            select_stmt.get_expression().visit_mut(self),
-            select_stmt.get_case_blocks().iter().map(|block| block.visit_mut(self)).collect(),
-            select_stmt.get_default_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-        ))
+        let mut result = select_stmt.clone();
+        *result.get_expression_mut() = select_stmt.get_expression().visit_mut(self);
+        *result.get_case_blocks_mut() = select_stmt.get_case_blocks().iter().map(|block| block.visit_mut(self)).collect();
+        *result.get_default_statements_mut() = select_stmt.get_default_statements().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        Statement::Select(result)
     }
 
     fn visit_case_block(&mut self, case_block: &CaseBlock) -> CaseBlock {
-        CaseBlock::empty(
+        CaseBlock::new(
+            case_block.get_case_token().clone(),
             case_block.get_case_specifiers().iter().map(|specifier| specifier.visit_mut(self)).collect(),
             case_block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
         )
@@ -542,29 +553,31 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_while_statement(&mut self, while_stmt: &WhileStatement) -> Statement {
-        Statement::While(WhileStatement::empty(
-            self.visit_condition(while_stmt.get_condition()),
-            while_stmt.get_statement().visit_mut(self),
-        ))
+        let mut result = while_stmt.clone();
+        *result.get_condition_mut() = self.visit_condition(while_stmt.get_condition());
+        *result.get_statement_mut() = while_stmt.get_statement().visit_mut(self);
+        Statement::While(result)
     }
 
     fn visit_while_do_statement(&mut self, while_do: &WhileDoStatement) -> Statement {
-        Statement::WhileDo(WhileDoStatement::empty(
-            self.visit_condition(while_do.get_condition()),
-            while_do.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-        ))
+        let mut result = while_do.clone();
+        *result.get_condition_mut() = self.visit_condition(while_do.get_condition());
+        *result.get_statements_mut() = while_do.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        Statement::WhileDo(result)
     }
 
     fn visit_repeat_until_statement(&mut self, repeat_until: &RepeatUntilStatement) -> Statement {
-        Statement::RepeatUntil(RepeatUntilStatement::empty(
-            self.visit_condition(repeat_until.get_condition()),
-            repeat_until.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-        ))
+        let mut result = repeat_until.clone();
+        *result.get_condition_mut() = self.visit_condition(repeat_until.get_condition());
+        *result.get_statements_mut() = repeat_until.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect();
+        Statement::RepeatUntil(result)
     }
 
     fn visit_loop_statement(&mut self, loop_stmt: &LoopStatement) -> Statement {
-        Statement::Loop(LoopStatement::empty(
+        Statement::Loop(LoopStatement::new(
+            loop_stmt.get_loop_token().clone(),
             loop_stmt.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+            loop_stmt.get_endloop_token().clone(),
         ))
     }
 

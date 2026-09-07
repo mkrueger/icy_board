@@ -31,7 +31,9 @@ const EXPECTED_CODE_SIZE: &[(&str, usize)] = &[
     ("oracle_type_coercion.pps", 362),
     ("push_pop_test.pps", 46),
     ("recurse.pps", 144),
-    ("select_case.pps", 510),
+    // Source-aware boolean reachability now removes the nested IF TRUE/FALSE
+    // bodies; select_constant_branches_emit_only_the_live_body guards this.
+    ("select_case.pps", 478),
     ("sort.pps", 218),
     ("string_functions.pps", 492),
     ("test_constants.pps", 914),
@@ -108,6 +110,16 @@ fn test_the_emitted_code_does_not_grow() {
         .join("\n");
 
     panic!("emitted code size changed:\n{report}\nupdate EXPECTED_CODE_SIZE to:\n{table}");
+}
+
+#[test]
+fn select_constant_branches_emit_only_the_live_body() {
+    let path = Path::new("tests/test_data/select_case.pps");
+    let source = fs::read_to_string(path).unwrap();
+    let dead_branches = "    IF TRUE THEN\n        IF FALSE THEN\n            PRINTLN \"2\"\n        ENDIF\n        PRINTLN \"1\"\n    ENDIF";
+    assert!(source.contains(dead_branches));
+    let simplified = source.replace(dead_branches, "    PRINTLN \"1\"");
+    assert_eq!(code_size(path, &source), code_size(path, &simplified));
 }
 
 #[test]

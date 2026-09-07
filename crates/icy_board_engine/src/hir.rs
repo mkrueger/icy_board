@@ -47,6 +47,37 @@ pub struct HirProgram {
     pub commands: Vec<HirCommand>,
 }
 
+/// The first structural failure, with a zero-based HIR command index.
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("Invalid lowered program at command {command_index}: {reason}")]
+pub struct HirValidationError {
+    pub command_index: usize,
+    pub reason: String,
+}
+
+impl HirProgram {
+    /// Validate resolved structure, not operand types, arity or control-flow semantics.
+    /// Storage IDs share the one-based variable table; labels remain zero-based HIR
+    /// identities even after the compiler patches the separate PPE command stream.
+    /// Code offsets and member/type IDs belong to other domains and are not checked here.
+    pub fn validate(&self, declaration_count: usize, label_count: usize) -> Result<(), HirValidationError> {
+        for (command_index, command) in self.commands.iter().enumerate() {
+            command
+                .validate(declaration_count, label_count)
+                .map_err(|reason| HirValidationError { command_index, reason })?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_storage_id(kind: &str, id: usize, declaration_count: usize) -> Result<(), String> {
+    if id == 0 || id > declaration_count {
+        Err(format!("{kind}({id}) is outside the one-based variable table ({declaration_count} entries)"))
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum HirExpr {
     #[default]
@@ -92,6 +123,34 @@ pub enum HirCommand {
 }
 
 impl HirExpr {
+    fn validate(&self, declaration_count: usize) -> Result<(), String> {
+        match self {
+            Self::Invalid => Err("unresolved HirExpr::Invalid".to_string()),
+            Self::Variable(id) => validate_storage_id("VariableId", id.0, declaration_count),
+            Self::Constant(id) => validate_storage_id("ConstantId", id.0, declaration_count),
+            Self::RoutineReference(id) => validate_storage_id("RoutineId", id.0, declaration_count),
+            Self::RecordLiteral(_, fields) => fields.iter().try_for_each(|(_, value)| value.validate(declaration_count)),
+            Self::Member(base, _) | Self::Unary(_, base) => base.validate(declaration_count),
+            Self::Binary(_, left, right) => {
+                left.validate(declaration_count)?;
+                right.validate(declaration_count)
+            }
+            Self::Dim(id, arguments) => {
+                validate_storage_id("VariableId", id.0, declaration_count)?;
+                arguments.iter().try_for_each(|argument| argument.validate(declaration_count))
+            }
+            Self::FunctionCall(id, arguments) => {
+                validate_storage_id("RoutineId", id.0, declaration_count)?;
+                arguments.iter().try_for_each(|argument| argument.validate(declaration_count))
+            }
+            Self::PredefinedCall(_, arguments) => arguments.iter().try_for_each(|argument| argument.validate(declaration_count)),
+            Self::IndexedMember(base, _, arguments) | Self::MemberCall(base, arguments, _) => {
+                base.validate(declaration_count)?;
+                arguments.iter().try_for_each(|argument| argument.validate(declaration_count))
+            }
+        }
+    }
+
     pub fn variable(id: usize) -> Self {
         Self::Variable(VariableId(id))
     }
@@ -126,5 +185,45 @@ impl HirExpr {
 
     pub fn member_call(receiver: Self, arguments: Vec<Self>, member: usize) -> Self {
         Self::MemberCall(Box::new(receiver), arguments, MemberId(member))
+    }
+}
+
+impl HirCommand {
+    fn validate(&self, declaration_count: usize, label_count: usize) -> Result<(), String> {
+        let label = |id: LabelId| {
+            if id.0 >= label_count {
+                Err(format!("LabelId({}) is outside the zero-based label table ({label_count} entries)", id.0))
+            } else {
+                Ok(())
+            }
+        };
+        match self {
+            Self::End | Self::EndFunction | Self::EndProcedure | Self::Return | Self::NextForEach(_) => Ok(()),
+            Self::Goto(id) | Self::Gosub(id) => label(*id),
+            Self::OnError(target) => match target {
+                HirErrorTarget::Off => Ok(()),
+                HirErrorTarget::Goto(id) | HirErrorTarget::Gosub(id) => label(*id),
+                HirErrorTarget::Procedure(id) => validate_storage_id("RoutineId", id.0, declaration_count),
+            },
+            Self::ConditionalGoto(condition, id) => {
+                condition.validate(declaration_count)?;
+                label(*id)
+            }
+            Self::Let(target, value) => {
+                target.validate(declaration_count)?;
+                value.validate(declaration_count)
+            }
+            Self::MemberCall(expression) => expression.validate(declaration_count),
+            Self::PredefinedCall(_, arguments) => arguments.iter().try_for_each(|argument| argument.validate(declaration_count)),
+            Self::ProcedureCall(id, arguments) => {
+                validate_storage_id("RoutineId", id.0, declaration_count)?;
+                arguments.iter().try_for_each(|argument| argument.validate(declaration_count))
+            }
+            Self::ForEach(id, collection, end) => {
+                validate_storage_id("VariableId", id.0, declaration_count)?;
+                collection.validate(declaration_count)?;
+                label(*end)
+            }
+        }
     }
 }

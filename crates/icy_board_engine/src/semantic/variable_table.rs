@@ -85,8 +85,10 @@ impl LookupVariabeleTable {
                 }
             }
         }
-        log::error!("Constant not found {constant:?}");
-        0
+        // Lowering and constant folding introduce values absent from the source
+        // AST. Intern them here; they do not require another semantic pass.
+        self.add_constant(constant);
+        self.lookup_constant(constant)
     }
 
     pub(super) fn start_define_function_body(&mut self, identifier: unicase::Ascii<String>) {
@@ -120,8 +122,12 @@ impl LookupVariabeleTable {
         };
 
         let const_num = self.string_lookup_table.len() + self.const_lookup_table.len() + 1;
-        let entry = TableEntry::new(format!("CONST_{}", const_num + 1), header, value.clone(), EntryType::Constant);
-        let id = self.push(entry);
+        let mut entry = TableEntry::new(format!("CONST_{}", const_num + 1), header, value.clone(), EntryType::Constant);
+        // Pool labels are not source symbols. In particular, lazy interning must
+        // never shadow a user's CONST_2 (global or local) during code generation.
+        let id = self.variable_table.len() + 1;
+        entry.header.id = id;
+        self.variable_table.push(entry);
         if let GenericVariableData::String(value) = value.generic_data {
             self.string_lookup_table.insert(std::sync::Arc::unwrap_or_clone(value), id);
         } else {

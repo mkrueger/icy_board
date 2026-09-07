@@ -401,6 +401,23 @@ END SELECT",
 }
 
 #[test]
+fn source_provenance_select_selector_and_case_operand_spans() {
+    for spacing in [" ", "  \t "] {
+        let source = format!("SELECT CASE{spacing}missingSelector\nCASE{spacing}missingCase\nEND SELECT");
+        let Statement::Select(statement) = parse_statement(&source, true) else {
+            panic!("expected SELECT");
+        };
+        let start = source.find("missingSelector").unwrap();
+        assert_eq!(statement.get_expression().get_span(), start..start + "missingSelector".len());
+        let CaseSpecifier::Expression(operand) = &statement.get_case_blocks()[0].get_case_specifiers()[0] else {
+            panic!("expected CASE expression");
+        };
+        let start = source.find("missingCase").unwrap();
+        assert_eq!(operand.get_span(), start..start + "missingCase".len());
+    }
+}
+
+#[test]
 fn test_select_statement() {
     check_statement(
         r"SELECT CASE A

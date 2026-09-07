@@ -75,37 +75,33 @@ impl<'a> Parser<'a> {
 
             if is_on {
                 let start = self.lex.span().start;
-                let end = self.lex.span().end;
                 if let Some(lookahead) = self.lex.next_token() {
                     if lookahead == Token::Identifier(ERROR_TOKEN.clone()) {
                         self.cur_token = Some(Spanned::new(Token::OnError, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token = Some(Spanned::new(lookahead, end..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahead, self.lex.span()));
                     }
                 }
             } else if is_else {
                 let start = self.lex.span().start;
-                let end = self.lex.span().end;
                 if let Some(lookahead) = self.lex.next_token() {
                     if lookahead == Token::If {
                         self.cur_token = Some(Spanned::new(Token::ElseIf, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token = Some(Spanned::new(lookahead, end..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahead, self.lex.span()));
                     }
                 }
             } else if is_case {
                 let start = self.lex.span().start;
-                let end = self.lex.span().end;
                 if let Some(lookahead) = self.lex.next_token() {
                     if lookahead == Token::Else {
                         self.cur_token = Some(Spanned::new(Token::Default, start..self.lex.span().end));
                     } else {
-                        self.lookahead_token = Some(Spanned::new(lookahead, end..self.lex.span().end));
+                        self.lookahead_token = Some(Spanned::new(lookahead, self.lex.span()));
                     }
                 }
             } else if is_end {
                 let start = self.lex.span().start;
-                let end = self.lex.span().end;
                 if let Some(lookahead) = self.lex.next_token() {
                     match lookahead {
                         Token::If => {
@@ -132,10 +128,10 @@ impl<'a> Parser<'a> {
                         _ => {
                             let set_lookahead = if let Token::Identifier(identifier) = &lookahead {
                                 if *identifier == *PROC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(Token::EndProc, end..self.lex.span().end));
+                                    self.cur_token = Some(Spanned::new(Token::EndProc, start..self.lex.span().end));
                                     false
                                 } else if *identifier == *FUNC_TOKEN {
-                                    self.cur_token = Some(Spanned::new(Token::EndFunc, end..self.lex.span().end));
+                                    self.cur_token = Some(Spanned::new(Token::EndFunc, start..self.lex.span().end));
                                     false
                                 } else {
                                     true
@@ -145,7 +141,7 @@ impl<'a> Parser<'a> {
                             };
 
                             if set_lookahead {
-                                self.lookahead_token = Some(Spanned::new(lookahead, end..self.lex.span().end));
+                                self.lookahead_token = Some(Spanned::new(lookahead, self.lex.span()));
                             }
                         }
                     }
@@ -189,5 +185,51 @@ impl<'a> Parser<'a> {
         self.cur_token = current_token;
         self.lookahead_token = lookahead_token;
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_provenance_unfolded_lookahead_keeps_lexer_span() {
+        for prefix in ["", "; é😀\r\n"] {
+            for keyword in ["CASE", "ELSE", "ON", "END"] {
+                for spacing in [" ", "  \t ", "\r\n  "] {
+                    let source = format!("{prefix}{keyword}{spacing}missing");
+                    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                    let registry = UserTypeRegistry::default();
+                    let mut parser = Parser::new(PathBuf::from("."), errors, &registry, &source, Encoding::Utf8, &Workspace::default());
+                    parser.next_token();
+                    parser.skip_eol_and_comments();
+                    let start = prefix.chars().count();
+                    assert_eq!(parser.save_token_span(), start..start + keyword.len(), "{source:?}");
+                    parser.next_token();
+                    parser.skip_eol();
+                    assert_eq!(parser.get_cur_token(), Some(Token::Identifier(Ascii::new("missing".to_string()))));
+                    let start = source[..source.find("missing").unwrap()].chars().count();
+                    assert_eq!(parser.save_token_span(), start..start + "missing".len(), "{source:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn source_provenance_compound_keywords_cover_both_words() {
+        for (source, expected) in [
+            ("ON  ERROR", Token::OnError),
+            ("ELSE\tIF", Token::ElseIf),
+            ("CASE  ELSE", Token::Default),
+            ("END SELECT", Token::EndSelect),
+            ("END  PROC", Token::EndProc),
+            ("END\tFUNC", Token::EndFunc),
+        ] {
+            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+            let registry = UserTypeRegistry::default();
+            let mut parser = Parser::new(PathBuf::from("."), errors, &registry, source, Encoding::Utf8, &Workspace::default());
+            assert_eq!(parser.next_token(), Some(Spanned::new(expected, 0..source.len())), "{source:?}");
+            assert!(parser.next_token().is_none());
+        }
     }
 }

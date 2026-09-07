@@ -153,6 +153,31 @@ fn a_constant_may_hold_an_enum_member() {
     assert!(errors.iter().any(|e| e == "Can't assign Color to Integer"), "{errors:?}");
 }
 
+/// Substitution must retain the checked bitwise operation, not add a cast per use.
+#[test]
+fn checked_enum_constants_keep_bitwise_bytecode_equal_to_members() {
+    // Intern the shared value before the bitwise type ID in both programs;
+    // this isolates lowering from source constant-pool insertion order.
+    let flags = "ENUM Bits\n Zero = 0\n One = 1\n Two = 2\n Both = 3\nENDENUM\nPRINTLN Bits.Both\n";
+    let named = compile(&format!(
+        "{flags}CONST Bits Mask = Bits.Both\nBits value = Bits.One\nvalue |= Mask\nIF ((value & Mask) = Mask) PRINTLN value\n"
+    ))
+    .unwrap();
+    let members = compile(&format!(
+        "{flags}Bits value = Bits.One\nvalue |= Bits.Both\nIF ((value & Bits.Both) = Bits.Both) PRINTLN value\n"
+    ))
+    .unwrap();
+    assert_eq!(members.to_buffer().unwrap(), named.to_buffer().unwrap());
+}
+
+#[test]
+fn checked_unnamed_enum_constants_need_no_runtime_cast() {
+    // Built-in flag enums admit combinations without a named variant.
+    let named = compile("CONST RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.MultiLine\nPRINTLN Options\n").unwrap();
+    let literal = compile("PRINTLN 3\n").unwrap();
+    assert_eq!(literal.to_buffer().unwrap(), named.to_buffer().unwrap());
+}
+
 /// The declared type decides what the value is written as, not the literal.
 #[test]
 fn the_declared_type_decides_the_constant() {

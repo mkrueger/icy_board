@@ -39,7 +39,15 @@ struct ModuleInfo {
 
 type ModuleCatalog = HashMap<Ascii<String>, ModuleInfo>;
 
+/// Compatibility entry point for callers that only need source name binding.
+/// Executable desugaring is deliberately not part of this phase.
 pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>, registry: &UserTypeRegistry) -> Vec<Ast> {
+    bind_sources(asts, errors, registry)
+}
+
+/// Resolve module namespaces and legacy declaration kinds as part of source
+/// semantics. Keep source control flow, operands, spans and call identities.
+pub(crate) fn bind_sources(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>, registry: &UserTypeRegistry) -> Vec<Ast> {
     let mut catalog = ModuleCatalog::new();
 
     for (module_index, ast) in asts.iter().enumerate() {
@@ -621,6 +629,140 @@ mod tests {
         parser::{Encoding, UserTypeRegistry, parse_ast},
     };
     use std::path::PathBuf;
+
+    #[derive(Debug, Default, PartialEq)]
+    struct ExpressionProvenance {
+        calls: Vec<(u64, Spanned<Token>, Spanned<Token>)>,
+        binaries: Vec<(u64, Spanned<Token>)>,
+        unaries: Vec<Spanned<Token>>,
+    }
+
+    impl AstVisitor<()> for ExpressionProvenance {
+        fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) {
+            self.calls.push((call.id, call.get_lpar_token().clone(), call.get_rpar_token().clone()));
+            crate::ast::walk_function_call_expression(self, call);
+        }
+
+        fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) {
+            self.binaries.push((binary.id, binary.get_op_token().clone()));
+            crate::ast::walk_binary_expression(self, binary);
+        }
+
+        fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) {
+            self.unaries.push(unary.get_op_token().clone());
+            unary.get_expression().visit(self);
+        }
+    }
+
+    #[test]
+    fn source_provenance_binding_keeps_expression_ids_and_module_tokens() {
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let registry = UserTypeRegistry::icy_board_registry();
+        let workspace = Workspace::default();
+        let module = parse_ast(
+            PathBuf::from("values.pps"),
+            errors.clone(),
+            "MODULE Values\nFUNCTION Answer(INTEGER n) INTEGER\n RETURN -n + Answer(n)\nENDFUNC\nENDMODULE\n",
+            &registry,
+            Encoding::Utf8,
+            &workspace,
+        );
+        let main = parse_ast(
+            PathBuf::from("main.pps"),
+            errors.clone(),
+            "IMPORT Values AS V\nPRINTLN -V.Answer(1 + V.Answer(2))\n",
+            &registry,
+            Encoding::Utf8,
+            &workspace,
+        );
+        let bound = bind_sources(&[&module, &main], errors.clone(), &registry);
+        assert!(!errors.lock().unwrap().has_errors());
+        for (source, bound) in [&module, &main].into_iter().zip(&bound) {
+            let mut before = ExpressionProvenance::default();
+            let mut after = ExpressionProvenance::default();
+            source.visit(&mut before);
+            bound.visit(&mut after);
+            assert!(!before.calls.is_empty());
+            assert!(!before.binaries.is_empty());
+            assert!(!before.unaries.is_empty());
+            assert_eq!(before, after);
+        }
+        let function = |ast: &Ast| {
+            ast.nodes
+                .iter()
+                .find_map(|node| match node {
+                    AstNode::Function(function) => Some(function.clone()),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let before = function(&module);
+        let after = function(&bound[0]);
+        assert_eq!(before.id, after.id);
+        assert_eq!(before.get_identifier_token().span, after.get_identifier_token().span);
+        assert_eq!(after.get_identifier().as_str(), "__M0_Answer");
+        assert_eq!(before.get_function_token(), after.get_function_token());
+        assert_eq!(before.get_endfunc_token(), after.get_endfunc_token());
+        assert_eq!(before.get_parameters(), after.get_parameters());
+    }
+
+    #[test]
+    fn source_provenance_legacy_kind_normalization_keeps_routine_and_return_operand() {
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let registry = UserTypeRegistry::icy_board_registry();
+        let source = parse_ast(
+            PathBuf::from("legacy.pps"),
+            errors.clone(),
+            ";$LANGVERSION 340\nDECLARE PROCEDURE Work(INTEGER n)\nEND\nFUNCTION Work(INTEGER n) INTEGER\n RETURN -ABS(n) + 1\nENDFUNC\n",
+            &registry,
+            Encoding::Utf8,
+            &Workspace::default(),
+        );
+        let bound = bind_sources(&[&source], errors.clone(), &registry);
+        assert!(!errors.lock().unwrap().has_errors());
+        let before = source
+            .nodes
+            .iter()
+            .find_map(|node| match node {
+                AstNode::Function(function) => Some(function),
+                _ => None,
+            })
+            .unwrap();
+        let after = bound[0]
+            .nodes
+            .iter()
+            .find_map(|node| match node {
+                AstNode::Procedure(procedure) => Some(procedure),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(before.id, after.id);
+        assert_eq!(before.get_identifier_token(), after.get_identifier_token());
+        assert_eq!(before.get_function_token().span, after.get_procedure_token().span);
+        assert_eq!(before.get_endfunc_token().span, after.get_endproc_token().span);
+        assert_eq!(before.get_parameters(), after.get_parameters());
+        let mut original = ExpressionProvenance::default();
+        let mut normalized = ExpressionProvenance::default();
+        walk_function_implementation(&mut original, before);
+        walk_procedure_implementation(&mut normalized, after);
+        assert_eq!(original.calls.len(), 1);
+        assert_eq!(original.binaries.len(), 1);
+        assert_eq!(original, normalized);
+        let Statement::Return(ret) = &before.get_statements()[0] else {
+            panic!("expected RETURN")
+        };
+        let Statement::Block(block) = &after.get_statements()[0] else {
+            panic!("expected normalized RETURN block")
+        };
+        let Statement::Let(assignment) = &block.get_statements()[0] else {
+            panic!("expected return assignment")
+        };
+        let Statement::Return(bare_return) = &block.get_statements()[1] else {
+            panic!("expected bare RETURN")
+        };
+        assert_eq!(ret.get_expression().as_ref().unwrap(), assignment.get_value_expression());
+        assert_eq!(ret.get_return_token(), bare_return.get_return_token());
+    }
 
     fn compile(sources: &[(&str, &str)]) -> Arc<Mutex<ErrorReporter>> {
         compile_with_optimization(sources, true)

@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    ast::{Constant, Expression, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, Statement},
-    compiler::{CompilationErrorType, CompilationWarningType, optimizer::statement_reachability, workspace::Workspace},
+    ast::{Constant, Expression, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, Statement, VariableSpecifier},
+    compiler::{CompilationErrorType, CompilationWarningType, optimizer::SourceReachability, workspace::Workspace},
     executable::{
         EntryType, FuncOpCode, FunctionValue, GenericVariableData, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableType,
         VariableValue,
@@ -20,6 +20,8 @@ use crate::{
 
 mod arrays;
 pub mod call_graph;
+mod checked;
+pub use checked::CheckedProgram;
 #[cfg(test)]
 mod find_references_tests;
 mod members;
@@ -39,6 +41,7 @@ pub use variable_table::LookupVariabeleTable;
 type NameTableLookup = HashMap<unicase::Ascii<String>, usize>;
 
 pub struct SemanticVisitor {
+    source_annotations: HashMap<PathBuf, Arc<checked::SourceAnnotations>>,
     lang_version: u16,
     runtime: u16,
     pub type_registry: UserTypeRegistry,
@@ -63,6 +66,9 @@ pub struct SemanticVisitor {
 
     pub function_type_lookup: HashMap<CallId, SemanticInfo>,
     pub enum_binary_types: HashMap<u64, u8>,
+    /// Source LET identifier offset -> assigned element/member/function-result type.
+    /// Like the member lookups, snapshot and clear this map between source files.
+    pub compound_target_types: HashMap<usize, VariableType>,
     pub call_graph: CallGraph,
     member_array_returns: HashMap<CallId, (VariableType, u8)>,
 
@@ -83,6 +89,10 @@ pub struct SemanticVisitor {
 
     local_variable_lookup: Option<VariableLookups>,
 
+    /// Appended after semantic checking; source reference IDs must never move.
+    /// Emitted immediately after each routine's source locals, before its result.
+    lowering_local_variables: HashMap<usize, Vec<usize>>,
+
     /// Named constants never reach the variable table - the value takes the place of
     /// the name - so they are kept beside it.
     global_constants: HashMap<unicase::Ascii<String>, (VariableType, VariableValue, usize)>,
@@ -102,6 +112,8 @@ pub struct SemanticVisitor {
     cur_func_call: u64,
     control_flow_liveness: bool,
     references_are_reachable: bool,
+    source_reachability: Option<SourceReachability>,
+    source_body_is_reachable: bool,
 
     /// The type of a receiver a member reference already walked. A call and the member
     /// reference inside it both need it, and walking it twice made a chain like `a[i][j][k]`
@@ -387,17 +399,6 @@ impl SemanticVisitor {
         self.allowed_routine_reference_spans.contains(&span_start)
     }
 
-    fn check_enum_compound_operator(&mut self, token: &Spanned<Token>, target: VariableType, value: VariableType) {
-        if (self.type_registry.is_enum_type(target) || self.type_registry.is_enum_type(value))
-            && !matches!(token.token, Token::Eq | Token::AndAssign | Token::OrAssign)
-        {
-            self.errors
-                .lock()
-                .unwrap()
-                .report_error(token.span.clone(), CompilationErrorType::InvalidEnumOperation);
-        }
-    }
-
     pub fn is_function_return_value(&self, span_start: usize) -> bool {
         self.function_return_value_spans.contains(&span_start)
     }
@@ -425,11 +426,13 @@ impl SemanticVisitor {
             static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
             enum_binary_types: HashMap::new(),
+            compound_target_types: HashMap::new(),
             call_graph: CallGraph::default(),
             member_array_returns: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
+            lowering_local_variables: HashMap::new(),
             global_constants: HashMap::new(),
             local_constants: None,
             loop_counters: HashSet::new(),
@@ -444,6 +447,9 @@ impl SemanticVisitor {
             cur_func_impl: None,
             control_flow_liveness: true,
             references_are_reachable: true,
+            source_reachability: None,
+            source_annotations: HashMap::new(),
+            source_body_is_reachable: true,
             function_containers: Vec::new(),
             legacy_call_signatures: HashMap::new(),
             last_lookup_index: 0,
@@ -464,6 +470,16 @@ impl SemanticVisitor {
     ///
     /// Panics if .
     pub fn generate_variable_table(&mut self) -> LookupVariabeleTable {
+        self.generate_table(true)
+    }
+
+    /// Allocate resolved storage only. The backend interns constants from the
+    /// lowered code so folded-away source operands do not inflate the PPE.
+    pub(crate) fn generate_storage_table(&mut self) -> LookupVariabeleTable {
+        self.generate_table(false)
+    }
+
+    fn generate_table(&mut self, include_source_constants: bool) -> LookupVariabeleTable {
         let mut variable_table = LookupVariabeleTable::default();
 
         if self.require_user_variables {
@@ -530,7 +546,11 @@ impl SemanticVisitor {
                 r.variable_table_index = variable_table.variable_table.len() + 1;
             }
             let mut locals = 0usize;
-            for idx in f.local_variables.start..f.local_variables.end {
+            for idx in f
+                .local_variables
+                .clone()
+                .chain(self.lowering_local_variables.get(&f.id).into_iter().flatten().copied())
+            {
                 let is_live = self.reference_is_live(idx);
                 let (rt, _reference) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
@@ -675,7 +695,11 @@ impl SemanticVisitor {
                 variable_table.push(new_entry);
             }
 
-            for idx in f.local_variables.start..f.local_variables.end {
+            for idx in f
+                .local_variables
+                .clone()
+                .chain(self.lowering_local_variables.get(&f.id).into_iter().flatten().copied())
+            {
                 let is_live = self.reference_is_live(idx);
                 let storage_type = self.storage_type(self.references[idx].1.variable_type);
                 let (rt, r) = &mut self.references[idx];
@@ -720,15 +744,17 @@ impl SemanticVisitor {
             variable_table.end_compile_function_body();
         }
 
-        for c in &self.global_lookup.constants {
-            variable_table.add_constant(c);
-        }
-        for f in &self.function_containers {
-            if !self.call_graph.is_reachable(SymbolId(f.id)) {
-                continue;
-            }
-            for c in &f.lookup.constants {
+        if include_source_constants {
+            for c in &self.global_lookup.constants {
                 variable_table.add_constant(c);
+            }
+            for f in &self.function_containers {
+                if !self.call_graph.is_reachable(SymbolId(f.id)) {
+                    continue;
+                }
+                for c in &f.lookup.constants {
+                    variable_table.add_constant(c);
+                }
             }
         }
         variable_table
@@ -893,20 +919,98 @@ impl SemanticVisitor {
         }
     }
 
-    fn visit_statement_sequence(&mut self, statements: &[Statement]) -> bool {
-        if !self.control_flow_liveness {
-            for statement in statements {
-                statement.visit(self);
+    /// Own one CFG for the complete, unmoved source body. Nested walks only query it.
+    fn visit_source_body(&mut self, statements: &[Statement]) -> bool {
+        let previous_graph = self.source_reachability.take();
+        let previous_body = self.source_body_is_reachable;
+        self.source_body_is_reachable = self.references_are_reachable;
+        self.source_reachability = self.control_flow_liveness.then(|| SourceReachability::build(statements));
+        let falls_through = self.source_reachability.as_ref().is_none_or(SourceReachability::falls_through);
+        self.visit_statement_sequence(statements);
+        self.source_reachability = previous_graph;
+        self.source_body_is_reachable = previous_body;
+        falls_through
+    }
+
+    fn visit_source_statement(&mut self, statement: &Statement) {
+        let previous = self.references_are_reachable;
+        if let Some(reachable) = self.source_reachability.as_ref().and_then(|graph| graph.statement_is_reachable(statement)) {
+            // A GOTO may enter a nested body without reaching its parent's entry.
+            self.references_are_reachable = self.source_body_is_reachable && reachable;
+        }
+        statement.visit(self);
+        self.references_are_reachable = previous;
+    }
+
+    fn visit_statement_sequence(&mut self, statements: &[Statement]) {
+        for statement in statements {
+            self.visit_source_statement(statement);
+        }
+    }
+
+    fn with_source_expression<T>(&mut self, expression: &Expression, check: impl FnOnce(&mut Self) -> T) -> T {
+        let previous = self.references_are_reachable;
+        if let Some(reachable) = self.source_reachability.as_ref().and_then(|graph| graph.expression_is_reachable(expression)) {
+            self.references_are_reachable = self.source_body_is_reachable && reachable;
+        }
+        let result = check(self);
+        self.references_are_reachable = previous;
+        result
+    }
+
+    fn visit_source_expression(&mut self, expression: &Expression) -> VariableType {
+        self.with_source_expression(expression, |visitor| expression.visit(visitor))
+    }
+
+    /// Register trusted lowering declarations AFTER `finish`, BEFORE table generation.
+    /// No semantic visitors, call edges, source usages, or warnings are produced.
+    /// `None` denotes main/global storage; `Some` is a qualified routine name.
+    pub(crate) fn register_lowering_temporaries(&mut self, mut temporaries: HashMap<Option<unicase::Ascii<String>>, Vec<(VariableType, VariableSpecifier)>>) {
+        assert!(self.local_variable_lookup.is_none(), "lowering storage requires completed source analysis");
+        if let Some(globals) = temporaries.remove(&None) {
+            for (variable_type, variable) in globals {
+                self.add_variable(
+                    variable_type,
+                    variable.get_identifier_token(),
+                    variable.get_dimensions().len() as u8,
+                    variable.get_vector_size(),
+                    variable.get_matrix_size(),
+                    variable.get_cube_size(),
+                );
+                self.reference_owners.entry(self.references.len() - 1).or_default().insert(None);
             }
-            return true;
         }
-        let outer_reachability = self.references_are_reachable;
-        for (statement, reachable) in statement_reachability(statements) {
-            self.references_are_reachable = outer_reachability && reachable;
-            statement.visit(self);
+        // Container order (not HashMap iteration) keeps emitted storage deterministic.
+        for container_index in 0..self.function_containers.len() {
+            let container = &self.function_containers[container_index];
+            if container.parameter_index.is_some() {
+                continue;
+            }
+            let Some(locals) = temporaries.remove(&Some(container.name.clone())) else {
+                continue;
+            };
+            let owner = container.id;
+            // Lowering may also have processed bodies which will not be emitted.
+            if !self.call_graph.is_reachable(SymbolId(owner)) {
+                continue;
+            }
+            self.local_variable_lookup = Some(std::mem::take(&mut self.function_containers[container_index].lookup));
+            for (variable_type, variable) in locals {
+                self.add_variable(
+                    variable_type,
+                    variable.get_identifier_token(),
+                    variable.get_dimensions().len() as u8,
+                    variable.get_vector_size(),
+                    variable.get_matrix_size(),
+                    variable.get_cube_size(),
+                );
+                let id = self.references.len() - 1;
+                self.reference_owners.entry(id).or_default().insert(Some(owner));
+                self.lowering_local_variables.entry(owner).or_default().push(id);
+            }
+            self.function_containers[container_index].lookup = self.local_variable_lookup.take().unwrap();
         }
-        self.references_are_reachable = outer_reachability;
-        true
+        debug_assert!(temporaries.is_empty(), "lowering temporaries name an unknown routine");
     }
 
     fn check_enum_signature_runtime(&mut self, parameters: &[ParameterSpecifier], result: VariableType, span: std::ops::Range<usize>) {
@@ -1393,5 +1497,213 @@ impl SemanticVisitor {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod source_reachability_tests {
+    use super::*;
+    use crate::{
+        ast::{Ast, DimensionSpecifier},
+        parser::{Encoding, parse_ast},
+    };
+
+    fn name(value: &str) -> unicase::Ascii<String> {
+        unicase::Ascii::new(value.to_string())
+    }
+
+    fn analyze(source: &str, liveness: bool) -> (Ast, SemanticVisitor) {
+        let mut workspace = Workspace::default();
+        workspace.set_default_language_version(Some(400));
+        workspace.package.runtime = Some(400);
+        let registry = UserTypeRegistry::icy_board_registry();
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let ast = parse_ast(PathBuf::from("reachability.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+        {
+            let errors = errors.lock().unwrap();
+            assert!(
+                errors.errors.is_empty(),
+                "source must parse:\n{source}\nparser errors:\n{}",
+                errors
+                    .errors
+                    .iter()
+                    .map(|error| format!("{:?}: {}", error.span, error.error))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+        }
+        let original = ast.nodes.clone();
+        let mut visitor = SemanticVisitor::new(&workspace, errors, registry);
+        visitor.set_control_flow_liveness(liveness);
+        visitor.set_file_name(&ast.file_name);
+        ast.visit(&mut visitor);
+        visitor.finish();
+        assert_eq!(original, ast.nodes, "source nodes and IDs must remain untouched");
+        assert!(visitor.source_reachability.is_none());
+        assert!(visitor.references_are_reachable);
+        (ast, visitor)
+    }
+
+    fn reference(visitor: &SemanticVisitor, value: &str) -> usize {
+        visitor.global_lookup.variable_lookup[&name(value)]
+    }
+
+    #[test]
+    fn nested_label_entry_overrides_dead_parent_but_keeps_dead_usages() {
+        let (_, visitor) = analyze(
+            "INTEGER deadValue, liveValue\nGOTO entered\nIF FALSE THEN\nPRINT deadValue\nDeadCall()\n:entered\nPRINT liveValue\nLiveCall()\nENDIF\nEXIT\nPROCEDURE DeadCall()\nENDPROC\nPROCEDURE LiveCall()\nENDPROC\n",
+            true,
+        );
+        let dead = reference(&visitor, "deadValue");
+        assert!(!visitor.reference_is_live(dead));
+        assert_eq!(visitor.references[dead].1.usages.len(), 1);
+        assert!(visitor.reference_is_live(reference(&visitor, "liveValue")));
+        assert!(!visitor.routine_is_reachable(reference(&visitor, "DeadCall")));
+        assert!(visitor.routine_is_reachable(reference(&visitor, "LiveCall")));
+        let errors = visitor.errors.lock().unwrap();
+        assert!(errors.errors.is_empty());
+        assert!(!errors.warnings.iter().any(|warning| warning.error.to_string().contains("deadValue")));
+    }
+
+    #[test]
+    fn separately_executed_control_expressions_gate_calls_not_diagnostics() {
+        let (_, visitor) = analyze(
+            "IF TRUE THEN\nPRINT 1\nELSEIF (HiddenTest()) THEN\nPRINT unknownInDeadBranch\nENDIF\nREPEAT\nBREAK\nUNTIL TrailingTest()\nSELECT CASE UnusedSelector()\nCASE ELSE\nPRINT 2\nENDSELECT\nEXIT\nFUNCTION HiddenTest() BOOLEAN\nRETURN TRUE\nENDFUNC\nFUNCTION TrailingTest() BOOLEAN\nRETURN TRUE\nENDFUNC\nFUNCTION UnusedSelector() INTEGER\nRETURN 1\nENDFUNC\n",
+            true,
+        );
+        for routine in ["HiddenTest", "TrailingTest", "UnusedSelector"] {
+            let index = reference(&visitor, routine);
+            assert!(!visitor.routine_is_reachable(index), "{routine}");
+            assert_eq!(visitor.references[index].1.usages.len(), 1, "{routine}");
+        }
+        assert!(
+            visitor
+                .errors
+                .lock()
+                .unwrap()
+                .errors
+                .iter()
+                .any(|error| error.error.to_string().contains("unknownInDeadBranch"))
+        );
+        assert_eq!(visitor.function_type_lookup.len(), 3, "dead calls still need source annotations");
+    }
+
+    #[test]
+    fn for_test_and_step_can_be_live_without_the_initializer() {
+        let (_, visitor) = analyze(
+            "INTEGER counter\nGOTO body\nFOR counter = Initial() TO Bound() STEP Stride()\n:body\nPRINT 1\nNEXT\nEXIT\nFUNCTION Initial() INTEGER\nRETURN 1\nENDFUNC\nFUNCTION Bound() INTEGER\nRETURN 2\nENDFUNC\nFUNCTION Stride() INTEGER\nRETURN 1\nENDFUNC\n",
+            true,
+        );
+        assert!(visitor.errors.lock().unwrap().errors.is_empty());
+        assert!(!visitor.routine_is_reachable(reference(&visitor, "Initial")));
+        assert!(visitor.routine_is_reachable(reference(&visitor, "Bound")));
+        assert!(visitor.routine_is_reachable(reference(&visitor, "Stride")));
+        assert!(visitor.reference_is_live(reference(&visitor, "counter")));
+    }
+
+    #[test]
+    fn routine_cfg_is_independent_and_liveness_can_be_disabled() {
+        let source = "Outer()\nEXIT\nPROCEDURE Outer()\nIF FALSE THEN\nHidden()\nENDIF\nLOOP\nBREAK\nHidden()\nENDLOOP\nENDPROC\nPROCEDURE Hidden()\nENDPROC\n";
+        for liveness in [true, false] {
+            let (_, visitor) = analyze(source, liveness);
+            assert!(visitor.errors.lock().unwrap().errors.is_empty());
+            assert!(visitor.routine_is_reachable(reference(&visitor, "Outer")));
+            assert_eq!(!liveness, visitor.routine_is_reachable(reference(&visitor, "Hidden")));
+        }
+    }
+
+    #[test]
+    fn isolated_dead_routine_calls_keep_usages_without_live_edges() {
+        for body in [
+            "IF FALSE THEN\nHidden()\nENDIF\n",
+            "IF ((!TRUE)) THEN\nHidden()\nENDIF\n",
+            "LOOP\nBREAK\nHidden()\nENDLOOP\n",
+            "REPEAT\nCONTINUE\nHidden()\nUNTIL TRUE\n",
+            "WHILE ((TRUE)) DO\nCONTINUE\nENDWHILE\nHidden()\n",
+        ] {
+            let source = format!("Outer()\nEXIT\nPROCEDURE Outer()\n{body}ENDPROC\nPROCEDURE Hidden()\nENDPROC\n");
+            for liveness in [true, false] {
+                let (_, visitor) = analyze(&source, liveness);
+                assert!(visitor.errors.lock().unwrap().errors.is_empty(), "{body}");
+                assert!(visitor.routine_is_reachable(reference(&visitor, "Outer")), "{body}");
+                let hidden = reference(&visitor, "Hidden");
+                assert_eq!(!liveness, visitor.routine_is_reachable(hidden), "{body}");
+                assert_eq!(1, visitor.references[hidden].1.usages.len(), "{body}");
+            }
+        }
+    }
+
+    #[test]
+    fn compound_annotations_describe_assigned_elements_and_function_results() {
+        let source = "TYPE Item\n STRING text\nENDTYPE\nItem items[1]\nINTEGER values[1]\nitems[0].text += \"x\"\nvalues[0] += 1\nPRINT Result()\nFUNCTION Result() INTEGER\nResult += 1\nENDFUNC\n";
+        let (_, visitor) = analyze(source, true);
+        assert!(visitor.errors.lock().unwrap().errors.is_empty());
+        for (assignment, expected) in [
+            ("items[0].text +=", VariableType::UnboundedString),
+            ("values[0] +=", VariableType::Integer),
+            ("Result +=", VariableType::Integer),
+        ] {
+            assert_eq!(
+                Some(&expected),
+                visitor.compound_target_types.get(&source.find(assignment).unwrap()),
+                "{assignment}"
+            );
+        }
+    }
+
+    #[test]
+    fn lowering_storage_preserves_reference_ids_dimensions_and_contiguous_routines() {
+        let (_, mut visitor) = analyze(
+            "PRINT First(1), Second(2)\nFUNCTION First(INTEGER arg) INTEGER\nINTEGER local\nlocal = arg\nRETURN local\nENDFUNC\nFUNCTION Second(INTEGER arg) INTEGER\nINTEGER local\nlocal = arg\nRETURN local\nENDFUNC\nFUNCTION Dead() INTEGER\nRETURN 0\nENDFUNC\n",
+            true,
+        );
+        assert!(visitor.errors.lock().unwrap().errors.is_empty());
+        let original_references = visitor.references.clone();
+        let warning_count = visitor.errors.lock().unwrap().warnings.len();
+        let mut dynamic = VariableSpecifier::empty(name("__temp"), Vec::new());
+        dynamic.get_dimensions_mut().push(DimensionSpecifier::dynamic());
+        visitor.register_lowering_temporaries(HashMap::from([
+            (None, vec![(VariableType::Integer, VariableSpecifier::empty(name("__global"), vec![3, 4, 5]))]),
+            (Some(name("First")), vec![(VariableType::Integer, dynamic)]),
+            (
+                Some(name("Second")),
+                vec![(VariableType::String, VariableSpecifier::empty(name("__temp"), Vec::new()))],
+            ),
+            (
+                Some(name("Dead")),
+                vec![(VariableType::Integer, VariableSpecifier::empty(name("__dead"), Vec::new()))],
+            ),
+        ]));
+        assert_eq!(original_references, visitor.references[..original_references.len()]);
+        assert_eq!(warning_count, visitor.errors.lock().unwrap().warnings.len());
+        assert_eq!(original_references.len() + 3, visitor.references.len());
+        assert!(visitor.references[original_references.len()..].iter().all(|(_, refs)| refs.usages.is_empty()));
+        let mut table = visitor.generate_variable_table();
+        let global = table.lookup_variable(&name("__global")).unwrap();
+        assert_eq!(
+            (3, 3, 4, 5),
+            (global.header.dim, global.header.vector_size, global.header.matrix_size, global.header.cube_size)
+        );
+        for (routine, dynamic) in [("First", true), ("Second", false)] {
+            let container = visitor.routine_container(reference(&visitor, routine)).unwrap();
+            let reference_id = container.lookup.variable_lookup[&name("__temp")];
+            assert!(visitor.reference_is_live(reference_id));
+            let routine_id = table.lookup_variable_index(&name(routine)).unwrap();
+            let routine_value = unsafe { table.lookup_variable(&name(routine)).unwrap().value.data.function_value };
+            assert_eq!(3, routine_value.local_variables, "source local, generated local, result");
+            assert_eq!(routine_id + 4, routine_value.return_var as usize);
+            table.start_compile_function_body(&name(routine));
+            let temporary = table.lookup_variable(&name("__temp")).unwrap();
+            assert_eq!(routine_id + 3, temporary.header.id);
+            assert_eq!(EntryType::LocalVariable, temporary.entry_type);
+            assert_eq!(u8::from(dynamic), temporary.header.dim);
+            assert_eq!(
+                dynamic,
+                temporary.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0
+            );
+            table.end_compile_function_body();
+        }
+        assert!(!table.has_variable(&name("Dead")));
+        assert!(visitor.errors.lock().unwrap().errors.is_empty());
     }
 }
