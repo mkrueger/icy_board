@@ -8,6 +8,12 @@ and bundles through binkp; QWKnet provides a public-conference leaf gateway
 with Synchronet HTTP(S); ZCONNECT provides a public-text leaf gateway with
 ZIP/ZMODEM over Telnet or offline packet exchange.
 
+For a practical introduction and first-connection walkthrough, download the
+:download:`ZCONNECT overview and setup guide <../../zconnect.md>`. It covers
+peer prerequisites, ICBSetup area mappings, receive-only testing, sending,
+offline exchange and troubleshooting. The tables on this page are the
+field-by-field reference rather than the setup tutorial.
+
 File selection and notation
 ---------------------------
 

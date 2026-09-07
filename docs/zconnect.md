@@ -1,4 +1,4 @@
-# ZCONNECT public-text networking
+# ZCONNECT: overview and setup guide
 
 Icy Board implements a limited ZCONNECT leaf-node gateway between public
 ZCONNECT boards and local JAM message bases. This is separate from
@@ -6,6 +6,134 @@ ZCONNECT boards and local JAM message bases. This is separate from
 ZMODEM over Telnet. Offline packet exchange through an external mailer is also
 supported. **No live interoperability with an external ZCONNECT system has
 been verified.** Test with your peer before deploying unattended.
+
+## Overview: what connects to what?
+
+ZCONNECT is a legacy mailbox-network standard with both an online exchange
+protocol and a message format. It is **not the same as ZMODEM**: ZMODEM moves
+the files; ZCONNECT negotiates the exchange and describes the messages inside
+them. A **leaf node** exchanges its own mail with an upstream peer, rather than
+acting as a general-purpose router for other systems.
+
+| Term | Meaning in this setup |
+| --- | --- |
+| Peer / link | A remote ZCONNECT system with which you have arranged an account and public-board feed. |
+| Remote board / Brett | A public discussion area, for example `/PUBLIC/GENERAL`. |
+| Local message area | The area callers see in Icy Board; its JAM base stores the messages. |
+| Mapping | Connects a remote board name to that local area's JAM base path. |
+| Inbound / outbound | Separate spool directories for received and queued ZIP packets, not the live message bases. |
+
+The normal online flow is:
+
+```text
+Local public posts in a mapped JAM base
+  -> scan: prepare a retryable ZIP packet
+  -> poll: log in, negotiate ZCONNECT, exchange files using ZMODEM
+  -> toss: import received public posts into mapped JAM bases
+  -> callers read and reply in the local message area
+```
+
+The `zconnect-poll` command performs all three steps. You do not need a separate
+scan/toss script for normal online use. An external mailer can instead handle
+transport while Icy Board scans and tosses packets offline.
+
+## Before you start
+
+- Have a working Icy Board installation and an `icbmailer` binary available.
+- Arrange a connection with an actual ZCONNECT peer. There is no built-in
+  public server directory or automatic network enrollment.
+- Obtain the dial host and port, our account/system name at the peer, its
+  password, the login profile (`zconnect`, `janus` or `direct`), and the exact
+  public-board names supplied by that peer. Confirm ZIP/ZMODEM compatibility.
+- Agree on your fully qualified message-system name and the text encoding.
+  Start with ASCII subjects/names and ASCII or explicit ISO1 message bodies.
+- Ask the peer to enable the desired **public** board subscriptions. Adding a
+  local mapping does not subscribe to the board remotely; there is no MAPS
+  subscription interface in this implementation.
+- Back up any existing message bases and use dedicated test areas for the
+  first exchange. Do not map a private mailbox or an unrelated FTN/QWK feed.
+- Use a trusted connection or a secure tunnel: Telnet transmits credentials
+  and mail in cleartext.
+
+## Quick start: first public board
+
+### 1. Prepare a local message area
+
+In ICBSetup, create or choose a public message area in the conference callers
+will use. Note its **JAM base path**, for example
+`conferences/zconnect/general`, without `.jhr` or `.jdt`.
+
+Use that exact path in the ZCONNECT mapping. The importer can create the JAM
+files, but a network mapping does **not** create a conference or add a visible
+area to its area list. Configure the local read/write access separately.
+
+### 2. Set the local identity
+
+Open **Messaging & Networking → ZCONNECT → General settings**. Fill in:
+
+- **Local system (FQDN):** the message-system name agreed with the peer,
+  such as `bbs.example.org`.
+- **Local user:** the fallback sender localpart, normally `sysop`.
+- **Configuration file:** keep the default `zconnect.toml` unless your board
+  stores its network configuration elsewhere.
+- **Inbound / outbound:** keep the separate default spool directories.
+- **Enabled:** turn on when the identity and link configuration are complete.
+
+### 3. Add the peer and its area mapping
+
+Under **Links**, press **Insert** to add a peer. Give it a stable local ID such
+as `PEER`, then enter the host, port, username/account, password and login
+profile supplied by the remote sysop. The optional **Expected peer SYS** is
+the remote system's advertised name, not necessarily its DNS hostname.
+
+Press **F2** on the link to open its area mappings, then **Insert**. Set:
+
+| Field | Example |
+| --- | --- |
+| Remote board | `/PUBLIC/GENERAL` — replace with the actual subscribed name |
+| Local JAM base | `conferences/zconnect/general` — same path as step 1 |
+| Read only | `true` for the initial receive-only test |
+
+Return with **Esc**, then save the board settings. Merely leaving a form does
+not save the configuration to disk. The separate network file is saved along
+with the board configuration.
+
+### 4. Check and receive
+
+From the board directory, run `icbmailer zconnect-links icyboard.toml PEER`.
+Replace `icyboard.toml` with the actual board configuration filename. Check that
+the intended host and area count are shown. This checks configuration, **not**
+network reachability or credentials.
+
+Next run `icbmailer zconnect-poll icyboard.toml PEER`. With the mapping read-only,
+no local posts from that area are exported. Inspect the result:
+
+- Successfully imported ZIP packets move to `zconnect/inbound/PEER/processed/`.
+- Unsupported content or unknown board names move to `retained/` for review.
+- Malformed packets stay in the inbox and cause a failure status.
+- No mail waiting is possible even after a successful connection; confirm the
+  subscription and test-message availability with the remote sysop.
+
+Log into Icy Board and open the local area to check the sender, subject, text
+and replies. An imported message count alone does not prove the area is visible
+or correctly configured for callers.
+
+### 5. Test sending, then automate
+
+After receive-only testing succeeds, turn off **Read only** for the mapping
+and save. Write a small public test post through Icy Board and poll again.
+Ask the remote sysop to confirm that the post arrived correctly. Poll once
+more to check that already imported messages are not sent back.
+
+**The first scan can export existing eligible local posts in the mapped base**;
+it does not start at the time you enable the network. Use a new test base to
+avoid unexpectedly sending an area's history.
+
+Only after successful two-way testing, schedule `zconnect-poll` using your OS
+scheduler or an appropriate board event. Use absolute executable/configuration
+paths, capture output and nonzero exit statuses, and avoid overlapping runs.
+No automatic polling schedule is created by the ZCONNECT settings. Retained
+archives require review and consume disk space; plan backups and cleanup.
 
 ## Configuration
 
@@ -159,6 +287,31 @@ they cannot modify outbound packets concurrently with scan, poll or ack.
 
 Online polling performs acknowledgement internally only after the required
 protocol receipt; do not run manual acknowledgement in parallel with it.
+
+## Troubleshooting
+
+| Symptom | Check / action |
+| --- | --- |
+| No ZCONNECT configuration, or processing disabled | Save the board after editing; check its `[paths].zconnect_file` selection and the network's `enabled` flag. Commands take the board configuration, not the standalone network file. |
+| Invalid local system or board mapping | Use a fully qualified local system name, uppercase remote board paths, and unique link IDs/mappings. Do not enter a conference number as a JAM path. |
+| Timeout during login | Verify host, port and the agreed login profile. A normal BBS login prompt is not necessarily a ZCONNECT endpoint. `direct` expects an endpoint already starting the protocol. |
+| Authentication or expected-SYS failure | Check our account name (`username`), the agreed password (1–10 printable ASCII characters online), and the peer's actual advertised SYS. A successful DNS lookup is not a SYS-name check. |
+| Unsupported protocol or archive mode | The initial profile requires ZIP/ZIP2 and ZMODEM. Agree on that profile with the peer; arbitrary transfer protocols and encrypted/deferred modes are not implemented. |
+| No messages visible locally after import | Ensure the conference's area list points to the same JAM base and grants the caller read access. A network mapping alone does not create that UI entry. |
+| Unknown boards / retained packet | Match the actual incoming board names and subscriptions. After correcting a mapping, deliberately retry the retained ZIP; already imported copies are deduplicated. |
+| Unsupported content or encoding | Review the limits below. Private mail, binary content and unsupported charsets are retained, not delivered as public text. Do not delete the only copy. |
+| Local post is not exported | Check read-only mapping, message privacy/password/hold flags, origin and encoding. Imported network messages are not automatically forwarded. |
+| Same outgoing ZIP appears on another scan | Expected until receipt is confirmed. Retry online polling; use manual `zconnect-ack` only after verified external delivery. |
+| Pending archive/checkpoint mismatch | Preserve both files and backups; investigate external modification or an incomplete manual workflow. Do not delete the checkpoint to force a rescan. |
+| Poll already active | Check for another running mailer and overlapping schedules. Do not remove lock files to bypass it; the lock is released when the owning handle closes. |
+
+## Further reading
+
+- [Network configuration reference](source/configuration/networks.rst): exact
+  fields, defaults, validation and generated state-file formats.
+- [QWKnet](qwknet.md): a separate alternative for compatible public-message hubs.
+- [ZCONNECT 3.1 specification](../crates/doc/ZCONNECT.pdf): protocol reference;
+  the implementation supports only the subset described here.
 
 ## Supported profile and limits
 

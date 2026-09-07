@@ -14,7 +14,7 @@ handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 | [File areas](icbfile.md) | Import, normalize and maintain file bases. |
 | [Upload processing](upload_processing.md) | Quarantine, advertisement cleanup, one own advertisement file or a PPE generator. |
 | [Timed events](events.md) | Built-in editor keys, scheduler drain/reload lifecycle, caller notices and source-reviewed PCBoard differences. |
-| [ZCONNECT networking](zconnect.md) | Configure public-board packet exchange and outbound ZCONNECT polling. |
+| [ZCONNECT setup and overview](zconnect.md) | Arrange a peer, map public boards, test receiving/sending, and troubleshoot packet exchange. |
 
 ## Understand compatibility
 
