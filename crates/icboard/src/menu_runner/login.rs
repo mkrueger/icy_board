@@ -52,15 +52,12 @@ impl PcbBoardCommand {
         self.state.display_file(&welcome_screen).await?;
         self.state.new_line().await?;
 
-        // An event is about to take the board down - nobody gets in any more.
-        if let Some(window) = self.state.event_window().await
-            && window.is_suspended(&chrono::Local::now())
-        {
-            self.state.display_text(IceText::DeniedAccessForEvent, display_flags::NEWLINE).await?;
-            self.state.hangup().await?;
+        if self.deny_login_for_event().await? {
             return Ok(false);
         }
-        self.state.limit_time_for_event().await;
+        // set_current_user applies the event cap after loading the real security
+        // allowance. Capping the anonymous 1000-minute default here would leave
+        // EVTTIMEADJ set even for callers whose own allowance ends before the event.
 
         let mut tries = 0;
         if !is_local && self.state.get_board().await.config.board.allow_iemsi {
@@ -81,6 +78,9 @@ impl PcbBoardCommand {
         }
 
         loop {
+            if self.state.session.request_logoff || self.deny_login_for_event().await? {
+                return Ok(false);
+            }
             tries += 1;
             if tries > 3 {
                 log::warn!("Login at {} num login tries exceeded.", Local::now().to_rfc2822());
@@ -226,6 +226,9 @@ impl PcbBoardCommand {
     }
 
     async fn new_user(&mut self) -> Res<bool> {
+        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+            return Ok(false);
+        }
         let mut tries = 0;
 
         if self.state.get_board().await.config.system_control.is_closed_board {
@@ -568,6 +571,10 @@ impl PcbBoardCommand {
         }
         self.newask_questions().await?;
 
+        // A shutdown during registration/surveys must not publish a partial account.
+        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+            return Ok(false);
+        }
         if self.state.get_board().await.config.new_user_settings.auto_register_conferences {
             self.register_public_conferences(&mut new_user).await;
         }
@@ -586,6 +593,10 @@ impl PcbBoardCommand {
         log::info!("NEW USER: '{}'", self.state.session.user_name);
         self.state.log_logon_to_caller_log().await;
 
+        self.announce_event_time_adjustment().await?;
+        if self.state.session.request_logoff {
+            return Ok(false);
+        }
         self.state.display_news(false).await?;
         self.logon_questions().await?;
 
@@ -717,6 +728,10 @@ impl PcbBoardCommand {
             return Ok(false);
         }
 
+        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+            return Ok(false);
+        }
+
         let subscription = self.state.get_board().await.config.subscription_info.clone();
         if let Some(user) = &self.state.session.current_user {
             match icy_board_engine::icy_board::subscription::status(
@@ -764,6 +779,10 @@ impl PcbBoardCommand {
 
         log::warn!("Login from {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
         self.state.log_logon_to_caller_log().await;
+        self.announce_event_time_adjustment().await?;
+        if self.state.session.request_logoff {
+            return Ok(false);
+        }
         let last_conference = if let Some(user) = &self.state.session.current_user {
             user.last_conference
         } else {
@@ -775,9 +794,39 @@ impl PcbBoardCommand {
         Ok(true)
     }
 
+    async fn deny_login_for_event(&mut self) -> Res<bool> {
+        let maintenance = self.state.bbs.lock().await.admissions_closed();
+        let suspended = self.state.event_window().await.is_some_and(|window| window.is_suspended(&Local::now()));
+        if !maintenance && !suspended {
+            return Ok(false);
+        }
+        let notice = self
+            .state
+            .display_text(IceText::DeniedAccessForEvent, display_flags::NEWLINE | display_flags::LOGIT)
+            .await;
+        self.state.hangup().await?;
+        notice?;
+        Ok(true)
+    }
+
+    async fn announce_event_time_adjustment(&mut self) -> Res<()> {
+        self.state.limit_time_for_event().await;
+        if self.state.session.time_adjusted_for_event {
+            // PCBoard LOGIN.C protects this warning from INTRO with an acknowledgement.
+            self.state
+                .display_text(IceText::TimeAdjusted, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            self.state.press_enter().await?;
+        }
+        Ok(())
+    }
+
     async fn input_required(&mut self, txt: IceText, mask: &str, len: i32, flags: i32) -> Res<Option<String>> {
         let mut tries = 0;
         loop {
+            if self.state.session.request_logoff {
+                return Ok(None);
+            }
             tries += 1;
             if tries > 3 {
                 return Ok(None);

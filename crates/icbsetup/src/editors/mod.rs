@@ -2,12 +2,18 @@ pub mod accounting_rates;
 pub mod areas;
 pub mod bullettins;
 pub mod command;
+mod common;
 pub mod dirs;
 pub mod door;
+pub mod events;
 pub mod languages;
+mod list;
 pub mod protocols;
 pub mod sec_editor;
 pub mod surveys;
+
+pub(crate) use common::{EditorDialog, EditorSaveChanges, list_editor_frame, render_config_form, render_editor_footer, standalone_editor_frame};
+pub(crate) use list::EditorList;
 
 use std::path::Path;
 
@@ -15,7 +21,35 @@ use icy_board_tui::{
     config_menu::{ConfigMenu, ConfigMenuState, ListValue},
     get_text, get_text_args,
     tab_page::{InfoState, PageMessage},
+    theme::get_tui_theme,
 };
+use ratatui::{
+    layout::Alignment,
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Padding},
+};
+
+/// The frame every list editor shares, so all of them keep one look.
+pub(crate) fn list_frame(title: String) -> Block<'static> {
+    Block::new()
+        .title_alignment(Alignment::Center)
+        .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
+        .style(get_tui_theme().dialog_box)
+        .padding(Padding::new(2, 2, 1, 1))
+        .borders(Borders::ALL)
+        .border_set(icy_board_tui::BORDER_SET)
+}
+
+/// The nested form frame, matching the shared popup dialogs.
+pub(crate) fn popup_frame(title: String) -> Block<'static> {
+    Block::new()
+        .title_alignment(Alignment::Center)
+        .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
+        .style(get_tui_theme().dialog_box)
+        .padding(Padding::new(2, 2, 1, 1))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+}
 
 /// Align a single-column editor to its longest translated label, measured in
 /// terminal cells rather than UTF-8 bytes. Keep the existing minimum width.

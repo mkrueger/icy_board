@@ -1,27 +1,26 @@
 use std::sync::{Arc, Mutex};
 
+use crate::editors::EditorList;
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{IcyBoard, ftn::FtnRoute};
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
 };
 use jamjam::util::echomail::EchomailAddress;
 use ratatui::{
     Frame,
-    layout::{Alignment, Margin, Rect},
-    text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
+    layout::{Margin, Rect},
+    text::Line,
+    widgets::{Clear, ScrollbarState, TableState, Widget},
 };
 
 pub struct RoutingConfiguration<'a> {
     table: InsertTable<'a>,
     board: Arc<Mutex<IcyBoard>>,
-    edit_state: ConfigMenuState,
-    editor: Option<ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)>>,
+    detail: crate::editors::EditorDialog<(usize, Arc<Mutex<IcyBoard>>)>,
 }
 
 impl<'a> RoutingConfiguration<'a> {
@@ -51,13 +50,11 @@ impl<'a> RoutingConfiguration<'a> {
                 content_length,
             },
             board,
-            edit_state: ConfigMenuState::default(),
-            editor: None,
+            detail: crate::editors::EditorDialog::default(),
         }
     }
 
     fn open_editor(&mut self, selected: usize) {
-        self.edit_state = ConfigMenuState::default();
         let board = self.board.lock().unwrap();
         let Some(route) = board.ftn.routes.get(selected) else {
             return;
@@ -89,7 +86,7 @@ impl<'a> RoutingConfiguration<'a> {
             ),
         ];
         drop(board);
-        self.editor = Some(ConfigMenu {
+        self.detail.open(ConfigMenu {
             obj: (selected, self.board.clone()),
             entry,
         });
@@ -99,64 +96,34 @@ impl<'a> RoutingConfiguration<'a> {
 impl Page for RoutingConfiguration<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
-        Block::new()
-            .title_alignment(Alignment::Center)
-            .title(Line::from(Span::from(get_text("fido_route_title")).style(get_tui_theme().dialog_box_title)))
-            .style(get_tui_theme().dialog_box)
-            .padding(Padding::new(2, 2, 1, 1))
-            .borders(Borders::ALL)
-            .border_set(icy_board_tui::BORDER_SET)
-            .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding))
+        crate::editors::list_editor_frame(get_text("fido_route_title"), get_text("icb_setup_key_conf_list_help"), self.detail.is_open())
             .render(area, frame.buffer_mut());
 
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
-        let selected = self.table.table_state.selected();
-        self.table.render_table(frame, area);
-        self.table.table_state.select(selected);
+        self.table.render_list(frame, area);
 
-        if let Some(editor) = &mut self.editor {
+        if self.detail.is_open() {
             let mut area = area.inner(Margin { vertical: 2, horizontal: 3 });
             area.height += 1;
-            Clear.render(area, frame.buffer_mut());
-            Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(Span::from(get_text("fido_route_editor")).style(get_tui_theme().dialog_box_title)))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double)
-                .render(area, frame.buffer_mut());
-            editor.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_state);
-            if let Some(item) = editor.get_item(self.edit_state.selected) {
-                item.text_field_state.set_cursor_position(frame);
-            }
+            self.detail.render(frame, area, get_text("fido_route_editor"), String::new());
         }
     }
 
     fn request_status(&self) -> ResultState {
-        ResultState::default()
+        self.detail.status()
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(editor) = &mut self.editor {
-            if editor.handle_key_press(key, &mut self.edit_state).edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-                self.editor = None;
-            }
-            return PageMessage::None;
+        if let Some(message) = self.detail.handle_key(key) {
+            return message;
         }
         match key.code {
             KeyCode::Esc => return PageMessage::Close,
             KeyCode::Insert => {
-                self.board.lock().unwrap().ftn.routes.push(FtnRoute::default());
-                self.table.content_length += 1;
+                self.table.push_row(&mut self.board.lock().unwrap().ftn.routes, FtnRoute::default());
             }
             KeyCode::Delete => {
-                if let Some(selected) = self.table.table_state.selected()
-                    && selected < self.board.lock().unwrap().ftn.routes.len()
-                {
-                    self.board.lock().unwrap().ftn.routes.remove(selected);
-                    self.table.content_length -= 1;
-                }
+                self.table.remove_row(&mut self.board.lock().unwrap().ftn.routes);
             }
             KeyCode::Enter => {
                 if let Some(selected) = self.table.table_state.selected() {

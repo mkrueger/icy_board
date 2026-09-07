@@ -1,13 +1,19 @@
 use std::{
+    future::Future,
     path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use crate::{Res, SHOW_TOTAL_STATS};
+use crate::{Res, SHOW_TOTAL_STATS, event_screen::RuntimeStatus};
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, state::NodeStatus, statistics::Statistics};
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    bbs::{BBS, EventMaintenancePhase},
+    state::NodeStatus,
+    statistics::Statistics,
+};
 use icy_board_tui::{
     app::get_screen_size,
     get_text, get_text_args,
@@ -29,6 +35,8 @@ use crate::VERSION;
 
 #[derive(Clone)]
 pub enum CallWaitMessage {
+    /// Scheduler asks the service owner for a stop/reload/restart handshake.
+    EventRestart,
     User(bool),
     Sysop(bool),
     Exit(bool),
@@ -62,6 +70,7 @@ pub struct CallWaitScreen {
     statistics: Statistics,
     paging_alert: Option<String>,
     error_message: Option<String>,
+    runtime: RuntimeStatus,
 }
 
 impl CallWaitScreen {
@@ -177,12 +186,100 @@ impl CallWaitScreen {
             statistics: Statistics::default(),
             paging_alert: None,
             error_message: None,
+            runtime: RuntimeStatus::default(),
         })
     }
 
     pub fn show_error(&mut self, message: impl Into<String>) {
         self.selected = None;
         self.error_message = Some(message.into());
+    }
+
+    /// Keep drawing through service drain, command execution and reload/restart.
+    /// The pinned operation is never cancelled by a tick. No operator input is read.
+    pub async fn during_event<B: Backend, F: Future>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        bbs: &Arc<Mutex<BBS>>,
+        full_screen: bool,
+        operation: F,
+    ) -> Res<F::Output>
+    where
+        B::Error: Send + Sync + 'static,
+    {
+        tokio::pin!(operation);
+        let mut status = RuntimeStatus::default();
+        let mut redraw = tokio::time::interval(Duration::from_millis(250));
+        redraw.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            status.refresh(bbs);
+            terminal.draw(|frame| Self::event_ui(frame, full_screen, &status, self.error_message.as_deref()))?;
+            tokio::select! {
+                result = &mut operation => return Ok(result),
+                _ = redraw.tick() => {},
+            }
+        }
+    }
+
+    fn event_ui(frame: &mut Frame, full_screen: bool, runtime: &RuntimeStatus, operator_error: Option<&str>) {
+        let area = get_screen_size(frame, full_screen);
+        let mut args = std::collections::HashMap::new();
+        let mut failed = false;
+        let (description, phase) = if let Some(error) = &runtime.failure {
+            failed = true;
+            (get_text("event_runtime_scheduler_stopped"), error.clone())
+        } else if let Some(status) = &runtime.maintenance {
+            let key = match &status.phase {
+                EventMaintenancePhase::Waiting(time) => {
+                    args.insert("time".to_string(), time.clone());
+                    "event_runtime_waiting"
+                }
+                EventMaintenancePhase::Draining(count) => {
+                    args.insert("count".to_string(), count.to_string());
+                    "event_runtime_draining"
+                }
+                EventMaintenancePhase::Stopping => "event_runtime_stopping",
+                EventMaintenancePhase::Running => "event_runtime_running",
+                EventMaintenancePhase::Reloading => "event_runtime_reloading",
+                EventMaintenancePhase::ReloadFailed(error) => {
+                    failed = true;
+                    args.insert("error".to_string(), error.clone());
+                    "event_runtime_reload_failed"
+                }
+                EventMaintenancePhase::Restarting => "event_runtime_restarting",
+            };
+            (status.description.clone(), get_text_args(key, args))
+        } else {
+            (String::new(), get_text("event_runtime_gate_closed"))
+        };
+        let mut text = if runtime.failure.is_some() {
+            format!("{description}\n\n{}\n\n{phase}", get_text("event_runtime_failed_hint"))
+        } else if failed {
+            // Keep repair instructions visible even when a parser error is very long.
+            format!("{description}\n\n{}\n\n{phase}", get_text("event_runtime_repair_hint"))
+        } else {
+            format!("{description}\n\n{phase}\n\n{}", get_text("event_runtime_offline_hint"))
+        };
+        if let Some(online) = runtime.online_text() {
+            text = format!("{online}\n\n{text}");
+        }
+        if let Some(error) = operator_error {
+            failed = true;
+            text = format!("{error}\n\n{text}");
+        }
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(text)
+                .wrap(Wrap { trim: true })
+                .style(Style::new().fg(DOS_WHITE).bg(if failed { DOS_RED } else { DOS_BLUE }))
+                .block(
+                    Block::bordered()
+                        .border_type(BorderType::Double)
+                        .title(get_text("event_runtime_title"))
+                        .title_bottom(Line::from(Local::now().format(" %H:%M:%S ").to_string()).right_aligned()),
+                ),
+            area,
+        );
     }
 
     pub async fn reset(&mut self, board: &Arc<Mutex<IcyBoard>>) {
@@ -225,8 +322,17 @@ impl CallWaitScreen {
     {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
-
         loop {
+            self.runtime.refresh(bbs);
+            if self.runtime.restart && self.runtime.failure.is_none() {
+                return Ok(CallWaitMessage::EventRestart);
+            }
+            if self.runtime.offline || self.runtime.failure.is_some() {
+                self.selected = None;
+                terminal.draw(|frame| Self::event_ui(frame, full_screen, &self.runtime, self.error_message.as_deref()))?;
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                continue;
+            }
             self.statistics = board.lock().await.statistics.clone();
             self.paging_alert = Self::paging_alert(board, bbs).await;
 
@@ -248,6 +354,10 @@ impl CallWaitScreen {
                     continue;
                 }
                 match key.code {
+                    KeyCode::F(6) => {
+                        crate::event_screen::run(terminal, board, bbs, full_screen).await?;
+                        continue;
+                    }
                     KeyCode::Esc => {
                         return Ok(CallWaitMessage::Exit(false));
                     }
@@ -319,7 +429,12 @@ impl CallWaitScreen {
                     .style(Style::new().white())
                     .right_aligned(),
             )
-            .title_bottom(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).centered())
+            .title_bottom(
+                Line::from(format!(" {} ", get_text("event_runtime_menu_key")))
+                    .style(Style::new().white())
+                    .left_aligned(),
+            )
+            .title_bottom(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).right_aligned())
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
             .border_style(Style::new().white())
@@ -337,7 +452,7 @@ impl CallWaitScreen {
         let [header, mut title, mut button_bar, footer, separator, mut stats] = vertical.areas(area.inner(Margin { vertical: 1, horizontal: 1 }));
 
         // draw node
-        Line::from("https://github.com/mkrueger/icy_board")
+        Line::from(self.runtime.online_text().unwrap_or_else(|| "https://github.com/mkrueger/icy_board".into()))
             .style(Style::new().fg(DOS_WHITE))
             .centered()
             .render(header, frame.buffer_mut());
@@ -383,10 +498,15 @@ impl CallWaitScreen {
             );
         }
 
-        Line::from(self.buttons[selected_button].description.to_string())
-            .style(Style::new().fg(DOS_WHITE))
-            .centered()
-            .render(footer.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+        Line::from(
+            self.runtime
+                .request_error
+                .clone()
+                .unwrap_or_else(|| self.buttons[selected_button].description.to_string()),
+        )
+        .style(Style::new().fg(DOS_WHITE))
+        .centered()
+        .render(footer.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
 
         // draw description
         Line::from("═".repeat(stats.width as usize))
@@ -614,6 +734,50 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     #[test]
+    fn offline_gate_and_sticky_failure_render_without_a_phase() {
+        let mut runtime = RuntimeStatus {
+            offline: true,
+            ..RuntimeStatus::default()
+        };
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal
+            .draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, Some("Board lock unavailable")))
+            .unwrap();
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
+        assert!(text.contains("OFFLINE"));
+        assert!(text.contains("Board lock unavailable"));
+        assert!(text.contains(&get_text("event_runtime_gate_closed")));
+        runtime.failure = Some("Sticky journal failure".into());
+        terminal.draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, None)).unwrap();
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
+        assert!(text.contains("Sticky journal failure"));
+        assert!(text.contains("OFFLINE"));
+    }
+
+    #[tokio::test]
+    async fn online_snapshot_keeps_callwait_buttons_and_f6_visible() {
+        let board = Arc::new(Mutex::new(IcyBoard::new()));
+        let mut screen = CallWaitScreen::new(&board).await.unwrap();
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        bbs.lock().await.event_online_status = Some(icy_board_engine::icy_board::bbs::OnlineEventStatus {
+            event_id: "online".into(),
+            description: "Foreground report".into(),
+            started: chrono::Utc::now(),
+            log_file: None,
+            running_long: true,
+        });
+        screen.runtime.refresh(&bbs);
+        assert!(!screen.runtime.offline);
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| screen.ui(frame, false)).unwrap();
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
+        assert!(text.contains("ONLINE: Foreground report"));
+        assert!(text.contains(&get_text("event_runtime_menu_key")));
+        assert!(text.contains(&screen.buttons[0].title));
+        assert_eq!(screen.buttons.len(), 15);
+    }
+
+    #[test]
     fn tool_error_is_rendered_as_a_visible_dialog() {
         let buttons = (0..15)
             .map(|_| Button {
@@ -632,6 +796,7 @@ mod tests {
             statistics: Statistics::default(),
             paging_alert: None,
             error_message: None,
+            runtime: RuntimeStatus::default(),
         };
         screen.show_error("icbsetup exited with exit status: 7");
         let backend = TestBackend::new(80, 25);
@@ -662,6 +827,7 @@ mod tests {
             statistics: Statistics::default(),
             paging_alert: Some("SYSOP PAGE: Node 2 - Alice (1 active)".into()),
             error_message: None,
+            runtime: RuntimeStatus::default(),
         };
         let backend = TestBackend::new(80, 25);
         let mut terminal = Terminal::new(backend).unwrap();

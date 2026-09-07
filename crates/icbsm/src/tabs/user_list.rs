@@ -9,7 +9,7 @@ use icy_board_engine::icy_board::user_base::UserBase;
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
 use icy_board_tui::save_changes_dialog::SaveChangesMessage;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
-use icy_board_tui::theme::get_tui_theme;
+use icy_board_tui::theme::{config_title, get_tui_theme};
 use icy_board_tui::{get_text, get_text_args};
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
@@ -143,10 +143,9 @@ impl UserList {
     fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let header = ["", "Name", "Alias", "Sec", "Last On", ""]
             .into_iter()
-            .map(Cell::from)
+            .map(|title| Cell::from(Text::from(Vec::from(config_title(title)))))
             .collect::<Row>()
-            .style(get_tui_theme().table_header)
-            .height(1);
+            .height(2);
 
         let l = self.icy_board.lock().unwrap();
         let rows = self.view.iter().map(|i| {

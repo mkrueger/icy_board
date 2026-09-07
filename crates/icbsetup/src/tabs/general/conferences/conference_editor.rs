@@ -7,17 +7,11 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{IcyBoard, security_expr::SecurityExpression, user_base::Password};
 use icy_board_tui::{
-    BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
 };
-use ratatui::{
-    layout::Rect,
-    text::Span,
-    widgets::{Block, Borders, Padding, Widget},
-};
+use ratatui::{layout::Rect, widgets::Widget};
 
 pub struct ConferenceEditor {
     state: ConfigMenuState,
@@ -543,14 +537,7 @@ impl Page for ConferenceEditor {
             }
         }
 
-        let block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().dialog_box);
+        let block = crate::editors::standalone_editor_frame(bottom_text, self.state.is_path_browser_open());
         block.render(area, frame.buffer_mut());
 
         let area = Rect {
@@ -559,7 +546,7 @@ impl Page for ConferenceEditor {
             width: disp_area.width.saturating_sub(5),
             height: area.height - 2,
         };
-        self.menu.render(area, frame, &mut self.state);
+        crate::editors::render_config_form(frame, area, &mut self.menu, &mut self.state);
     }
 
     fn request_status(&self) -> ResultState {
@@ -615,6 +602,7 @@ mod tests {
     use super::*;
     use crossterm::event::KeyCode;
     use icy_board_engine::icy_board::conferences::Conference;
+    use icy_board_tui::theme::get_tui_theme;
     use ratatui::{Terminal, backend::TestBackend, text::Line};
 
     #[test]

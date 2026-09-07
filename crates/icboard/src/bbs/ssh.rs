@@ -18,8 +18,9 @@ use russh::{
 };
 
 use super::handle_client;
+use tokio_util::sync::CancellationToken;
 
-pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
+pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, generation: CancellationToken) -> Res<()> {
     let mut rng: StdRng = rand::make_rng();
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
@@ -34,61 +35,77 @@ pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBo
         ..Default::default()
     };
     let config = Arc::new(config);
-    let mut server_impl = Server { board, bbs };
     let configured_addr = if ssh.address.trim().is_empty() {
         "0.0.0.0".to_string()
     } else {
         ssh.address.clone()
     };
 
-    match russh::server::Server::run_on_address(&mut server_impl, config.clone(), (configured_addr.as_str(), ssh.port)).await {
-        Ok(_) => {
-            log::info!("SSH listening on {}:{}", configured_addr, ssh.port);
-            Ok(())
-        }
+    let listener = match tokio::net::TcpListener::bind((configured_addr.as_str(), ssh.port)).await {
+        Ok(listener) => listener,
         Err(e) => {
             log::error!("SSH bind failed on {}:{} -> {e}; kind={:?}", configured_addr, ssh.port, e);
             // Only attempt fallback if user supplied a non-wildcard that failed
             if configured_addr != "0.0.0.0" && e.kind() == std::io::ErrorKind::AddrNotAvailable {
                 let fallback = "0.0.0.0";
                 log::warn!("Retrying SSH listener on fallback {}:{}", fallback, ssh.port);
-                if let Err(e2) = russh::server::Server::run_on_address(&mut server_impl, config, (fallback, ssh.port)).await {
-                    log::error!("SSH fallback bind also failed on {}:{} -> {e2}", fallback, ssh.port);
-                    Err(e2.into())
-                } else {
-                    log::info!("SSH listening on fallback {}:{}", fallback, ssh.port);
-                    Ok(())
-                }
+                tokio::net::TcpListener::bind((fallback, ssh.port)).await?
             } else {
-                Err(e.into())
+                return Err(e.into());
             }
         }
+    };
+    log::info!("SSH listening on {}", listener.local_addr()?);
+    // Own transport tasks as well as the accept loop. russh's convenience server
+    // spawns detached transports; dropping it is not a completed shutdown.
+    let mut transports = tokio::task::JoinSet::new();
+    let result = loop {
+        tokio::select! {
+            _ = generation.cancelled() => break Ok(()),
+            result = transports.join_next(), if !transports.is_empty() => {
+                if let Some(Err(err)) = result { log::error!("SSH transport failed: {err}"); }
+            }
+            accepted = listener.accept() => {
+                let (stream, _) = match accepted {
+                    Ok(accepted) => accepted,
+                    Err(err) => break Err(err.into()),
+                };
+                let handler = SshSession { board: board.clone(), bbs: bbs.clone(), generation: generation.clone() };
+                let config = config.clone();
+                let cancel = generation.clone();
+                transports.spawn(async move {
+                    let mut session = tokio::select! {
+                        _ = cancel.cancelled() => return,
+                        result = server::run_stream(config, stream, handler) => match result {
+                            Ok(session) => session,
+                            Err(err) => { log::debug!("SSH setup failed: {err}"); return; }
+                        }
+                    };
+                    tokio::select! {
+                        result = &mut session => { if let Err(err) = result { log::debug!("SSH session ended: {err}"); } },
+                        _ = cancel.cancelled() => {
+                            let _ = session.handle().disconnect(russh::Disconnect::ByApplication, "Board maintenance".into(), String::new()).await;
+                            let _ = session.await;
+                        }
+                    }
+                });
+            }
+        }
+    };
+    drop(listener);
+    generation.cancel();
+    while let Some(result) = transports.join_next().await {
+        if let Err(err) = result {
+            log::error!("SSH transport shutdown failed: {err}");
+        }
     }
+    result
 }
 
 struct SshSession {
     board: Arc<tokio::sync::Mutex<IcyBoard>>,
     bbs: Arc<Mutex<BBS>>,
-}
-
-#[derive(Clone)]
-struct Server {
-    board: Arc<tokio::sync::Mutex<IcyBoard>>,
-    bbs: Arc<Mutex<BBS>>,
-}
-
-impl server::Server for Server {
-    type Handler = SshSession;
-    fn new_client(&mut self, _: Option<std::net::SocketAddr>) -> SshSession {
-        SshSession {
-            board: self.board.clone(),
-            bbs: self.bbs.clone(),
-        }
-    }
-
-    fn handle_session_error(&mut self, _error: <Self::Handler as russh::server::Handler>::Error) {
-        log::error!("SSH Session error: {:#?}", _error);
-    }
+    generation: CancellationToken,
 }
 
 impl server::Handler for SshSession {
@@ -96,28 +113,37 @@ impl server::Handler for SshSession {
 
     async fn channel_open_session(&mut self, channel: Channel<Msg>, reply: ChannelOpenHandle, session: &mut Session) -> Result<(), Self::Error> {
         let bbs2 = self.bbs.clone();
-        let node = self.bbs.lock().await.create_new_node(ConnectionType::SSH).await;
-        let node_list = self.bbs.lock().await.get_open_connections().clone();
+        let mut admission = self.bbs.lock().await;
+        // russh can retain authenticated transports after its accept loop exits.
+        // An old generation must never open a new BBS node after event restart.
+        if self.generation.is_cancelled() {
+            return Ok(());
+        }
+        let node_list = admission.open_connections.clone();
         let board = self.board.clone();
 
         let channel_id = channel.id();
         let session_handle = session.handle();
         let connection = SSHConnection::new(channel, channel_id, session_handle);
 
-        let handle = std::thread::Builder::new()
-            .name("SSH handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                        log::error!("Error running background client: {}", err);
-                    }
-                    log::info!("SSH session for node {} ended.", node);
-                });
-                Ok(())
+        let node = admission
+            .spawn_node(ConnectionType::SSH, move |node, _| {
+                std::thread::Builder::new().name("SSH handle".to_string()).spawn(move || {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                        if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
+                            log::error!("Error running background client: {}", err);
+                        }
+                        log::info!("SSH session for node {} ended.", node);
+                    });
+                    Ok(())
+                })
             })
-            .unwrap();
-
-        self.bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
+            .await?;
+        drop(admission);
+        if node.is_none() {
+            // Dropping the unanswered reply rejects the channel; no BBS thread exists.
+            return Ok(());
+        }
 
         reply.accept().await;
         Ok(())
@@ -135,16 +161,10 @@ impl server::Handler for SshSession {
         Ok(server::Auth::Accept)
     }
 
-    async fn tcpip_forward(&mut self, address: &str, port: &mut u32, session: &mut Session) -> Result<bool, Self::Error> {
-        let handle = session.handle();
-        let address = address.to_string();
-        let port = *port;
-        tokio::spawn(async move {
-            let channel = handle.channel_open_forwarded_tcpip(address, port, "1.2.3.4", 1234).await.unwrap();
-            let _ = channel.data(&b"Hello from a forwarded port"[..]).await;
-            let _ = channel.eof().await;
-        });
-        Ok(true)
+    async fn tcpip_forward(&mut self, _address: &str, _port: &mut u32, _session: &mut Session) -> Result<bool, Self::Error> {
+        // This BBS is not a forwarding service. Do not spawn an untracked dummy
+        // forwarding task which can outlive a listener generation.
+        Ok(false)
     }
 }
 

@@ -42,13 +42,21 @@ impl SystemStatisticsScreen {
         }
     }
 
-    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, full_screen: bool) -> Res<SystemStatisticsScreenMessage>
+    pub async fn run<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        full_screen: bool,
+        bbs: &Arc<tokio::sync::Mutex<icy_board_engine::icy_board::bbs::BBS>>,
+    ) -> Res<SystemStatisticsScreenMessage>
     where
         B::Error: Send + Sync + 'static,
     {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         loop {
+            if bbs.lock().await.event_restart_requested {
+                return Ok(SystemStatisticsScreenMessage::Exit);
+            }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             let mut page_len = 0;
 

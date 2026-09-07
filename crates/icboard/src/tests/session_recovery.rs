@@ -3,14 +3,18 @@
 //! These exercise connection loss and reopen, not process/power-loss durability.
 use std::{path::Path, sync::Arc, time::Duration};
 
+use chrono::{Local, Utc};
+use icy_board_engine::datetime::IcbTime;
 use icy_board_engine::icy_board::{
     IcyBoard, IcyBoardSerializer,
-    bbs::BBS,
+    bbs::{BBS, BBSMessage},
     commands::CommandList,
     conferences::Conference,
+    events::{BoardEvent, EventMode, event_window},
     icb_config::DisplayNewsBehavior,
     icb_text::{DEFAULT_DISPLAY_TEXT, IceText},
     message_area::{AreaList, MessageArea},
+    sec_levels::SecurityLevel,
     state::IcyBoardState,
     user_base::{FSEMode, User, UserBase},
 };
@@ -19,6 +23,7 @@ use jamjam::jam::{JamMessage, JamMessageBase};
 use tokio::sync::{Mutex, oneshot};
 
 use crate::bbs::{LoginOptions, internal_handle_client};
+use crate::menu_runner::PcbBoardCommand;
 
 const DEADLINE: Duration = Duration::from_secs(10);
 const COMMAND: &str = "[test-command]";
@@ -32,6 +37,11 @@ const ABORT: &str = "[test-abort]";
 const ABORTED: &str = "[test-aborted]";
 const CONTINUE: &str = "[test-continue]";
 const FULL_SCREEN: &str = "[test-full-screen]";
+const SHUTDOWN: &str = "[test-event-shutdown]";
+const TIME_ADJUSTED: &str = "[test-event-time-adjusted]";
+const EVENT_DENIED: &str = "[test-event-denied]";
+const FIRST_NAME: &str = "[test-first-name]";
+const REGISTER: &str = "[test-register]";
 
 fn board_at(root: &Path) -> IcyBoard {
     let mut board = IcyBoard::new();
@@ -61,6 +71,10 @@ fn board_at(root: &Path) -> IcyBoard {
         (IceText::MessageAborted, ABORTED),
         (IceText::PressEnter, CONTINUE),
         (IceText::EscToExit, FULL_SCREEN),
+        (IceText::TimeAdjusted, TIME_ADJUSTED),
+        (IceText::DeniedAccessForEvent, EVENT_DENIED),
+        (IceText::YourFirstName, FIRST_NAME),
+        (IceText::Register, REGISTER),
     ] {
         board.default_display_text.update_record_number(id as usize, marker).unwrap();
     }
@@ -215,10 +229,35 @@ impl Session {
         .await
         .expect("session connection was not released");
         let nodes = self.bbs.lock().await.open_connections.clone();
-        let handle = nodes.lock().await[self.node].as_mut().unwrap().handle.take().unwrap();
-        handle.join().expect("session thread panicked").unwrap();
-        self.bbs.lock().await.clear_closed_connections().await;
+        let handle = {
+            let bbs = self.bbs.lock().await;
+            let mut nodes = nodes.lock().await;
+            match nodes[self.node].as_mut() {
+                Some(node) => Some(node.handle.take().expect("live node lost its session handle")),
+                None => {
+                    // A finished sibling's cleanup may already have joined this
+                    // thread. Only a fully reclaimed node is acceptable here.
+                    assert!(bbs.bbs_channels[self.node].is_none(), "reclaimed node retained its session sender");
+                    None
+                }
+            }
+        };
+        if let Some(handle) = handle {
+            handle.join().expect("session thread panicked").unwrap();
+            // The harness owns this explicit join. A receiver restored into
+            // NodeState is not a live writer once the thread has been joined;
+            // remove that node as production's explicit join owners do.
+            let mut bbs = self.bbs.lock().await;
+            let mut nodes = nodes.lock().await;
+            if let Some(node) = nodes[self.node].take() {
+                assert!(node.handle.is_none(), "joined node acquired another session handle");
+            }
+            bbs.bbs_channels[self.node] = None;
+        }
+        let mut bbs = self.bbs.lock().await;
+        bbs.clear_closed_connections().await;
         assert!(nodes.lock().await[self.node].is_none(), "finished node was not reclaimed");
+        assert!(bbs.bbs_channels[self.node].is_none(), "finished session retained its writer channel");
         String::from_utf8(self.output).unwrap()
     }
 
@@ -413,4 +452,250 @@ async fn carrier_loss_in_full_screen_editor_discards_the_partial_body() {
     assert!(!output.contains(SAVED));
     assert_eq!(snapshot(dir.path()), before);
     assert_eq!(UserBase::load(&dir.path().join("users.toml")).unwrap()[0].stats.messages_left, 0);
+}
+
+async fn assert_no_session_writers(bbs: &Arc<Mutex<BBS>>) {
+    let bbs = bbs.lock().await;
+    assert!(
+        bbs.open_connections.lock().await.iter().all(Option::is_none),
+        "stale session thread or reserved node"
+    );
+    assert!(bbs.bbs_channels.iter().all(Option::is_none), "stale session sender");
+}
+
+async fn event_shutdown_sessions(editor: bool) {
+    let dir = tempfile::tempdir().unwrap();
+    seed(dir.path());
+    let before = snapshot(dir.path());
+    let started = Utc::now();
+    let board = Arc::new(Mutex::new(board_at(dir.path())));
+    // Leave a free slot so admission denial cannot accidentally pass because
+    // the board is full instead of because maintenance closed the gate.
+    let bbs = Arc::new(Mutex::new(BBS::new(3)));
+    let mut first = Session::start(board.clone(), bbs.clone(), 0).await;
+    let mut second = Session::start(board.clone(), bbs.clone(), 1).await;
+    assert_ne!(first.node, second.node);
+    first.expect(COMMAND).await;
+    if editor {
+        second.compose("Event interrupted draft", "event must not save this draft").await;
+    } else {
+        second.expect(COMMAND).await;
+    }
+    let senders = {
+        let mut bbs = bbs.lock().await;
+        bbs.event_maintenance = true;
+        assert!(bbs.admissions_closed());
+        assert!(bbs.try_create_new_node(ConnectionType::Channel).await.is_none());
+        let nodes = bbs.open_connections.lock().await;
+        assert_eq!(nodes[first.node].as_ref().unwrap().cur_user, 0);
+        assert_eq!(nodes[second.node].as_ref().unwrap().cur_user, 1);
+        [first.node, second.node].map(|node| bbs.bbs_channels[node].as_ref().unwrap().clone())
+    };
+    // No BYE, carrier loss, or extra key is sent: blocked session input must
+    // service BBSMessage::Shutdown itself, including inside the editor.
+    for sender in &senders {
+        sender.try_send(BBSMessage::Shutdown(SHUTDOWN.to_string())).unwrap();
+    }
+    if editor {
+        // Exercise automatic joining, not just the harness's explicit join.
+        // Thread completion is the barrier, never an output-idle delay.
+        tokio::time::timeout(DEADLINE, async {
+            loop {
+                let nodes = bbs.lock().await.open_connections.clone();
+                let finished = nodes.lock().await.iter().flatten().all(|node| node.handle.as_ref().unwrap().is_finished());
+                if finished {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("event shutdown left a session thread running");
+        bbs.lock().await.clear_closed_connections().await;
+        assert_no_session_writers(&bbs).await;
+    }
+    let first_output = first.finish().await;
+    let second_output = second.finish().await;
+    for output in [&first_output, &second_output] {
+        assert_eq!(output.matches(SHUTDOWN).count(), 1, "{output}");
+        assert!(!output.contains(SAVED), "shutdown saved an unsolicited message: {output}");
+    }
+    assert!(senders.iter().all(|sender| sender.is_closed()), "a stale session still owns its receiver");
+    drop(senders);
+    assert_no_session_writers(&bbs).await;
+    assert!(bbs.lock().await.admissions_closed(), "session cleanup reopened event admission");
+    drop(board);
+
+    assert_eq!(snapshot(dir.path()), before, "shutdown changed the durable message base");
+    let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+    assert_eq!(users.len(), 2);
+    for (index, name) in ["SYSOP", "SECOND"].iter().enumerate() {
+        assert_eq!(users[index].name, *name);
+        assert_eq!(users[index].stats.num_times_on, 1, "shutdown did not persist {name}");
+        assert!(users[index].stats.last_on >= started, "shutdown did not save {name}'s login timestamp");
+        assert_eq!(users[index].stats.messages_left, 0);
+    }
+    assert_eq!(
+        messages(dir.path()),
+        vec![("Existing message".to_string(), "existing durable body".to_string())]
+    );
+
+    // Reopen from disk, not the old board's caches, and prove both reading and
+    // writing still work after the event has joined every previous writer.
+    bbs.lock().await.event_maintenance = false;
+    let fresh_board = Arc::new(Mutex::new(board_at(dir.path())));
+    let mut reader = Session::start(fresh_board.clone(), bbs.clone(), 0).await;
+    assert_eq!(reader.node, 0);
+    reader.expect(COMMAND).await;
+    reader.send("R\r1\r").await;
+    reader.expect("existing durable body").await;
+    reader.peer.shutdown().await.unwrap();
+    reader.finish().await;
+    let mut writer = Session::start(fresh_board, bbs.clone(), 1).await;
+    writer.compose("After event", "fresh session durable body").await;
+    writer.save().await;
+    writer.bye().await;
+    assert_no_session_writers(&bbs).await;
+    let stored = messages(dir.path());
+    assert_eq!(stored.len(), 2);
+    assert_eq!(stored[1].0, "After event");
+    assert_eq!(stored[1].1.trim(), "fresh session durable body");
+    let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+    assert_eq!(users[0].stats.num_times_on, 2);
+    assert_eq!(users[1].stats.num_times_on, 2);
+    assert_eq!(users[0].stats.messages_left, 0);
+    assert_eq!(users[1].stats.messages_left, 1);
+}
+
+#[tokio::test]
+async fn event_shutdown_joins_two_callers_at_command_prompts_and_reopens_mail() {
+    event_shutdown_sessions(false).await;
+}
+
+#[tokio::test]
+async fn event_shutdown_joins_prompt_and_editor_callers_without_saving_the_draft() {
+    event_shutdown_sessions(true).await;
+}
+
+#[tokio::test]
+async fn login_announces_time_adjustment_for_a_future_fixed_event_only() {
+    for (mode, time_per_day, adjusted) in [
+        (EventMode::Fixed, 120, true),
+        (EventMode::Slide, 120, false),
+        (EventMode::Idle, 120, false),
+        // A caller whose ordinary allowance ends before suspension is unaffected.
+        (EventMode::Fixed, 10, false),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut board = board_at(dir.path());
+        board.sec_levels.push(SecurityLevel {
+            security: 255,
+            time_per_day,
+            ..Default::default()
+        });
+        board.config.event.enabled = true;
+        board.config.event.suspend_minutes = 5;
+        let run_at = Local::now() + chrono::Duration::minutes(30);
+        let event = BoardEvent {
+            description: "Login adjustment regression".to_string(),
+            time: IcbTime::parse(&run_at.format("%H:%M:%S").to_string()),
+            mode,
+            ..Default::default()
+        };
+        board.events.push(event.clone());
+        let mut bbs = BBS::new(1);
+        bbs.event_window = Some(event_window(&board.config.event, event, run_at));
+        let bbs = Arc::new(Mutex::new(bbs));
+        let mut session = Session::start(Arc::new(Mutex::new(board)), bbs.clone(), 0).await;
+        if adjusted {
+            session.expect(TIME_ADJUSTED).await;
+            session.expect(CONTINUE).await;
+            session.send("\r").await;
+        }
+        session.expect(COMMAND).await;
+        // Inspect login output before logoff can add any unrelated text.
+        let login_output = String::from_utf8_lossy(&session.output).into_owned();
+        session.bye().await;
+        assert_no_session_writers(&bbs).await;
+        assert_eq!(
+            login_output.matches(TIME_ADJUSTED).count(),
+            usize::from(adjusted),
+            "{mode:?}, allowance {time_per_day}: {login_output}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn suspended_event_denies_new_user_before_registration() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut board = board_at(dir.path());
+    let before = std::fs::read(&board.config.paths.user_file).unwrap();
+    board.config.event.enabled = true;
+    board.config.event.suspend_minutes = 10;
+    let run_at = Local::now() + chrono::Duration::minutes(5);
+    let event = BoardEvent {
+        time: IcbTime::parse(&run_at.format("%H:%M:%S").to_string()),
+        mode: EventMode::Fixed,
+        ..Default::default()
+    };
+    let window = event_window(&board.config.event, event.clone(), run_at);
+    assert!(window.is_suspended(&Local::now()));
+    board.events.push(event);
+    let board = Arc::new(Mutex::new(board));
+    let bbs = Arc::new(Mutex::new(BBS::new(1)));
+    let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+    let nodes = bbs.lock().await.open_connections.clone();
+    let (mut peer, connection) = ChannelConnection::create_pair();
+    let state = IcyBoardState::new(bbs.clone(), board.clone(), nodes, node, Box::new(connection)).await;
+    // Model a connection accepted just before suspension. Bypass listener
+    // admission deliberately to test login's own PCBoard event denial.
+    bbs.lock().await.event_window = Some(window);
+    let mut command = PcbBoardCommand::new(state);
+    peer.send(b"NEW PERSON\r\rY\r").await.unwrap();
+    let accepted = tokio::time::timeout(DEADLINE, command.login(true))
+        .await
+        .expect("suspended login waited for registration input")
+        .unwrap();
+    let logged_off = command.state.session.request_logoff;
+    let has_user = command.state.session.current_user.is_some();
+    drop(command);
+    let mut output = Vec::new();
+    tokio::time::timeout(DEADLINE, async {
+        let mut bytes = [0; 4096];
+        loop {
+            let size = peer.read(&mut bytes).await.unwrap();
+            if size == 0 {
+                break;
+            }
+            output.extend_from_slice(&bytes[..size]);
+        }
+    })
+    .await
+    .expect("denied login retained its connection");
+    // This direct command never had a session thread. Release its reservation
+    // only after dropping the command; automatic cleanup must not mistake an
+    // unstarted reservation for a completed thread.
+    {
+        let bbs = bbs.lock().await;
+        let mut nodes = bbs.open_connections.lock().await;
+        let node = nodes[node].as_mut().unwrap();
+        assert!(node.handle.is_none());
+        drop(node.bbs_channel.take());
+    }
+    bbs.lock().await.clear_closed_connections().await;
+    assert_no_session_writers(&bbs).await;
+    let output = String::from_utf8(output).unwrap();
+    assert!(!accepted, "new user was admitted during suspension");
+    assert!(logged_off);
+    assert!(!has_user);
+    assert_eq!(output.matches(EVENT_DENIED).count(), 1, "{output}");
+    for forbidden in [FIRST_NAME, REGISTER, COMMAND, TIME_ADJUSTED] {
+        assert!(!output.contains(forbidden), "suspended login reached {forbidden}: {output}");
+    }
+    assert_eq!(board.lock().await.users.len(), 2);
+    assert_eq!(
+        std::fs::read(dir.path().join("users.toml")).unwrap(),
+        before,
+        "denied registration changed the user base"
+    );
 }

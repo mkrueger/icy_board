@@ -129,6 +129,17 @@ call_wait_screen_show_statistics=Show Statistics
 call_wait_screen_show_statistics_descr=Shows all Statistics for the system
 
 call_wait_screen_sys_ready = System is Ready For Callers
+event_runtime_title = Event maintenance — OFFLINE
+event_runtime_waiting = Sessions drained. Waiting for scheduled start: { $time }.
+event_runtime_draining = Waiting for { $count } session(s) to finish and save. Fixed events request disconnect; sliding events wait for callers to leave.
+event_runtime_stopping = Stopping listeners and waiting for active admin requests / transports to finish.
+event_runtime_running = Running event command. Waiting for it to exit; a blocked command keeps the board offline.
+event_runtime_reloading = Command finished. Reacquiring the board lock and reloading configuration and data.
+event_runtime_reload_failed = Reload blocked — automatic retry; the command will NOT run again.
+    { $error }
+event_runtime_restarting = Reload succeeded. Restarting services; admission stays closed until the scheduler rechecks pending events.
+event_runtime_offline_hint = New callers are blocked. Progress refreshes automatically; operator keys are not read. Check the log / blocked session or process if this stage does not finish. No timeout reopens the board.
+event_runtime_repair_hint = Keep this process running. In another terminal, repair the reported configuration/data or resolve the board-lock owner; check the log for details. Reload retries automatically. Do not force the board online with stale data.
 call_wait_screen_sysop_page = SYSOP PAGE: Node { $node } - { $user } ({ $count } active)
 call_wait_screen_unknown_caller = Unknown caller
 call_wait_screen_last_caller = Last Caller:
@@ -2340,6 +2351,214 @@ connection_info_display_file-help=
 # ICBSETUP -> Event Information
 
 event_setup_title=Event Information
+event_editor_title=Event Editor
+event_editor_detail_title=Edit Event
+event_editor_keys=↑ Up  ↓ Down  ⏎ Edit  INS New  ␡ Delete  PgUp/Dn Move
+event_editor_keys_more=F5 Copy  F6 History  ␛ Back
+event_editor_detail_keys=F1 Help  ␛ Close
+event_editor_setup_keys=F1 Help  F2 Edit events  F4 Browse  Esc Back
+event_editor_file_status=F2 edits/creates the event list; F4 browses relative to the board root.
+event_editor_status=F1 Help | F5 copies with a new ID. F6 read-only history. Esc asks whether to save.
+event_editor_empty=No events
+event_editor_header_enabled=Act
+event_editor_header_mode=Mod
+event_editor_header_time=Time
+event_editor_header_days=SMTWTFS
+event_editor_header_description=Description
+event_editor_header_command=Command
+event_editor_mode_fixed=Fixed
+event_editor_mode_slide=Slide
+event_editor_mode_idle=Idle
+event_editor_mode_fixed_letter=F
+event_editor_mode_slide_letter=S
+event_editor_mode_idle_letter=I
+event_editor_mode_legend=Modes: F = Fixed  S = Sliding  I = Idle
+event_editor_description=Description
+event_editor_description-status=Description shown in the event list; long text scrolls horizontally.
+event_editor_description-help=
+    # Description
+
+    A name for this event, shown in the list and in the history view.
+
+    Esc closes the form and stores the record in the list. The list itself is
+    only written when leaving the editor.
+event_editor_enabled=Enabled
+event_editor_enabled-status=Space or Left/Right toggles this event. New events start disabled.
+event_editor_enabled-help=
+    # Enabled
+
+    Space or Left/Right toggles this event.
+
+    - The global event switch must be enabled as well.
+    - New events start disabled until they are configured.
+    - A disabled event can still be started manually from the board.
+event_editor_time=Start time
+event_editor_time-status=24-hour local time: HH:MM or HH:MM:SS. Seconds are preserved.
+event_editor_time-help=
+    # Start time
+
+    Local 24-hour time from 00:00 to 23:59, optionally with seconds.
+
+    Invalid input is rejected when closing the form instead of silently using midnight.
+event_editor_days=Days (Sun-Sat)
+event_editor_days-status=Seven Y/N flags, Sunday first and Saturday last; YYYYYYY means every day.
+event_editor_days-help=
+    # Days
+
+    Seven Y/N flags, Sunday first and Saturday last.
+
+    - YYYYYYY runs every day
+    - NYYYYYN runs on weekdays
+    - NNNNNNN schedules no day at all
+
+    Lowercase is accepted.
+event_editor_mode=Mode
+event_editor_mode-status=Enter opens the list, Up/Down selects, Enter confirms. F1 explains caller handling.
+event_editor_mode-help=
+    # Mode
+
+    How callers are treated when the event is due.
+
+    - Fixed: maintenance disconnects callers on time; online runs while they stay
+    - Slide: maintenance closes admission and waits for callers to leave;
+      online waits for an empty board without closing admission
+    - Idle: skips the occurrence while callers are online, in both execution types
+
+    Enter opens the list, Up/Down selects, Enter confirms.
+event_editor_command=Shell command
+event_editor_command-status=Full shell command including arguments and quoting; not a browser path.
+event_editor_command-help=
+    # Shell command
+
+    The runtime passes this text to the shell, with arguments and quoting preserved.
+
+    - An empty command runs nothing
+    - F4 is deliberately unavailable: a shell command is not a filename
+    - This editor never executes commands
+event_editor_invalid_time=Invalid time. Use HH:MM or HH:MM:SS, with hours 00-23 and minutes/seconds 00-59. The form has not been applied.
+event_editor_invalid_days=Invalid days. Enter exactly seven Y/N flags, Sunday through Saturday. The form has not been applied.
+event_editor_end_time=Latest start
+event_editor_end_time-status=Inclusive same-day latest start, HH:MM[:SS]; blank means no end limit.
+event_editor_end_time-help=
+    # Latest start
+
+    Optional inclusive latest start on the selected day. It bounds starting,
+    never the running time of a command.
+
+    - Use HH:MM or HH:MM:SS at or after the start time
+    - Overnight windows are not supported
+    - Blank disables this bound
+
+    With an interval, starts stop here or at the end of the selected day.
+event_editor_interval=Interval (min)
+event_editor_interval-status=Positive whole minutes, 1-4294967295; blank schedules once per day.
+event_editor_interval-help=
+    # Interval
+
+    Optional positive whole minutes between scheduled starts, measured from the
+    start time and not from the previous completion.
+
+    - Starts stay within the selected day and the latest-start bound
+    - Blank schedules one start per selected day
+    - Zero is invalid
+event_editor_warning=Warning (min)
+event_editor_warning-status=Positive whole minutes; blank disables the running-long warning. Never kills.
+event_editor_warning-help=
+    # Running-long warning
+
+    Optional positive whole minutes before the runtime reports that a command
+    is running long.
+
+    This is only a warning, never a timeout: it does not kill the shell or its
+    descendants. Blank disables it; zero is invalid.
+event_editor_execution=Execution
+event_editor_execution_maintenance=Maintenance
+event_editor_execution_online=Online
+event_editor_execution-status=Enter opens the list, Up/Down selects, Enter confirms. F1: safety restrictions.
+event_editor_execution-help=
+    # Execution
+
+    Maintenance is the default: the board goes offline, the command runs and the
+    board reloads afterwards.
+
+    Online keeps the board LIVE while an administrator-supplied shell command runs.
+
+    ## Online safety rules
+
+    - Online commands MUST NOT change board configuration, users, mail or filebases
+    - There is no sandbox, and no tool including icbmailer is verified as online-safe
+    - Commands must stay in the foreground, need no input and leave no background work
+
+    Use Maintenance for anything that changes live board data.
+event_editor_online_warning=ONLINE: Board stays LIVE. Do NOT change config, users, mail or filebases!
+event_editor_invalid_end_time=Invalid latest start. Use HH:MM[:SS] at or after start on the SAME day, or blank. Overnight windows are not supported. Draft retained.
+event_editor_invalid_minutes=Enter positive whole minutes (1-4294967295), or blank to disable. Draft retained.
+event_editor_history_title=Event history (read-only)
+event_editor_history_keys=↑ Up  ↓ Down  PgUp/Dn Scroll  F6 Refresh  F1 Help  ␛ Back
+event_editor_history_status=Read-only snapshot from the board root. No execution, recovery or history changes.
+event_editor_history_empty=No recorded history for this event.
+event_editor_history_failed=Cannot read event history: { $error }
+event_editor_history_latest=Latest
+event_editor_history_scheduled=Scheduled
+event_editor_history_start=Attempted start
+event_editor_history_finish=Finished
+event_editor_history_result=Result
+event_editor_history_exit=Exit code
+event_editor_history_log=Log file
+event_editor_history_log_time=Log modified (UTC)
+event_editor_history_unavailable=Unavailable / no log
+event_editor_history_detail=Details
+event_editor_result_pending=Pending
+event_editor_result_success=Success
+event_editor_result_nonzero_exit=Nonzero exit
+event_editor_result_spawn_error=Spawn error
+event_editor_result_wait_error=Wait error
+event_editor_result_interrupted=Interrupted
+event_editor_result_skipped_busy=Skipped (busy)
+event_editor_result_expired=Expired
+event_editor_history_help=
+    # Event history
+
+    Read-only history of the selected event ID, newest attempted start first.
+    It shows the result, exit code, UTC timestamps and the log path relative to
+    the board root.
+
+    Up/Down or Home/End selects an entry, PgUp/PgDn scrolls long text,
+    F6 refreshes and Esc returns.
+
+    ## Notes
+
+    - An attempted start is not proof that a command ran
+    - A planned log file may not exist
+    - Missing history is empty; read errors are reported and change nothing
+    - This view never runs commands, recovers entries or clears history
+
+    Rotate logs separately: deleting the journal would allow a repeated run.
+event_editor_load_failed=Cannot open event list { $path }: { $error }
+event_editor_help=
+    # Timed event list
+
+    Enter edits the selected record. Insert adds a disabled record after it.
+    Delete removes the selected record. PgUp/PgDn move it up/down; order breaks scheduling ties.
+    F5 copies the selected record after itself, including settings, but assigns a NEW stable ID.
+    Editing preserves its ID. Insert also creates a new ID. Interval minutes enable same-day repeats.
+    Latest start is inclusive and must not precede start; blank optional fields disable them.
+    F6 shows read-only history for this event from the board root, not the event file's directory.
+
+    Maintenance is default. Online keeps the board LIVE: commands MUST NOT change board
+    configuration, users, mail or filebases. No tool (including icbmailer) is guaranteed safe online.
+    Commands must be foreground, noninteractive and leave no background descendants.
+
+    In a record: Up/Down or Enter moves between fields, Left/Right changes mode or enabled state.
+    F2 applies the record; Esc cancels its edits. Invalid time/day text stays available for correction.
+    Long descriptions and shell commands scroll horizontally without being truncated in storage.
+
+    In the list: F2 saves and closes. Esc asks whether to save changes; choose No to discard,
+    or Esc to return to the list. Files and parent directories are created only when saving.
+    A save error leaves the working list open for retry. Commands are never run by this editor.
+
+    Global event settings and the event list are saved separately. Saving this list does not
+    save the global event-file path or enable events. Reload the board to activate saved events.
 
 event_enabled_for_expedited_label=For EXPEDITED Events:
 
@@ -4473,3 +4692,55 @@ message_box_warning_title= Warning
 message_box_error_title= Error 
 message_box_dismiss= Press ENTER 
 no_file_name_given=No file name has been configured for this entry.
+
+event_runtime_picker_title = Events — Run Event Now
+event_runtime_picker_keys = ↑↓ Select  Enter Run now  F5/R Refresh history  Esc Back
+event_runtime_menu_key = F6 Events
+event_runtime_event = Event
+event_runtime_enabled_column = Enabled
+event_runtime_mode_column = Execution / mode
+event_runtime_result_column = Last result
+event_runtime_enabled = Yes
+event_runtime_disabled = No
+event_runtime_maintenance = Maintenance
+event_runtime_online = Online
+event_runtime_fixed = Fixed
+event_runtime_slide = Slide
+event_runtime_idle = Idle
+event_runtime_long = Running long
+event_runtime_pending = Pending
+event_runtime_success = Success
+event_runtime_nonzero = Nonzero exit
+event_runtime_spawn_error = Spawn error
+event_runtime_wait_error = Wait error
+event_runtime_interrupted = Interrupted
+event_runtime_skipped_busy = Skipped: busy
+event_runtime_expired = Expired
+event_runtime_queued_active = Queued / active
+event_runtime_history_title = Last run — cached; F5/R refresh
+event_runtime_history_error = Cannot read event history
+event_runtime_no_history = No recorded runs for this event.
+event_runtime_manual = Manual
+event_runtime_scheduled = Scheduled
+event_runtime_log = Log
+event_runtime_empty = No events configured.
+event_runtime_confirm_title = Confirm Run Event Now
+event_runtime_yes = Queue now
+event_runtime_no = Cancel
+event_runtime_confirm_keys = ←/→/Tab Choose  Enter Confirm  Esc Cancel
+event_runtime_manual_help = Manual overrides enabled, global scheduling, days and start/end times.
+    Maintenance: Fixed gates/drains immediately; Slide gates and waits.
+    Online: Fixed allows callers; Slide waits without closing admission.
+    Idle skips if callers are busy. Mode/execution are preserved by the queue.
+event_runtime_online_warning = Online shell commands must NOT write live board data, start background
+    work or need input. Offline tools and Exit stay blocked until work ends.
+event_runtime_queued = Request queued, not yet executed. F5/R refreshes history.
+event_runtime_duplicate = This event is already queued or active.
+event_runtime_unavailable = Events unavailable: maintenance or scheduler repair required.
+event_runtime_changed = Event changed or removed. Refresh and confirm again.
+event_runtime_gate_closed = Admission is closed. Offline operator/event work is pending.
+event_runtime_failed_hint = Scheduler stopped: repair and restart required; no automatic retry.
+    Keep this process running while a command may still be active.
+event_runtime_tools_blocked = Offline tools cannot start: callers, queued/active events or maintenance.
+event_runtime_exit_blocked = Exit refused: queued/active events or maintenance. Wait for completion; force Exit is not safe either.
+event_runtime_scheduler_stopped = Event scheduler terminated unexpectedly. Repair and restart required.

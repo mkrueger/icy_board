@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::editors::EditorList;
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     Res,
@@ -14,18 +15,16 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     insert_table::{Column, InsertTable},
-    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
 };
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Layout, Margin, Rect},
-    text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
+    layout::{Constraint, Layout, Margin, Rect},
+    text::Line,
+    widgets::{Clear, ScrollbarState, TableState, Widget},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,9 +43,8 @@ pub struct DoorEditor<'a> {
     mode: EditCommandMode,
 
     insert_table: InsertTable<'a>,
-    edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<DoorList>>)>>,
-    save_dialog: Option<SaveChangesDialog>,
+    detail: super::EditorDialog<(usize, Arc<Mutex<DoorList>>)>,
+    save_changes: super::EditorSaveChanges,
 }
 
 impl<'a> DoorEditor<'a> {
@@ -143,19 +141,19 @@ impl<'a> DoorEditor<'a> {
             menu_state: ConfigMenuState::default(),
             insert_table,
             mode: EditCommandMode::Config,
-            edit_config: None,
-            edit_config_state: ConfigMenuState::default(),
-            save_dialog: None,
+            detail: super::EditorDialog::default(),
+            save_changes: super::EditorSaveChanges::default(),
         })
     }
 
     fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect) {
-        let sel = self.insert_table.table_state.selected();
-        if self.mode == EditCommandMode::Config {
-            self.insert_table.table_state.select(None);
-        }
-        self.insert_table.render_table(frame, *area);
-        self.insert_table.table_state.select(sel);
+        let len = self.door_list.lock().unwrap().len();
+        let selected = self.insert_table.table_state.selected();
+        // Only the credentials form is focused, so the list hides its marker but keeps the row.
+        let focused = if self.mode == EditCommandMode::Config { None } else { selected };
+        self.insert_table.sync_rows(len, focused);
+        self.insert_table.render_list(frame, *area);
+        self.insert_table.sync_rows(len, selected);
     }
 
     fn add_door(&mut self) {
@@ -176,9 +174,7 @@ impl<'a> DoorEditor<'a> {
             dos_memory_mb: 64,
             dos_max_runtime_seconds: icy_board_engine::icy_board::doors::DEFAULT_DOS_MAX_RUNTIME_SECONDS,
         });
-        drop(door_list);
-        self.insert_table.content_length += 1;
-        self.insert_table.table_state.select(Some(selected));
+        self.insert_table.sync_rows(door_list.len(), Some(selected));
         self.mode = EditCommandMode::Table;
     }
 }
@@ -189,21 +185,16 @@ impl<'a> Page for DoorEditor<'a> {
         let conference_name = crate::tabs::conferences::get_cur_conference_name();
         let title = get_text_args("doors_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
 
-        let block = Block::new()
-            .title_alignment(Alignment::Center)
-            .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
-            .style(get_tui_theme().dialog_box)
-            .padding(Padding::new(2, 2, 1, 1))
-            .borders(Borders::ALL)
-            .border_set(icy_board_tui::BORDER_SET)
-            .title_bottom(Span::styled(
-                if self.mode == EditCommandMode::Config {
-                    get_text("doors_editor_key_help")
-                } else {
-                    get_text("doors_editor_key_help_door")
-                },
-                get_tui_theme().key_binding,
-            ));
+        let modal = self.detail.is_open() || self.save_changes.is_open() || self.menu_state.is_path_browser_open();
+        let block = super::list_editor_frame(
+            title,
+            if self.mode == EditCommandMode::Config {
+                get_text("doors_editor_key_help")
+            } else {
+                get_text("doors_editor_key_help_door")
+            },
+            modal,
+        );
 
         block.render(area, frame.buffer_mut());
 
@@ -213,76 +204,49 @@ impl<'a> Page for DoorEditor<'a> {
         if self.mode == EditCommandMode::Table {
             self.menu_state.selected = usize::MAX;
         }
-        self.menu.render(menu_area, frame, &mut self.menu_state);
+        super::render_config_form(frame, menu_area, &mut self.menu, &mut self.menu_state);
         self.menu_state.selected = sel;
 
         self.display_insert_table(frame, &table_area);
 
-        self.menu
-            .get_item(self.menu_state.selected)
-            .unwrap()
-            .text_field_state
-            .set_cursor_position(frame);
+        self.detail.render(
+            frame,
+            area.inner(Margin { vertical: 4, horizontal: 3 }),
+            get_text("doors_editor_edit_title"),
+            String::new(),
+        );
+        self.save_changes.render(frame, area);
+    }
 
-        if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 4, horizontal: 3 });
-            Clear.render(area, frame.buffer_mut());
-            let block = Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(
-                    Span::from(get_text("doors_editor_edit_title")).style(get_tui_theme().dialog_box_title),
-                ))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double);
-            //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
-            block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
-
-            edit_config
-                .get_item(self.edit_config_state.selected)
-                .unwrap()
-                .text_field_state
-                .set_cursor_position(frame);
-        }
-        if let Some(save_changes) = &self.save_dialog {
-            save_changes.render(frame, area);
+    fn request_status(&self) -> ResultState {
+        if self.detail.is_open() {
+            self.detail.status()
+        } else if self.mode == EditCommandMode::Config {
+            ResultState::status_line(self.menu.current_status_line(&self.menu_state))
+        } else {
+            ResultState::default()
         }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if self.save_dialog.is_some() {
-            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
-            return match res {
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
-                    self.save_dialog = None;
-                    PageMessage::None
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    crate::editors::save_file(&self.path, || self.door_list.lock().unwrap().save(&self.path))
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
-            };
+        if let Some(message) = self
+            .save_changes
+            .handle_key(key, || super::save_file(&self.path, || self.door_list.lock().unwrap().save(&self.path)))
+        {
+            return message;
         }
 
-        if let Some(edit_config) = &mut self.edit_config {
-            let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
-            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-                self.edit_config = None;
-                return PageMessage::None;
-            }
-            return PageMessage::None;
+        if let Some(message) = self.detail.handle_key(key) {
+            return message;
+        }
+
+        if self.menu_state.is_path_browser_open() {
+            return PageMessage::ResultState(self.menu.handle_key_press(key, &mut self.menu_state));
         }
 
         match key.code {
             KeyCode::Esc => {
-                if self.door_list_orig == self.door_list.lock().unwrap().clone() {
-                    return PageMessage::Close;
-                }
-                self.save_dialog = Some(SaveChangesDialog::new());
-                return PageMessage::None;
+                return self.save_changes.request_close(self.door_list_orig != *self.door_list.lock().unwrap());
             }
 
             KeyCode::Tab => {
@@ -299,23 +263,16 @@ impl<'a> Page for DoorEditor<'a> {
                 EditCommandMode::Table => match key.code {
                     KeyCode::Insert => self.add_door(),
                     KeyCode::Delete => {
-                        if let Some(selected_item) = self.insert_table.table_state.selected()
-                            && selected_item < self.door_list.lock().unwrap().len()
-                        {
-                            self.door_list.lock().unwrap().remove(selected_item);
-                            self.insert_table.content_length -= 1;
-                        }
+                        self.insert_table.remove_row(&mut *self.door_list.lock().unwrap());
                     }
 
                     KeyCode::Enter => {
-                        self.edit_config_state = ConfigMenuState::default();
-
                         if let Some(selected_item) = self.insert_table.table_state.selected() {
                             let cmd = self.door_list.lock().unwrap();
                             let Some(action) = cmd.get(selected_item) else {
                                 return PageMessage::None;
                             };
-                            self.edit_config = Some(super::align_editor_labels(ConfigMenu {
+                            self.detail.open(super::align_editor_labels(ConfigMenu {
                                 obj: (selected_item, self.door_list.clone()),
                                 entry: vec![
                                     ConfigEntry::Item(
@@ -466,7 +423,7 @@ impl<'a> Page for DoorEditor<'a> {
                     }
                 },
                 EditCommandMode::Config => {
-                    self.menu.handle_key_press(key, &mut self.menu_state);
+                    return PageMessage::ResultState(self.menu.handle_key_press(key, &mut self.menu_state));
                 }
             },
         }
@@ -485,6 +442,53 @@ mod tests {
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    #[test]
+    fn modal_hints_and_failed_save_preserve_door_modes() {
+        let directory = tempfile::tempdir().unwrap();
+        let parent = directory.path().join("blocked");
+        std::fs::write(&parent, b"not a directory").unwrap();
+        let path = parent.join("doors.toml");
+        let mut editor = DoorEditor::new(&path).unwrap();
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        let mut assert_hint = |editor: &mut DoorEditor<'_>, hint: Option<&str>| {
+            terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+            let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
+            if let Some(hint) = hint {
+                assert!(border.contains(&get_text(hint)));
+            } else {
+                assert!(!border.contains(&get_text("doors_editor_key_help")));
+                assert!(!border.contains(&get_text("doors_editor_key_help_door")));
+            }
+        };
+
+        assert_hint(&mut editor, Some("doors_editor_key_help"));
+        editor.handle_key_press(key(KeyCode::F(2)));
+        assert_hint(&mut editor, Some("doors_editor_key_help_door"));
+        editor.handle_key_press(key(KeyCode::Enter));
+        assert_hint(&mut editor, None);
+        editor.handle_key_press(key(KeyCode::Tab));
+        assert_eq!(editor.mode, EditCommandMode::Table);
+        editor.handle_key_press(key(KeyCode::Esc));
+        assert_hint(&mut editor, Some("doors_editor_key_help_door"));
+        editor.handle_key_press(key(KeyCode::Esc));
+        assert!(editor.save_changes.is_open());
+        assert_hint(&mut editor, None);
+        editor.handle_key_press(key(KeyCode::Right));
+        assert!(matches!(
+            editor.handle_key_press(key(KeyCode::Enter)),
+            PageMessage::InfoBox(icy_board_tui::tab_page::InfoState::Error, _)
+        ));
+        assert!(!editor.save_changes.is_open());
+        editor.handle_key_press(key(KeyCode::Tab));
+        assert_eq!(editor.mode, EditCommandMode::Config);
+        assert_hint(&mut editor, Some("doors_editor_key_help"));
+        std::fs::remove_file(parent).unwrap();
+        editor.handle_key_press(key(KeyCode::Esc));
+        editor.handle_key_press(key(KeyCode::Right));
+        assert!(matches!(editor.handle_key_press(key(KeyCode::Enter)), PageMessage::Close));
+        assert_eq!(DoorList::load(&path).unwrap().len(), 1);
     }
 
     #[test]
@@ -512,7 +516,7 @@ mod tests {
         editor.handle_key_press(key(KeyCode::F(2)));
         editor.handle_key_press(key(KeyCode::Enter));
 
-        let entries = &editor.edit_config.as_ref().unwrap().entry;
+        let entries = &editor.detail.menu.as_ref().unwrap().entry;
         assert_eq!(
             entries
                 .iter()

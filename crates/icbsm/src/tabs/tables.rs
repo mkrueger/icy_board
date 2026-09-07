@@ -12,7 +12,7 @@ use icy_board_tui::{
     get_text, get_text_args,
     select_menu::MenuItem,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
+    theme::{config_title, get_tui_theme},
 };
 use ratatui::{
     Frame,
@@ -89,10 +89,7 @@ fn value_header(kind: TableKind) -> String {
 
 /// The panel of prose the original printed beside the table.
 fn table_help(kind: TableKind) -> Vec<Line<'static>> {
-    let mut lines = vec![
-        Line::from(Span::styled(kind_text(kind, "icbsm_table_help_title"), get_tui_theme().group_title)),
-        Line::from(""),
-    ];
+    let mut lines = Vec::from(config_title(kind_text(kind, "icbsm_table_help_title")));
     for line in kind_text(kind, "icbsm_table_help").lines() {
         lines.push(Line::from(line.to_string()));
     }
@@ -217,10 +214,8 @@ impl Page for TableEditPage {
         let [table_area, help_area] = Layout::horizontal([Constraint::Length(24), Constraint::Min(20)]).areas(inner);
 
         // The two columns carry their heading once, over the whole table.
-        let headers = Line::from(format!("{:<11}{}", value_header(self.kind), get_text("icbsm_table_security")));
-        Paragraph::new(Text::from(headers))
-            .style(get_tui_theme().group_title)
-            .render(Rect { height: 1, ..table_area }, frame.buffer_mut());
+        let headers = format!("{:<11}{}", value_header(self.kind), get_text("icbsm_table_security"));
+        Paragraph::new(Text::from(Vec::from(config_title(headers)))).render(Rect { height: 2, ..table_area }, frame.buffer_mut());
 
         let rows_area = Rect {
             y: table_area.y + 2,

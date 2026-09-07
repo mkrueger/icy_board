@@ -87,6 +87,9 @@ impl NodeMonitoringScreen {
         let mut node_info: Vec<Option<Info>> = Vec::new();
         let mut connections: Vec<Connection> = Vec::new();
         loop {
+            if bbs.lock().await.event_restart_requested {
+                return Ok(NodeMonitoringScreenMessage::Exit);
+            }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             let mut page_len = 0;
             if node_info.is_empty() || last_tick.elapsed() >= tick_rate {

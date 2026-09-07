@@ -539,7 +539,9 @@ fn test_cmd_r_short_long_and_help_execute_inside_reader() {
 #[test]
 fn test_cmd_r_capture_can_be_cancelled_without_body_or_read_effects() {
     for option in ["C", "D", "Z", "QWK"] {
-        let (output, base) = persisted_read(&format!("R\n1 {option}\nN\n\n"), address_first_to_sysop);
+        // Protocol cancellation requires a remote session; local capture uses
+        // a host directory picker and never asks for a transfer protocol.
+        let (output, base) = persisted_read_with_session(&format!("R\n1 {option}\nN\n\n"), false, address_first_to_sysop);
         assert!(output.contains("Total Messages Captured for Download"), "capture did not run:\n{output}");
         assert!(!output.contains("Invalid Entry"), "capture was rejected:\n{output}");
         if option == "C" {

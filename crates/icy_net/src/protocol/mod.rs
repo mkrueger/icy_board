@@ -104,7 +104,9 @@ impl FromStr for TransferProtocolType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let res = if s.starts_with('@') {
+        let res = if s.is_empty() {
+            TransferProtocolType::None
+        } else if s.starts_with('@') {
             match s.to_ascii_lowercase().as_str() {
                 ASC_STR => TransferProtocolType::ASCII,
                 XMODEM_STR => TransferProtocolType::XModem,
@@ -166,5 +168,29 @@ impl serde::Serialize for TransferProtocolType {
         S: serde::Serializer,
     {
         self.to_string().serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod type_tests {
+    use super::TransferProtocolType;
+
+    #[test]
+    fn protocol_types_round_trip_through_their_configuration_strings() {
+        for protocol in [
+            TransferProtocolType::None,
+            TransferProtocolType::ASCII,
+            TransferProtocolType::XModem,
+            TransferProtocolType::XModemCRC,
+            TransferProtocolType::XModem1k,
+            TransferProtocolType::XModem1kG,
+            TransferProtocolType::YModem,
+            TransferProtocolType::YModemG,
+            TransferProtocolType::ZModem,
+            TransferProtocolType::ZModem8k,
+            TransferProtocolType::External("./transfer --send".into()),
+        ] {
+            assert_eq!(protocol.to_string().parse::<TransferProtocolType>().unwrap(), protocol);
+        }
     }
 }

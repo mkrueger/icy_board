@@ -37,36 +37,36 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
-        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().clone();
+        let mut admission = bbs.lock().await;
+        let node_list = admission.open_connections.clone();
         let board = board.clone();
-        let handle = std::thread::Builder::new()
-            .name("Telnet handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let orig_hook = std::panic::take_hook();
-                    std::panic::set_hook(Box::new(move |panic_info| {
-                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                        log::error!("full info: {:?}", panic_info);
-                        orig_hook(panic_info);
-                    }));
+        admission
+            .spawn_node(ConnectionType::Telnet, move |node, _| {
+                std::thread::Builder::new().name("Telnet handle".to_string()).spawn(move || {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                        let orig_hook = std::panic::take_hook();
+                        std::panic::set_hook(Box::new(move |panic_info| {
+                            log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                            log::error!("full info: {:?}", panic_info);
+                            orig_hook(panic_info);
+                        }));
 
-                    match TelnetConnection::accept(stream) {
-                        Ok(connection) => {
-                            // connection succeeded
-                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running background client: {}", err);
+                        match TelnetConnection::accept(stream) {
+                            Ok(connection) => {
+                                // connection succeeded
+                                if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
+                                    log::error!("Error running background client: {}", err);
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("telnet connection failed {}", e);
                             }
                         }
-                        Err(e) => {
-                            log::error!("telnet connection failed {}", e);
-                        }
-                    }
-                });
-                Ok(())
+                    });
+                    Ok(())
+                })
             })
-            .unwrap();
-        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
+            .await?;
     }
 }
 
@@ -80,36 +80,37 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
-        let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().clone();
+        let mut admission = bbs.lock().await;
+        let node_list = admission.open_connections.clone();
         let board = board.clone();
-        let handle = std::thread::Builder::new()
-            .name("Websocket handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let orig_hook: Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Send + Sync> = std::panic::take_hook();
-                    std::panic::set_hook(Box::new(move |panic_info| {
-                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                        log::error!("full info: {:?}", panic_info);
-                        orig_hook(panic_info);
-                    }));
+        admission
+            .spawn_node(ConnectionType::Telnet, move |node, _| {
+                std::thread::Builder::new().name("Websocket handle".to_string()).spawn(move || {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                        let orig_hook: Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Send + Sync> = std::panic::take_hook();
+                        std::panic::set_hook(Box::new(move |panic_info| {
+                            log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                            log::error!("full info: {:?}", panic_info);
+                            orig_hook(panic_info);
+                        }));
 
-                    match accept_websocket(stream).await {
-                        Ok(connection) => {
-                            // connection succeeded
-                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running background client: {}", err);
+                        match tokio::time::timeout(Duration::from_secs(30), accept_websocket(stream)).await {
+                            Ok(Ok(connection)) => {
+                                // connection succeeded
+                                if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
+                                    log::error!("Error running background client: {}", err);
+                                }
                             }
+                            Ok(Err(e)) => {
+                                log::error!("telnet connection failed {}", e);
+                            }
+                            Err(_) => log::warn!("WebSocket handshake timed out"),
                         }
-                        Err(e) => {
-                            log::error!("telnet connection failed {}", e);
-                        }
-                    }
-                });
-                Ok(())
+                    });
+                    Ok(())
+                })
             })
-            .unwrap();
-        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
+            .await?;
     }
 }
 
@@ -123,36 +124,37 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
-        let node: usize = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().clone();
+        let mut admission = bbs.lock().await;
+        let node_list = admission.open_connections.clone();
         let board = board.clone();
-        let handle = std::thread::Builder::new()
-            .name("Secure Websocket handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let orig_hook = std::panic::take_hook();
-                    std::panic::set_hook(Box::new(move |panic_info| {
-                        log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
-                        log::error!("full info: {:?}", panic_info);
-                        orig_hook(panic_info);
-                    }));
+        admission
+            .spawn_node(ConnectionType::Telnet, move |node, _| {
+                std::thread::Builder::new().name("Secure Websocket handle".to_string()).spawn(move || {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                        let orig_hook = std::panic::take_hook();
+                        std::panic::set_hook(Box::new(move |panic_info| {
+                            log::error!("IcyBoard thread crashed at {:?}", panic_info.location());
+                            log::error!("full info: {:?}", panic_info);
+                            orig_hook(panic_info);
+                        }));
 
-                    match accept_sec_websocket(stream).await {
-                        Ok(connection) => {
-                            // connection succeeded
-                            if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
-                                log::error!("Error running background client: {}", err);
+                        match tokio::time::timeout(Duration::from_secs(30), accept_sec_websocket(stream)).await {
+                            Ok(Ok(connection)) => {
+                                // connection succeeded
+                                if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
+                                    log::error!("Error running background client: {}", err);
+                                }
                             }
+                            Ok(Err(e)) => {
+                                log::error!("telnet connection failed {}", e);
+                            }
+                            Err(_) => log::warn!("Secure WebSocket handshake timed out"),
                         }
-                        Err(e) => {
-                            log::error!("telnet connection failed {}", e);
-                        }
-                    }
-                });
-                Ok(())
+                    });
+                    Ok(())
+                })
             })
-            .unwrap();
-        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
+            .await?;
     }
 }
 

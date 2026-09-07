@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Cell, HighlightSpacing, Row, ScrollbarState, Table, TableState},
 };
 
-use crate::theme::get_tui_theme;
+use crate::theme::{config_title, get_tui_theme};
 
 /// Width of the record number column, matching PCBoard's `"%3ld)"` records.
 const NUMBER_WIDTH: u16 = 5;
@@ -56,10 +56,9 @@ impl<'a> InsertTable<'a> {
         }
         for column in &self.columns {
             let title = column.title.trim_end();
-            let underline = "═".repeat(title.chars().count());
-            header_cells.push(Cell::from(Text::from(vec![Line::from(title.to_string()), Line::from(underline)])));
+            header_cells.push(Cell::from(Text::from(Vec::from(config_title(title)))));
         }
-        let header = Row::new(header_cells).style(get_tui_theme().table_header).height(2);
+        let header = Row::new(header_cells).height(2);
 
         let mut rows = Vec::new();
         for i in 0..self.content_length {

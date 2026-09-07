@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::editors::EditorList;
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     Res,
@@ -12,19 +13,17 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     insert_table::{Column, InsertTable},
-    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
-    theme::get_tui_theme,
 };
 use icy_net::protocol::TransferProtocolType;
 use ratatui::{
     Frame,
-    layout::{Alignment, Margin, Rect},
-    text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, ScrollbarState, TableState, Widget},
+    layout::{Margin, Rect},
+    text::Line,
+    widgets::{Clear, ScrollbarState, TableState, Widget},
 };
 
 pub struct ProtocolEditor<'a> {
@@ -34,9 +33,8 @@ pub struct ProtocolEditor<'a> {
     protocols_orig: SupportedProtocols,
     protocols: Arc<Mutex<SupportedProtocols>>,
 
-    edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<SupportedProtocols>>)>>,
-    save_dialog: Option<SaveChangesDialog>,
+    detail: super::EditorDialog<(usize, Arc<Mutex<SupportedProtocols>>)>,
+    save_changes: super::EditorSaveChanges,
 }
 
 impl<'a> ProtocolEditor<'a> {
@@ -78,150 +76,79 @@ impl<'a> ProtocolEditor<'a> {
             protocols_orig,
             insert_table,
             protocols,
-            edit_config: None,
-            edit_config_state: ConfigMenuState::default(),
-            save_dialog: None,
+            detail: super::EditorDialog::default(),
+            save_changes: super::EditorSaveChanges::default(),
         })
-    }
-
-    fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect) {
-        let sel = self.insert_table.table_state.selected();
-        self.insert_table.render_table(frame, *area);
-        self.insert_table.table_state.select(sel);
-    }
-
-    fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected()
-            && selected > 0
-        {
-            let mut levels = self.protocols.lock().unwrap();
-            levels.swap(selected, selected - 1);
-            self.insert_table.table_state.select(Some(selected - 1));
-        }
-    }
-
-    fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected()
-            && selected + 1 < self.protocols.lock().unwrap().len()
-        {
-            let mut levels = self.protocols.lock().unwrap();
-            levels.swap(selected, selected + 1);
-            self.insert_table.table_state.select(Some(selected + 1));
-        }
     }
 }
 
 impl<'a> Page for ProtocolEditor<'a> {
+    fn request_status(&self) -> ResultState {
+        self.detail.status()
+    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
 
-        let block = Block::new()
-            .title_alignment(Alignment::Center)
-            .title(Line::from(
-                Span::from(get_text("protocol_editor_title")).style(get_tui_theme().dialog_box_title),
-            ))
-            .style(get_tui_theme().dialog_box)
-            .padding(Padding::new(2, 2, 1, 1))
-            .borders(Borders::ALL)
-            .border_set(icy_board_tui::BORDER_SET)
-            .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding));
+        let block = super::list_editor_frame(
+            get_text("protocol_editor_title"),
+            get_text("icb_setup_key_conf_list_help"),
+            self.detail.is_open() || self.save_changes.is_open(),
+        );
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
-        self.display_insert_table(frame, &area);
+        self.insert_table.render_list(frame, area);
 
-        if let Some(edit_config) = &mut self.edit_config {
+        if self.detail.is_open() {
             let area = area.inner(Margin { vertical: 6, horizontal: 3 });
-            Clear.render(area, frame.buffer_mut());
-            let block = Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(
-                    Span::from(get_text("protocol_editor_editor")).style(get_tui_theme().dialog_box_title),
-                ))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double);
-            //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
-            block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
-
-            edit_config
-                .get_item(self.edit_config_state.selected)
-                .unwrap()
-                .text_field_state
-                .set_cursor_position(frame);
+            self.detail.render(frame, area, get_text("protocol_editor_editor"), String::new());
         }
-        if let Some(save_changes) = &self.save_dialog {
-            save_changes.render(frame, area);
-        }
+        self.save_changes.render(frame, area);
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if self.save_dialog.is_some() {
-            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
-            return match res {
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
-                    self.save_dialog = None;
-                    PageMessage::None
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    crate::editors::save_file(&self.path, || self.protocols.lock().unwrap().save(&self.path))
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
-            };
+        if let Some(message) = self.save_changes.handle_key(key, || {
+            crate::editors::save_file(&self.path, || self.protocols.lock().unwrap().save(&self.path))
+        }) {
+            return message;
         }
-        if let Some(edit_config) = &mut self.edit_config {
-            let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
-            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-                self.edit_config = None;
-                return PageMessage::None;
-            }
-            return PageMessage::None;
+        if let Some(message) = self.detail.handle_key(key) {
+            return message;
         }
 
         match key.code {
             KeyCode::Esc => {
-                if self.protocols_orig == self.protocols.lock().unwrap().clone() {
-                    return PageMessage::Close;
-                }
-                self.save_dialog = Some(SaveChangesDialog::new());
-                return PageMessage::None;
+                return self.save_changes.request_close(self.protocols_orig != *self.protocols.lock().unwrap());
             }
             _ => match key.code {
-                KeyCode::PageUp => self.move_up(),
-                KeyCode::PageDown => self.move_down(),
+                KeyCode::PageUp => self.insert_table.move_row(&mut self.protocols.lock().unwrap(), -1),
+                KeyCode::PageDown => self.insert_table.move_row(&mut self.protocols.lock().unwrap(), 1),
 
                 KeyCode::Insert => {
-                    self.protocols.lock().unwrap().push(Protocol {
-                        is_enabled: true,
-                        is_batch: false,
-                        is_bi_directional: false,
-                        char_code: "N".to_string(),
-                        description: String::new(),
-                        send_command: TransferProtocolType::None,
-                        recv_command: TransferProtocolType::None,
-                    });
-                    self.insert_table.content_length += 1;
+                    self.insert_table.push_row(
+                        &mut *self.protocols.lock().unwrap(),
+                        Protocol {
+                            is_enabled: true,
+                            is_batch: false,
+                            is_bi_directional: false,
+                            char_code: "N".to_string(),
+                            description: String::new(),
+                            send_command: TransferProtocolType::None,
+                            recv_command: TransferProtocolType::None,
+                        },
+                    );
                 }
                 KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected()
-                        && selected_item < self.protocols.lock().unwrap().len()
-                    {
-                        self.protocols.lock().unwrap().remove(selected_item);
-                        self.insert_table.content_length -= 1;
-                    }
+                    self.insert_table.remove_row(&mut *self.protocols.lock().unwrap());
                 }
 
                 KeyCode::Enter => {
-                    self.edit_config_state = ConfigMenuState::default();
-
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
                         let cmd = self.protocols.lock().unwrap();
                         let Some(cur_prot) = cmd.get(selected_item) else {
                             return PageMessage::None;
                         };
-                        self.edit_config = Some(ConfigMenu {
+                        self.detail.open(ConfigMenu {
                             obj: (selected_item, self.protocols.clone()),
                             entry: vec![
                                 ConfigEntry::Item(

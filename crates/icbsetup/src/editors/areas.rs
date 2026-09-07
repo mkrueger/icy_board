@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::editors::EditorList;
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::{
     Res,
@@ -14,19 +15,17 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    BORDER_SET,
-    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     insert_table::{Column, InsertTable},
-    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
     Frame,
-    layout::{Alignment, Margin, Rect},
+    layout::{Margin, Rect},
     text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, ScrollbarState, TableState, Widget},
+    widgets::{Clear, Paragraph, ScrollbarState, TableState, Widget},
 };
 
 /// One line of a `.NA` area list, and whether the sysop wants it.
@@ -119,14 +118,12 @@ pub struct MessageAreasEditor<'a> {
     area_list_orig: AreaList,
     area_list: Arc<Mutex<AreaList>>,
 
-    edit_config_state: ConfigMenuState,
-    edit_config: Option<ConfigMenu<(usize, Arc<Mutex<AreaList>>)>>,
-    import_config_state: ConfigMenuState,
-    import_config: Option<ConfigMenu<Arc<Mutex<NaImportSettings>>>>,
+    detail: super::EditorDialog<(usize, Arc<Mutex<AreaList>>)>,
+    import_form: super::EditorDialog<Arc<Mutex<NaImportSettings>>>,
     import_settings: Arc<Mutex<NaImportSettings>>,
     import_areas: Option<Vec<NaArea>>,
     import_selected: usize,
-    save_dialog: Option<SaveChangesDialog>,
+    save_changes: super::EditorSaveChanges,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -172,29 +169,26 @@ impl<'a> MessageAreasEditor<'a> {
             insert_table,
             area_list,
             area_list_orig,
-            edit_config: None,
-            edit_config_state: ConfigMenuState::default(),
-            import_config_state: ConfigMenuState::default(),
-            import_config: None,
+            detail: super::EditorDialog::default(),
+            import_form: super::EditorDialog::default(),
             import_settings,
             import_areas: None,
             import_selected: 0,
-            save_dialog: None,
+            save_changes: super::EditorSaveChanges::default(),
         })
     }
 
     fn with_path_base(mut self, path_base: PathBuf) -> Self {
-        self.edit_config_state.path_base = Some(path_base.clone());
-        self.import_config_state.path_base = Some(path_base);
+        self.detail.state.path_base = Some(path_base.clone());
+        self.import_form.state.path_base = Some(path_base);
         // Configuration filenames may be nested; message paths are board-relative.
         self.import_settings.lock().unwrap().base_directory = PathBuf::from("messages");
         self
     }
 
     fn open_import(&mut self) {
-        super::reset_config_state(&mut self.import_config_state);
         let settings = self.import_settings.lock().unwrap().clone();
-        self.import_config = Some(ConfigMenu {
+        self.import_form.open(ConfigMenu {
             obj: self.import_settings.clone(),
             entry: vec![
                 ConfigEntry::Item(
@@ -222,7 +216,8 @@ impl<'a> MessageAreasEditor<'a> {
     fn load_import(&mut self) -> PageMessage {
         let source = self.import_settings.lock().unwrap().source.clone();
         let source = self
-            .import_config_state
+            .import_form
+            .state
             .path_base
             .as_ref()
             .map_or_else(|| source.clone(), |base| base.join(&source));
@@ -234,39 +229,13 @@ impl<'a> MessageAreasEditor<'a> {
                 }
                 self.import_areas = Some(areas);
                 self.import_selected = 0;
-                self.import_config = None;
+                self.import_form.close();
                 PageMessage::None
             }
             Err(err) => PageMessage::InfoBox(
                 icy_board_tui::tab_page::InfoState::Error,
                 get_text_args("area_import_failed", HashMap::from([("error".to_string(), err.to_string())])),
             ),
-        }
-    }
-
-    fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect) {
-        let sel = self.insert_table.table_state.selected();
-        self.insert_table.render_table(frame, *area);
-        self.insert_table.table_state.select(sel);
-    }
-
-    fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected()
-            && selected > 0
-        {
-            let mut levels = self.area_list.lock().unwrap();
-            levels.swap(selected, selected - 1);
-            self.insert_table.table_state.select(Some(selected - 1));
-        }
-    }
-
-    fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected()
-            && selected + 1 < self.area_list.lock().unwrap().len()
-        {
-            let mut levels = self.area_list.lock().unwrap();
-            levels.swap(selected, selected + 1);
-            self.insert_table.table_state.select(Some(selected + 1));
         }
     }
 }
@@ -277,75 +246,26 @@ impl<'a> Page for MessageAreasEditor<'a> {
         let conference_name = crate::tabs::conferences::get_cur_conference_name();
         let title = get_text_args("area_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
 
-        let block = Block::new()
-            .title_alignment(Alignment::Center)
-            .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
-            .style(get_tui_theme().dialog_box)
-            .padding(Padding::new(2, 2, 1, 1))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .title_bottom(Span::styled(get_text("area_editor_key_help"), get_tui_theme().key_binding));
+        let modal = self.detail.is_open() || self.import_form.is_open() || self.import_areas.is_some() || self.save_changes.is_open();
+        let block = super::list_editor_frame(title, get_text("area_editor_key_help"), modal);
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
-        self.display_insert_table(frame, &area);
+        self.insert_table.render_list(frame, area);
 
-        if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 3, horizontal: 3 });
-            Clear.render(area, frame.buffer_mut());
-            let block = Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(
-                    Span::from(get_text("area_editor_edit_title")).style(get_tui_theme().dialog_box_title),
-                ))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double)
-                .title_bottom(Span::styled(
-                    super::path_browse_hint(edit_config, &self.edit_config_state),
-                    get_tui_theme().key_binding,
-                ));
-            //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
-            block.render(area, frame.buffer_mut());
-            edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
-
-            if !self.edit_config_state.is_path_browser_open() {
-                edit_config
-                    .get_item(self.edit_config_state.selected)
-                    .unwrap()
-                    .text_field_state
-                    .set_cursor_position(frame);
-            }
-        }
-        if let Some(import_config) = &mut self.import_config {
+        self.detail.render(
+            frame,
+            area.inner(Margin { vertical: 3, horizontal: 3 }),
+            get_text("area_editor_edit_title"),
+            String::new(),
+        );
+        if self.import_form.is_open() {
             let margin = Margin {
                 vertical: if area.height >= 18 { 5 } else { 1 },
                 horizontal: if area.width >= 70 { 5 } else { 1 },
             };
             let area = area.inner(margin);
-            Clear.render(area, frame.buffer_mut());
-            Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(Span::from(get_text("area_import_title")).style(get_tui_theme().dialog_box_title)))
-                .title_bottom(Span::styled(
-                    format!(
-                        "{}  {}",
-                        get_text("area_import_load_help"),
-                        super::path_browse_hint(import_config, &self.import_config_state),
-                    ),
-                    get_tui_theme().key_binding,
-                ))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double)
-                .render(area, frame.buffer_mut());
-            import_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.import_config_state);
-            if !self.import_config_state.is_path_browser_open()
-                && let Some(item) = import_config.get_item(self.import_config_state.selected)
-            {
-                item.text_field_state.set_cursor_position(frame);
-            }
+            self.import_form
+                .render(frame, area, get_text("area_import_title"), get_text("area_import_load_help"));
         }
         if let Some(import_areas) = &self.import_areas {
             let margin = Margin {
@@ -354,16 +274,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
             };
             let area = area.inner(margin);
             Clear.render(area, frame.buffer_mut());
-            Block::new()
-                .title_alignment(Alignment::Center)
-                .title(Line::from(
-                    Span::from(get_text("area_import_preview_title")).style(get_tui_theme().dialog_box_title),
-                ))
+            super::popup_frame(get_text("area_import_preview_title"))
                 .title_bottom(Span::styled(get_text("area_import_preview_help"), get_tui_theme().key_binding))
-                .style(get_tui_theme().dialog_box)
-                .padding(Padding::new(2, 2, 1, 1))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Double)
                 .render(area, frame.buffer_mut());
             let inner = area.inner(Margin { vertical: 2, horizontal: 2 });
             let height = inner.height as usize;
@@ -385,25 +297,23 @@ impl<'a> Page for MessageAreasEditor<'a> {
                 .collect::<Vec<_>>();
             Paragraph::new(Text::from(lines)).render(inner, frame.buffer_mut());
         }
-        if let Some(save_changes) = &self.save_dialog {
-            save_changes.render(frame, area);
+        self.save_changes.render(frame, area);
+    }
+
+    fn request_status(&self) -> ResultState {
+        if self.import_form.is_open() {
+            self.import_form.status()
+        } else {
+            self.detail.status()
         }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if self.save_dialog.is_some() {
-            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
-            return match res {
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
-                    self.save_dialog = None;
-                    PageMessage::None
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    crate::editors::save_file(&self.path, || self.area_list.lock().unwrap().save(&self.path))
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
-            };
+        if let Some(message) = self
+            .save_changes
+            .handle_key(key, || super::save_file(&self.path, || self.area_list.lock().unwrap().save(&self.path)))
+        {
+            return message;
         }
 
         if self.import_areas.is_some() {
@@ -428,7 +338,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                     let areas = self.import_areas.take().unwrap_or_default();
                     let directory = self.import_settings.lock().unwrap().base_directory.clone();
                     let added = import_na(&mut self.area_list.lock().unwrap(), &areas, &directory);
-                    self.insert_table.content_length = self.area_list.lock().unwrap().len();
+                    self.insert_table
+                        .sync_rows(self.area_list.lock().unwrap().len(), self.insert_table.table_state.selected().or(Some(0)));
                     return PageMessage::InfoBox(
                         icy_board_tui::tab_page::InfoState::Info,
                         get_text_args("area_import_done", HashMap::from([("count".to_string(), added.to_string())])),
@@ -439,61 +350,40 @@ impl<'a> Page for MessageAreasEditor<'a> {
             return PageMessage::None;
         }
 
-        if let Some(import_config) = &mut self.import_config {
-            if !self.import_config_state.is_path_browser_open() && key.code == KeyCode::F(2) {
+        if self.import_form.is_open() {
+            if !self.import_form.state.is_path_browser_open() && key.code == KeyCode::F(2) {
                 return self.load_import();
             }
-            let res = import_config.handle_key_press(key, &mut self.import_config_state);
-            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-                self.import_config = None;
-            }
-            return PageMessage::None;
+            return self.import_form.handle_key(key).unwrap_or(PageMessage::None);
         }
 
-        if let Some(edit_config) = &mut self.edit_config {
-            let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
-            if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-                self.edit_config = None;
-                return PageMessage::None;
-            }
-            return PageMessage::None;
+        if let Some(message) = self.detail.handle_key(key) {
+            return message;
         }
 
         match key.code {
             KeyCode::Esc => {
-                if self.area_list_orig == self.area_list.lock().unwrap().clone() {
-                    return PageMessage::Close;
-                }
-                self.save_dialog = Some(SaveChangesDialog::new());
-                return PageMessage::None;
+                return self.save_changes.request_close(self.area_list_orig != *self.area_list.lock().unwrap());
             }
             _ => match key.code {
-                KeyCode::PageUp => self.move_up(),
-                KeyCode::PageDown => self.move_down(),
+                KeyCode::PageUp => self.insert_table.move_row(&mut self.area_list.lock().unwrap(), -1),
+                KeyCode::PageDown => self.insert_table.move_row(&mut self.area_list.lock().unwrap(), 1),
 
                 KeyCode::Insert => {
-                    self.area_list.lock().unwrap().push(MessageArea::default());
-                    self.insert_table.content_length += 1;
+                    self.insert_table.push_row(&mut *self.area_list.lock().unwrap(), MessageArea::default());
                 }
                 KeyCode::F(2) => self.open_import(),
                 KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected()
-                        && selected_item < self.area_list.lock().unwrap().len()
-                    {
-                        self.area_list.lock().unwrap().remove(selected_item);
-                        self.insert_table.content_length -= 1;
-                    }
+                    self.insert_table.remove_row(&mut *self.area_list.lock().unwrap());
                 }
 
                 KeyCode::Enter => {
-                    super::reset_config_state(&mut self.edit_config_state);
-
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
                         let cmd = self.area_list.lock().unwrap();
                         let Some(item) = cmd.get(selected_item) else {
                             return PageMessage::None;
                         };
-                        self.edit_config = Some(super::align_editor_labels(ConfigMenu {
+                        self.detail.open(super::align_editor_labels(ConfigMenu {
                             obj: (selected_item, self.area_list.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
@@ -647,6 +537,83 @@ mod tests {
     use super::*;
 
     #[test]
+    fn first_imported_area_is_immediately_editable_after_an_empty_render() {
+        let root = tempfile::tempdir().unwrap();
+        let mut editor = MessageAreasEditor::new(&root.path().join("areas.toml")).unwrap();
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+        assert_eq!(editor.insert_table.table_state.selected(), None);
+        editor.import_areas = Some(parse_na("FSX_GEN General"));
+        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::Enter)), PageMessage::InfoBox(_, _)));
+        assert_eq!(editor.insert_table.table_state.selected(), Some(0));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        assert!(editor.detail.is_open());
+        assert_eq!(editor.area_list.lock().unwrap()[0].ftn_area_tag, "FSX_GEN");
+    }
+
+    #[test]
+    fn parent_hint_is_hidden_for_detail_import_preview_and_save() {
+        let root = tempfile::tempdir().unwrap();
+        let mut editor = MessageAreasEditor::new(&root.path().join("areas.toml")).unwrap();
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        let mut assert_hint = |editor: &mut MessageAreasEditor<'_>, visible: bool| {
+            terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+            let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
+            assert_eq!(border.contains(&get_text("area_editor_key_help")), visible);
+        };
+
+        assert_hint(&mut editor, true);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Insert));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert_hint(&mut editor, true);
+        editor.open_import();
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::F(4)));
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        std::fs::write(root.path().join("areas.na"), b"FSX_GEN General\r\n").unwrap();
+        editor.import_settings.lock().unwrap().source = root.path().join("areas.na");
+        editor.handle_key_press(KeyEvent::from(KeyCode::F(2)));
+        assert!(editor.import_areas.is_some());
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert!(editor.save_changes.is_open());
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert_hint(&mut editor, true);
+    }
+
+    #[test]
+    fn failed_save_returns_to_area_list_and_can_be_retried() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("blocked");
+        std::fs::write(&parent, b"not a directory").unwrap();
+        let path = parent.join("areas.toml");
+        let mut editor = MessageAreasEditor::new(&path).unwrap();
+        editor.handle_key_press(KeyEvent::from(KeyCode::Insert));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert!(editor.save_changes.is_open());
+        editor.handle_key_press(KeyEvent::from(KeyCode::Right));
+        assert!(matches!(
+            editor.handle_key_press(KeyEvent::from(KeyCode::Enter)),
+            PageMessage::InfoBox(icy_board_tui::tab_page::InfoState::Error, _)
+        ));
+        assert!(!editor.save_changes.is_open());
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        assert!(editor.detail.is_open());
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        std::fs::remove_file(parent).unwrap();
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Right));
+        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::Enter)), PageMessage::Close));
+        assert_eq!(AreaList::load(&path).unwrap().len(), 1);
+    }
+
+    #[test]
     fn import_browser_owns_f2_and_esc_and_loads_relative_source_under_board_root() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("areas.na"), b"FSX_GEN General\r\n").unwrap();
@@ -654,21 +621,21 @@ mod tests {
             .unwrap()
             .with_path_base(root.path().to_path_buf());
         editor.open_import();
-        assert_eq!(editor.import_config_state.path_base.as_deref(), Some(root.path()));
+        assert_eq!(editor.import_form.state.path_base.as_deref(), Some(root.path()));
         editor.handle_key_press(KeyEvent::from(KeyCode::F(4)));
-        assert!(editor.import_config_state.is_path_browser_open());
-        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::F(2))), PageMessage::None));
+        assert!(editor.import_form.state.is_path_browser_open());
+        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::F(2))), PageMessage::ResultState(_)));
         assert!(editor.import_areas.is_none());
-        assert!(editor.import_config_state.is_path_browser_open());
+        assert!(editor.import_form.state.is_path_browser_open());
         editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
-        assert!(editor.import_config.is_some());
-        assert!(!editor.import_config_state.is_path_browser_open());
+        assert!(editor.import_form.is_open());
+        assert!(!editor.import_form.state.is_path_browser_open());
 
         editor.import_settings.lock().unwrap().source = PathBuf::from("areas.na");
         editor.handle_key_press(KeyEvent::from(KeyCode::F(2)));
         assert_eq!(editor.import_areas.as_ref().unwrap()[0].tag, "FSX_GEN");
         editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
-        assert_eq!(editor.import_config_state.path_base.as_deref(), Some(root.path()));
+        assert_eq!(editor.import_form.state.path_base.as_deref(), Some(root.path()));
         assert_eq!(editor.import_settings.lock().unwrap().base_directory, PathBuf::from("messages"));
     }
 

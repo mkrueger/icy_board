@@ -1,4 +1,7 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::Line,
+};
 use std::sync::RwLock;
 
 use icy_board_engine::icy_board::icb_config::PcbScreenColors;
@@ -38,7 +41,6 @@ pub struct Theme {
     pub menu_box_title: Style,
 
     pub config_title: Style,
-    pub group_title: Style,
 
     pub filter_text: Style,
     pub description_text: Style,
@@ -49,7 +51,6 @@ pub struct Theme {
 
     pub table: Style,
     pub table_inactive: Style,
-    pub table_header: Style,
     pub help_box: Style,
     pub help_header: Style,
 
@@ -110,17 +111,18 @@ impl Theme {
             dialog_box_scrollbar: dos_attribute_style(colors[21]),
             menu_box: dos_attribute_style(colors[3]),
             menu_box_title: dos_attribute_style(colors[4]),
-            config_title: dos_attribute_style(colors[2]),
-            group_title: dos_attribute_style(colors[2]).add_modifier(Modifier::UNDERLINED),
+            // PCBSETUP uses the display-only colour for headings inside a
+            // configuration screen. All such headings go through
+            // `config_title`, including table columns and section headings.
+            config_title: dos_attribute_style(colors[13]),
             filter_text: dos_attribute_style(colors[10]),
             description_text: dos_attribute_style(colors[14]),
             text_field_text: dos_attribute_style(colors[12]),
             text_field_background: dos_attribute_style(colors[12]),
             text_field_filler_char: ' ',
-            table: dos_attribute_style(colors[5]),
+            // PCBSETUP's list editors render every record with Colors[ANSWER].
+            table: dos_attribute_style(colors[11]),
             table_inactive: dos_attribute_style(colors[8]),
-            // PCBSETUP prints list headers in the display-only color, not in the heading color.
-            table_header: dos_attribute_style(colors[13]),
             help_box: dos_attribute_style(colors[15]),
             help_header: dos_attribute_style(colors[16]),
             swatch: false,
@@ -163,14 +165,12 @@ pub static CLASSIC_THEME: Theme = Theme {
     status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
-    config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
-    group_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY).add_modifier(Modifier::UNDERLINED),
+    config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
-    table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
+    table: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
-    table_header: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     help_box: Style::new().bg(DOS_GREEN).fg(DOS_BLACK),
     help_header: Style::new().bg(DOS_GREEN).fg(DOS_YELLOW),
@@ -211,8 +211,7 @@ pub static DEFAULT_THEME: Theme = Theme {
     item: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
     selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
-    config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
-    group_title: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY).add_modifier(Modifier::UNDERLINED),
+    config_title: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
     true_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     false_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),
@@ -220,7 +219,6 @@ pub static DEFAULT_THEME: Theme = Theme {
     edit_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
-    table_header: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
 
     text_field_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     text_field_background: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
@@ -233,6 +231,16 @@ pub static DEFAULT_THEME: Theme = Theme {
 
     swatch: true,
 };
+
+/// Builds the common two-row heading used inside all configuration tools.
+/// Keeping the text, underline character, and style here prevents section
+/// headings and table headings from drifting apart.
+pub fn config_title(title: impl Into<String>) -> [Line<'static>; 2] {
+    let title = title.into();
+    let underline = "═".repeat(Line::raw(&title).width());
+    let style = get_tui_theme().config_title;
+    [Line::styled(title, style), Line::styled(underline, style)]
+}
 
 const LIGHT_GRAY: Color = Color::Indexed(7);
 const WHITE: Color = Color::Indexed(15);
@@ -281,5 +289,14 @@ mod tests {
         ];
 
         assert!(colors.into_iter().all(|color| matches!(color, Color::Indexed(0..=15))));
+    }
+
+    #[test]
+    fn pcbsetup_list_records_use_answer_color() {
+        let palette = PcbScreenColors::default();
+        let theme = Theme::from_pcboard(&palette);
+
+        assert_eq!(theme.table, dos_attribute_style(palette.colors[11]));
+        assert_ne!(theme.table, dos_attribute_style(palette.colors[5]));
     }
 }

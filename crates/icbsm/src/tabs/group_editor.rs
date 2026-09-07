@@ -15,7 +15,7 @@ use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::config_menu::TextFlags;
 use icy_board_tui::get_text_args;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
-use icy_board_tui::theme::get_tui_theme;
+use icy_board_tui::theme::{config_title, get_tui_theme};
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
@@ -77,10 +77,9 @@ impl GroupEditor {
     fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let header = ["", "Name", "#Users"]
             .into_iter()
-            .map(Cell::from)
+            .map(|title| Cell::from(Text::from(Vec::from(config_title(title)))))
             .collect::<Row>()
-            .style(get_tui_theme().table_header)
-            .height(1);
+            .height(2);
 
         let l = self.icy_board.lock().unwrap();
         let rows = l.groups.iter().enumerate().map(|(i, group)| {

@@ -1,11 +1,9 @@
 pub mod conference_editor;
 pub use conference_editor::*;
-use icy_board_tui::BORDER_SET;
 use icy_board_tui::get_text;
 use icy_board_tui::tab_page::Page;
 use icy_board_tui::tab_page::PageMessage;
 use ratatui::text::Line;
-use ratatui::text::Span;
 
 use std::io::Write;
 use std::sync::Arc;
@@ -16,9 +14,6 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::theme::get_tui_theme;
-use ratatui::widgets::Block;
-use ratatui::widgets::Borders;
-use ratatui::widgets::Padding;
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
@@ -159,14 +154,7 @@ impl Page for ConferenceListEditor {
 
         Clear.render(disp_area, frame.buffer_mut());
 
-        let block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .border_style(get_tui_theme().dialog_box)
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .title_bottom(Span::styled(get_text("icb_setup_key_conf_list_help"), get_tui_theme().key_binding));
+        let block = crate::editors::standalone_editor_frame(get_text("icb_setup_key_conf_list_help"), false);
         block.render(disp_area, frame.buffer_mut());
 
         let val = get_text("conf_list_title");

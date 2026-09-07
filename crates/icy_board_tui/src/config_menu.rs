@@ -18,7 +18,7 @@ use crate::{
     path_browser::{PathBrowser, PathBrowserResult},
     tab_page::PageMessage,
     text_field::{TextField, TextfieldState},
-    theme::{dos_attribute_style, get_tui_theme},
+    theme::{config_title, dos_attribute_style, get_tui_theme},
 };
 
 #[derive(Default, PartialEq)]
@@ -1504,19 +1504,24 @@ impl<T> ConfigMenu<T> {
                 }
                 ConfigEntry::Group(title, items) => {
                     if !title.is_empty() {
-                        if !display_editor && *y >= state.first_row && *y < area.height + state.first_row {
-                            let left_area = Rect {
-                                x: area.x + *x,
-                                y: area.y + y.saturating_sub(state.first_row),
-                                width: area.width.saturating_sub(*x + 1),
-                                height: 1,
-                            };
-                            Text::from(format!(" {}", title.clone()))
-                                .alignment(ratatui::layout::Alignment::Left)
-                                .style(get_tui_theme().group_title)
-                                .render(left_area, frame.buffer_mut());
+                        if !display_editor {
+                            let title_lines = config_title(title.clone());
+                            for (row, line) in title_lines.into_iter().enumerate() {
+                                let row = *y + row as u16;
+                                if row >= state.first_row && row < area.height + state.first_row {
+                                    line.render(
+                                        Rect {
+                                            x: area.x + *x + 1,
+                                            y: area.y + row - state.first_row,
+                                            width: area.width.saturating_sub(*x + 2),
+                                            height: 1,
+                                        },
+                                        frame.buffer_mut(),
+                                    );
+                                }
+                            }
                         }
-                        *y += 1;
+                        *y += 2;
                     }
                     if !Self::display_list(val, i, items, area, y, x, frame, state, display_editor) {
                         return false;
@@ -1677,8 +1682,8 @@ impl<T> ConfigMenu<T> {
             return;
         };
         if y < state.first_row {
-            // Row 1 means a group header sits above, so show it too.
-            state.first_row = if y == 1 { 0 } else { y };
+            // Rows 0 and 1 are the two-row group heading above the first item.
+            state.first_row = if y == 2 { 0 } else { y };
         } else if state.area_height > 0 && y >= state.first_row + state.area_height {
             state.first_row = y - state.area_height + 1;
         }

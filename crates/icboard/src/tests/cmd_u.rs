@@ -16,6 +16,8 @@ fn setup_upload_directory(board: &mut IcyBoard) {
 }
 
 fn assert_returned_to_main_command(output: &str) {
+    // Scripts must acknowledge the non-expert menu's PressEnter after U/BU
+    // returns (PCBoard COMMAND.C), in addition to cancelling the upload itself.
     assert_eq!(output.matches("Main Board Command?").count(), 2, "upload did not finish cleanly:\n{output}");
     assert!(!output.contains("Invalid Entry"), "upload input leaked into the command loop:\n{output}");
     assert!(!output.contains("Transfer Successful"), "cancel claimed a transfer:\n{output}");
@@ -24,7 +26,7 @@ fn assert_returned_to_main_command(output: &str) {
 /// PCBoard asks for the description before anything is transferred.
 #[test]
 fn test_upload_asks_for_a_description() {
-    let output = test_remote_output("U\nTESTUP.ZIP\na proper description\n\nN\n".to_string(), setup_upload_directory);
+    let output = test_remote_output("U\nTESTUP.ZIP\na proper description\n\nN\n\n".to_string(), setup_upload_directory);
     assert!(output.contains("TESTUP.ZIP"), "{output}");
     assert!(output.contains("Private"), "the private hint is missing:\n{output}");
     assert!(output.contains("Protocol Type for Transfer"), "{output}");
@@ -35,7 +37,7 @@ fn test_upload_asks_for_a_description() {
 /// again rather than dropping out of the command.
 #[test]
 fn test_upload_empty_description_asks_for_another_name() {
-    let output = test_remote_output("U\nTESTUP.ZIP\n\n\n".to_string(), setup_upload_directory);
+    let output = test_remote_output("U\nTESTUP.ZIP\n\n\n\n".to_string(), setup_upload_directory);
     assert!(!output.contains("Protocol"), "the upload should have been abandoned:\n{output}");
     assert_eq!(
         output.matches("Filename to Upload").count(),
@@ -48,7 +50,7 @@ fn test_upload_empty_description_asks_for_another_name() {
 /// Fewer than five characters is not a description, so the original asks again.
 #[test]
 fn test_upload_short_description_asks_again() {
-    let output = test_remote_output("U\nTESTUP.ZIP\nabc\na proper description\n\nN\n".to_string(), setup_upload_directory);
+    let output = test_remote_output("U\nTESTUP.ZIP\nabc\na proper description\n\nN\n\n".to_string(), setup_upload_directory);
     assert!(output.contains("longer description"), "{output}");
     assert!(output.contains("Protocol Type for Transfer"), "{output}");
     assert_returned_to_main_command(&output);
@@ -57,7 +59,7 @@ fn test_upload_short_description_asks_again() {
 /// The board says where the upload will land before it starts.
 #[test]
 fn test_upload_says_it_is_posted_immediately() {
-    let output = test_remote_output("U\nTESTUP.ZIP\na proper description\n\nN\n".to_string(), setup_upload_directory);
+    let output = test_remote_output("U\nTESTUP.ZIP\na proper description\n\nN\n\n".to_string(), setup_upload_directory);
     assert!(output.contains("Posted Immediately"), "{output}");
     assert!(output.contains("Protocol Type for Transfer"), "{output}");
     assert_returned_to_main_command(&output);
@@ -66,7 +68,7 @@ fn test_upload_says_it_is_posted_immediately() {
 /// A leading slash asks for the upload to be screened instead.
 #[test]
 fn test_upload_slash_marks_it_for_screening() {
-    let output = test_remote_output("U\nTESTUP.ZIP\n/a private upload\n\nN\n".to_string(), setup_upload_directory);
+    let output = test_remote_output("U\nTESTUP.ZIP\n/a private upload\n\nN\n\n".to_string(), setup_upload_directory);
     assert!(output.contains("Screened Before Posting"), "{output}");
     assert!(output.contains("Protocol Type for Transfer"), "{output}");
     assert_returned_to_main_command(&output);
@@ -77,7 +79,7 @@ fn test_upload_rejects_an_existing_filename_without_regard_to_case() {
     let upload = test_dir();
     std::fs::write(upload.join("existing.zip"), b"old").unwrap();
 
-    let output = test_remote_output("U\nEXISTING.ZIP\n\n".to_string(), |board| {
+    let output = test_remote_output("U\nEXISTING.ZIP\n\n\n".to_string(), |board| {
         setup_upload_directory(board);
         board.conferences[0].pub_upload_location = upload.clone();
     });
@@ -94,7 +96,7 @@ fn test_upload_rejects_an_existing_filename_without_regard_to_case() {
 #[test]
 fn test_batch_upload_collects_numbered_names_before_protocol() {
     let output = test_remote_output(
-        "BU\nONE.ZIP\nfirst description\n\nTWO.ZIP\nsecond description\n\n\nN\n".to_string(),
+        "BU\nONE.ZIP\nfirst description\n\nTWO.ZIP\nsecond description\n\n\nN\n\n".to_string(),
         setup_upload_directory,
     );
     let mut remaining = output.as_str();
@@ -117,7 +119,7 @@ fn test_batch_upload_collects_numbered_names_before_protocol() {
 
 #[test]
 fn test_batch_upload_below_batch_security_falls_back_to_normal_upload() {
-    let output = test_remote_output("BU\nONE.ZIP\nfirst description\n\nN\n".to_string(), |board| {
+    let output = test_remote_output("BU\nONE.ZIP\nfirst description\n\nN\n\n".to_string(), |board| {
         setup_upload_directory(board);
         board.users[0].security_level = 10;
         board.config.user_command_level.cmd_u = SecurityExpression::from_req_security(0);

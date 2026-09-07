@@ -6,18 +6,12 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{IcyBoard, IcyBoardSerializer, accounting_cfg::AccountingConfig};
 use icy_board_tui::{
-    BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
-    save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
-use ratatui::{
-    layout::Rect,
-    text::Span,
-    widgets::{Block, Borders, Padding, Widget},
-};
+use ratatui::{layout::Rect, text::Span, widgets::Widget};
 
 pub struct AccountingRatesEditor {
     state: ConfigMenuState,
@@ -25,7 +19,7 @@ pub struct AccountingRatesEditor {
     menu: ConfigMenu<Arc<Mutex<AccountingConfig>>>,
 
     path: PathBuf,
-    save_dialog: Option<SaveChangesDialog>,
+    save_changes: super::EditorSaveChanges,
 }
 
 impl AccountingRatesEditor {
@@ -215,7 +209,7 @@ impl AccountingRatesEditor {
             orig,
             state: ConfigMenuState::default(),
             path,
-            save_dialog: None,
+            save_changes: super::EditorSaveChanges::default(),
         }
     }
 }
@@ -229,16 +223,11 @@ impl Page for AccountingRatesEditor {
             height: disp_area.height,
         };
 
-        let bottom_text = get_text("icb_setup_key_menu_help");
-        let block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .title_top(Span::styled(get_text("accounting_title"), get_tui_theme().menu_title))
-            .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().dialog_box);
+        let block = super::standalone_editor_frame(
+            get_text("icb_setup_key_menu_help"),
+            self.save_changes.is_open() || self.state.is_path_browser_open(),
+        )
+        .title_top(Span::styled(get_text("accounting_title"), get_tui_theme().menu_title));
         block.render(area, frame.buffer_mut());
 
         let area = Rect {
@@ -247,10 +236,8 @@ impl Page for AccountingRatesEditor {
             width: disp_area.width - 3,
             height: area.height - 2,
         };
-        self.menu.render(area, frame, &mut self.state);
-        if let Some(save_changes) = &self.save_dialog {
-            save_changes.render(frame, area);
-        }
+        super::render_config_form(frame, area, &mut self.menu, &mut self.state);
+        self.save_changes.render(frame, area);
     }
 
     fn request_status(&self) -> ResultState {
@@ -261,28 +248,16 @@ impl Page for AccountingRatesEditor {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if self.save_dialog.is_some() {
-            let res = self.save_dialog.as_mut().unwrap().handle_key_press(key);
-            return match res {
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Cancel => {
-                    self.save_dialog = None;
-                    PageMessage::None
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    crate::editors::save_file(&self.path, || self.menu.obj.lock().unwrap().save(&self.path))
-                }
-                icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
-            };
+        if let Some(message) = self
+            .save_changes
+            .handle_key(key, || super::save_file(&self.path, || self.menu.obj.lock().unwrap().save(&self.path)))
+        {
+            return message;
         }
 
         let res = self.menu.handle_key_press(key, &mut self.state);
         if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-            if *self.menu.obj.lock().unwrap() == self.orig {
-                return PageMessage::Close;
-            }
-            self.save_dialog = Some(SaveChangesDialog::new());
-            return PageMessage::None;
+            return self.save_changes.request_close(self.orig != *self.menu.obj.lock().unwrap());
         }
         PageMessage::ResultState(res)
     }
@@ -290,4 +265,51 @@ impl Page for AccountingRatesEditor {
 
 pub fn edit_account_config(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
     PageMessage::OpenSubPage(Box::new(AccountingRatesEditor::new(path)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyCode;
+
+    #[test]
+    fn save_hides_form_hint_and_failure_allows_correction_and_retry() {
+        let directory = tempfile::tempdir().unwrap();
+        let parent = directory.path().join("blocked");
+        std::fs::write(&parent, b"not a directory").unwrap();
+        let path = parent.join("accounting.toml");
+        let mut editor = AccountingRatesEditor::new(path.clone());
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        let mut assert_hint = |editor: &mut AccountingRatesEditor, visible: bool| {
+            terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+            let border: String = (1..79).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
+            assert_eq!(border.contains(&get_text("icb_setup_key_menu_help")), visible);
+        };
+
+        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::Esc)), PageMessage::Close));
+        editor.menu.obj.lock().unwrap().new_user_balance += 1.0;
+        assert_hint(&mut editor, true);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert!(editor.save_changes.is_open());
+        assert_hint(&mut editor, false);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert!(!editor.save_changes.is_open());
+        assert_hint(&mut editor, true);
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Right));
+        assert!(matches!(
+            editor.handle_key_press(KeyEvent::from(KeyCode::Enter)),
+            PageMessage::InfoBox(icy_board_tui::tab_page::InfoState::Error, _)
+        ));
+        assert!(!editor.save_changes.is_open());
+        assert_hint(&mut editor, true);
+        let selected = editor.state.selected;
+        editor.handle_key_press(KeyEvent::from(KeyCode::Down));
+        assert_ne!(editor.state.selected, selected);
+        std::fs::remove_file(parent).unwrap();
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Right));
+        assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::Enter)), PageMessage::Close));
+        assert!(AccountingConfig::load(&path).unwrap() == *editor.menu.obj.lock().unwrap());
+    }
 }

@@ -932,7 +932,11 @@ impl IcyBoardState {
         }
         let _ = self
             .display_text(
-                IceText::TimelimitExceeded,
+                if self.session.time_adjusted_for_event {
+                    IceText::DeniedAccessForEvent
+                } else {
+                    IceText::TimelimitExceeded
+                },
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT | display_flags::BELL,
             )
             .await;
@@ -1941,19 +1945,32 @@ impl IcyBoardState {
 
     /// The event the board is heading towards, if any is scheduled.
     pub async fn event_window(&self) -> Option<EventWindow> {
+        // A strictly-future query would hide the due occurrence during maintenance.
+        let retained = self.bbs.lock().await.event_window.clone();
+        if retained.is_some() {
+            return retained;
+        }
         let board = self.board.lock().await;
-        events::next_window(&board.config.event, &board.events, &chrono::Local::now())
+        // Slide/idle must not conceal the next fixed event's session restrictions.
+        let mut fixed = events::EventList::default();
+        fixed.extend(board.events.iter().filter(|event| event.mode == events::EventMode::Fixed).cloned());
+        events::next_window(&board.config.event, &fixed, &chrono::Local::now())
     }
 
     /// Cuts the session short so that the caller is gone before the event starts.
     pub async fn limit_time_for_event(&mut self) {
-        let now = chrono::Local::now();
         let Some(window) = self.event_window().await else {
             return;
         };
+        if window.event.mode != events::EventMode::Fixed {
+            return;
+        }
         // Never zero, which reads as an unlimited session; a caller this close to an
-        // event gets a minute and is then hung up on.
-        let minutes = (window.minutes_until_suspend(&now) as i32).max(1);
+        // event gets a minute and is then hung up on. time_limit is the TOTAL
+        // allowance: conference changes must not subtract elapsed time twice.
+        let minutes = (window.suspend_at.with_timezone(&Utc) - self.session.login_date)
+            .num_minutes()
+            .clamp(1, i64::from(i32::MAX)) as i32;
         if self.session.time_limit == 0 || minutes < self.session.time_limit {
             self.session.time_limit = minutes;
             self.session.time_adjusted_for_event = true;
@@ -3941,12 +3958,21 @@ impl IcyBoardState {
 
     /// Says goodbye and drops the line - the caller gets no say in it.
     async fn shutdown_for_event(&mut self, msg: String) -> Res<()> {
-        self.new_line().await?;
-        self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
-        self.println(TerminalTarget::Both, &msg).await?;
-        self.bell().await?;
-        self.reset_color(TerminalTarget::Both).await?;
-        self.hangup().await
+        // No MORE pause, and a failed notice must still disconnect. Preserve the
+        // record for early-returning PPE/login paths without double time accounting.
+        self.session.disp_options.count_lines = false;
+        let notice = async {
+            self.new_line().await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+            self.println(TerminalTarget::Both, &msg).await?;
+            self.bell().await?;
+            self.reset_color(TerminalTarget::Both).await
+        }
+        .await;
+        let saved = self.persist_current_user().await;
+        self.hangup().await?;
+        saved?;
+        notice
     }
 
     async fn show_broadcast(&mut self, msg: String) -> Res<()> {

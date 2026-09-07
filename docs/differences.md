@@ -164,7 +164,12 @@ assembler functions remain out of scope.
 
 - Configuration and maintenance TUIs work locally and over SSH.
 - User packing, sorting and bulk maintenance can run non-interactively.
-- Events can invoke current executables and scripts.
+- Events run foreground executables/scripts on weekdays with start-anchored
+  intervals and inclusive same-day latest starts. Maintenance drains/reloads the
+  board; Online must not write live board files and is not sandboxed. Stable IDs,
+  durable history and confirmed manual runs are supported, but not downtime
+  catch-up, automatic retries or monthly/date masks. See [events.md](events.md)
+  for safety boundaries, including maintenance-only mailer live writes.
 - Logs are shared and node-stamped instead of split into DOS node files.
 - `icbsetup check` validates every configured path, including display-file
   variants and case mismatches.

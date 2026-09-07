@@ -162,28 +162,29 @@ impl Tui {
         let board = board.clone();
         let bbs2 = bbs.clone();
 
-        let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
-        let node_state = bbs.lock().await.open_connections.clone();
-        let node = ui_node;
+        let mut admission = bbs.lock().await;
+        let node_state = admission.open_connections.clone();
         let screen = Arc::new(std::sync::Mutex::new(new_terminal_screen()));
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
         // Install the capability before login can run (also for non-SysOp local users).
         let (picker_sender, picker_receiver) = mpsc::channel(1);
-        node_state.lock().await[node].as_mut().unwrap().local_file_picker = Some(picker_sender);
         let options = LoginOptions { login_sysop, ppe, local: true };
-        let handle = std::thread::Builder::new()
-            .name("Local mode handle".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .block_on(async { handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await })
+        let node = admission
+            .spawn_node(ConnectionType::Channel, move |node, state| {
+                state.local_file_picker = Some(picker_sender);
+                std::thread::Builder::new().name("Local mode handle".to_string()).spawn(move || {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                        .block_on(async { handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await })
+                })
             })
-            .unwrap();
-        bbs.lock().await.get_open_connections().as_ref().lock().await[node].as_mut().unwrap().handle = Some(handle);
+            .await?
+            .ok_or("Board is in maintenance or all nodes are occupied")?;
+        drop(admission);
         let screen_generation = Arc::new(AtomicU64::new(0));
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone(), screen_generation.clone());
 
@@ -211,7 +212,10 @@ impl Tui {
 
     async fn logoff_sysop(&self, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
         if self.sysop_mode {
-            bbs.lock().await.bbs_channels[self.node].as_ref().unwrap().send(BBSMessage::SysopLogout).await?;
+            let channel = bbs.lock().await.bbs_channels.get(self.node).and_then(Clone::clone);
+            if let Some(channel) = channel {
+                let _ = channel.try_send(BBSMessage::SysopLogout);
+            }
         }
         Ok(())
     }
@@ -245,7 +249,7 @@ impl Tui {
         let Some(channel) = bbs.bbs_channels.get(node).and_then(Option::as_ref) else {
             return Ok(None);
         };
-        if channel.send(BBSMessage::SysopLogin).await.is_err() {
+        if channel.try_send(BBSMessage::SysopLogin).is_err() {
             return Ok(None);
         }
 
@@ -305,10 +309,12 @@ impl Tui {
             if self.local_picker.is_some() && self.tx.is_closed() {
                 return Ok(());
             }
-            if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
+            let mut nodes = self.handle.lock().await;
+            if let Some(Some(node_state)) = nodes.get_mut(self.node) {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
                         let handle = node_state.handle.take().unwrap();
+                        nodes[self.node] = None;
                         match handle.join() {
                             Ok(res) => {
                                 return res;
@@ -323,6 +329,7 @@ impl Tui {
             } else {
                 return Ok(());
             }
+            drop(nodes);
             if self.local_picker.as_ref().is_some_and(LocalFilePicker::is_closed) {
                 self.local_picker.take();
                 self.restore_after_picker(&mut terminal)?;

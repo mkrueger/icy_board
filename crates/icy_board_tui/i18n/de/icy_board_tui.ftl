@@ -280,6 +280,17 @@ call_wait_screen_statistics_descr=Zwischen Gesamt- und Tagesstatistik wechseln.
 call_wait_screen_show_statistics=Statistik anzeigen
 call_wait_screen_show_statistics_descr=Alle Statistiken des Systems anzeigen.
 call_wait_screen_sys_ready = System bereit für Anrufe
+event_runtime_title = Ereigniswartung — OFFLINE
+event_runtime_waiting = Sitzungen beendet. Warte auf den geplanten Start: { $time }.
+event_runtime_draining = Warte auf das Beenden und Speichern von { $count } Sitzung(en). Feste Ereignisse fordern die Trennung an; verschiebbare warten auf das Ende der Anrufe.
+event_runtime_stopping = Listener werden gestoppt. Warte auf laufende Admin-Anfragen / Verbindungen.
+event_runtime_running = Ereignisbefehl läuft. Warte auf sein Ende; ein blockierter Befehl hält die Board offline.
+event_runtime_reloading = Befehl beendet. Board-Sperre wird erneut angefordert, Konfiguration und Daten werden neu geladen.
+event_runtime_reload_failed = Neuladen blockiert — automatischer Wiederholungsversuch; der Befehl wird NICHT erneut ausgeführt.
+    { $error }
+event_runtime_restarting = Neuladen erfolgreich. Dienste werden neu gestartet; der Zugang bleibt bis zur erneuten Prüfung anstehender Ereignisse gesperrt.
+event_runtime_offline_hint = Neue Anrufer sind gesperrt. Die Anzeige aktualisiert sich automatisch; Bedienereingaben werden nicht gelesen. Bei Stillstand Protokoll / blockierte Sitzung oder Prozess prüfen. Kein Timeout öffnet die Board.
+event_runtime_repair_hint = Diesen Prozess weiterlaufen lassen. In einem anderen Terminal die gemeldete Konfiguration/Daten reparieren oder den Besitzer der Board-Sperre prüfen; Details stehen im Protokoll. Neuladen wird automatisch wiederholt. Die Board nicht mit veralteten Daten öffnen.
 call_wait_screen_last_caller = Letzter Anrufer:
 call_wait_screen_last_caller_none = Keiner
 call_wait_screen_num_calls = Anrufe:
@@ -2063,6 +2074,218 @@ connection_info_display_file-help=
 
 # ICBSetup -> Ereignisse
 event_setup_title=Ereignisse
+event_editor_title=Ereigniseditor
+event_editor_detail_title=Ereignis bearbeiten
+event_editor_keys=↑ Auf  ↓ Ab  ⏎ Ändern  INS Neu  ␡ Löschen  PgUp/Dn Verschieben
+event_editor_keys_more=F5 Kopie  F6 Verlauf  ␛ Zurück
+event_editor_detail_keys=F1 Hilfe  ␛ Schließen
+event_editor_setup_keys=F1 Hilfe  F2 Ereignisse bearbeiten  F4 Suchen  Esc Zurück
+event_editor_file_status=F2 bearbeitet/erstellt die Liste; F4 sucht ausgehend vom Board-Verzeichnis.
+event_editor_status=F1 Hilfe | F5 kopiert mit neuer ID. F6 zeigt den Verlauf. Esc fragt nach dem Speichern.
+event_editor_empty=Keine Ereignisse
+event_editor_header_enabled=Akt
+event_editor_header_mode=Mod
+event_editor_header_time=Zeit
+event_editor_header_days=SMDMDFS
+event_editor_header_description=Beschreibung
+event_editor_header_command=Befehl
+event_editor_mode_fixed=Fest
+event_editor_mode_slide=Gleit.
+event_editor_mode_idle=Leerl.
+event_editor_mode_fixed_letter=F
+event_editor_mode_slide_letter=G
+event_editor_mode_idle_letter=L
+event_editor_mode_legend=Modi: F = Fest  G = Gleitend  L = Leerlauf
+event_editor_description=Beschreibung
+event_editor_description-status=Name in der Ereignisliste; langer Text wird horizontal gescrollt.
+event_editor_description-help=
+    # Beschreibung
+
+    Ein Name für dieses Ereignis, sichtbar in der Liste und im Verlauf.
+
+    Änderungen wirken erst mit Esc auf die Liste. Die Liste selbst wird erst beim
+    Verlassen des Editors geschrieben.
+event_editor_enabled=Aktiviert
+event_editor_enabled-status=Leertaste oder Links/Rechts schaltet um. Neue Ereignisse sind deaktiviert.
+event_editor_enabled-help=
+    # Aktiviert
+
+    Leertaste oder Links/Rechts schaltet dieses Ereignis um.
+
+    - Zusätzlich muss die globale Ereignisoption aktiviert sein.
+    - Neue Ereignisse bleiben zunächst deaktiviert.
+    - Ein deaktiviertes Ereignis lässt sich am Board weiterhin manuell starten.
+event_editor_time=Startzeit
+event_editor_time-status=Lokale Uhrzeit im 24-Stunden-Format: HH:MM oder HH:MM:SS, mit Sekunden.
+event_editor_time-help=
+    # Startzeit
+
+    Lokale Uhrzeit von 00:00 bis 23:59, wahlweise mit Sekunden.
+
+    Ungültige Eingaben werden beim Schließen zurückgewiesen, statt stillschweigend
+    Mitternacht zu verwenden.
+event_editor_days=Tage (So-Sa)
+event_editor_days-status=Sieben Y/N-Zeichen, Sonntag zuerst, Samstag zuletzt; YYYYYYY gilt täglich.
+event_editor_days-help=
+    # Tage
+
+    Sieben Y/N-Zeichen, Sonntag zuerst und Samstag zuletzt.
+
+    - YYYYYYY läuft täglich
+    - NYYYYYN läuft werktags
+    - NNNNNNN plant keinen Tag ein
+
+    Kleinbuchstaben sind erlaubt.
+event_editor_mode=Modus
+event_editor_mode-status=Enter öffnet die Liste, Auf/Ab wählt, Enter übernimmt. F1 erklärt das Verhalten.
+event_editor_mode-help=
+    # Modus
+
+    Wie mit Anrufern umgegangen wird, wenn das Ereignis fällig ist.
+
+    - Fest: Wartung trennt Anrufer pünktlich; online läuft der Befehl trotz Anrufern
+    - Gleitend: Wartung sperrt neue Anmeldungen und wartet auf das Auflegen;
+      online wird auf ein leeres Board gewartet, ohne Anmeldungen zu sperren
+    - Leerlauf: überspringt den Termin, solange Anrufer online sind
+
+    Enter öffnet die Liste, Auf/Ab wählt, Enter übernimmt.
+event_editor_command=Shell-Befehl
+event_editor_command-status=Vollständiger Shell-Befehl mit Argumenten und Anführungszeichen; kein Dateipfad.
+event_editor_command-help=
+    # Shell-Befehl
+
+    Der Laufzeitdienst übergibt diesen Text an die Shell, samt Argumenten und
+    Anführungszeichen.
+
+    - Ein leerer Befehl führt nichts aus
+    - F4 ist hier absichtlich nicht verfügbar: ein Shell-Befehl ist kein Dateiname
+    - Dieser Editor führt selbst keine Befehle aus
+event_editor_invalid_time=Ungültige Zeit. HH:MM oder HH:MM:SS verwenden: Stunden 00-23, Minuten/Sekunden 00-59. Das Formular wurde nicht übernommen.
+event_editor_invalid_days=Ungültige Tage. Genau sieben Y/N-Zeichen für Sonntag bis Samstag eingeben. Das Formular wurde nicht übernommen.
+event_editor_end_time=Spätester Start
+event_editor_end_time-status=Inklusive Startgrenze am selben Tag, HH:MM[:SS]; leer ohne Endgrenze.
+event_editor_end_time-help=
+    # Spätester Start
+
+    Optionale inklusive späteste Startzeit am gewählten Tag. Sie begrenzt nur den
+    Start, nicht die Laufzeit eines Befehls.
+
+    - HH:MM oder HH:MM:SS ab der Startzeit eingeben
+    - Zeitfenster über Mitternacht sind nicht erlaubt
+    - Leer deaktiviert die Grenze
+
+    Mit Intervall enden Starts hier oder am Ende des gewählten Tages.
+event_editor_interval=Intervall (Min)
+event_editor_interval-status=Positive ganze Minuten, 1-4294967295; leer bedeutet einmal täglich.
+event_editor_interval-help=
+    # Intervall
+
+    Optionale positive ganze Minuten zwischen geplanten Starts, gerechnet ab der
+    Startzeit und nicht ab dem Ende des letzten Laufs.
+
+    - Starts bleiben am gewählten Tag und innerhalb der spätesten Startzeit
+    - Leer plant einen Start je gewähltem Tag
+    - Null ist ungültig
+event_editor_warning=Warnung (Min)
+event_editor_warning-status=Positive ganze Minuten; leer ohne Laufzeitwarnung. Beendet niemals Prozesse.
+event_editor_warning-help=
+    # Laufzeitwarnung
+
+    Optionale positive ganze Minuten, bis der Laufzeitdienst eine lange Laufzeit
+    meldet.
+
+    Das ist nur eine Warnung und kein Zeitlimit: Shell und Kindprozesse werden
+    dadurch nie beendet. Leer deaktiviert die Warnung; Null ist ungültig.
+event_editor_execution=Ausführung
+event_editor_execution_maintenance=Wartung
+event_editor_execution_online=Online
+event_editor_execution-status=Enter öffnet die Liste, Auf/Ab wählt, Enter übernimmt. F1: Sicherheitsregeln.
+event_editor_execution-help=
+    # Ausführung
+
+    Wartung ist der Standard: Das Board geht offline, der Befehl läuft und danach
+    wird das Board neu geladen.
+
+    Online hält das Board LIVE, während ein vom Administrator vorgegebener
+    Shell-Befehl läuft.
+
+    ## Sicherheitsregeln für Online
+
+    - Online-Befehle DÜRFEN Konfiguration, Benutzer, Mail und Dateibasen NICHT ändern
+    - Es gibt keine Sandbox; auch icbmailer ist nicht als online-sicher bestätigt
+    - Befehle müssen im Vordergrund laufen, ohne Eingaben und ohne Hintergrundprozesse
+
+    Für Änderungen an Live-Daten Wartung verwenden.
+event_editor_online_warning=ONLINE: Board bleibt LIVE. Konfig, Benutzer, Mail, Dateibasen NICHT ändern!
+event_editor_invalid_end_time=Ungültige Startgrenze. HH:MM[:SS] ab Start am SELBEN Tag oder leer eingeben. Keine Fenster über Mitternacht. Entwurf bleibt erhalten.
+event_editor_invalid_minutes=Positive ganze Minuten (1-4294967295) oder leer zum Deaktivieren eingeben. Entwurf bleibt erhalten.
+event_editor_history_title=Ereignisverlauf (nur lesen)
+event_editor_history_keys=↑ Auf  ↓ Ab  PgUp/Dn Scrollen  F6 Neu lesen  F1 Hilfe  ␛ Zurück
+event_editor_history_status=Nur-Lese-Ansicht aus dem Board-Verzeichnis. Kein Start, keine Wiederherstellung.
+event_editor_history_empty=Kein Verlauf für dieses Ereignis vorhanden.
+event_editor_history_failed=Ereignisverlauf kann nicht gelesen werden: { $error }
+event_editor_history_latest=Zuletzt
+event_editor_history_scheduled=Geplant
+event_editor_history_start=Startversuch
+event_editor_history_finish=Beendet
+event_editor_history_result=Ergebnis
+event_editor_history_exit=Exitcode
+event_editor_history_log=Logdatei
+event_editor_history_log_time=Log geändert (UTC)
+event_editor_history_unavailable=Nicht verfügbar / kein Log
+event_editor_history_detail=Details
+event_editor_result_pending=Ausstehend
+event_editor_result_success=Erfolgreich
+event_editor_result_nonzero_exit=Exitcode ungleich Null
+event_editor_result_spawn_error=Startfehler
+event_editor_result_wait_error=Wartefehler
+event_editor_result_interrupted=Unterbrochen
+event_editor_result_skipped_busy=Übersprungen (belegt)
+event_editor_result_expired=Abgelaufen
+event_editor_history_help=
+    # Ereignisverlauf
+
+    Nur-Lese-Verlauf des gewählten Ereignisses, neuester Startversuch zuerst.
+    Angezeigt werden Ergebnis, Exitcode, UTC-Zeiten und der Logpfad relativ zum
+    Board-Verzeichnis.
+
+    Auf/Ab oder Pos1/Ende wählt einen Eintrag, Bild auf/ab scrollt lange Texte,
+    F6 liest neu und Esc kehrt zurück.
+
+    ## Hinweise
+
+    - Ein Startversuch beweist nicht, dass ein Befehl gelaufen ist
+    - Eine geplante Logdatei kann fehlen
+    - Fehlender Verlauf bleibt leer; Lesefehler werden gemeldet und ändern nichts
+    - Diese Ansicht startet nichts, stellt nichts wieder her und löscht nichts
+
+    Logs getrennt rotieren: Ein gelöschtes Journal erlaubt einen erneuten Lauf.
+event_editor_load_failed=Ereignisliste { $path } kann nicht geöffnet werden: { $error }
+event_editor_help=
+    # Zeitgesteuerte Ereignisse
+
+    Enter bearbeitet den Eintrag. Einfg legt dahinter einen deaktivierten Eintrag an.
+    Entf löscht den Eintrag. Bild auf/ab verschiebt ihn; die Reihenfolge entscheidet bei gleichen Zeiten.
+    F5 kopiert den Eintrag mit allen Einstellungen, aber einer NEUEN stabilen ID.
+    Bearbeiten erhält die ID. Einfg erzeugt eine neue ID. Intervallminuten erlauben Wiederholungen am selben Tag.
+    Spätester Start gilt inklusive und darf nicht vor Start liegen; leere optionale Felder deaktivieren sie.
+    F6 zeigt den Verlauf nur lesend aus dem Board-Verzeichnis, nicht dem Ordner der Ereignisdatei.
+
+    Wartung ist Standard. Online hält das Board LIVE: Befehle DÜRFEN NICHT Board-Konfiguration,
+    Benutzer, Mail oder Dateibasen verändern. Auch icbmailer ist nicht als online-sicher garantiert.
+    Befehle müssen im Vordergrund ohne Eingaben laufen und dürfen keine Hintergrundprozesse hinterlassen.
+
+    Im Formular wechseln Auf/Ab oder Enter das Feld; Enter öffnet Auswahllisten.
+    Esc schließt das Formular und übernimmt den Eintrag in die Liste.
+    Ungültige Zeit-/Tagesangaben bleiben korrigierbar.
+    Lange Beschreibungen und Shell-Befehle scrollen horizontal und werden ungekürzt gespeichert.
+
+    Esc fragt in der Liste nach dem Speichern; Nein verwirft alles,
+    Esc kehrt zur Liste zurück. Dateien und Elternverzeichnisse entstehen erst beim Speichern.
+    Bei Speicherfehlern bleibt die Arbeitskopie für einen neuen Versuch offen. Befehle werden nie ausgeführt.
+
+    Globale Optionen und Ereignisliste werden getrennt gespeichert. Diese Liste zu speichern
+    speichert weder den globalen Dateipfad noch aktiviert es Ereignisse. Das Board zum Aktivieren neu laden.
 event_enabled_for_expedited_label=Für vorgezogene Ereignisse (EXPEDITED):
 event_enabled=Zeitgesteuerte Ereignisse aktiv
 event_enabled-status=Zeitgesteuerte Ereignisse aktivieren
@@ -3901,3 +4124,55 @@ message_box_warning_title= Warnung
 message_box_error_title= Fehler
 message_box_dismiss= ENTER drücken
 no_file_name_given=Für diesen Eintrag ist kein Dateiname konfiguriert.
+
+event_runtime_picker_title = Ereignisse — Jetzt ausführen
+event_runtime_picker_keys = ↑↓ Auswahl  Enter Start  F5/R Verlauf laden  Esc Zurück
+event_runtime_menu_key = F6 Ereignisse
+event_runtime_event = Ereignis
+event_runtime_enabled_column = Aktiv
+event_runtime_mode_column = Ausführung / Modus
+event_runtime_result_column = Letztes Ergebnis
+event_runtime_enabled = Ja
+event_runtime_disabled = Nein
+event_runtime_maintenance = Wartung
+event_runtime_online = Online
+event_runtime_fixed = Fest
+event_runtime_slide = Verschiebbar
+event_runtime_idle = Leerlauf
+event_runtime_long = Läuft lange
+event_runtime_pending = Ausstehend
+event_runtime_success = Erfolgreich
+event_runtime_nonzero = Exit ungleich 0
+event_runtime_spawn_error = Startfehler
+event_runtime_wait_error = Wartefehler
+event_runtime_interrupted = Unterbrochen
+event_runtime_skipped_busy = Überspr.: belegt
+event_runtime_expired = Abgelaufen
+event_runtime_queued_active = Geplant / aktiv
+event_runtime_history_title = Letzter Lauf — Cache; F5/R lädt neu
+event_runtime_history_error = Ereignisverlauf nicht lesbar
+event_runtime_no_history = Keine Läufe für dieses Ereignis erfasst.
+event_runtime_manual = Manuell
+event_runtime_scheduled = Zeitplan
+event_runtime_log = Protokoll
+event_runtime_empty = Keine Ereignisse konfiguriert.
+event_runtime_confirm_title = Jetzt ausführen bestätigen
+event_runtime_yes = Einreihen
+event_runtime_no = Abbrechen
+event_runtime_confirm_keys = ←/→/Tab Auswahl  Enter Bestätigen  Esc Abbrechen
+event_runtime_manual_help = Manuell ignoriert Aktivierung, globalen Zeitplan, Tage und Start/Ende.
+    Wartung: Fest sperrt/trennt sofort; Verschiebbar sperrt und wartet.
+    Online: Fest erlaubt Anrufer; Verschiebbar wartet ohne Zugangssperre.
+    Leerlauf überspringt bei Anrufern. Ausführung und Modus bleiben erhalten.
+event_runtime_online_warning = Online-Befehle dürfen KEINE Live-Daten ändern, Hintergrundarbeit starten
+    oder Eingaben erwarten. Offline-Werkzeuge und Exit warten auf das Ende.
+event_runtime_queued = Eingereiht, noch nicht ausgeführt. F5/R lädt den Verlauf neu.
+event_runtime_duplicate = Dieses Ereignis ist bereits eingereiht oder aktiv.
+event_runtime_unavailable = Ereignisse gesperrt: Wartung oder Scheduler-Reparatur erforderlich.
+event_runtime_changed = Ereignis geändert oder entfernt. Neu laden und erneut bestätigen.
+event_runtime_gate_closed = Zugang gesperrt. Offline-Bedienerarbeit/Ereignis steht an.
+event_runtime_failed_hint = Scheduler gestoppt: Reparatur und Neustart nötig; kein neuer Versuch.
+    Diesen Prozess weiterlaufen lassen, solange ein Befehl aktiv sein könnte.
+event_runtime_tools_blocked = Offline-Werkzeuge gesperrt: Anrufer, geplante/aktive Ereignisse oder Wartung.
+event_runtime_exit_blocked = Exit verweigert: geplante/aktive Ereignisse oder Wartung. Ende abwarten; auch erzwungenes Exit ist nicht sicher.
+event_runtime_scheduler_stopped = Ereignis-Scheduler unerwartet beendet. Reparatur und Neustart nötig.

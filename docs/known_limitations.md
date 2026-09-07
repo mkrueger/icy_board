@@ -36,7 +36,23 @@ procedure and this page as its risk checklist.
 | Encoding | Structural text is UTF-8. Display files with a UTF-8 BOM are UTF-8; display files without it are read as CP437. See [differences.md](differences.md). |
 | Passwords | Hashed by default. The plain text fallback exists for PPEs that read the password and is a security risk. |
 | Access | Security level, group and age instead of a single level. |
-| Events | The nightly event runs, clears the board and can suspend callers. PCBoard's per node, expedited, fido and mail event modes have no equivalent, and `EVENT.DAT` is not read. |
+| Events | Weekday schedules support positive start-anchored intervals, inclusive same-day latest starts, Maintenance/Online execution, stable IDs, durable history and confirmed manual runs. Monthly/date masks, overnight windows, PCBoard per-node scheduling/last-run dates and Fido/mail-hour modes are absent; `EVENT.DAT` is not imported. See [events.md](events.md). |
+
+### Event operation
+
+- Maintenance drains managed writers and reloads the board; Online does neither
+	and **must not modify live board files**. Arbitrary shell commands are not
+	sandboxed. Keep mailer live writes in Maintenance: raw `icbmailer` does not
+	acquire `BoardLock`, and online safety has not been verified. Independently
+	launched workers are outside the event restart handshake.
+- Commands run foreground without a forced time limit; `warning_minutes` only
+	logs a warning. Stalled commands or uncooperative sessions can delay maintenance
+	indefinitely; background descendants are not tracked.
+- The atomic journal prevents replay of claimed occurrences, but startup does
+	not catch up downtime or retry interrupted/failed commands. It is not an
+	exactly-once guarantee. Journal failures close admission pending repair/restart.
+	History and command-log retention are unbounded; rotate logs separately and
+	retain journal keys.
 
 ## Import
 
