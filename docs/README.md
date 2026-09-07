@@ -1,7 +1,7 @@
 # Icy Board documentation
 
 The [project README](../README.md) explains what Icy Board is and what it can
-do. This directory holds the shorter, task-oriented documentation. The full
+do. This directory holds task-oriented guides and Markdown format references. The full
 handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 
 ## Run a board
@@ -9,6 +9,7 @@ handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 | Start here | Use it for |
 | :--- | :--- |
 | [Getting started](gettingstarted.md) | Create a board, configure it, make a local call and find the important files. |
+| [TOML configuration reference](configuration/README.md) | Complete file formats, exact keys, required fields, defaults, enum values and examples. |
 | [Installation](../INSTALL.md) | Prebuilt packages, source builds and editor setup. |
 | [Migrating from PCBoard](migration.md) | Dry-run an import, map DOS drives, inspect PPEs and validate the result. |
 | [File areas](icbfile.md) | Import, normalize and maintain file bases. |
@@ -36,6 +37,7 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 
 | Guide | Use it for |
 | :--- | :--- |
+| [Command lists / CMD.LST](configuration/commands.md) | Add or override commands, launch PPEs and understand the native TOML and legacy import formats. |
 | [PPL and PPEs](ppl.md) | Language overview, runtime compatibility and the toolchain. |
 | [PPL compiler](pplc.md) | Projects, language versions, output and diagnostics. |
 | [New in PPL 3.50 and 4.x](new_ppl.md) | Version matrix for loops, initializers, constants, enums, routine parameters, records and board objects. |
