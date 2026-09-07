@@ -11,6 +11,7 @@ lazy_static = { workspace = true }
 thiserror = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true, features = ["unstable-rendered-line-info"] }
+ratatui-explorer = "0.3.0"
 terminfo = { workspace = true }
 semver = { workspace = true }
 log = { workspace = true }
@@ -30,3 +31,4 @@ md-tui = "0.10.3"
 
 [dev-dependencies]
 fluent-syntax = "0.12.0"
+tempfile = { workspace = true }

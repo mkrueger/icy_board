@@ -195,4 +195,27 @@ mod tests {
         board.lock().unwrap().config.file_transfer.strip_colors_in_descriptions = true;
         assert!(tab.is_dirty());
     }
+
+    #[test]
+    fn nested_browser_keeps_tab_control_and_escape_does_not_close_the_page() {
+        use crossterm::event::KeyCode;
+        use icy_board_tui::tab_page::PageMessage;
+
+        let (mut tab, board) = tab();
+        let root = tempfile::tempdir().unwrap();
+        board.lock().unwrap().root_path = root.path().to_path_buf();
+        let PageMessage::OpenSubPage(page) = crate::editors::dirs::edit_dirs((0, board), root.path().join("config/dirs.toml")) else {
+            panic!("expected directory editor");
+        };
+        tab.page.open_sup_page(page);
+        assert!(tab.has_control());
+        for code in [KeyCode::Insert, KeyCode::Enter, KeyCode::Down, KeyCode::F(4), KeyCode::Esc] {
+            tab.handle_key_press(KeyEvent::from(code));
+            assert!(tab.has_control(), "active nested page must own global shortcuts");
+            assert_eq!(tab.page.sub_pages.len(), 1);
+        }
+        // The second Escape closes only the item editor, not the page.
+        tab.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        assert_eq!(tab.page.sub_pages.len(), 1);
+    }
 }

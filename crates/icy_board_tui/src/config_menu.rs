@@ -15,6 +15,7 @@ use ratatui::{
 };
 
 use crate::{
+    path_browser::{PathBrowser, PathBrowserResult},
     tab_page::PageMessage,
     text_field::{TextField, TextfieldState},
     theme::{dos_attribute_style, get_tui_theme},
@@ -1149,6 +1150,15 @@ pub struct ConfigMenuState {
     pub item_pos: HashMap<usize, u16>,
 
     pub scroll_state: ScrollbarState,
+    /// Root used for relative configuration paths; never changes the process cwd.
+    pub path_base: Option<PathBuf>,
+    path_browser: Option<PathBrowser>,
+}
+
+impl ConfigMenuState {
+    pub fn is_path_browser_open(&self) -> bool {
+        self.path_browser.is_some()
+    }
 }
 
 impl<T> ConfigMenu<T> {
@@ -1173,6 +1183,10 @@ impl<T> ConfigMenu<T> {
     }
 
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
+        if let Some(browser) = &state.path_browser {
+            browser.render(area, frame);
+            return;
+        }
         let mut y = 0;
         let mut x = 0;
         let mut i = 0;
@@ -1555,17 +1569,52 @@ impl<T> ConfigMenu<T> {
     }
 
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
+        if let Some(browser) = &mut state.path_browser {
+            match browser.handle(key) {
+                PathBrowserResult::Pending => {}
+                PathBrowserResult::Cancelled => state.path_browser = None,
+                PathBrowserResult::Selected(path) => {
+                    state.path_browser = None;
+                    let mut len = 0;
+                    if let Some(item) = Self::get_item_internal_mut(&mut self.entry, &mut len, state.selected)
+                        && item.editable()
+                        && let ListValue::Path(old) = &item.value
+                        && *old != path
+                    {
+                        item.value = ListValue::Path(path);
+                        item.text_field_state = TextfieldState::default();
+                        item.need_update = false;
+                        if let Some(update) = &item.update_value {
+                            update(&self.obj, &item.value);
+                        }
+                    }
+                }
+            }
+            return ResultState::status_line(self.current_status_line(state));
+        }
+        if key.code == KeyCode::F(4)
+            && key.kind != crossterm::event::KeyEventKind::Release
+            && let Some(item) = self.get_item(state.selected)
+            && item.editable()
+            && let ListValue::Path(path) = &item.value
+        {
+            state.path_browser = Some(PathBrowser::new(path, state.path_base.as_deref()));
+            return ResultState::status_line(self.current_status_line(state));
+        }
         let res = self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
         match res.edit_msg {
             EditMessage::PrevItem => self.prev(state),
             EditMessage::NextItem => self.next(state),
             _ => {
-                return res;
+                return ResultState {
+                    status_line: self.current_status_line(state),
+                    ..res
+                };
             }
         }
 
-        if let Some(item) = self.get_item(state.selected) {
-            ResultState::status_line(item.status.clone())
+        if self.get_item(state.selected).is_some() {
+            ResultState::status_line(self.current_status_line(state))
         } else {
             log::error!("config_menu: no item found for index {}", state.selected);
             ResultState::default()
@@ -1641,6 +1690,9 @@ impl<T> ConfigMenu<T> {
 
     pub fn current_status_line(&self, state: &ConfigMenuState) -> String {
         if let Some(item) = self.get_item(state.selected) {
+            if item.editable() && matches!(item.value, ListValue::Path(_)) {
+                return format!("{}  |  {}", item.status, crate::get_text("path_browser_shortcut"));
+            }
             return item.status.clone();
         }
         String::new()
@@ -1686,6 +1738,65 @@ mod tests {
     use super::*;
     use crossterm::event::KeyModifiers;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    #[test]
+    fn path_browser_updates_once_without_waiting_for_render_and_cancel_does_not_edit() {
+        use std::{cell::RefCell, rc::Rc};
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("new.txt"), "test").unwrap();
+        let updates = Rc::new(RefCell::new(Vec::new()));
+        let mut menu = ConfigMenu {
+            obj: updates.clone(),
+            entry: vec![ConfigEntry::Item(
+                ListItem::new("Path".into(), ListValue::Path("old.txt".into()))
+                    .with_update_path_value(&|updates: &Rc<RefCell<Vec<PathBuf>>>, path| updates.borrow_mut().push(path)),
+            )],
+        };
+        let mut state = ConfigMenuState {
+            path_base: Some(dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        assert!(menu.current_status_line(&state).contains("F4"));
+        let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
+        menu.handle_key_press(key(KeyCode::F(4)), &mut state);
+        assert!(state.is_path_browser_open());
+        for code in [KeyCode::F(1), KeyCode::F(2), KeyCode::F(3), KeyCode::Tab] {
+            assert!(menu.handle_key_press(key(code), &mut state).edit_msg == EditMessage::None);
+        }
+        assert!(menu.handle_key_press(key(KeyCode::Esc), &mut state).edit_msg == EditMessage::None);
+        assert!(!state.is_path_browser_open());
+        assert!(updates.borrow().is_empty());
+        menu.handle_key_press(key(KeyCode::F(4)), &mut state);
+        menu.handle_key_press(key(KeyCode::End), &mut state);
+        menu.handle_key_press(key(KeyCode::Enter), &mut state);
+        assert!(!state.is_path_browser_open());
+        assert_eq!(*updates.borrow(), vec![PathBuf::from("new.txt")]);
+        assert!(matches!(&menu.get_item(0).unwrap().value, ListValue::Path(path) if path == std::path::Path::new("new.txt")));
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        terminal.draw(|frame| menu.render(Rect::new(1, 1, 78, 20), frame, &mut state)).unwrap();
+        assert_eq!(updates.borrow().len(), 1);
+        menu.handle_key_press(key(KeyCode::F(4)), &mut state);
+        menu.handle_key_press(key(KeyCode::Enter), &mut state);
+        assert_eq!(updates.borrow().len(), 1, "reselecting the same file does not dirty the config");
+        assert!(menu.handle_key_press(key(KeyCode::Esc), &mut state).edit_msg == EditMessage::Close);
+    }
+
+    #[test]
+    fn browser_is_not_available_for_inactive_or_non_path_fields() {
+        for item in [
+            ListItem::new("inactive".into(), ListValue::Path("test".into())).with_editable(false),
+            ListItem::new("text".into(), ListValue::Text(20, TextFlags::None, "test".into())),
+        ] {
+            let mut menu = ConfigMenu {
+                obj: (),
+                entry: vec![ConfigEntry::Item(item)],
+            };
+            let mut state = ConfigMenuState::default();
+            menu.handle_key_press(KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE), &mut state);
+            assert!(!state.is_path_browser_open());
+            assert!(!menu.current_status_line(&state).contains("F4"));
+        }
+    }
 
     #[test]
     fn u32_field_can_be_emptied_with_delete_before_entering_a_replacement() {

@@ -30,6 +30,20 @@ Set the board and sysop names, choose a permanent sysop password, inspect the
 network listeners and confirm the node count. Options that the runtime does not
 use yet are greyed out and explain why.
 
+On an editable filename or directory field, **F4** opens the file browser:
+
+- **Enter** selects a file or opens a directory; **Ctrl-S** selects the current directory.
+- Use the arrow keys and Page Up/Down to browse, **Backspace** for the parent directory,
+  and **.** to show or hide hidden files.
+- **Esc** cancels without changing the field. The next Esc returns through the menus.
+
+Browsing starts at the current path, or its nearest existing directory. Relative paths
+are resolved against the board directory. Selections within it remain relative when
+the original field was relative or empty; selections outside it use absolute paths.
+Choosing a path updates the field, not the filesystem, and uses the normal save dialog.
+You can still type new filenames manually: **F2** edits an existing file and **F3**
+creates a missing file where those shortcuts are offered.
+
 Escape returns through the menus. When something changed, the exit dialog has
 the answers PCBSetup had:
 

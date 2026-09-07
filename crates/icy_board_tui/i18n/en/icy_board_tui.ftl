@@ -237,8 +237,16 @@ key_desc_edit=Edit
 
 icb_setup_key_main_help=↑ Up  ↓ Down  F1 Help  ␛ Quit
 icb_setup_key_menu_help=↑ Up  ↓ Down  F1 Help  ␛ Back
-icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit this file  ␛ Back
-icb_setup_key_menu_create_help=↑ Up  ↓ Down  F1 Help  F3 Create file  ␛ Back
+icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit  F4 Browse  ␛ Back
+icb_setup_key_menu_create_help=↑ Up  ↓ Down  F1 Help  F3 Create  F4 Browse  ␛ Back
+icb_setup_key_menu_browse_help=↑ Up  ↓ Down  F1 Help  F4 Browse  ␛ Back
+path_browser_shortcut=F4 Browse
+path_browser_title=Select configuration path
+path_browser_keys=Enter: file/open dir | Ctrl-S: use current dir
+    Arrows/PgUp/PgDn: browse | Backspace: parent
+    Esc: cancel | .: show/hide hidden files
+path_browser_missing=Select an existing file or directory.
+path_browser_empty=Empty directory
 icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move ␛ Back
 
 icb_setup_main_title=Main Menu

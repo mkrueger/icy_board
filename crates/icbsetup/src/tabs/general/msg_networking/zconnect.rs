@@ -119,9 +119,11 @@ struct ZconnectForm {
 
 impl ZconnectForm {
     fn new(board: Board, title: &'static str, entries: Vec<ConfigEntry<Board>>, link: Option<usize>) -> Self {
+        let mut state = ConfigMenuState::default();
+        state.path_base = Some(board.lock().unwrap().root_path.clone());
         Self {
             menu: ConfigMenu { obj: board, entry: entries },
-            state: ConfigMenuState::default(),
+            state,
             title,
             link,
             text_cursors: HashMap::new(),
@@ -391,7 +393,9 @@ impl Page for ZconnectForm {
                 item.text_field_state = Default::default();
             }
             self.menu.render(area, frame, &mut self.state);
-            self.render_text(frame, area);
+            if !self.state.is_path_browser_open() {
+                self.render_text(frame, area);
+            }
         }
     }
 
@@ -400,12 +404,13 @@ impl Page for ZconnectForm {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if key.code == KeyCode::F(2)
+        if !self.state.is_path_browser_open()
+            && key.code == KeyCode::F(2)
             && let Some(link) = self.link
         {
             return PageMessage::OpenSubPage(Box::new(ZconnectList::new(self.menu.obj.clone(), ListKind::Areas(link))));
         }
-        if self.edit_text(key) {
+        if !self.state.is_path_browser_open() && self.edit_text(key) {
             return PageMessage::ResultState(self.request_status());
         }
         let result = self.menu.handle_key_press(key, &mut self.state);

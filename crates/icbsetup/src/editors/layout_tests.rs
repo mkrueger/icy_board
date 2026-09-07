@@ -2,9 +2,57 @@ use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_tui::{get_text, tab_page::Page};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 
-use super::{areas::MessageAreasEditor, dirs::DirsEditor, door::DoorEditor, sec_editor::SecurityLevelEditor};
+use super::{
+    areas::MessageAreasEditor, bullettins::BullettinsEditor, dirs::DirsEditor, door::DoorEditor, sec_editor::SecurityLevelEditor, surveys::SurveyEditor,
+};
 
 const VIEWPORT: Rect = Rect::new(0, 1, 80, 23);
+
+#[test]
+fn nested_path_browse_hint_is_visible_before_opening_and_does_not_cover_modal() {
+    let directory = tempfile::tempdir().unwrap();
+    let pages: Vec<(Box<dyn Page>, usize, usize, u16)> = vec![
+        (Box::new(DirsEditor::new(&directory.path().join("dirs.toml")).unwrap()), 1, 2, 19),
+        (Box::new(BullettinsEditor::new(&directory.path().join("bulletins.toml")).unwrap()), 0, 1, 14),
+        (Box::new(SurveyEditor::new(&directory.path().join("surveys.toml")).unwrap()), 0, 2, 14),
+        (Box::new(MessageAreasEditor::new(&directory.path().join("areas.toml")).unwrap()), 4, 1, 19),
+    ];
+    let hint = get_text("path_browser_shortcut");
+    assert!(hint.contains("F4"));
+    for (mut page, path_index, next_non_path, border_y) in pages {
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        page.handle_key_press(KeyEvent::from(KeyCode::Insert));
+        page.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        for _ in 0..path_index {
+            page.handle_key_press(KeyEvent::from(KeyCode::Down));
+        }
+        terminal.draw(|frame| page.render(frame, VIEWPORT)).unwrap();
+        let border: String = (4..76).map(|x| terminal.backend().buffer()[(x, border_y)].symbol()).collect();
+        assert!(border.contains(&hint), "missing browse hint before F4: {border}");
+
+        page.handle_key_press(KeyEvent::from(KeyCode::F(4)));
+        terminal.draw(|frame| page.render(frame, VIEWPORT)).unwrap();
+        let rows: Vec<String> = (0..25)
+            .map(|y| (0..80).map(|x| terminal.backend().buffer()[(x, y)].symbol()).collect())
+            .collect();
+        assert!(
+            rows.iter().any(|row| row.contains(&get_text("path_browser_title"))),
+            "browser title was obscured"
+        );
+        assert!(rows.iter().all(|row| !row.contains(&hint)), "inactive form hint must not cover the browser");
+
+        page.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        terminal.draw(|frame| page.render(frame, VIEWPORT)).unwrap();
+        let border: String = (4..76).map(|x| terminal.backend().buffer()[(x, border_y)].symbol()).collect();
+        assert!(border.contains(&hint), "hint must return after cancelling the browser");
+        for _ in 0..next_non_path {
+            page.handle_key_press(KeyEvent::from(KeyCode::Down));
+        }
+        terminal.draw(|frame| page.render(frame, VIEWPORT)).unwrap();
+        let border: String = (4..76).map(|x| terminal.backend().buffer()[(x, border_y)].symbol()).collect();
+        assert!(!border.contains(&hint), "non-path field advertises browsing: {border}");
+    }
+}
 
 fn assert_popup_labels_fit(mut page: impl Page, popup: Rect, keys: &[&str]) {
     let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();

@@ -54,6 +54,62 @@ fn update(form: &ZconnectForm, index: usize, value: ListValue) {
 }
 
 #[test]
+fn zconnect_browser_routes_before_text_and_f2_and_selection_updates_without_rendering() {
+    let root = tempfile::tempdir().unwrap();
+    let selected = root.path().join("chosen.dat");
+    std::fs::write(&selected, b"chosen").unwrap();
+    let board = board();
+    {
+        let mut b = board.lock().unwrap();
+        b.root_path = root.path().to_path_buf();
+        b.file_name = root.path().join("configuration/icyboard.toml");
+        b.zconnect.inbound.clear();
+    }
+    let mut form = ZconnectForm::general(board.clone());
+    form.state.selected = 4;
+    // Exercise the common form's F2 interception as well as its path editor.
+    form.link = Some(0);
+    assert_eq!(form.state.path_base.as_deref(), Some(root.path()));
+    render(&mut form);
+    form.handle_key_press(key(KeyCode::F(4)));
+    assert!(form.state.is_path_browser_open());
+    for code in [KeyCode::Char('x'), KeyCode::Delete, KeyCode::F(2)] {
+        assert!(matches!(form.handle_key_press(key(code)), PageMessage::ResultState(_)));
+        assert!(form.state.is_path_browser_open());
+        assert!(board.lock().unwrap().zconnect.inbound.as_os_str().is_empty());
+    }
+
+    // Compare with the shared modal's render: the local text repaint must not
+    // erase its cells or relocate its cursor to the underlying path field.
+    let mut actual = Terminal::new(TestBackend::new(80, 25)).unwrap();
+    actual.draw(|frame| form.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+    let mut expected = Terminal::new(TestBackend::new(80, 25)).unwrap();
+    expected
+        .draw(|frame| {
+            let area = panel(frame, Rect::new(0, 1, 80, 23), form.title, "zconnect_link_keys");
+            form.menu.render(area, frame, &mut form.state);
+        })
+        .unwrap();
+    assert_eq!(actual.backend().buffer(), expected.backend().buffer());
+    assert_eq!(actual.get_cursor_position().unwrap(), expected.get_cursor_position().unwrap());
+
+    form.handle_key_press(key(KeyCode::End));
+    form.handle_key_press(key(KeyCode::Enter));
+    assert!(!form.state.is_path_browser_open());
+    let value = board.lock().unwrap().zconnect.inbound.clone();
+    assert_eq!(root.path().join(&value), selected);
+    assert!(matches!(&form.menu.get_item(4).unwrap().value, ListValue::Path(path) if path == &value));
+    assert_eq!(board.lock().unwrap().config.paths.zconnect_file, PathBuf::from("zconnect.toml"));
+
+    form.handle_key_press(key(KeyCode::F(4)));
+    assert!(matches!(form.handle_key_press(key(KeyCode::Esc)), PageMessage::ResultState(_)));
+    assert!(!form.state.is_path_browser_open());
+    assert_eq!(board.lock().unwrap().zconnect.inbound, value);
+    assert!(matches!(form.handle_key_press(key(KeyCode::F(2))), PageMessage::OpenSubPage(_)));
+    assert!(matches!(form.handle_key_press(key(KeyCode::Esc)), PageMessage::Close));
+}
+
+#[test]
 fn zconnect_has_a_separate_menu_and_viewing_does_not_enable_saving() {
     let board = board();
     let initial = board.lock().unwrap().zconnect.clone();

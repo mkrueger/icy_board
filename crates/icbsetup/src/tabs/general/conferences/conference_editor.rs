@@ -516,10 +516,9 @@ impl ConferenceEditor {
                 entry,
             }
         };
-        Self {
-            state: ConfigMenuState::default(),
-            menu,
-        }
+        let mut state = ConfigMenuState::default();
+        state.path_base = Some(icy_board.lock().unwrap().root_path.clone());
+        Self { state, menu }
     }
 }
 
@@ -535,9 +534,11 @@ impl Page for ConferenceEditor {
         let mut bottom_text = get_text("icb_setup_key_menu_help");
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
+            && item.editable()
         {
+            bottom_text = get_text("icb_setup_key_menu_browse_help");
             let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
-            if path.exists() && path.is_file() && item.editable() {
+            if path.is_file() {
                 bottom_text = get_text("icb_setup_key_menu_edit_help");
             }
         }
@@ -569,7 +570,8 @@ impl Page for ConferenceEditor {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(item) = self.menu.get_item(self.state.selected)
+        if !self.state.is_path_browser_open()
+            && let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
             && key.code == crossterm::event::KeyCode::F(2)
             && item.editable()
@@ -614,6 +616,33 @@ mod tests {
     use crossterm::event::KeyCode;
     use icy_board_engine::icy_board::conferences::Conference;
     use ratatui::{Terminal, backend::TestBackend, text::Line};
+
+    #[test]
+    fn conference_path_browse_help_does_not_require_an_existing_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("menu");
+        std::fs::write(&file, "menu").unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = directory.path().to_path_buf();
+        board.conferences.clear();
+        board.conferences.push(Conference::default());
+        let mut page = ConferenceEditor::new(Arc::new(Mutex::new(board)), 0);
+        page.state.selected = 4;
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        for (value, editable, help_key) in [
+            (ListValue::Path("".into()), true, "icb_setup_key_menu_browse_help"),
+            (ListValue::Path(directory.path().to_path_buf()), true, "icb_setup_key_menu_browse_help"),
+            (ListValue::Path("missing/menu".into()), true, "icb_setup_key_menu_browse_help"),
+            (ListValue::Path(file.clone()), true, "icb_setup_key_menu_edit_help"),
+            (ListValue::Path(file), false, "icb_setup_key_menu_help"),
+            (ListValue::Bool(false), true, "icb_setup_key_menu_help"),
+        ] {
+            *page.menu.get_item_mut(page.state.selected).unwrap() = ListItem::new("Test".into(), value).with_editable(editable);
+            terminal.draw(|frame| page.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+            let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
+            assert!(border.contains(&get_text(help_key)), "incorrect conference help: {border}");
+        }
+    }
 
     #[test]
     fn conference_labels_headers_and_editors_fit_when_scrolling() {

@@ -62,6 +62,7 @@ macro_rules! freq_list {
             fn open_editor(&mut self, selected: usize) {
                 self.edit_state = ConfigMenuState::default();
                 let board = self.board.lock().unwrap();
+                self.edit_state.path_base = Some(board.root_path.clone());
                 let Some(entry) = board.ftn.freq.$list.get(selected) else {
                     return;
                 };
@@ -105,7 +106,9 @@ macro_rules! freq_list {
                         .border_type(BorderType::Double)
                         .render(area, frame.buffer_mut());
                     editor.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_state);
-                    if let Some(item) = editor.get_item(self.edit_state.selected) {
+                    if !self.edit_state.is_path_browser_open()
+                        && let Some(item) = editor.get_item(self.edit_state.selected)
+                    {
                         item.text_field_state.set_cursor_position(frame);
                     }
                 }

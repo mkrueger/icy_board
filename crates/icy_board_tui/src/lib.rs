@@ -22,6 +22,7 @@ pub mod icbsetupmenu;
 pub mod inactive_options;
 pub mod insert_table;
 pub mod message_box;
+mod path_browser;
 pub mod pcb_line;
 pub mod position_editor;
 pub mod save_changes_dialog;

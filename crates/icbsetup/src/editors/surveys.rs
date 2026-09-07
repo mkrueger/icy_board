@@ -78,6 +78,11 @@ impl<'a> SurveyEditor<'a> {
         })
     }
 
+    fn with_path_base(mut self, path_base: PathBuf) -> Self {
+        self.edit_config_state.path_base = Some(path_base);
+        self
+    }
+
     fn display_insert_table(&mut self, frame: &mut Frame, area: &Rect) {
         let sel = self.insert_table.table_state.selected();
         self.insert_table.render_table(frame, *area);
@@ -132,16 +137,22 @@ impl<'a> Page for SurveyEditor<'a> {
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
-                .border_type(BorderType::Double);
+                .border_type(BorderType::Double)
+                .title_bottom(Span::styled(
+                    super::path_browse_hint(edit_config, &self.edit_config_state),
+                    get_tui_theme().key_binding,
+                ));
             //     let area =  footer.inner(&Margin { vertical: 15, horizontal: 5 });
             block.render(area, frame.buffer_mut());
             edit_config.render(area.inner(Margin { vertical: 1, horizontal: 1 }), frame, &mut self.edit_config_state);
 
-            edit_config
-                .get_item(self.edit_config_state.selected)
-                .unwrap()
-                .text_field_state
-                .set_cursor_position(frame);
+            if !self.edit_config_state.is_path_browser_open() {
+                edit_config
+                    .get_item(self.edit_config_state.selected)
+                    .unwrap()
+                    .text_field_state
+                    .set_cursor_position(frame);
+            }
         }
         if let Some(save_changes) = &self.save_dialog {
             save_changes.render(frame, area);
@@ -199,7 +210,7 @@ impl<'a> Page for SurveyEditor<'a> {
                 }
 
                 KeyCode::Enter => {
-                    self.edit_config_state = ConfigMenuState::default();
+                    super::reset_config_state(&mut self.edit_config_state);
 
                     if let Some(selected_item) = self.insert_table.table_state.selected() {
                         let cmd = self.survey_list.lock().unwrap();
@@ -251,6 +262,7 @@ impl<'a> Page for SurveyEditor<'a> {
     }
 }
 
-pub fn edit_surveys(_board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
-    PageMessage::OpenSubPage(Box::new(SurveyEditor::new(&path).unwrap()))
+pub fn edit_surveys(board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
+    let root = board.1.lock().unwrap().root_path.clone();
+    PageMessage::OpenSubPage(Box::new(SurveyEditor::new(&path).unwrap().with_path_base(root)))
 }

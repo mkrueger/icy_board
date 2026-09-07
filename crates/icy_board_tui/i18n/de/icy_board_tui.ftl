@@ -337,8 +337,16 @@ quick_save=Schnell
 # ICBSetup
 icb_setup_key_main_help=↑ Auf  ↓ Ab  F1 Hilfe  ␛ Ende
 icb_setup_key_menu_help=↑ Auf  ↓ Ab  F1 Hilfe  ␛ Zurück
-icb_setup_key_menu_edit_help=↑ Auf  ↓ Ab  F1 Hilfe  F2 Datei bearbeiten  ␛ Zurück
-icb_setup_key_menu_create_help=↑ Auf  ↓ Ab  F1 Hilfe  F3 Datei erstellen  ␛ Zurück
+icb_setup_key_menu_edit_help=↑ Auf  ↓ Ab  F1 Hilfe  F2 Bearbeiten  F4 Durchsuchen  ␛ Zurück
+icb_setup_key_menu_create_help=↑ Auf  ↓ Ab  F1 Hilfe  F3 Erstellen  F4 Durchsuchen  ␛ Zurück
+icb_setup_key_menu_browse_help=↑ Auf  ↓ Ab  F1 Hilfe  F4 Durchsuchen  ␛ Zurück
+path_browser_shortcut=F4 Durchsuchen
+path_browser_title=Konfigurationspfad auswählen
+path_browser_keys=Enter: Datei/Ordner öffnen | Strg-S: aktueller Ordner
+    Pfeile/Bild↑/Bild↓: navigieren | Rücktaste: übergeordneter Ordner
+    Esc: abbrechen | .: versteckte Dateien ein-/ausblenden
+path_browser_missing=Eine vorhandene Datei oder einen Ordner auswählen.
+path_browser_empty=Leerer Ordner
 icb_setup_key_conf_list_help=↑ Auf  ↓ Ab  INS Neu  ␡ Löschen  PgUp/Dn Verschieben ␛ Zurück
 icb_setup_main_title=Hauptmenü
 icb_setup_main_use_label=Für ICB { $version }

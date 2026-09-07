@@ -24,11 +24,9 @@ pub struct ICBConfigMenuUI {
 
 impl ICBConfigMenuUI {
     pub fn new(title: String, menu: ConfigMenu<Arc<Mutex<IcyBoard>>>) -> Self {
-        Self {
-            state: ConfigMenuState::default(),
-            title,
-            menu,
-        }
+        let mut state = ConfigMenuState::default();
+        state.path_base = Some(menu.obj.lock().unwrap().root_path.clone());
+        Self { state, title, menu }
     }
 
     pub fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
@@ -41,7 +39,9 @@ impl ICBConfigMenuUI {
         let mut bottom_text = get_text("icb_setup_key_menu_help");
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
+            && item.editable()
         {
+            bottom_text = get_text("icb_setup_key_menu_browse_help");
             let path = self.menu.obj.lock().unwrap().resolve_file(path);
             if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
                 bottom_text = if path.is_file() {
@@ -100,6 +100,9 @@ impl ICBConfigMenuUI {
     }
 
     pub fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if self.state.is_path_browser_open() {
+            return PageMessage::ResultState(self.menu.handle_key_press(key, &mut self.state));
+        }
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
             && item.editable()
@@ -176,6 +179,50 @@ fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{can_create_file, uses_graphics_editor};
+
+    #[test]
+    fn browse_uses_board_root_and_blocks_editor_and_create_shortcuts() {
+        use super::*;
+        use crate::config_menu::{ConfigEntry, ListItem};
+        use crossterm::event::KeyCode;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("selected.txt"), "unchanged").unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().to_path_buf();
+        board.config.paths.statistics_file = "missing.txt".into();
+        let board = Arc::new(Mutex::new(board));
+        let editor_calls = Arc::new(AtomicUsize::new(0));
+        let calls = editor_calls.clone();
+        let mut ui = ICBConfigMenuUI::new(
+            "Files".into(),
+            ConfigMenu {
+                obj: board.clone(),
+                entry: vec![ConfigEntry::Item(
+                    ListItem::new("Statistics".into(), ListValue::Path("missing.txt".into()))
+                        .with_update_path_value(&|board: &Arc<Mutex<IcyBoard>>, path| board.lock().unwrap().config.paths.statistics_file = path)
+                        .with_path_editor(Box::new(move |_, _| {
+                            calls.fetch_add(1, Ordering::Relaxed);
+                            PageMessage::None
+                        })),
+                )],
+            },
+        );
+        for code in [KeyCode::F(4), KeyCode::F(3), KeyCode::End, KeyCode::Enter] {
+            ui.handle_key_press(KeyEvent::from(code));
+        }
+        assert!(!root.path().join("missing.txt").exists());
+        assert_eq!(board.lock().unwrap().config.paths.statistics_file, std::path::PathBuf::from("selected.txt"));
+        for code in [KeyCode::F(4), KeyCode::F(2), KeyCode::Esc] {
+            assert!(matches!(ui.handle_key_press(KeyEvent::from(code)), PageMessage::ResultState(_)));
+        }
+        assert_eq!(editor_calls.load(Ordering::Relaxed), 0);
+        ui.handle_key_press(KeyEvent::from(KeyCode::F(2)));
+        assert_eq!(editor_calls.load(Ordering::Relaxed), 1);
+        assert!(matches!(ui.handle_key_press(KeyEvent::from(KeyCode::Esc)), PageMessage::Close));
+        assert_eq!(std::fs::read_to_string(root.path().join("selected.txt")).unwrap(), "unchanged");
+    }
 
     fn test_dir() -> std::path::PathBuf {
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
