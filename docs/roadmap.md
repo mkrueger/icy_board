@@ -25,6 +25,23 @@ tracks the larger remaining directions; it is not a release-date promise.
 - Provide a web administration or caller frontend; IcyTerm can run as
   WebAssembly, but the board still needs a suitable API.
 
+### PPL compiler: semantic analysis before lowering
+
+- Move source-level semantic analysis before structural AST rewrites: resolve
+  names and types and validate calls on the original source AST, including code
+  that is later optimized away.
+- Target pipeline: source AST → semantically checked HIR → lowering → code
+  generation. Lowering should consume resolved symbols and types rather than
+  repeat source analysis; replace the separate compound-receiver type probe
+  with these shared semantic results.
+- Preserve source provenance through lowering for later diagnostics. Keep
+  internal consistency checks after lowering rather than a second full
+  source-level semantic pass.
+- Migrate compiler and language-server analysis together, with regression tests
+  for diagnostic messages and ranges, module and legacy-language behavior, and
+  generated program behavior. Treat this as a separate architecture change,
+  not just a reordering of the current compiler passes.
+
 ## Explicitly out of scope
 
 DOS, serial and modem support, FOSSIL drivers, PPE DOS/assembler calls and
