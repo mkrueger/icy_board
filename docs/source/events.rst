@@ -236,7 +236,7 @@ serialized result ``superseded``: journals containing it are not backward
 compatible with those binaries. Account for this before downgrading.
 
 Manual execution at call-wait
-----------------------------
+-----------------------------
 
 F6 opens the runtime Events menu. Up/Down and Home/End select; R or F5 refreshes
 the loaded-board list and read-only history snapshot (not the event file on disk);

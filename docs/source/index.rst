@@ -9,6 +9,7 @@ Version |icy_version|
    introduction
    installation
    icy_board
+   configuration/index
    events
    mailer
    customizing/index

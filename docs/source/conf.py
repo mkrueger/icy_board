@@ -17,7 +17,6 @@ extensions = []
 
 templates_path = ['_templates']
 exclude_patterns = [
-    'customizing/adding_commands.rst',
     'customizing/internationalization.rst',
     'customizing/look_and_feel.rst',
     'customizing/menus.rst',

@@ -173,6 +173,10 @@ main/ files
 
 The ``main/`` directory contains core system configuration and data files:
 
+See :doc:`configuration/index` for the complete TOML format reference,
+including exact keys, required fields, defaults and examples. Custom commands
+are explained in :doc:`customizing/adding_commands`.
+
 **Configuration Files**
 
 +------------------------+---------------------------------------------------------------+
