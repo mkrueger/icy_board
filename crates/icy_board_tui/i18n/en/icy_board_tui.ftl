@@ -4195,6 +4195,16 @@ fido_msgs_to_track=Number of Messages to Track for Dupes
 fido_msgs_to_track-status=How far back the duplicate check looks, 0 for the whole area
 fido_msgs_to_track-help=A busy area holds a long list of message ids, and reading all of them costs time on every run.
 
+fido_auto_add_files=Auto Add File Areas
+fido_auto_add_files-status=Create file directories for unknown TIC area tags
+fido_auto_add_files-help=After checking the source, password, size and checksum, create a file directory in the selected conference. Disabled by default; unknown TICs and payloads then remain in inbound. Use Secure Netmail and link TIC passwords to restrict incoming file echoes. New directories use default access permissions.
+fido_auto_add_file_conference=Add File Areas To Conference
+fido_auto_add_file_conference-status=Conference number for new file areas, starting at 0
+fido_auto_add_file_conference-help=The conference must exist and have a directory-list file configured. Its file directories are saved before an incoming file is moved. This setting is independent of message area auto-add.
+fido_new_file_areas=New File Areas
+fido_new_file_areas-status=Root directory for automatically created file echoes
+fido_new_file_areas-help=Defaults to ftn/files relative to the board root. Each tag gets a separate subdirectory. Used only when Auto Add File Areas is enabled.
+
 fido_auto_add=Auto Add Fido Areas
 fido_auto_add-status=Make an area out of a tag no area carries
 fido_auto_add-help=Without this a message for an unknown tag is counted and dropped.

@@ -822,6 +822,8 @@ impl PCBoardImporter {
                 sysop_change: self.data.fido_sysop_change,
                 auto_add: false,
                 auto_add_conference: 0,
+                auto_add_files: false,
+                auto_add_file_conference: 0,
                 pass_thru: self.data.fido_enable_pass_thru,
                 enable_routing: self.data.fido_enable_routing,
                 route_echo_mail: self.data.fido_route_echo_mail,

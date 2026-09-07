@@ -246,6 +246,55 @@ import changes only the editor: leave with Escape and choose Save to write it,
 or discard the changes as usual.
 
 
+File echoes and automatic file areas
+------------------------------------
+
+``icbmailer toss`` also processes TIC file echoes. Set a file directory's
+``Fido Area Tag`` to the TIC's ``Area`` value, for example ``AGN_INFO``. An
+existing directory with that name is also recognised, case-insensitively.
+The payload is moved into that directory and its TIC description is indexed.
+Unknown areas normally leave both the TIC and payload in inbound for a later
+toss; they are not discarded.
+
+To create these directories automatically, enable **Auto Add File Areas** in
+ICBSetup's Fido tosser settings and select **Add File Areas To Conference**.
+In Fido directory settings, **New File Areas** sets their root directory.
+The equivalent settings in the FTN configuration are:
+
+.. code-block:: toml
+
+   # Top-level setting, before [options]. Relative to the board root.
+   new_file_areas = "ftn/files"
+
+   [options]
+   auto_add_files = true
+   auto_add_file_conference = 0
+
+Merge these entries into the existing configuration; do not add a second
+``[options]`` table. Auto-add is off by default and is independent of message
+area ``auto_add`` and ``auto_add_conference``. The destination conference is
+zero-based and must already exist with a directory-list file configured.
+
+For example, ``AGN_INFO`` creates a directory under ``ftn/files/agn_info``
+and adds an ``AGN_INFO`` file-directory entry to the selected conference.
+Existing tag/name mappings are reused. Tags are restricted to 1–64 printable
+ASCII characters without spaces or path separators; punctuation is escaped in
+generated directory names to avoid collisions. Each directory uses default
+access permissions; choose a suitably restricted conference if new file areas
+should not be public immediately.
+
+Source/password checks and any supplied size/CRC checks happen before area
+creation. Enable ``options.secure`` to require a configured source link and
+set ``tic_password`` on that link to authenticate its TICs. With secure mode
+off, the auto-add option can accept new file areas from unconfigured sources.
+
+The directory list is saved atomically before the payload is moved. A failed
+registration leaves both inbound files available for retry. Once the area is
+configured, rerun toss to process files already waiting; no re-download is
+needed. Successful processing removes the TIC. This feature adds local file
+directories, not FileFix subscriptions or forwarding to downlinks.
+
+
 The origin line
 ---------------
 

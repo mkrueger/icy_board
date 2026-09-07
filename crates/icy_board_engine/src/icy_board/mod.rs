@@ -220,6 +220,7 @@ impl IcyBoard {
             self.ftn.nodelist = get_path(&self.root_path, &self.ftn.nodelist);
         }
         self.ftn.new_areas = get_path(&self.root_path, &self.ftn.new_areas);
+        self.ftn.new_file_areas = get_path(&self.root_path, &self.ftn.new_file_areas);
 
         // Trashcan files
         self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);

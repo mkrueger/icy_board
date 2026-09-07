@@ -10,13 +10,14 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard, IcyBoardSerializer,
+        file_directory::FileDirectory,
         ftn::{
             FtnConfig, FtnLink, FtnLogLevel,
             bundle::{is_bundle, unpack},
             freq,
             nodelist::Nodelist,
             packet::Packet,
-            tic::{FileArea, toss_tics},
+            tic::{FileArea, toss_tics_with_area_registration},
             toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
         },
         message_area::MessageArea,
@@ -29,6 +30,9 @@ mod zconnect;
 
 #[cfg(test)]
 mod cli_tests;
+
+#[cfg(test)]
+mod file_area_tests;
 
 #[derive(Parser)]
 #[command(name = "icbmailer", about = text("icbmailer", "about"), disable_version_flag = true)]
@@ -619,8 +623,13 @@ fn print_untrusted_netmail_advice(board: &IcyBoard, source: &str, count: usize) 
 
 /// Puts the files that arrived with a `.TIC` into the directories that carry
 /// their area.
-fn toss_files(board: &IcyBoard) -> Res<()> {
-    let report = toss_tics(&board.ftn, &file_areas(board))?;
+fn toss_files(board: &mut IcyBoard) -> Res<()> {
+    let config = board.ftn.clone();
+    let areas = file_areas(board);
+    let report = toss_tics_with_area_registration(&config, &areas, |area| register_new_file_area(board, area))?;
+    for area in &report.added {
+        println!("  {} is new, added to file conference {}", area.tag, config.options.auto_add_file_conference);
+    }
     for (file, area) in &report.arrived {
         println!("  {} put into {}", file, area);
     }
@@ -629,13 +638,49 @@ fn toss_files(board: &IcyBoard) -> Res<()> {
     }
     for (tag, count) in &report.unknown {
         println!(
-            "  {} file(s) arrived for {}, which no file directory carries. Set Fido Area Tag = \"{}\" on the directory that should hold them",
+            "  {} file(s) arrived for {}, which no file directory carries. Set Fido Area Tag = \"{}\" on the directory that should hold them, or enable Auto Add File Areas",
             count, tag, tag
         );
     }
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
     }
+    Ok(())
+}
+
+/// Persist the directory mapping before the TIC processor consumes the input.
+/// Write a copy atomically, leaving the in-memory list unchanged on failure.
+fn register_new_file_area(board: &mut IcyBoard, area: &FileArea) -> Res<()> {
+    let number = board.ftn.options.auto_add_file_conference;
+    let conference = board
+        .conferences
+        .get_mut(number)
+        .ok_or_else(|| format!("Conference {number}, which new file areas are added to, does not exist"))?;
+    if conference.dir_file.as_os_str().is_empty() || conference.dir_file.is_dir() {
+        return Err(format!("Configure a directory-list file for conference {number} before auto-adding file areas").into());
+    }
+    if conference.directories.is_none() && conference.dir_file.exists() {
+        return Err(format!("Cannot auto-add file areas: {} was not loaded", conference.dir_file.display()).into());
+    }
+    let mut directories = conference.directories.as_deref().cloned().unwrap_or_default();
+    directories.push(FileDirectory {
+        name: area.name.clone(),
+        ftn_area_tag: area.tag.clone(),
+        path: area.path.clone(),
+        metadata_path: area.metadata_path.clone(),
+        ..Default::default()
+    });
+    let parent = conference
+        .dir_file
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    fs::create_dir_all(parent)?;
+    let temporary = tempfile::NamedTempFile::new_in(parent)?;
+    directories.save(&temporary.path())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(&conference.dir_file)?;
+    conference.directories = Some(std::sync::Arc::new(directories));
     Ok(())
 }
 

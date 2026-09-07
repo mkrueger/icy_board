@@ -16,6 +16,10 @@ use jamjam::util::echomail::EchomailAddress;
 use super::{Context, FtnConfig, freq::matches_mask};
 use crate::Res;
 
+#[cfg(test)]
+#[path = "tic_auto_add_tests.rs"]
+mod auto_add_tests;
+
 /// One file directory of this board as the tosser sees it: the tag it carries
 /// in the network, the name it is known by here and where its files live.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -76,6 +80,10 @@ impl Tic {
 /// What one run over the file echos waiting in the inbound left behind.
 #[derive(Debug, Default)]
 pub struct TicReport {
+    /// New directories registered during this run, including ones whose later
+    /// file installation failed. Callers without a registrar must persist these.
+    pub added: Vec<FileArea>,
+
     /// The files that reached an area, and the area each went to.
     pub arrived: Vec<(String, String)>,
 
@@ -91,7 +99,14 @@ pub struct TicReport {
 /// Puts the files waiting in the inbound into the directories that carry their
 /// area.
 pub fn toss_tics(config: &FtnConfig, areas: &[FileArea]) -> Res<TicReport> {
+    toss_tics_with_area_registration(config, areas, |_| Ok(()))
+}
+
+/// Register a validated unknown area before moving its payload or deleting its
+/// TIC. A failed registration leaves both inbound files available for retry.
+pub fn toss_tics_with_area_registration(config: &FtnConfig, areas: &[FileArea], mut register: impl FnMut(&FileArea) -> Res<()>) -> Res<TicReport> {
     let mut report = TicReport::default();
+    let mut areas = areas.to_vec();
     if !config.options.enabled || !config.options.process_in || !config.inbound.is_dir() {
         return Ok(report);
     }
@@ -108,7 +123,7 @@ pub fn toss_tics(config: &FtnConfig, areas: &[FileArea]) -> Res<TicReport> {
 
     for path in tics {
         log::info!("Tossing the file echo {}", path.display());
-        match toss_tic(config, areas, &path, &mut report) {
+        match toss_tic(config, &mut areas, &path, &mut report, &mut register) {
             Ok(true) => fs::remove_file(&path).context(|| format!("Cannot remove {} now that its file has been tossed", path.display()))?,
             // A file that has not arrived yet, or an area nobody here carries,
             // is worth another run rather than being thrown away.
@@ -119,7 +134,7 @@ pub fn toss_tics(config: &FtnConfig, areas: &[FileArea]) -> Res<TicReport> {
     Ok(report)
 }
 
-fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut TicReport) -> Res<bool> {
+fn toss_tic(config: &FtnConfig, areas: &mut Vec<FileArea>, path: &Path, report: &mut TicReport, register: &mut impl FnMut(&FileArea) -> Res<()>) -> Res<bool> {
     let text = fs::read(path).context(|| format!("Cannot read the file echo {}", path.display()))?;
     let tic = Tic::parse(&String::from_utf8_lossy(&text));
 
@@ -153,11 +168,33 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
         .into());
     }
 
-    let Some(area) = areas
+    let known = areas
         .iter()
         .find(|area| area.tag.eq_ignore_ascii_case(&tic.area))
-        .or_else(|| areas.iter().find(|area| area.name.eq_ignore_ascii_case(&tic.area)))
-    else {
+        .or_else(|| areas.iter().find(|area| area.name.eq_ignore_ascii_case(&tic.area)));
+    let is_new = known.is_none();
+    let area = if let Some(area) = known {
+        area.clone()
+    } else if config.options.auto_add_files {
+        // Bound generated names and keep case folding unambiguous. Escape dots
+        // and punctuation using the same collision-free scheme as message areas.
+        if tic.area.len() > 64 || !tic.area.bytes().all(|byte| byte.is_ascii_graphic()) {
+            return Err(format!("Cannot auto-add invalid file echo tag {:?}", tic.area).into());
+        }
+        if config.new_file_areas.as_os_str().is_empty() {
+            return Err("Configure new_file_areas before enabling file area auto-add".into());
+        }
+        let path = config.new_file_areas.join(super::toss::auto_area_name(&tic.area)?);
+        if areas.iter().any(|area| area.path == path) {
+            return Err(format!("Cannot auto-add {}: {} already belongs to another area", tic.area, path.display()).into());
+        }
+        FileArea {
+            tag: tic.area.to_ascii_uppercase(),
+            name: tic.area.to_ascii_uppercase(),
+            metadata_path: path.join("dir"),
+            path,
+        }
+    } else {
         *report.unknown.entry(tic.area.to_uppercase()).or_default() += 1;
         return Ok(false);
     };
@@ -198,6 +235,19 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
         }
     }
 
+    if is_new {
+        // Never follow an existing area symlink supplied outside configuration.
+        match fs::symlink_metadata(&area.path) {
+            Ok(metadata) if !metadata.is_dir() || metadata.file_type().is_symlink() => {
+                return Err(format!("Cannot auto-add {}: {} is not a plain directory", area.tag, area.path.display()).into());
+            }
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => return Err(err.into()),
+            _ => {}
+        }
+        register(&area)?;
+        areas.push(area.clone());
+        report.added.push(area.clone());
+    }
     fs::create_dir_all(&area.path).context(|| format!("Cannot create the file directory {} of {}", area.path.display(), area.name))?;
     let target = area.path.join(&tic.file);
     let metadata_path = if area.metadata_path.as_os_str().is_empty() {

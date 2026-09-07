@@ -168,6 +168,8 @@ pub fn tosser(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             ConfigEntry::Separator,
             flag!("fido_auto_add", width, auto_add, lock),
             number!("fido_auto_add_conference", width, u16::MAX as u32, auto_add_conference, usize, lock),
+            flag!("fido_auto_add_files", width, auto_add_files, lock),
+            number!("fido_auto_add_file_conference", width, u16::MAX as u32, auto_add_file_conference, usize, lock),
         ]
     };
     page("fido_tosser_title", &icy_board, entry)
@@ -185,6 +187,7 @@ pub fn directories(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             path!("fido_bad_packets", width, bad_packets, lock),
             path!("fido_nodelist", width, nodelist, lock),
             path!("fido_new_areas", width, new_areas, lock),
+            path!("fido_new_file_areas", width, new_file_areas, lock),
         ]
     };
     page("fido_directory_title", &icy_board, entry)

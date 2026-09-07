@@ -220,6 +220,12 @@ pub struct FtnOptions {
     /// The conference an area added that way is attached to.
     pub auto_add_conference: usize,
 
+    /// Create local file directories for validated TICs with unknown area tags.
+    pub auto_add_files: bool,
+
+    /// The conference receiving automatically added file directories.
+    pub auto_add_file_conference: usize,
+
     /// A tag no area carries is passed on to the links that asked for it. A
     /// hub feeds an area it does not read itself this way.
     pub pass_thru: bool,
@@ -266,6 +272,8 @@ impl Default for FtnOptions {
             sysop_change: true,
             auto_add: false,
             auto_add_conference: 0,
+            auto_add_files: false,
+            auto_add_file_conference: 0,
             pass_thru: false,
             enable_routing: false,
             route_echo_mail: false,
@@ -313,6 +321,10 @@ pub struct FtnConfig {
     /// Where the base of an area added by `options.auto_add` is created.
     #[serde(default = "FtnConfig::default_new_areas")]
     pub new_areas: PathBuf,
+
+    /// Root directory for file echoes added by `options.auto_add_files`.
+    #[serde(default = "FtnConfig::default_new_file_areas")]
+    pub new_file_areas: PathBuf,
 
     /// Appended to every echomail message this board originates.
     #[serde(default)]
@@ -366,6 +378,10 @@ impl FtnConfig {
         PathBuf::from("ftn/areas")
     }
 
+    fn default_new_file_areas() -> PathBuf {
+        PathBuf::from("ftn/files")
+    }
+
     /// One of the addresses this board answers to, which is what tells mail
     /// meant for it from mail that only passes through.
     pub fn answers_to(&self, address: &EchomailAddress) -> bool {
@@ -416,6 +432,7 @@ impl Default for FtnConfig {
             bad_packets: Self::default_bad_packets(),
             nodelist: PathBuf::new(),
             new_areas: Self::default_new_areas(),
+            new_file_areas: Self::default_new_file_areas(),
             origin: String::new(),
             options: FtnOptions::default(),
             freq: freq::FtnFreq::default(),
@@ -430,6 +447,15 @@ impl IcyBoardSerializer for FtnConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_old_ftn_configs_leave_file_auto_add_disabled() {
+        let config: FtnConfig = toml::from_str("inbound = 'in'\noutbound = 'out'\n[options]\nauto_add = true\n").unwrap();
+        assert!(config.options.auto_add);
+        assert!(!config.options.auto_add_files);
+        assert_eq!(config.options.auto_add_file_conference, 0);
+        assert_eq!(config.new_file_areas, PathBuf::from("ftn/files"));
+    }
 
     fn aka(address: &str, domain: &str) -> FtnAka {
         FtnAka {
@@ -508,6 +534,9 @@ mod tests {
         config.options.make_response = true;
         config.options.area_fix_forwarding = true;
         config.options.auto_add_passthru = true;
+        config.options.auto_add_files = true;
+        config.options.auto_add_file_conference = 3;
+        config.new_file_areas = PathBuf::from("files/echoes");
         config.freq.enabled = true;
         config.freq.paths.push(freq::FreqPath {
             path: PathBuf::from("files/freq"),

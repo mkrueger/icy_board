@@ -3662,6 +3662,16 @@ fido_check_dupe_msg_id-help=Nachrichten können über mehrere Wege durch ein Net
 fido_msgs_to_track=Nachrichten für Duplikatprüfung
 fido_msgs_to_track-status=Prüftiefe der Duplikatsuche; 0 prüft den ganzen Bereich
 fido_msgs_to_track-help=Ein stark genutzter Bereich enthält viele Nachrichtenkennungen. Sie bei jedem Lauf vollständig zu lesen kostet Zeit.
+fido_auto_add_files=Dateibereiche automatisch anlegen
+fido_auto_add_files-status=Dateiverzeichnisse für unbekannte TIC-Bereichskennungen anlegen
+fido_auto_add_files-help=Nach Prüfung von Quelle, Passwort, Größe und Prüfsumme wird ein Dateiverzeichnis in der gewählten Konferenz angelegt. Standardmäßig ausgeschaltet; unbekannte TICs und Nutzdateien bleiben dann im Eingang. Sicheres Netmail und TIC-Passwörter der Gegenstellen begrenzen die Annahme. Neue Verzeichnisse verwenden die Standard-Zugriffsrechte.
+fido_auto_add_file_conference=Dateibereiche zu Konferenz
+fido_auto_add_file_conference-status=Konferenznummer für neue Dateibereiche, beginnend mit 0
+fido_auto_add_file_conference-help=Die Konferenz muss existieren und eine konfigurierte Verzeichnislistendatei besitzen. Ihre Dateiverzeichnisse werden gespeichert, bevor die eingehende Datei verschoben wird. Diese Einstellung ist unabhängig vom Auto-Add für Nachrichtenbereiche.
+fido_new_file_areas=Neue Dateibereiche
+fido_new_file_areas-status=Basisverzeichnis für automatisch angelegte Dateiechos
+fido_new_file_areas-help=Standard ist ftn/files relativ zum Board-Verzeichnis. Jede Kennung erhält ein eigenes Unterverzeichnis. Wird nur bei aktiviertem Auto-Add für Dateibereiche verwendet.
+
 fido_auto_add=Fido-Bereiche automatisch anlegen
 fido_auto_add-status=Bereich für eine noch unbekannte Kennung anlegen
 fido_auto_add-help=Ohne diese Option wird eine Nachricht für eine unbekannte Kennung gezählt und verworfen.

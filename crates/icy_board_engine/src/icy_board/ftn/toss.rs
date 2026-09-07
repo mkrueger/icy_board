@@ -559,7 +559,7 @@ impl Tosser<'_> {
 
 /// Tags are network input, not paths. JAM replaces a base's extension, so
 /// even ordinary dotted tags need escaping to keep their bases distinct.
-fn auto_area_name(tag: &str) -> Res<String> {
+pub(super) fn auto_area_name(tag: &str) -> Res<String> {
     if tag.is_empty() || tag.contains(['/', '\\', ':']) || tag.chars().any(char::is_control) || matches!(tag, "." | "..") {
         return Err(format!("Cannot auto-add invalid echo tag {tag:?}").into());
     }
