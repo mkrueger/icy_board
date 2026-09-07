@@ -8,11 +8,32 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
+    style::Style,
     widgets::{Block, Borders, Clear, FrameExt, Paragraph, Wrap},
 };
 use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Input, Theme};
 
-use crate::{get_text, theme::get_tui_theme};
+use crate::{
+    get_text,
+    theme::{DOS_BLACK, DOS_LIGHT_CYAN, DOS_WHITE, DOS_YELLOW},
+};
+
+// Explicit foreground AND background avoid inheriting the classic dialog's
+// dark blue text on black, including inside the explorer's own list block.
+const TEXT: Style = Style::new().fg(DOS_WHITE).bg(DOS_BLACK);
+const ACCENT: Style = Style::new().fg(DOS_LIGHT_CYAN).bg(DOS_BLACK);
+const NOTICE: Style = Style::new().fg(DOS_YELLOW).bg(DOS_BLACK);
+const SELECTED: Style = Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_CYAN);
+
+fn explorer_theme() -> Theme {
+    Theme::new()
+        .with_style(TEXT)
+        .with_block(Block::default().borders(Borders::ALL).style(TEXT).border_style(ACCENT))
+        .with_item_style(TEXT)
+        .with_dir_style(ACCENT)
+        .with_highlight_item_style(SELECTED)
+        .with_highlight_dir_style(SELECTED)
+}
 
 pub(crate) enum PathBrowserResult {
     Pending,
@@ -44,7 +65,7 @@ impl PathBrowser {
                 .find(|path| path.is_dir())
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, get_text("path_browser_missing")))?;
             let mut explorer = FileExplorerBuilder::default().working_dir(directory).build()?;
-            explorer.set_theme(Theme::default());
+            explorer.set_theme(explorer_theme());
             if target.file_name().is_some_and(|name| name.to_string_lossy().starts_with('.')) && target.is_file() {
                 explorer.handle(Input::ToggleShowHidden)?;
             }
@@ -138,7 +159,9 @@ impl PathBrowser {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(get_text("path_browser_title"))
-            .style(get_tui_theme().dialog_box);
+            .style(TEXT)
+            .border_style(ACCENT)
+            .title_style(NOTICE);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let [path, files, help, error] = Layout::vertical([
@@ -149,16 +172,16 @@ impl PathBrowser {
         ])
         .areas(inner);
         if let Some(explorer) = &self.explorer {
-            frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()), path);
+            frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()).style(ACCENT), path);
             if explorer.files().is_empty() {
-                frame.render_widget(Paragraph::new(get_text("path_browser_empty")), files);
+                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(TEXT), files);
             } else if !files.is_empty() {
                 frame.render_widget_ref(explorer.widget(), files);
             }
         }
-        frame.render_widget(Paragraph::new(get_text("path_browser_keys")).wrap(Wrap { trim: false }), help);
+        frame.render_widget(Paragraph::new(get_text("path_browser_keys")).style(TEXT).wrap(Wrap { trim: false }), help);
         if let Some(message) = &self.error {
-            frame.render_widget(Paragraph::new(message.as_str()).wrap(Wrap { trim: false }), error);
+            frame.render_widget(Paragraph::new(message.as_str()).style(NOTICE).wrap(Wrap { trim: false }), error);
         }
     }
 }
@@ -249,6 +272,58 @@ mod tests {
         assert!(matches!(browser.handle(key(KeyCode::Enter)), PathBrowserResult::Pending));
         assert!(browser.error.is_some());
         assert!(matches!(browser.handle(key(KeyCode::Esc)), PathBrowserResult::Cancelled));
+    }
+
+    #[test]
+    fn picker_colors_do_not_inherit_dark_blue_dialog_style() {
+        use crate::theme::DOS_BLUE;
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("selected.txt");
+        std::fs::write(&file, "test").unwrap();
+        std::fs::write(root.path().join("other.txt"), "test").unwrap();
+        let mut browser = PathBrowser::new(&file, Some(root.path()));
+        browser.error = Some("Example error".into());
+        let mut terminal = Terminal::new(TestBackend::new(100, 25)).unwrap();
+        for select_directory in [false, true] {
+            if select_directory {
+                browser.handle(key(KeyCode::Home));
+                browser.error = Some("Example error".into());
+            }
+            terminal
+                .draw(|frame| {
+                    let area = frame.area();
+                    frame.render_widget(Block::default().style(Style::new().fg(DOS_BLUE).bg(DOS_BLACK)), area);
+                    browser.render(area, frame);
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            let assert_text = |text: &str, style: Style| {
+                for y in 0..25 {
+                    let row: String = (0..100).map(|x| buffer[(x, y)].symbol()).collect();
+                    if let Some(offset) = row.find(text) {
+                        let x = row[..offset].chars().count() as u16;
+                        assert_eq!(buffer[(x, y)].fg, style.fg.unwrap(), "{text}");
+                        assert_eq!(buffer[(x, y)].bg, style.bg.unwrap(), "{text}");
+                        return;
+                    }
+                }
+                panic!("missing text: {text}");
+            };
+            assert_text(&get_text("path_browser_title"), NOTICE);
+            assert_text("Enter:", TEXT);
+            assert_text("Example error", NOTICE);
+            assert_text("other.txt", TEXT);
+            assert_text("selected.txt", if select_directory { TEXT } else { SELECTED });
+            assert_text("../", if select_directory { SELECTED } else { ACCENT });
+            assert_eq!(buffer[(0, 0)].fg, DOS_LIGHT_CYAN);
+            assert_eq!(buffer[(1, 1)].fg, DOS_LIGHT_CYAN);
+            for cell in &buffer.content {
+                if !cell.symbol().trim().is_empty() {
+                    assert_ne!(cell.fg, DOS_BLUE);
+                    assert_ne!(cell.fg, cell.bg);
+                }
+            }
+        }
     }
 
     #[test]
