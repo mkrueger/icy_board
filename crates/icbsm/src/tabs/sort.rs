@@ -7,35 +7,35 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::frame_title,
     config_menu::ResultState,
     get_text, get_text_args,
     hotkeys::HotkeyBar,
-    select_menu::{MenuItem, SelectMenu, SelectMenuState},
+    icbsetupmenu::IcbSetupMenuUI,
+    select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
     Frame,
     layout::{Alignment, Margin, Rect},
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{Block, Borders, Clear, Padding, Paragraph, Widget, Wrap},
 };
 use std::collections::HashMap;
 
 /// A list of choices in its own box, the way the original nested its menus.
 pub struct MenuPage {
-    title: String,
-    menu: SelectMenu<i32>,
-    state: SelectMenuState,
+    page: IcbSetupMenuUI,
     open: Box<dyn Fn(i32) -> Option<Box<dyn Page>>>,
 }
 
 impl MenuPage {
     pub fn new(title: String, items: Vec<MenuItem<i32>>, open: Box<dyn Fn(i32) -> Option<Box<dyn Page>>>) -> Self {
         Self {
-            title,
-            menu: SelectMenu::new(items),
-            state: SelectMenuState::default(),
+            page: IcbSetupMenuUI::new(SelectMenu::new(items))
+                .with_center_title(title)
+                .with_footer("icbsm_menu_keys"),
             open,
         }
     }
@@ -43,43 +43,16 @@ impl MenuPage {
 
 impl Page for MenuPage {
     fn render(&mut self, frame: &mut Frame, disp_area: Rect) {
-        let area = disp_area.inner(Margin { vertical: 1, horizontal: 2 });
-        Clear.render(area, frame.buffer_mut());
-
-        let block = Block::new()
-            .style(get_tui_theme().background)
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .border_style(get_tui_theme().menu_box)
-            .padding(Padding::new(2, 2, 1, 0))
-            .title_alignment(Alignment::Center)
-            .title(Span::styled(self.title.clone(), get_tui_theme().menu_box_title))
-            .title_bottom(HotkeyBar::for_id("icbsm_menu_keys").line());
-        block.render(area, frame.buffer_mut());
-
-        frame.buffer_mut().set_string(
-            area.x + 1,
-            area.y + 2,
-            "─".repeat((area.width as usize).saturating_sub(2)),
-            get_tui_theme().menu_box,
-        );
-
-        let width = self.menu.preferred_width();
-        let mut menu_area = area.inner(Margin {
-            vertical: 0,
-            horizontal: (area.width.saturating_sub(width)) / 2,
-        });
-        menu_area.y += 4;
-        menu_area.height = menu_area.height.saturating_sub(5);
-        self.menu.render(menu_area, frame, &mut self.state);
+        self.page.render(frame, disp_area);
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if key.code == KeyCode::Esc {
             return PageMessage::Close;
         }
-        if let Some(id) = self.menu.handle_key_press(key, &mut self.state)
-            && let Some(page) = (self.open)(*id)
+        let (_, selected) = self.page.handle_key_press(key);
+        if let Some(id) = selected
+            && let Some(page) = (self.open)(id)
         {
             return PageMessage::OpenSubPage(page);
         }
@@ -220,7 +193,7 @@ impl Page for SortPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(Span::styled(get_text("icbsm_sort_run_title"), get_tui_theme().dialog_box_title))
+            .title(frame_title(get_text("icbsm_sort_run_title"), get_tui_theme().dialog_box_title))
             .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))
@@ -250,5 +223,29 @@ impl Page for SortPage {
             }
             _ => PageMessage::None,
         }
+    }
+}
+
+#[cfg(test)]
+mod rendering_tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn row_text(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[test]
+    fn nested_menu_uses_setup_title_height_and_footer() {
+        let mut page = MenuPage::new("User maintenance".into(), vec![MenuItem::new(0, 'A', "Edit users".into())], Box::new(|_| None));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| page.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+
+        assert!(!row_text(buffer, 1).contains("User maintenance"));
+        assert!(row_text(buffer, 2).contains("User maintenance"));
+        assert_eq!(row_text(buffer, 3).chars().filter(|ch| *ch == '─').count(), 76);
+        assert!(row_text(buffer, 5).contains("Edit users"));
+        assert!(row_text(buffer, 24).contains(&HotkeyBar::for_id("icbsm_menu_keys").line().to_string()));
     }
 }

@@ -23,6 +23,7 @@ pub struct IcbSetupMenuUI {
     left_title: Option<String>,
     center_title: Option<String>,
     right_title: Option<String>,
+    footer_id: &'static str,
 }
 
 #[cfg(test)]
@@ -98,6 +99,7 @@ impl IcbSetupMenuUI {
             left_title: None,
             center_title: None,
             right_title: None,
+            footer_id: "icb_setup_key_menu_help",
         }
     }
 
@@ -131,7 +133,7 @@ impl IcbSetupMenuUI {
             .border_style(get_tui_theme().menu_box)
             .title_alignment(ratatui::layout::Alignment::Center);
         if self.sub_pages.is_empty() {
-            block = block.title_bottom(HotkeyBar::for_id("icb_setup_key_menu_help").line());
+            block = block.title_bottom(HotkeyBar::for_id(self.footer_id).line());
         }
         block.render(disp_area, frame.buffer_mut());
 
@@ -210,6 +212,10 @@ impl IcbSetupMenuUI {
     }
     pub fn with_right_title(mut self, right_title: String) -> Self {
         self.right_title = Some(right_title);
+        self
+    }
+    pub fn with_footer(mut self, footer_id: &'static str) -> Self {
+        self.footer_id = footer_id;
         self
     }
 

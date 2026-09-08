@@ -18,6 +18,7 @@ pub(crate) use list::EditorList;
 use std::path::Path;
 
 use icy_board_tui::{
+    chrome::frame_title,
     config_menu::{ConfigMenu, ConfigMenuState, ListValue},
     get_text_args,
     tab_page::{InfoState, PageMessage},
@@ -25,7 +26,6 @@ use icy_board_tui::{
 };
 use ratatui::{
     layout::Alignment,
-    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Padding},
 };
 
@@ -33,7 +33,7 @@ use ratatui::{
 pub(crate) fn list_frame(title: String) -> Block<'static> {
     Block::new()
         .title_alignment(Alignment::Center)
-        .title(Line::from(Span::from(format!(" {title} ")).style(get_tui_theme().dialog_box_title)))
+        .title(frame_title(title, get_tui_theme().dialog_box_title))
         .style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 1))
         .borders(Borders::ALL)
@@ -44,7 +44,7 @@ pub(crate) fn list_frame(title: String) -> Block<'static> {
 pub(crate) fn popup_frame(title: String) -> Block<'static> {
     Block::new()
         .title_alignment(Alignment::Center)
-        .title(Line::from(Span::from(format!(" {title} ")).style(get_tui_theme().dialog_box_title)))
+        .title(frame_title(title, get_tui_theme().dialog_box_title))
         .style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 1))
         .borders(Borders::ALL)

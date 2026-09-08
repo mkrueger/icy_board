@@ -9,6 +9,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::frame_title,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     hotkeys::HotkeyBar,
@@ -18,7 +19,7 @@ use icy_board_tui::{
 use ratatui::{
     Frame,
     layout::{Alignment, Margin, Rect},
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{Block, Borders, Clear, Padding, Paragraph, Widget, Wrap},
 };
 use std::collections::HashMap;
@@ -694,7 +695,7 @@ impl MaintenancePage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(Span::styled(title, get_tui_theme().dialog_box_title))
+            .title(frame_title(title, get_tui_theme().dialog_box_title))
             .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))
@@ -728,7 +729,7 @@ impl Page for MaintenancePage {
                     .border_style(get_tui_theme().dialog_box)
                     .padding(Padding::new(2, 2, 1, 0))
                     .title_alignment(Alignment::Center)
-                    .title(Span::styled(self.op.title(), get_tui_theme().dialog_box_title))
+                    .title(frame_title(self.op.title(), get_tui_theme().dialog_box_title))
                     .title_bottom(HotkeyBar::for_id("icbsm_criteria_keys").line());
                 block.render(area, frame.buffer_mut());
 
@@ -904,7 +905,7 @@ impl Page for UndoPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(Span::styled(get_text("icbsm_undo_title"), get_tui_theme().dialog_box_title))
+            .title(frame_title(get_text("icbsm_undo_title"), get_tui_theme().dialog_box_title))
             .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))

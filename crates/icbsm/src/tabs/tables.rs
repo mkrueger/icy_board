@@ -8,7 +8,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    chrome::dim_background,
+    chrome::{dim_background, frame_title},
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     hotkeys::HotkeyBar,
@@ -19,7 +19,7 @@ use icy_board_tui::{
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Margin, Rect},
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{Block, Borders, Clear, Padding, Paragraph, Widget, Wrap},
 };
 use std::collections::HashMap;
@@ -202,7 +202,7 @@ impl Page for TableEditPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(Span::styled(edit_title(self.kind), get_tui_theme().dialog_box_title))
+            .title(frame_title(edit_title(self.kind), get_tui_theme().dialog_box_title))
             .title_bottom(HotkeyBar::for_id("icbsm_table_keys").line());
         block.render(area, frame.buffer_mut());
 
@@ -384,7 +384,7 @@ fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: &str, lines:
         .border_style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 0))
         .title_alignment(Alignment::Center)
-        .title(Span::styled(title, get_tui_theme().dialog_box_title))
+        .title(frame_title(title, get_tui_theme().dialog_box_title))
         .title_bottom(HotkeyBar::for_id(bottom).line());
 
     Paragraph::new(Text::from(lines))

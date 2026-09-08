@@ -6,19 +6,13 @@ use icy_board_engine::icy_board::{
     user_base::{ChatStatus, FSEMode, Password, User},
 };
 use icy_board_tui::{
-    BORDER_SET,
     chrome::{dim_background, dirty_title},
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     hotkeys::HotkeyBar,
+    icbconfigmenu::render_config_menu_frame,
     save_changes_dialog::SaveChangesDialog,
     tab_page::{InfoState, Page, PageMessage},
-    theme::get_tui_theme,
-};
-use ratatui::{
-    layout::Rect,
-    text::Span,
-    widgets::{Block, Borders, Padding, Widget},
 };
 use std::sync::{Arc, Mutex};
 
@@ -494,6 +488,7 @@ impl UserEditor {
                 obj: Arc::new(Mutex::new(user)),
                 entry,
             }
+            .with_fitted_labels()
         };
         Self {
             security_baseline,
@@ -508,35 +503,10 @@ impl UserEditor {
 
 impl Page for UserEditor {
     fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
-        let area = Rect {
-            x: disp_area.x + 1,
-            y: disp_area.y,
-            width: disp_area.width.saturating_sub(2),
-            height: disp_area.height,
-        };
-
         let dirty = *self.menu.obj.lock().unwrap() != self.icy_board.lock().unwrap().users[self.num_user];
         let title = dirty_title(format!("{} #{}", get_text("icbsm_menu_edit_users"), self.num_user + 1), dirty);
-
-        let mut block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .title(Span::styled(title, get_tui_theme().dialog_box_title))
-            .border_style(get_tui_theme().dialog_box);
-        if self.save_dialog.is_none() {
-            block = block.title_bottom(HotkeyBar::for_id("icb_setup_key_menu_help").line());
-        }
-        block.render(area, frame.buffer_mut());
-
-        let area = Rect {
-            x: disp_area.x + 3,
-            y: area.y + 1,
-            width: disp_area.width.saturating_sub(3),
-            height: area.height.saturating_sub(2),
-        };
+        let footer = self.save_dialog.is_none().then(|| HotkeyBar::for_id("icb_setup_key_menu_help").line());
+        let area = render_config_menu_frame(frame, disp_area, &title, footer);
         self.menu.render(area, frame, &mut self.state);
         if let Some(save_changes) = &self.save_dialog {
             let backdrop = frame.area();
@@ -623,13 +593,26 @@ mod rendering_tests {
         let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
         terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
         let clean_title = format!("{} #1", get_text("icbsm_menu_edit_users"));
-        assert!(row_text(terminal.backend().buffer(), 0).contains(&clean_title));
-        assert!(!row_text(terminal.backend().buffer(), 0).contains('*'));
+        assert!(!row_text(terminal.backend().buffer(), 1).contains(&clean_title));
+        assert!(row_text(terminal.backend().buffer(), 2).contains(&clean_title));
+        assert_eq!(row_text(terminal.backend().buffer(), 3).chars().filter(|ch| *ch == '─').count(), 76);
+        assert!(!row_text(terminal.backend().buffer(), 2).contains('*'));
+        let visible = (0..25).map(|y| row_text(terminal.backend().buffer(), y)).collect::<Vec<_>>().join("\n");
+        for label in [
+            "user_editor_security",
+            "user_editor_bus_phone",
+            "user_editor_home_phone",
+            "user_editor_use_short_filedescr",
+            "user_editor_wide_editor",
+        ] {
+            let label = get_text(label);
+            assert!(visible.contains(&label), "clipped label: {label}");
+        }
         assert!(row_text(terminal.backend().buffer(), 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_help").line().to_string()));
 
         editor.menu.obj.lock().unwrap().sysop_comment = "Unsaved draft".into();
         terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
-        assert!(row_text(terminal.backend().buffer(), 0).contains(&format!("{clean_title} *")));
+        assert!(row_text(terminal.backend().buffer(), 2).contains(&format!("{clean_title} *")));
         let mut expected = terminal.backend().buffer().clone();
         let area = expected.area;
         dim_background(&mut expected, area);

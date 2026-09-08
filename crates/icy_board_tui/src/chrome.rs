@@ -5,7 +5,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier},
+    style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, Widget},
 };
@@ -18,6 +18,11 @@ pub fn dirty_title(title: impl Into<String>, dirty: bool) -> String {
         title.push_str(" *");
     }
     title
+}
+
+/// Keep text away from the border on every titled frame.
+pub fn frame_title(title: impl Into<String>, style: Style) -> Line<'static> {
+    Line::styled(format!(" {} ", title.into()), style)
 }
 
 /// Only the content recedes: the surface keeps its colour, highlights go grey.
@@ -106,5 +111,6 @@ mod tests {
         assert_eq!(buf[(7, 1)].bg, Color::Reset);
         assert_eq!(dirty_title("Editor", true), "Editor *");
         assert_eq!(dirty_title("Editor", false), "Editor");
+        assert_eq!(frame_title("Editor", get_tui_theme().dialog_box_title).to_string(), " Editor ");
     }
 }

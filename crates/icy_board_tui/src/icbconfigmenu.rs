@@ -23,6 +23,55 @@ pub struct ICBConfigMenuUI {
     menu: ConfigMenu<Arc<Mutex<IcyBoard>>>,
 }
 
+/// Paint the standard setup form chrome and return its content viewport.
+pub fn render_config_menu_frame(frame: &mut ratatui::Frame, disp_area: Rect, title: &str, footer: Option<Line<'static>>) -> Rect {
+    let area = Rect {
+        x: disp_area.x + 1,
+        y: disp_area.y + 1,
+        width: disp_area.width.saturating_sub(2),
+        height: disp_area.height.saturating_sub(1),
+    };
+    let mut block: Block<'_> = Block::new()
+        .style(get_tui_theme().background)
+        .padding(Padding::new(2, 2, 5, 0))
+        .borders(Borders::ALL)
+        .border_set(BORDER_SET)
+        .title_alignment(ratatui::layout::Alignment::Center)
+        .border_style(get_tui_theme().dialog_box);
+    if let Some(footer) = footer {
+        block = block.title_bottom(footer);
+    }
+    block.render(area, frame.buffer_mut());
+
+    let title_area = area.inner(Margin { horizontal: 1, vertical: 1 });
+    let width = Line::raw(title).width().min(title_area.width as usize) as u16;
+    Line::raw(title).style(get_tui_theme().dialog_box_title).render(
+        Rect {
+            x: (area.x + 1 + area.width.saturating_sub(width) / 2).min(title_area.right().saturating_sub(width)),
+            y: title_area.y,
+            width,
+            height: title_area.height.min(1),
+        },
+        frame.buffer_mut(),
+    );
+
+    if area.height > 3 && area.width > 2 {
+        frame.buffer_mut().set_string(
+            area.x + 1,
+            area.y + 2,
+            "─".repeat((area.width as usize).saturating_sub(2)),
+            get_tui_theme().dialog_box,
+        );
+    }
+
+    Rect {
+        x: disp_area.x + 3,
+        y: area.y + 3,
+        width: disp_area.width.saturating_sub(5),
+        height: area.height.saturating_sub(4),
+    }
+}
+
 impl ICBConfigMenuUI {
     pub fn new(title: String, menu: ConfigMenu<Arc<Mutex<IcyBoard>>>) -> Self {
         let mut state = ConfigMenuState::default();
@@ -31,12 +80,6 @@ impl ICBConfigMenuUI {
     }
 
     pub fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
-        let area = Rect {
-            x: disp_area.x + 1,
-            y: disp_area.y + 1,
-            width: disp_area.width.saturating_sub(2),
-            height: disp_area.height.saturating_sub(1),
-        };
         let mut preset_id = "icb_setup_key_menu_help";
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
@@ -55,52 +98,13 @@ impl ICBConfigMenuUI {
             }
         }
 
-        let mut block: Block<'_> = Block::new()
-            .style(get_tui_theme().background)
-            .padding(Padding::new(2, 2, 1 + 4, 0))
-            .borders(Borders::ALL)
-            .border_set(BORDER_SET)
-            // A settings page is not a menu, so it keeps the outer box colour.
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .border_style(get_tui_theme().dialog_box);
         let modal = self.state.is_path_browser_open()
             || self
                 .menu
                 .get_item(self.state.selected)
                 .is_some_and(|item| matches!(&item.value, ListValue::ComboBox(combo) if combo.is_edit_open));
-        if !modal {
-            block = block.title_bottom(HotkeyBar::for_id(preset_id).line());
-        }
-        block.render(area, frame.buffer_mut());
-
-        let title_area = area.inner(Margin { horizontal: 1, vertical: 1 });
-        let width = Line::raw(&self.title).width().min(title_area.width as usize) as u16;
-        Line::raw(&self.title).style(get_tui_theme().dialog_box_title).render(
-            Rect {
-                x: (area.x + 1 + area.width.saturating_sub(width) / 2).min(title_area.right().saturating_sub(width)),
-                y: title_area.y,
-                width,
-                height: title_area.height.min(1),
-            },
-            frame.buffer_mut(),
-        );
-
-        if area.height > 3 && area.width > 2 {
-            frame.buffer_mut().set_string(
-                area.x + 1,
-                area.y + 2,
-                "─".repeat((area.width as usize).saturating_sub(2)),
-                get_tui_theme().dialog_box,
-            );
-        }
-
-        let area = Rect {
-            x: disp_area.x + 3,
-            y: area.y + 3,
-            // Keep the menu's clearing pass and scrollbar inside the border.
-            width: disp_area.width.saturating_sub(5),
-            height: area.height.saturating_sub(4),
-        };
+        let footer = (!modal).then(|| HotkeyBar::for_id(preset_id).line());
+        let area = render_config_menu_frame(frame, disp_area, &self.title, footer);
         if area.width > 0 && area.height > 0 {
             self.menu.render(area, frame, &mut self.state);
         }

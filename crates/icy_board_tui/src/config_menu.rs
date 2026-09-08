@@ -1182,6 +1182,46 @@ impl<T> ConfigMenu<T> {
         self
     }
 
+    /// Align every sibling group to its longest translated label. Tables are
+    /// measured per column so a long label can use available horizontal space
+    /// without shifting unrelated columns or being clipped.
+    pub fn with_fitted_labels(mut self) -> Self {
+        fn fit<T>(entries: &mut [ConfigEntry<T>]) {
+            let width = entries
+                .iter()
+                .filter_map(|entry| match entry {
+                    ConfigEntry::Item(item) => Some(item.label_width.max(ratatui::text::Line::raw(&item.title).width() as u16)),
+                    _ => None,
+                })
+                .max()
+                .unwrap_or(0);
+            for entry in entries.iter_mut() {
+                match entry {
+                    ConfigEntry::Item(item) => item.label_width = width,
+                    ConfigEntry::Group(_, items) => fit(items),
+                    ConfigEntry::Table(cols, items) => {
+                        let cols = (*cols).max(1);
+                        let mut widths = vec![0; cols];
+                        for (index, entry) in items.iter().enumerate() {
+                            if let ConfigEntry::Item(item) = entry {
+                                widths[index % cols] = widths[index % cols].max(item.label_width.max(ratatui::text::Line::raw(&item.title).width() as u16));
+                            }
+                        }
+                        for (index, entry) in items.iter_mut().enumerate() {
+                            if let ConfigEntry::Item(item) = entry {
+                                item.label_width = widths[index % cols];
+                            }
+                        }
+                    }
+                    ConfigEntry::Label(_) | ConfigEntry::Separator => {}
+                }
+            }
+        }
+
+        fit(&mut self.entry);
+        self
+    }
+
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
         if let Some(browser) = &state.path_browser {
             browser.render(area, frame);

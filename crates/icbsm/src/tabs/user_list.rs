@@ -6,7 +6,7 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::user_base::UserBase;
-use icy_board_tui::chrome::{dim_background, dirty_title};
+use icy_board_tui::chrome::{dim_background, dirty_title, frame_title};
 use icy_board_tui::hotkeys::{Hotkey, HotkeyBar};
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
 use icy_board_tui::save_changes_dialog::SaveChangesMessage;
@@ -423,7 +423,7 @@ impl Page for UserList {
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double)
-            .title(Span::styled(title, get_tui_theme().dialog_box_title));
+            .title(frame_title(title, get_tui_theme().dialog_box_title));
         if let Some(summary) = self.selection_summary(summary_width) {
             block = block.title(summary);
         }
@@ -537,6 +537,7 @@ mod rendering_tests {
         let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
         terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
         let buffer = terminal.backend().buffer();
+        assert!(row_text(buffer, 1).contains(&format!(" {} ", get_text("icbsm_menu_edit_users"))));
         assert!(row_text(buffer, 4).contains("Alice"));
         assert!(row_text(buffer, 5).contains("Bob"));
         // The first record stays on the original first data row; the summary

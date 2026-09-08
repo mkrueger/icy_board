@@ -7,7 +7,7 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::group_list::Group;
 use icy_board_engine::icy_board::group_list::GroupList;
-use icy_board_tui::chrome::{dim_background, dirty_title};
+use icy_board_tui::chrome::{dim_background, dirty_title, frame_title};
 use icy_board_tui::config_menu::ConfigEntry;
 use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
@@ -25,7 +25,7 @@ use ratatui::widgets::Padding;
 use ratatui::{
     Frame,
     layout::{Constraint, Margin, Rect},
-    text::{Span, Text},
+    text::Text,
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
 };
 
@@ -243,7 +243,7 @@ impl Page for GroupEditor {
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double)
-            .title(Span::styled(get_text("icbsm_menu_groups"), get_tui_theme().dialog_box_title));
+            .title(frame_title(get_text("icbsm_menu_groups"), get_tui_theme().dialog_box_title));
         if !self.in_edit_mode {
             block = block.title_bottom(HotkeyBar::for_id("icbsm_menu_keys").line());
         }
@@ -275,10 +275,7 @@ impl Page for GroupEditor {
                 .style(get_tui_theme().dialog_box)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double)
-                .title(Span::styled(
-                    dirty_title(get_text("icbsm_menu_groups"), dirty),
-                    get_tui_theme().dialog_box_title,
-                ))
+                .title(frame_title(dirty_title(get_text("icbsm_menu_groups"), dirty), get_tui_theme().dialog_box_title))
                 .title_bottom(HotkeyBar::for_id("icbsm_group_edit_keys").line())
                 .render(popup, frame.buffer_mut());
             self.render_editor(frame, popup);
