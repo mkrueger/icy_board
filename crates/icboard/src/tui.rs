@@ -1182,7 +1182,7 @@ fn init_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
 }
 
 pub fn print_exit_screen() {
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout())).unwrap();
+    let mut terminal = Terminal::new(icy_board_tui::term::IcyBoardBackend::new(stdout())).unwrap();
     stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
     terminal
         .draw(|frame| {
