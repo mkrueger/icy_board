@@ -270,6 +270,10 @@ impl IcyBoardState {
             self.exit_menus = false;
             return Ok(());
         }
+        if file.is_file() {
+            // PCBoard displaymenu() counts the separating blank before resetting the page.
+            self.new_line().await?;
+        }
         self.session.disp_options.no_change();
         self.display_file_with_error(&file, false).await?;
         Ok(())

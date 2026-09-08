@@ -78,6 +78,9 @@ fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed
 mod edit_key_tests;
 
 #[cfg(test)]
+mod paging_tests;
+
+#[cfg(test)]
 mod option_tests {
     use super::{Duration, keyboard_timeout_elapsed};
 
@@ -164,7 +167,6 @@ impl DisplayOptions {
     }
     pub fn force_non_stop(&mut self) {
         self.count_lines = false;
-        self.num_lines_printed = 0;
     }
 
     pub fn no_change(&mut self) {
@@ -1209,22 +1211,28 @@ impl IcyBoardState {
         Ok(())
     }
 
+    pub(crate) fn page_line_limit(&self) -> Option<usize> {
+        if self.session.page_len == 0 {
+            return None;
+        }
+        // PCBoard checkpagelen(): reserve the local prompt row, not the remote status rows.
+        let limit = if self.session.is_local {
+            self.session.page_len.min(self.session.term_caps.term_size.1.saturating_sub(1).max(1))
+        } else {
+            self.session.page_len
+        };
+        Some(usize::from(limit))
+    }
+
     #[async_recursion(?Send)]
     async fn next_line(&mut self) -> Res<()> {
-        if self.session.disp_options.count_lines {
-            self.session.disp_options.num_lines_printed += 1;
+        if self.session.disp_options.abort_printout || !self.session.disp_options.count_lines {
+            return Ok(());
         }
-        if self.session.page_len > 0 && self.session.disp_options.num_lines_printed > self.session.page_len as usize {
-            if self.session.disp_options.abort_printout {
-                return Ok(());
-            }
-            if !self.session.disp_options.count_lines {
-                self.session.more_requested = true;
-                return Ok(());
-            }
-            if let Err(err) = self.more_promt().await {
-                log::error!("Error in more prompt: {err}");
-            }
+        self.session.disp_options.num_lines_printed += 1;
+        // The stored user length includes the line that triggers the pause.
+        if self.page_line_limit().is_some_and(|limit| self.session.disp_options.num_lines_printed >= limit) {
+            self.more_promt().await?;
         }
         Ok(())
     }
@@ -4264,20 +4272,40 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
-        if self.session.request_logoff {
+        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
             return Ok(());
         }
+        if !self.session.disp_options.allow_break {
+            return self.press_enter().await;
+        }
+        let user_color = self.user_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
+        let sysop_color = self.sysop_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
+        let result = self.more_prompt_input().await;
+        self.restore_prompt_colors(user_color, sysop_color).await?;
+        result
+    }
+
+    async fn restore_prompt_colors(&mut self, user: u8, sysop: u8) -> Res<()> {
+        if user == sysop {
+            return self.set_color(TerminalTarget::Both, IcbColor::Dos(user)).await;
+        }
+        self.set_color(TerminalTarget::User, IcbColor::Dos(user)).await?;
+        self.set_color(TerminalTarget::Sysop, IcbColor::Dos(sysop)).await
+    }
+
+    async fn more_prompt_input(&mut self) -> Res<()> {
         if self.session.disp_options.in_file_list.is_some() {
             self.filebase_more().await?;
             return Ok(());
         }
 
+        let mask = format!("{}HhSs", self.session.yes_no_mask);
         loop {
             let result = self
                 .input_field(
                     IceText::MorePrompt,
-                    12,
-                    "YyNnHhSs",
+                    3,
+                    &mask,
                     "HLPMORE",
                     None,
                     display_flags::UPCASE | display_flags::STACKED | display_flags::ERASELINE,
@@ -4285,14 +4313,16 @@ impl IcyBoardState {
                 .await?;
             self.session.disp_options.no_change();
             match result.as_str() {
-                "Y" | "" => {
+                "" => {
                     return Ok(());
                 }
                 "NS" => {
+                    self.session.disp_options.non_stop_during_cmd = true;
                     self.session.disp_options.force_non_stop();
                     return Ok(());
                 }
-                "N" => {
+                answer if answer == self.session.yes_char.to_string() => return Ok(()),
+                answer if answer == self.session.no_char.to_string() => {
                     self.session.disp_options.abort_printout = true;
                     return Ok(());
                 }
@@ -4303,13 +4333,25 @@ impl IcyBoardState {
 
     pub async fn press_enter(&mut self) -> Res<()> {
         self.session.more_requested = false;
-        self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await?;
-        Ok(())
+        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
+            return Ok(());
+        }
+        let user_color = self.user_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
+        let sysop_color = self.sysop_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
+        // PRESSENTER is not a stacked field; pending command arguments cannot dismiss it.
+        let tokens = std::mem::take(&mut self.session.tokens);
+        let result = self.input_field(IceText::PressEnter, 0, "", "", None, display_flags::ERASELINE).await;
+        self.session.tokens = tokens;
+        self.restore_prompt_colors(user_color, sysop_color).await?;
+        result.map(|_| ())
     }
 
     /// `PCBoard` counted a line here and nowhere else, so a PPE drawing its own screen with
     /// PRINT and cursor positioning never ran into a MORE prompt. See `newline()` in DISPLAY.C.
     pub async fn new_line(&mut self) -> Res<()> {
+        if self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
+            return Ok(());
+        }
         self.write_chars(TerminalTarget::Both, &['\r', '\n']).await?;
         self.next_line().await
     }

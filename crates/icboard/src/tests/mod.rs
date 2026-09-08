@@ -60,6 +60,7 @@ mod command_actions;
 mod display_file;
 mod generated_help;
 mod login_options;
+mod paging;
 mod session_recovery;
 mod statistics;
 mod subscriptions;

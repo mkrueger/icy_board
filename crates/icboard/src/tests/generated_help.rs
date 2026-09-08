@@ -4,6 +4,7 @@ use icy_board_engine::icy_board::{
     IcyBoard,
     bbs::BBS,
     commands::{CommandList, CommandType},
+    icb_text::DEFAULT_DISPLAY_TEXT,
     state::{GraphicsMode, IcyBoardState},
     user_base::User,
 };
@@ -62,12 +63,16 @@ async fn display(state: &mut IcyBoardState, connection: &mut ChannelConnection, 
 }
 
 fn screen(output: &str, width: i32) -> TextScreen {
-    let mut screen = TextScreen::new((width, 25));
+    screen_at_size(output.as_bytes(), width, 25)
+}
+
+fn screen_at_size(output: &[u8], width: i32, height: i32) -> TextScreen {
+    let mut screen = TextScreen::new((width, height));
     screen.buffer.buffer_type = BufferType::Unicode;
     screen.buffer.terminal_state.is_terminal_buffer = true;
     // VT terminals defer last-column wrapping until another printable character.
     screen.buffer.terminal_state.last_column_flag_mode = true;
-    AnsiParser::default().parse(output.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+    AnsiParser::default().parse(output, &mut icy_engine::ScreenSink::new(&mut screen));
     screen
 }
 
@@ -81,6 +86,163 @@ fn assert_cells(screen: &TextScreen, y: i32, expected: &str, attr: u8) {
         assert_eq!(cell.ch, ch, "character at {x},{y}");
         assert_eq!(cell.attribute.as_u8(IceMode::Blink), attr, "attribute at {x},{y}");
     }
+}
+
+async fn paged_generated_english_e(language: &str, local: bool, page_len: u16) {
+    const MORE: &str = ", (H)elp, More? ";
+    const ENTER: &str = "Press (Enter) to continue? ";
+    const DONE: &str = "[generated-help-done]";
+
+    let directory = tempfile::tempdir().unwrap();
+    let source = include_str!("../../../icy_board_help/data/en/hlpe.md");
+    let options = RenderOptions::default();
+    let document = icy_board_help::document::compile(source, options.width, &options.theme).unwrap();
+    std::fs::write(
+        directory.path().join(catalog::output_name("hlpe", "").unwrap()),
+        render(source, &options).unwrap().bytes,
+    )
+    .unwrap();
+    let (mut state, mut connection) = display_state(directory.path(), GraphicsMode::Graphics).await;
+    state.session.language = language.to_string();
+    state.session.is_local = local;
+    let height = if local { 23 } else { 25 };
+    state.set_terminal_size(80, height);
+    state.session.page_len = page_len;
+    state.session.current_user.as_mut().unwrap().page_len = page_len;
+    state.get_board().await.users[0].page_len = page_len;
+    state.display_text = DEFAULT_DISPLAY_TEXT.clone();
+    state.session.disp_options.count_lines = false;
+    state.session.tokens.push_back("E".to_string());
+    assert!(drain(&mut connection).await.is_empty());
+
+    let limit = if page_len == 0 { None } else { Some(if local { 22 } else { 23 }) };
+    let line_count = document.lines.len();
+    assert!(line_count > 46, "the shipped E source must exercise resumed pages");
+    let more_count = limit.map_or(0, |limit| line_count / limit);
+    let remainder = limit.map_or(line_count, |limit| line_count % limit);
+
+    let server = async {
+        state.show_help_cmd().await.unwrap();
+        assert!(state.session.tokens.is_empty(), "E must be consumed by the command dispatcher");
+        assert!(state.display_current_menu);
+        assert!(!state.session.disp_options.count_lines, "help must restore the caller's paging mode");
+        assert_eq!(state.session.disp_options.num_lines_printed, remainder);
+        assert!(!state.session.disp_options.abort_printout);
+        // show_help_cmd does not own the main loop's end-of-command pause.
+        state.press_enter().await.unwrap();
+        assert_eq!(state.session.disp_options.num_lines_printed, 0);
+        state.write_raw(TerminalTarget::User, &"RESET".chars().collect::<Vec<_>>()).await.unwrap();
+        state.connection.send(DONE.as_bytes()).await.unwrap();
+    };
+    let client = async {
+        let mut output = Vec::new();
+        let mut consumed = 0;
+        let mut stops = Vec::new();
+        loop {
+            let next = [MORE, ENTER, DONE]
+                .into_iter()
+                .filter_map(|marker| {
+                    output[consumed..]
+                        .windows(marker.len())
+                        .position(|bytes| bytes == marker.as_bytes())
+                        .map(|offset| (consumed + offset, marker))
+                })
+                .min_by_key(|(offset, _)| *offset);
+            if let Some((offset, marker)) = next {
+                let expected = if stops.len() < more_count {
+                    MORE
+                } else if stops.len() == more_count {
+                    ENTER
+                } else {
+                    DONE
+                };
+                assert_eq!(marker, expected, "unexpected help pause: {:?}", String::from_utf8_lossy(&output));
+                consumed = offset + marker.len();
+                if marker == DONE {
+                    output.truncate(offset);
+                    return (output, stops);
+                }
+                stops.push(consumed);
+                connection.send(b"\r").await.unwrap();
+            } else {
+                let mut packet = [0; 4096];
+                let size = connection.read(&mut packet).await.unwrap();
+                assert_ne!(size, 0, "EOF before help completed: {:?}", String::from_utf8_lossy(&output));
+                output.extend_from_slice(&packet[..size]);
+            }
+        }
+    };
+    // Own both futures so a timeout or assertion cancels the session with its reader.
+    let (_, (output, stops)) = tokio::time::timeout(Duration::from_secs(10), async { tokio::join!(server, client) })
+        .await
+        .unwrap_or_else(|_| panic!("generated E paging timed out: language={language:?}, local={local}, page_len={page_len}"));
+
+    for (page, end) in stops.into_iter().enumerate() {
+        let completed = if page < more_count { (page + 1) * limit.unwrap() } else { line_count };
+        let raw = &output[..end];
+        assert_eq!(
+            raw.iter().filter(|&&byte| byte == b'\n').count(),
+            completed,
+            "page {page}: counted terminal rows"
+        );
+        let terminal = screen_at_size(raw, 80, i32::from(height));
+        let prompt_y = completed.min(usize::from(height) - 1);
+        for y in 0..prompt_y {
+            let line = &document.lines[completed - prompt_y + y];
+            assert_eq!(
+                row(&terminal, y as i32, 80),
+                line.plain_text(),
+                "language={language:?}, local={local}, page={page}, row={y}"
+            );
+            let mut x = 0;
+            for span in &line.spans {
+                for ch in span.text.chars() {
+                    let cell = terminal.char_at((x, y as i32).into());
+                    assert_eq!(cell.ch, ch);
+                    assert_eq!(
+                        cell.attribute.as_u8(IceMode::Blink),
+                        options.theme.attribute(span.role),
+                        "page={page}, cell={x},{y}"
+                    );
+                    x += 1;
+                }
+            }
+        }
+        let prompt = row(&terminal, prompt_y as i32, 80);
+        if page < more_count {
+            assert!(
+                prompt.starts_with('(') && prompt.contains(" min left)") && prompt.ends_with(MORE.trim_end()),
+                "{prompt:?}"
+            );
+            assert_cells(&terminal, prompt_y as i32, &prompt, 0x0E);
+        } else {
+            assert_eq!(prompt, ENTER.trim_end());
+            assert_cells(&terminal, prompt_y as i32, &prompt, 0x0A);
+        }
+        for y in prompt_y + 1..usize::from(height) {
+            assert_eq!(row(&terminal, y as i32, 80), "", "prompt must not use the reserved remote row");
+        }
+        if page == 0 && page_len != 0 {
+            assert_eq!(prompt_y, if local { 22 } else { 23 });
+            assert_cells(&terminal, 0, "Help: (E)nter A Message", options.theme.title);
+            assert_cells(&terminal, 1, &"=".repeat(options.width), options.theme.border);
+        }
+    }
+    let terminal = screen_at_size(&output, 80, i32::from(height));
+    assert_eq!(row(&terminal, i32::from(height) - 1, 80), "RESET", "final prompt must be erased");
+    assert_cells(&terminal, i32::from(height) - 1, "RESET", 0x07);
+}
+
+#[tokio::test]
+async fn generated_english_e_preserves_first_page_geometry_and_resumed_colors() {
+    for local in [true, false] {
+        paged_generated_english_e("en", local, 23).await;
+    }
+}
+
+#[tokio::test]
+async fn generated_english_e_local_page_zero_skips_more_but_can_pause_at_end() {
+    paged_generated_english_e("en", true, 0).await;
 }
 
 #[tokio::test]

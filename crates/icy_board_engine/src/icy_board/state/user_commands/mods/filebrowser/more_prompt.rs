@@ -40,6 +40,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 "NS" => {
+                    self.session.disp_options.non_stop_during_cmd = true;
                     self.session.disp_options.force_non_stop();
                     return Ok(());
                 }

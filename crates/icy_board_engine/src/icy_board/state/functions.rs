@@ -374,7 +374,7 @@ impl IcyBoardState {
         }
 
         // .lines() not recognizes last empty line.
-        if converted_content.ends_with('\n') {
+        if converted_content.ends_with('\n') && !self.session.disp_options.abort_printout {
             self.new_line().await?;
         }
         Ok(())
@@ -410,7 +410,8 @@ impl IcyBoardState {
             return Ok(String::new());
         }
         self.session.default_answer.clone_from(&default_answer);
-        self.session.disp_options.no_change();
+        // INPUT.C resets the counter without changing a menu's POFF/nonstop mode.
+        self.session.disp_options.num_lines_printed = 0;
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
@@ -615,6 +616,8 @@ impl IcyBoardState {
     pub async fn show_help(&mut self, help: &str) -> Res<()> {
         // hardcoded help file.
         if help == "HLPMORE" || help == "HLPXFRMORE" {
+            let count_lines = self.session.disp_options.count_lines;
+            self.session.disp_options.no_change();
             self.display_text(IceText::MorehelpEnter, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             self.display_text(IceText::MorehelpYes, display_flags::NEWLINE).await?;
@@ -624,6 +627,8 @@ impl IcyBoardState {
                 self.display_text(IceText::MorehelpView, display_flags::NEWLINE).await?;
                 self.display_text(IceText::MorehelpFlag, display_flags::NEWLINE).await?;
             }
+            self.new_line().await?;
+            self.session.disp_options.count_lines = count_lines;
             return Ok(());
         }
 

@@ -86,6 +86,6 @@ fn test_cmd_j_abandon() {
     });
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n\u{1b}[1;32mTESTCONF (1) Joined\n\nPress (Enter) to continue? \u{1b}[0m\r\u{1b}[K\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) TESTCONF (1) Conference Command? \u{1b}[0mJ 0\n\n\u{1b}[1;36mTESTCONF (1) Abandoned\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n\u{1b}[1;32mTESTCONF (1) Joined\n\nPress (Enter) to continue? \u{1b}[0m\r\u{1b}[K\u{1b}[1;32m\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) TESTCONF (1) Conference Command? \u{1b}[0mJ 0\n\n\u{1b}[1;36mTESTCONF (1) Abandoned\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
     );
 }
