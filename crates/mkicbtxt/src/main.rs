@@ -26,6 +26,9 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 #[derive(Parser)]
 #[command(name = "mkicbtxt", disable_version_flag = true, about = icy_board_cli::text("mkicbtxt", "about"))]
 struct Cli {
@@ -105,12 +108,12 @@ mod cli_tests {
 fn main() -> Result<()> {
     // Preserve the legacy early version exit, even without the required file.
     if std::env::args().skip(1).any(|argument| argument == "--version") {
-        println!("mkicbtxt {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("mkicbtxt", &*VERSION, GIT_HASH));
         return Ok(());
     }
     let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
-        println!("mkicbtxt {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("mkicbtxt", &*VERSION, GIT_HASH));
         return Ok(());
     }
 

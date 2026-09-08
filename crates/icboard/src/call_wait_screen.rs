@@ -31,10 +31,7 @@ use ratatui::{
 
 use tokio::sync::Mutex;
 
-use crate::VERSION;
-
-/// Set by build.rs, empty when the binary was not built from a checkout.
-const GIT_HASH: &str = env!("ICBOARD_GIT_HASH");
+use crate::{GIT_HASH, VERSION};
 
 fn program_title(version: &str, hash: &str) -> String {
     if hash.is_empty() {

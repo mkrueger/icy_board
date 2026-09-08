@@ -110,6 +110,9 @@ mod cli_tests {
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
+
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
 /// evlevlelvelvelv`
 
 #[tokio::main]
@@ -125,7 +128,7 @@ async fn main() -> Res<()> {
         .await;
     }
     if arguments.version {
-        println!("icboard {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("icboard", &*VERSION, GIT_HASH));
         return Ok(());
     }
     let file = match icy_board_engine::resolve_icyboard_file(&arguments.file) {

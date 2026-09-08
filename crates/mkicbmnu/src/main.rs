@@ -25,6 +25,9 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 #[derive(Parser)]
 #[command(name = "mkicbmnu", disable_version_flag = true, about = icy_board_cli::text("mkicbmnu", "about"))]
 struct Cli {
@@ -59,7 +62,7 @@ mod cli_tests {
 fn main() -> Result<()> {
     let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
-        println!("mkicbmnu {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("mkicbmnu", &*VERSION, GIT_HASH));
         return Ok(());
     }
 

@@ -19,6 +19,7 @@ members = [
 	"crates/icbfile",
 	"crates/icbadmin",
 	"crates/tree-sitter-ppl",
+	"crates/icy_board_buildinfo",
 ]
 [workspace.package]
 version = "0.2.1"
@@ -30,6 +31,7 @@ codepages = { path = "crates/codepages" }
 dizbase = { path = "crates/dizbase" }
 jamjam = { git = "https://github.com/mkrueger/jamjam", branch = "main" }
 icy_board_tui = { path = "crates/icy_board_tui" }
+icy_board_buildinfo = { path = "crates/icy_board_buildinfo" }
 icy_board_cli = { path = "crates/icy_board_cli" }
 
 icy_net = { path = "crates/icy_net" }

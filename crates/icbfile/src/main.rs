@@ -25,6 +25,9 @@ use listing::{Entry, format_files_bbs, parse_files_bbs, parse_pcboard_dir};
 
 type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 #[derive(Parser)]
 #[command(name = "icbfile", about = text("icbfile", "about"), disable_version_flag = true)]
 struct Cli {
@@ -251,7 +254,7 @@ fn reset_sigpipe() {}
 
 fn run(cli: Cli) -> Res<()> {
     if cli.version {
-        println!("icbfile {}", env!("CARGO_PKG_VERSION"));
+        println!("{}", icy_board_cli::version_line("icbfile", env!("CARGO_PKG_VERSION"), GIT_HASH));
         return Ok(());
     }
     let Some(command) = cli.command else {

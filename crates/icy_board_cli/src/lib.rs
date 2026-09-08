@@ -170,6 +170,28 @@ pub fn parse<T: CommandFactory + FromArgMatches>() -> T {
     })
 }
 
+/// Format a `--version` line, appending the short git hash (from each tool's
+/// `build.rs`, via `icy_board_buildinfo`) when built from a checkout. A
+/// release tarball has no hash, so the plain "program version" line is kept.
+pub fn version_line(program: &str, version: impl std::fmt::Display, hash: &str) -> String {
+    if hash.is_empty() {
+        format!("{program} {version}")
+    } else {
+        format!("{program} {version} ({hash})")
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::version_line;
+
+    #[test]
+    fn hash_is_appended_only_when_present() {
+        assert_eq!(version_line("icboard", "0.2.1", "a1b2c3d"), "icboard 0.2.1 (a1b2c3d)");
+        assert_eq!(version_line("icboard", "0.2.1", ""), "icboard 0.2.1");
+    }
+}
+
 #[cfg(test)]
 mod localization_tests {
     use std::collections::BTreeSet;

@@ -4,6 +4,9 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
+[build-dependencies]
+icy_board_buildinfo = { workspace = true }
+
 [dependencies]
 codepages = { workspace = true }
 icy_engine = { workspace = true }

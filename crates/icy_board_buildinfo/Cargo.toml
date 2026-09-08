@@ -1,0 +1,5 @@
+[package]
+name = "icy_board_buildinfo"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true

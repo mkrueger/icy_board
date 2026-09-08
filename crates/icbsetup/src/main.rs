@@ -33,6 +33,9 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 #[derive(Parser)]
 #[command(name = "icbsetup", disable_version_flag = true, subcommand_precedence_over_arg = true, about = icy_board_cli::text("icbsetup", "about"))]
 struct Cli {
@@ -200,7 +203,7 @@ mod cli_tests {
 fn main() -> Result<()> {
     let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
-        println!("icbsetup {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("icbsetup", &*VERSION, GIT_HASH));
         return Ok(());
     }
 

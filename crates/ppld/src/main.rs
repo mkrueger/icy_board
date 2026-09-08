@@ -71,10 +71,13 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 fn main() {
     let arguments: Cli = icy_board_cli::parse();
     if arguments.version {
-        println!("ppld {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("ppld", &*VERSION, GIT_HASH));
         return;
     }
     // Keep the historical banner/report stream unless stdout was requested for source.

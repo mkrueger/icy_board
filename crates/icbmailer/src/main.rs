@@ -26,6 +26,9 @@ use icy_board_engine::{
 };
 use icy_net::binkp::{BinkpIdentity, PollRequest};
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 mod zconnect;
 
 #[cfg(test)]
@@ -188,7 +191,7 @@ struct Scan {
 async fn main() {
     let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
-        println!("icbmailer {}", env!("CARGO_PKG_VERSION"));
+        println!("{}", icy_board_cli::version_line("icbmailer", env!("CARGO_PKG_VERSION"), GIT_HASH));
         return;
     }
     let Some(command) = arguments.command else {

@@ -71,7 +71,10 @@ fn version_output_stays_manual_and_locale_independent() {
             let output = ppld(language).args(args).output().unwrap();
             assert!(output.status.success());
             assert!(output.stderr.is_empty());
-            assert_eq!(String::from_utf8(output.stdout).unwrap(), format!("ppld {}\n", env!("CARGO_PKG_VERSION")));
+            assert_eq!(
+                String::from_utf8(output.stdout).unwrap(),
+                format!("{}\n", icy_board_cli::version_line("ppld", env!("CARGO_PKG_VERSION"), env!("GIT_HASH")))
+            );
         }
     }
 }

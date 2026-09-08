@@ -58,6 +58,9 @@ fn cli_help_errors_and_version_are_localized() {
         assert!(stderr.contains(error) && stderr.contains("--unknown-option"), "{stderr}");
         let output = run(&["--version"]);
         assert!(output.status.success() && output.stderr.is_empty());
-        assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("icboard ", env!("CARGO_PKG_VERSION"), "\n"));
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            format!("{}\n", icy_board_cli::version_line("icboard", env!("CARGO_PKG_VERSION"), env!("GIT_HASH")))
+        );
     }
 }

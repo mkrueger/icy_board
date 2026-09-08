@@ -44,7 +44,10 @@ fn cli_help_errors_and_early_version_are_localized() {
         for args in [&["--version"][..], &["--unknown-option", "--version"], &["--", "--version"]] {
             let output = run(args);
             assert!(output.status.success() && output.stderr.is_empty());
-            assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("mkicbtxt ", env!("CARGO_PKG_VERSION"), "\n"));
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                format!("{}\n", icy_board_cli::version_line("mkicbtxt", env!("CARGO_PKG_VERSION"), env!("GIT_HASH")))
+            );
         }
     }
 }

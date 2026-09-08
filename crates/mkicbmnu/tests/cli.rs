@@ -46,7 +46,10 @@ fn cli_help_errors_version_and_no_arguments_keep_their_streams() {
         assert!(stderr.contains(error) && stderr.contains("--unknown-option"), "{stderr}");
         let output = run(&["--version"]);
         assert!(output.status.success() && output.stderr.is_empty());
-        assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("mkicbmnu ", env!("CARGO_PKG_VERSION"), "\n"));
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            format!("{}\n", icy_board_cli::version_line("mkicbmnu", env!("CARGO_PKG_VERSION"), env!("GIT_HASH")))
+        );
     }
 }
 

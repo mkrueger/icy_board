@@ -3810,6 +3810,7 @@ dependencies = [
  "clap",
  "codepages",
  "dizbase",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "libc",
@@ -3824,6 +3825,7 @@ dependencies = [
  "chrono",
  "clap",
  "fern",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_net",
@@ -3851,6 +3853,7 @@ dependencies = [
  "fern",
  "http",
  "icbadmin",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
@@ -3899,6 +3902,7 @@ dependencies = [
  "dizbase",
  "fastrand",
  "fern",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
@@ -3938,6 +3942,7 @@ dependencies = [
  "dizbase",
  "fastrand",
  "fern",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
@@ -4040,6 +4045,10 @@ dependencies = [
  "zerotrie",
  "zerovec",
 ]
+
+[[package]]
+name = "icy_board_buildinfo"
+version = "0.2.1"
 
 [[package]]
 name = "icy_board_cli"
@@ -5821,6 +5830,7 @@ dependencies = [
  "color-eyre",
  "crossterm 0.29.0",
  "fern",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
@@ -5846,6 +5856,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "crossterm 0.29.0",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
@@ -7511,6 +7522,7 @@ dependencies = [
  "codepages",
  "crossterm 0.29.0",
  "diff",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "icy_engine",
@@ -7532,6 +7544,7 @@ dependencies = [
  "clap",
  "codepages",
  "crossterm 0.29.0",
+ "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
  "lazy_static",

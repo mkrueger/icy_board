@@ -101,7 +101,10 @@ fn version_remains_manual_and_locale_independent() {
         let output = run(locale, &["--version"]);
         assert_eq!(output.status.code(), Some(0));
         assert!(output.stderr.is_empty());
-        assert_eq!(decoded(&output.stdout), format!("icbmailer {}\n", env!("CARGO_PKG_VERSION")));
+        assert_eq!(
+            decoded(&output.stdout),
+            format!("{}\n", icy_board_cli::version_line("icbmailer", env!("CARGO_PKG_VERSION"), env!("GIT_HASH")))
+        );
         let short = run(locale, &["-V"]);
         assert_eq!(short.status.code(), Some(1));
         assert!(short.stdout.is_empty());

@@ -95,6 +95,9 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("GIT_HASH");
+
 static COLOR: OnceLock<bool> = OnceLock::new();
 
 /// How many lines a file may have before `--check` stops showing the formatting difference line
@@ -160,7 +163,7 @@ fn main() {
     let arguments: Cli = icy_board_cli::parse();
     let _ = COLOR.set(decide_color(&arguments));
     if arguments.version {
-        println!("pplc {}", *VERSION);
+        println!("{}", icy_board_cli::version_line("pplc", &*VERSION, GIT_HASH));
         return;
     }
     if arguments.print_config && arguments.print_config_json {
