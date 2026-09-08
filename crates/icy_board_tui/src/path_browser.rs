@@ -8,31 +8,21 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::Style,
     widgets::{Block, Borders, Clear, FrameExt, Paragraph, Wrap},
 };
-use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Input, Theme};
+use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Input, Theme as ExplorerTheme};
 
-use crate::{
-    get_text,
-    theme::{DOS_BLACK, DOS_LIGHT_CYAN, DOS_WHITE, DOS_YELLOW},
-};
+use crate::{get_text, theme::get_tui_theme};
 
-// Explicit foreground AND background avoid inheriting the classic dialog's
-// dark blue text on black, including inside the explorer's own list block.
-const TEXT: Style = Style::new().fg(DOS_WHITE).bg(DOS_BLACK);
-const ACCENT: Style = Style::new().fg(DOS_LIGHT_CYAN).bg(DOS_BLACK);
-const NOTICE: Style = Style::new().fg(DOS_YELLOW).bg(DOS_BLACK);
-const SELECTED: Style = Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_CYAN);
-
-fn explorer_theme() -> Theme {
-    Theme::new()
-        .with_style(TEXT)
-        .with_block(Block::default().borders(Borders::ALL).style(TEXT).border_style(ACCENT))
-        .with_item_style(TEXT)
-        .with_dir_style(ACCENT)
-        .with_highlight_item_style(SELECTED)
-        .with_highlight_dir_style(SELECTED)
+fn explorer_theme() -> ExplorerTheme {
+    let theme = get_tui_theme();
+    ExplorerTheme::new()
+        .with_style(theme.dialog_box)
+        .with_block(Block::default().borders(Borders::ALL).style(theme.dialog_box).border_style(theme.dialog_box))
+        .with_item_style(theme.table)
+        .with_dir_style(theme.config_title)
+        .with_highlight_item_style(theme.selected_item)
+        .with_highlight_dir_style(theme.selected_item)
 }
 
 pub(crate) enum PathBrowserResult {
@@ -155,13 +145,14 @@ impl PathBrowser {
     }
 
     pub(crate) fn render(&self, area: Rect, frame: &mut Frame) {
+        let theme = get_tui_theme();
         frame.render_widget(Clear, area);
         let block = Block::default()
             .borders(Borders::ALL)
             .title(get_text("path_browser_title"))
-            .style(TEXT)
-            .border_style(ACCENT)
-            .title_style(NOTICE);
+            .style(theme.dialog_box)
+            .border_style(theme.dialog_box)
+            .title_style(theme.dialog_box_title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let [path, files, help, error] = Layout::vertical([
@@ -172,16 +163,19 @@ impl PathBrowser {
         ])
         .areas(inner);
         if let Some(explorer) = &self.explorer {
-            frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()).style(ACCENT), path);
+            frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()).style(theme.value), path);
             if explorer.files().is_empty() {
-                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(TEXT), files);
+                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(theme.table), files);
             } else if !files.is_empty() {
                 frame.render_widget_ref(explorer.widget(), files);
             }
         }
-        frame.render_widget(Paragraph::new(get_text("path_browser_keys")).style(TEXT).wrap(Wrap { trim: false }), help);
+        frame.render_widget(
+            Paragraph::new(get_text("path_browser_keys")).style(theme.table).wrap(Wrap { trim: false }),
+            help,
+        );
         if let Some(message) = &self.error {
-            frame.render_widget(Paragraph::new(message.as_str()).style(NOTICE).wrap(Wrap { trim: false }), error);
+            frame.render_widget(Paragraph::new(message.as_str()).style(theme.false_value).wrap(Wrap { trim: false }), error);
         }
     }
 }
@@ -189,7 +183,7 @@ impl PathBrowser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::{Terminal, backend::TestBackend};
+    use ratatui::{Terminal, backend::TestBackend, style::Style};
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -275,8 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn picker_colors_do_not_inherit_dark_blue_dialog_style() {
-        use crate::theme::DOS_BLUE;
+    fn picker_uses_active_theme_colors() {
         let root = tempfile::tempdir().unwrap();
         let file = root.path().join("selected.txt");
         std::fs::write(&file, "test").unwrap();
@@ -292,11 +285,11 @@ mod tests {
             terminal
                 .draw(|frame| {
                     let area = frame.area();
-                    frame.render_widget(Block::default().style(Style::new().fg(DOS_BLUE).bg(DOS_BLACK)), area);
                     browser.render(area, frame);
                 })
                 .unwrap();
             let buffer = terminal.backend().buffer();
+            let theme = get_tui_theme();
             let assert_text = |text: &str, style: Style| {
                 for y in 0..25 {
                     let row: String = (0..100).map(|x| buffer[(x, y)].symbol()).collect();
@@ -309,20 +302,17 @@ mod tests {
                 }
                 panic!("missing text: {text}");
             };
-            assert_text(&get_text("path_browser_title"), NOTICE);
-            assert_text("Enter:", TEXT);
-            assert_text("Example error", NOTICE);
-            assert_text("other.txt", TEXT);
-            assert_text("selected.txt", if select_directory { TEXT } else { SELECTED });
-            assert_text("../", if select_directory { SELECTED } else { ACCENT });
-            assert_eq!(buffer[(0, 0)].fg, DOS_LIGHT_CYAN);
-            assert_eq!(buffer[(1, 1)].fg, DOS_LIGHT_CYAN);
-            for cell in &buffer.content {
-                if !cell.symbol().trim().is_empty() {
-                    assert_ne!(cell.fg, DOS_BLUE);
-                    assert_ne!(cell.fg, cell.bg);
-                }
-            }
+            assert_text(&get_text("path_browser_title"), theme.dialog_box_title);
+            assert_text("Enter:", theme.table);
+            assert_text("Example error", theme.false_value);
+            assert_text("other.txt", theme.table);
+            assert_text("selected.txt", if select_directory { theme.table } else { theme.selected_item });
+            assert_text("../", if select_directory { theme.selected_item } else { theme.config_title });
+            assert_eq!(
+                (buffer[(0, 0)].fg, buffer[(0, 0)].bg),
+                (theme.dialog_box.fg.unwrap(), theme.dialog_box.bg.unwrap())
+            );
+            assert_eq!((buffer[(1, 1)].fg, buffer[(1, 1)].bg), (theme.value.fg.unwrap(), theme.value.bg.unwrap()));
         }
     }
 
