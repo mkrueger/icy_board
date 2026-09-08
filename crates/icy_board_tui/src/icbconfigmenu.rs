@@ -10,9 +10,9 @@ use ratatui::{
 
 use crate::{
     BORDER_SET,
-    chrome::key_hint,
     config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
     get_text,
+    hotkeys::HotkeyBar,
     tab_page::{InfoState, PageMessage},
     theme::get_tui_theme,
 };
@@ -37,20 +37,20 @@ impl ICBConfigMenuUI {
             width: disp_area.width.saturating_sub(2),
             height: disp_area.height.saturating_sub(1),
         };
-        let mut bottom_text = get_text("icb_setup_key_menu_help");
+        let mut preset_id = "icb_setup_key_menu_help";
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
             && item.editable()
         {
-            bottom_text = get_text("icb_setup_key_menu_browse_help");
+            preset_id = "icb_setup_key_menu_browse_help";
             let path = self.menu.obj.lock().unwrap().resolve_file(path);
             if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
-                bottom_text = if path.is_file() {
-                    get_text("icb_setup_key_menu_edit_help")
+                preset_id = if path.is_file() {
+                    "icb_setup_key_menu_edit_help"
                 } else if can_create_file(&path) {
-                    get_text("icb_setup_key_menu_create_help")
+                    "icb_setup_key_menu_create_help"
                 } else {
-                    bottom_text
+                    preset_id
                 };
             }
         }
@@ -69,7 +69,7 @@ impl ICBConfigMenuUI {
                 .get_item(self.state.selected)
                 .is_some_and(|item| matches!(&item.value, ListValue::ComboBox(combo) if combo.is_edit_open));
         if !modal {
-            block = block.title_bottom(key_hint(bottom_text));
+            block = block.title_bottom(HotkeyBar::for_id(preset_id).line());
         }
         block.render(area, frame.buffer_mut());
 
@@ -220,7 +220,7 @@ mod tests {
         assert!(row(buffer, 2).contains("Files"));
         assert_eq!(buffer[(3, 4)].symbol(), "P");
         assert_eq!(row(buffer, 3).chars().filter(|ch| *ch == '─').count(), 76);
-        assert!(row(buffer, 24).contains(&get_text("icb_setup_key_menu_create_help")));
+        assert!(row(buffer, 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_create_help").line().to_string()));
         assert!(
             matches!(ui.handle_key_press(KeyCode::F(1).into()), PageMessage::ResultState(state) if matches!(state.edit_msg, EditMessage::DisplayHelp(ref text) if text == "Path help"))
         );
@@ -229,7 +229,7 @@ mod tests {
         assert!(!row(terminal.backend().buffer(), 24).contains("F1"));
         ui.handle_key_press(KeyCode::Esc.into());
         terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
-        assert!(row(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_create_help")));
+        assert!(row(terminal.backend().buffer(), 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_create_help").line().to_string()));
         assert!(matches!(&ui.menu.get_item(0).unwrap().value, ListValue::Path(path) if path == std::path::Path::new("missing.txt")));
         assert!(!root.path().join("missing.txt").exists());
     }

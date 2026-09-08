@@ -247,25 +247,20 @@ impl<'a> Page for MessageAreasEditor<'a> {
         let title = get_text_args("area_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
 
         let modal = self.detail.is_open() || self.import_form.is_open() || self.import_areas.is_some() || self.save_changes.is_open();
-        let block = super::list_editor_frame(title, get_text("area_editor_key_help"), modal);
+        let block = super::list_editor_frame(title, "area_editor_key_help", modal);
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.insert_table.render_list(frame, area);
 
-        self.detail.render(
-            frame,
-            area.inner(Margin { vertical: 3, horizontal: 3 }),
-            get_text("area_editor_edit_title"),
-            String::new(),
-        );
+        self.detail
+            .render(frame, area.inner(Margin { vertical: 3, horizontal: 3 }), get_text("area_editor_edit_title"), "");
         if self.import_form.is_open() {
             let margin = Margin {
                 vertical: if area.height >= 18 { 5 } else { 1 },
                 horizontal: if area.width >= 70 { 5 } else { 1 },
             };
             let area = area.inner(margin);
-            self.import_form
-                .render(frame, area, get_text("area_import_title"), get_text("area_import_load_help"));
+            self.import_form.render(frame, area, get_text("area_import_title"), "area_import_load_help");
         }
         if let Some(import_areas) = &self.import_areas {
             let margin = Margin {
@@ -275,7 +270,7 @@ impl<'a> Page for MessageAreasEditor<'a> {
             let area = area.inner(margin);
             Clear.render(area, frame.buffer_mut());
             super::popup_frame(get_text("area_import_preview_title"))
-                .title_bottom(icy_board_tui::chrome::key_hint(get_text("area_import_preview_help")))
+                .title_bottom(icy_board_tui::hotkeys::HotkeyBar::for_id("area_import_preview_help").line())
                 .render(area, frame.buffer_mut());
             let inner = area.inner(Margin { vertical: 2, horizontal: 2 });
             let height = inner.height as usize;
@@ -559,7 +554,7 @@ mod tests {
         let mut assert_hint = |editor: &mut MessageAreasEditor<'_>, visible: bool| {
             terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
             let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
-            assert_eq!(border.contains(&get_text("area_editor_key_help")), visible);
+            assert_eq!(border.contains(&crate::editors::hint_text("area_editor_key_help")), visible);
         };
 
         assert_hint(&mut editor, true);

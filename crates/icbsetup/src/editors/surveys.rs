@@ -91,18 +91,14 @@ impl<'a> Page for SurveyEditor<'a> {
         let conference_name = crate::tabs::conferences::get_cur_conference_name();
         let title = get_text_args("surveys_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
 
-        let block = super::list_editor_frame(
-            title,
-            get_text("icb_setup_key_conf_list_help"),
-            self.detail.is_open() || self.save_changes.is_open(),
-        );
+        let block = super::list_editor_frame(title, "icb_setup_key_conf_list_help", self.detail.is_open() || self.save_changes.is_open());
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.insert_table.render_list(frame, area);
 
         if self.detail.is_open() {
             let area = area.inner(Margin { vertical: 8, horizontal: 3 });
-            self.detail.render(frame, area, get_text("survey_editor_editor"), String::new());
+            self.detail.render(frame, area, get_text("survey_editor_editor"), "");
         }
         self.save_changes.render(frame, area);
     }

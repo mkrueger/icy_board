@@ -17,7 +17,7 @@ fn nested_path_browse_hint_is_visible_before_opening_and_does_not_cover_modal() 
         (Box::new(SurveyEditor::new(&directory.path().join("surveys.toml")).unwrap()), 0, 2, 14),
         (Box::new(MessageAreasEditor::new(&directory.path().join("areas.toml")).unwrap()), 4, 1, 19),
     ];
-    let hint = get_text("path_browser_shortcut");
+    let hint = crate::editors::hint_text("path_browser_shortcut");
     assert!(hint.contains("F4"));
     for (mut page, path_index, next_non_path, border_y) in pages {
         let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
@@ -230,7 +230,6 @@ mod common_regressions {
     };
     use icy_board_tui::{
         config_menu::EditMessage,
-        get_text,
         tab_page::{InfoState, Page, PageMessage, TabPage},
     };
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
@@ -293,7 +292,7 @@ mod common_regressions {
     }
 
     fn assert_text(buffer: &Buffer, key: &str, visible: bool) {
-        let text = get_text(key);
+        let text = crate::editors::hint_text(key);
         assert!(!text.is_empty() && text != key, "missing translation: {key}");
         let rows = rows(buffer);
         assert_eq!(
@@ -308,7 +307,10 @@ mod common_regressions {
         assert_text(buffer, key, visible);
         let footer = VIEWPORT.bottom() - 1;
         if visible {
-            assert!(rows(buffer)[usize::from(footer)].contains(&get_text(key)), "help must be on the parent border");
+            assert!(
+                rows(buffer)[usize::from(footer)].contains(&crate::editors::hint_text(key)),
+                "help must be on the parent border"
+            );
         } else {
             // Also catch partially clipped/stale help, not just a complete translated string.
             for x in VIEWPORT.left() + 1..VIEWPORT.right() - 1 {

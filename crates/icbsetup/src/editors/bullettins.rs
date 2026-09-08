@@ -16,7 +16,6 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
-    get_text,
     insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
 };
@@ -93,7 +92,7 @@ impl<'a> Page for BullettinsEditor<'a> {
         Clear.render(area, frame.buffer_mut());
         let block = super::list_editor_frame(
             " Bullettins ".to_string(),
-            get_text("icb_setup_key_conf_list_help"),
+            "icb_setup_key_conf_list_help",
             self.detail.is_open() || self.save_changes.is_open(),
         );
         block.render(area, frame.buffer_mut());
@@ -102,7 +101,7 @@ impl<'a> Page for BullettinsEditor<'a> {
 
         if self.detail.is_open() {
             let area = area.inner(Margin { vertical: 8, horizontal: 3 });
-            self.detail.render(frame, area, " Edit Bullettin ".to_string(), String::new());
+            self.detail.render(frame, area, " Edit Bullettin ".to_string(), "");
         }
         self.save_changes.render(frame, area);
     }

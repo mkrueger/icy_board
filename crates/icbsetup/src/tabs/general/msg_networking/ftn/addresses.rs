@@ -114,7 +114,7 @@ impl<'a> SystemAddresses<'a> {
 impl<'a> Page for SystemAddresses<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
-        crate::editors::list_editor_frame(get_text("fido_address_title"), get_text("icb_setup_key_conf_list_help"), self.detail.is_open())
+        crate::editors::list_editor_frame(get_text("fido_address_title"), "icb_setup_key_conf_list_help", self.detail.is_open())
             .render(area, frame.buffer_mut());
 
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
@@ -123,7 +123,7 @@ impl<'a> Page for SystemAddresses<'a> {
         if self.detail.is_open() {
             let mut area = area.inner(Margin { vertical: 2, horizontal: 3 });
             area.height += 1;
-            self.detail.render(frame, area, get_text("fido_address_editor"), String::new());
+            self.detail.render(frame, area, get_text("fido_address_editor"), "");
         }
     }
 

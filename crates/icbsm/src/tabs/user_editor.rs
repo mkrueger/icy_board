@@ -7,9 +7,10 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    chrome::{dim_background, dirty_title, key_hint},
+    chrome::{dim_background, dirty_title},
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
+    hotkeys::HotkeyBar,
     save_changes_dialog::SaveChangesDialog,
     tab_page::{InfoState, Page, PageMessage},
     theme::get_tui_theme,
@@ -523,7 +524,7 @@ impl Page for UserEditor {
             .title(Span::styled(title, get_tui_theme().dialog_box_title))
             .border_style(get_tui_theme().dialog_box);
         if self.save_dialog.is_none() {
-            block = block.title_bottom(key_hint(get_text("icb_setup_key_menu_help")));
+            block = block.title_bottom(HotkeyBar::for_id("icb_setup_key_menu_help").line());
         }
         block.render(area, frame.buffer_mut());
 
@@ -593,6 +594,7 @@ impl Page for UserEditor {
 #[cfg(test)]
 mod rendering_tests {
     use super::*;
+    use icy_board_tui::hotkeys::HotkeyBar;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
 
     fn row_text(buffer: &Buffer, y: u16) -> String {
@@ -613,7 +615,7 @@ mod rendering_tests {
         let clean_title = format!("{} #1", get_text("icbsm_menu_edit_users"));
         assert!(row_text(terminal.backend().buffer(), 0).contains(&clean_title));
         assert!(!row_text(terminal.backend().buffer(), 0).contains('*'));
-        assert!(row_text(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_help")));
+        assert!(row_text(terminal.backend().buffer(), 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_help").line().to_string()));
 
         editor.menu.obj.lock().unwrap().sysop_comment = "Unsaved draft".into();
         terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
@@ -630,7 +632,7 @@ mod rendering_tests {
                 assert_eq!(actual[(x, y)], expected[(x, y)]);
             }
         }
-        assert!(!row_text(actual, 24).contains("F1"));
+        assert!(!(20..25).any(|y| row_text(actual, y).contains("F1")));
         assert!(board.lock().unwrap().users[0].sysop_comment.is_empty());
     }
 }

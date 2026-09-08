@@ -104,6 +104,14 @@ releases.
   `PCBOARD.DAT` has no such field, so the location used to come out empty and
   a binkp session announced nothing.
 
+### Changed
+
+- Uniform hotkey bars in ICBSetup, ICBSM, ICBText, the call-wait monitors and
+  shared dialogs. The existing hint bars now come from one structured catalog
+  with Unicode key symbols, centered placement on the frame and theme colours
+  instead of per-tool hint strings; runtime keys are unchanged.
+  See the [developer guide](docs/hotkey_bars.md).
+
 ### Fixed
 
 - W/LANG profile saves no longer finalize accounting. Logoff waits for enclosing

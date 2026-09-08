@@ -94,11 +94,7 @@ impl<'a> Page for LanguageListEditor<'a> {
         Clear.render(area, frame.buffer_mut());
         let title = get_text("lang_editor_title");
 
-        let block = super::list_editor_frame(
-            title,
-            get_text("icb_setup_key_conf_list_help"),
-            self.detail.is_open() || self.save_changes.is_open(),
-        );
+        let block = super::list_editor_frame(title, "icb_setup_key_conf_list_help", self.detail.is_open() || self.save_changes.is_open());
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
         self.insert_table.render_list(frame, area);
@@ -106,7 +102,7 @@ impl<'a> Page for LanguageListEditor<'a> {
         if self.detail.is_open() {
             let mut area = area.inner(Margin { vertical: 6, horizontal: 6 });
             area.height -= 2;
-            self.detail.render(frame, area, get_text("lang_editor_edit_lang"), String::new());
+            self.detail.render(frame, area, get_text("lang_editor_edit_lang"), "");
         }
 
         self.save_changes.render(frame, area);

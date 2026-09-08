@@ -125,9 +125,9 @@ impl SystemStatisticsScreen {
     fn ui(&mut self, frame: &mut Frame, full_screen: bool) {
         let now = Local::now();
         let footer = if self.confirming_reset {
-            get_text("icb_system_statistics_confirm_reset")
+            "icb_system_statistics_confirm_reset"
         } else {
-            get_text("icb_system_statistics_footer")
+            "icb_system_statistics_footer"
         };
 
         let area: Rect = get_screen_size(frame, full_screen);
@@ -142,7 +142,7 @@ impl SystemStatisticsScreen {
             .title_alignment(Alignment::Right)
             .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
-            .title_bottom(Line::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED))))
+            .title_bottom(crate::node_monitoring_screen::dos_hotkeys(footer))
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
             .border_style(Style::new().fg(DOS_YELLOW))

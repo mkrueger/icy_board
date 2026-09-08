@@ -1,7 +1,8 @@
 use crossterm::event::{KeyEvent, KeyEventKind};
 use icy_board_tui::{
-    chrome::{dim_background, key_hint},
+    chrome::dim_background,
     config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
+    hotkeys::HotkeyBar,
     save_changes_dialog::{SaveChangesDialog, SaveChangesMessage},
     tab_page::PageMessage,
     theme::get_tui_theme,
@@ -121,18 +122,20 @@ impl<T> EditorDialog<T> {
             .map_or_else(ResultState::default, |menu| ResultState::status_line(menu.current_status_line(&self.state)))
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, title: String, hint: String) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, title: String, hint: &str) {
         let Some(menu) = &mut self.menu else { return };
-        let browse = super::path_browse_hint(menu, &self.state);
-        let hint = if self.state.is_path_browser_open() {
-            String::new()
+        let mut bar = if self.state.is_path_browser_open() {
+            HotkeyBar::default()
         } else {
-            [hint, browse].into_iter().filter(|text| !text.is_empty()).collect::<Vec<_>>().join("  ")
+            preset(hint)
         };
+        if super::path_browse_hint(menu, &self.state) {
+            bar = bar.append(HotkeyBar::for_id("path_browser_shortcut"));
+        }
         let backdrop = frame.area();
         dim_background(frame.buffer_mut(), backdrop);
         Clear.render(area, frame.buffer_mut());
-        super::popup_frame(title).title_bottom(key_hint(hint)).render(area, frame.buffer_mut());
+        super::popup_frame(title).title_bottom(bar.line()).render(area, frame.buffer_mut());
         render_config_form(frame, area.inner(Margin { horizontal: 1, vertical: 1 }), menu, &mut self.state);
     }
 }
@@ -151,13 +154,18 @@ pub(crate) fn render_config_form<T>(frame: &mut Frame, area: Rect, menu: &mut Co
     }
 }
 
+/// Empty means no hint at all; otherwise the ID selects a central preset.
+fn preset(id: &str) -> HotkeyBar {
+    if id.is_empty() { HotkeyBar::default() } else { HotkeyBar::for_id(id) }
+}
+
 /// Only the active editor advertises its commands; geometry stays unchanged.
-pub(crate) fn list_editor_frame(title: String, hint: String, modal: bool) -> Block<'static> {
-    editor_frame_hint(super::list_frame(title), hint, modal)
+pub(crate) fn list_editor_frame(title: String, hint: &str, modal: bool) -> Block<'static> {
+    editor_frame_hint(super::list_frame(title), preset(hint), modal)
 }
 
 /// Full-page forms retain their background and heading layout.
-pub(crate) fn standalone_editor_frame(hint: String, modal: bool) -> Block<'static> {
+pub(crate) fn standalone_editor_frame(hint: &str, modal: bool) -> Block<'static> {
     editor_frame_hint(
         Block::new()
             .style(get_tui_theme().background)
@@ -166,25 +174,24 @@ pub(crate) fn standalone_editor_frame(hint: String, modal: bool) -> Block<'stati
             .border_set(icy_board_tui::BORDER_SET)
             .border_style(get_tui_theme().dialog_box)
             .title_alignment(Alignment::Center),
-        hint,
+        preset(hint),
         modal,
     )
 }
 
-fn editor_frame_hint(block: Block<'static>, hint: String, modal: bool) -> Block<'static> {
-    if modal { block } else { block.title_bottom(key_hint(hint)) }
+fn editor_frame_hint(block: Block<'static>, bar: HotkeyBar, modal: bool) -> Block<'static> {
+    if modal || bar.entries.is_empty() {
+        block
+    } else {
+        block.title_bottom(bar.line())
+    }
 }
 
 /// Multi-line legends use the same visibility policy as border shortcuts.
 pub(crate) fn render_editor_footer(frame: &mut Frame, area: Rect, lines: Vec<Line<'static>>, modal: bool) {
     if !modal {
         for (line, row) in lines.into_iter().zip(area.rows()) {
-            if line.style == get_tui_theme().key_binding {
-                let text: String = line.spans.into_iter().map(|span| span.content.into_owned()).collect();
-                key_hint(text).centered().render(row, frame.buffer_mut());
-            } else {
-                line.centered().render(row, frame.buffer_mut());
-            }
+            line.centered().render(row, frame.buffer_mut());
         }
     }
 }
@@ -199,14 +206,15 @@ mod tests {
     #[test]
     fn footer_keeps_shortcut_characters_and_hides_inactive_hints() {
         let area = Rect::new(0, 0, 80, 8);
-        let hint = "↑ Up  ↓ Down  F1 Help  ␛ Back";
+        let hint = "icb_setup_key_menu_help";
+        let expected = HotkeyBar::for_id(hint).line().to_string();
         let mut visible = Buffer::empty(area);
-        list_editor_frame("Title".into(), hint.into(), false).render(area, &mut visible);
+        list_editor_frame("Title".into(), hint, false).render(area, &mut visible);
         let footer: String = (0..area.width).map(|x| visible[(x, 7)].symbol()).collect();
-        assert!(footer.contains(hint));
+        assert!(footer.contains(&expected), "{footer}");
 
         let mut hidden = Buffer::empty(area);
-        list_editor_frame("Title".into(), hint.into(), true).render(area, &mut hidden);
+        list_editor_frame("Title".into(), hint, true).render(area, &mut hidden);
         let footer: String = (0..area.width).map(|x| hidden[(x, 7)].symbol()).collect();
         assert!(!footer.contains("F1"));
     }
@@ -224,7 +232,7 @@ mod tests {
                 expected = frame.buffer_mut().clone();
                 let area = frame.area();
                 dim_background(&mut expected, area);
-                dialog.render(frame, popup, "Form".into(), "F1 Help  ␛ Back".into());
+                dialog.render(frame, popup, "Form".into(), "icb_setup_key_menu_help");
             })
             .unwrap();
         let actual = terminal.backend().buffer();

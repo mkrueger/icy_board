@@ -7,9 +7,9 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    chrome::key_hint,
     config_menu::ResultState,
     get_text, get_text_args,
+    hotkeys::HotkeyBar,
     select_menu::{MenuItem, SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -54,7 +54,7 @@ impl Page for MenuPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(self.title.clone(), get_tui_theme().menu_box_title))
-            .title_bottom(key_hint(get_text("icbsm_menu_keys")));
+            .title_bottom(HotkeyBar::for_id("icbsm_menu_keys").line());
         block.render(area, frame.buffer_mut());
 
         frame.buffer_mut().set_string(
@@ -198,7 +198,7 @@ impl Page for SortPage {
         Clear.render(area, frame.buffer_mut());
 
         let (lines, bottom) = if let Some(result) = &self.result {
-            (vec![Line::from(result.clone())], get_text("icbsm_done_keys"))
+            (vec![Line::from(result.clone())], "icbsm_done_keys")
         } else {
             (
                 vec![
@@ -209,7 +209,7 @@ impl Page for SortPage {
                         HashMap::from([("value".to_string(), get_text(if self.reverse { "icbsm_yes" } else { "icbsm_no" }))]),
                     )),
                 ],
-                get_text("icbsm_sort_keys"),
+                "icbsm_sort_keys",
             )
         };
 
@@ -221,7 +221,7 @@ impl Page for SortPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(get_text("icbsm_sort_run_title"), get_tui_theme().dialog_box_title))
-            .title_bottom(key_hint(bottom));
+            .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)

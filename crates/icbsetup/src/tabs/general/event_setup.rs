@@ -61,14 +61,14 @@ impl Page for EventSetup {
     fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
         let area = disp_area.inner(Margin { horizontal: 1, vertical: 1 });
         let hint = if !self.state.is_path_browser_open() && self.state.selected == 1 {
-            get_text("event_editor_setup_keys")
+            "event_editor_setup_keys"
         } else {
-            get_text("icb_setup_key_menu_help")
+            "icb_setup_key_menu_help"
         };
         Block::new()
             .title_alignment(Alignment::Center)
             .title(Span::styled(get_text("event_setup_title"), get_tui_theme().dialog_box_title))
-            .title_bottom(icy_board_tui::chrome::key_hint(hint))
+            .title_bottom(icy_board_tui::hotkeys::HotkeyBar::for_id(hint).line())
             .style(get_tui_theme().background)
             .borders(Borders::ALL)
             .border_set(icy_board_tui::BORDER_SET)
@@ -243,7 +243,7 @@ mod tests {
             "event_minutes_uploads_disallowed",
             "event_editor_setup_keys",
         ] {
-            assert!(rows.iter().any(|row| row.contains(&get_text(key))), "missing {key}: {rows:?}");
+            assert!(rows.iter().any(|row| row.contains(&crate::editors::hint_text(key))), "missing {key}: {rows:?}");
         }
         assert!(page.request_status().status_line.contains("F2"));
         assert!(page.request_status().status_line.contains("F4"));

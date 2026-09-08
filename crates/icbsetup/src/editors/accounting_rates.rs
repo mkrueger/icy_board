@@ -254,11 +254,8 @@ impl Page for AccountingRatesEditor {
             height: disp_area.height,
         };
 
-        let block = super::standalone_editor_frame(
-            get_text("icb_setup_key_menu_help"),
-            self.save_changes.is_open() || self.state.is_path_browser_open(),
-        )
-        .title_top(Span::styled(get_text("accounting_title"), get_tui_theme().menu_title));
+        let block = super::standalone_editor_frame("icb_setup_key_menu_help", self.save_changes.is_open() || self.state.is_path_browser_open())
+            .title_top(Span::styled(get_text("accounting_title"), get_tui_theme().menu_title));
         block.render(area, frame.buffer_mut());
 
         let area = Rect {
@@ -373,7 +370,7 @@ mod tests {
         let mut assert_hint = |editor: &mut AccountingRatesEditor, visible: bool| {
             terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
             let border: String = (1..79).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
-            assert_eq!(border.contains(&get_text("icb_setup_key_menu_help")), visible);
+            assert_eq!(border.contains(&crate::editors::hint_text("icb_setup_key_menu_help")), visible);
         };
 
         assert!(matches!(editor.handle_key_press(KeyEvent::from(KeyCode::Esc)), PageMessage::Close));

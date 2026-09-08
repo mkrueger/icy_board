@@ -18,6 +18,7 @@ pub mod chrome;
 pub mod colors;
 pub mod config_menu;
 pub mod help_view;
+pub mod hotkeys;
 pub mod icbconfigmenu;
 pub mod icbsetupmenu;
 pub mod inactive_options;

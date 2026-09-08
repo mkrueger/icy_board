@@ -11,11 +11,31 @@ use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, state::NodeState};
 use icy_board_tui::{
     app::get_screen_size,
     get_text, get_text_args,
-    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
+    hotkeys::HotkeyBar,
+    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW, POLISHED_THEME, Theme},
 };
 use icy_net::ConnectionType;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::Mutex;
+
+/// Screens opened from the call-wait screen keep its DOS palette instead of the
+/// administration theme, so every monitor looks the same.
+pub fn monitor_theme() -> Theme {
+    Theme {
+        dialog_box: Style::new().fg(DOS_YELLOW).bg(DOS_BLUE),
+        dialog_box_title: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
+        menu_box: Style::new().fg(DOS_YELLOW).bg(DOS_BLUE),
+        menu_box_title: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
+        key_binding: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
+        key_binding_description: Style::new().fg(DOS_YELLOW).bg(DOS_RED),
+        ..POLISHED_THEME
+    }
+}
+
+pub fn dos_hotkeys(id: &str) -> Line<'static> {
+    let theme = monitor_theme();
+    HotkeyBar::for_id(id).with_styles(theme.key_binding, theme.key_binding_description).line()
+}
 
 pub enum NodeMonitoringScreenMessage {
     Exit,
@@ -193,11 +213,11 @@ impl NodeMonitoringScreen {
 
     fn ui(&mut self, frame: &mut Frame, infos: &[Option<Info>], connections: &[Connection], web_admin: Option<&WebAdminInfo>, full_screen: bool) {
         let now = Local::now();
-        let mut footer = get_text("icbmoni_footer");
+        let mut footer = "icbmoni_footer";
         if let Some(i) = self.table_state.selected()
             && infos.get(i).is_some_and(Option::is_some)
         {
-            footer = get_text("icbmoni_on_note_footer")
+            footer = "icbmoni_on_note_footer"
         }
         let area: Rect = get_screen_size(frame, full_screen);
 
@@ -211,7 +231,7 @@ impl NodeMonitoringScreen {
             .title_alignment(Alignment::Right)
             .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
             .title_alignment(Alignment::Center)
-            .title_bottom(Line::from(Span::from(footer).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED))))
+            .title_bottom(dos_hotkeys(footer))
             .style(Style::new().bg(DOS_BLUE))
             .border_type(BorderType::Double)
             .border_style(Style::new().fg(DOS_YELLOW))

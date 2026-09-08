@@ -1,6 +1,23 @@
 Icy Board
 =========
 
+Hotkey Bars
+-----------
+
+Setup, system manager, text/menu editors and call-wait screens show their
+existing hint bars in a uniform style: keys are highlighted separately from
+their descriptions, and the bar is centered on the frame of the active screen
+or dialog. This changes presentation, not the runtime keys.
+
+Key legend: **␛** Esc, **↵** Enter, **⇥** Tab, **⎀** Insert, **⌦** Delete,
+**⌫** Backspace, **⇞** PageUp, **⇟** PageDown, **↖** Home, **↘** End,
+**␠** Space. Arrows remain arrows and function keys remain F1, F2, etc.
+Modifiers stay explicit, for example Ctrl+s and Shift+⇥; a slash separates
+alternative keys for the same action.
+
+Use a monospace terminal font with these Unicode symbols. Not every font
+supports all glyphs; missing symbols may appear as boxes.
+
 
 Call Waiting Screen
 -------------------

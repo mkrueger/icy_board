@@ -97,11 +97,7 @@ impl<'a> Page for DirsEditor<'a> {
         let conference_name = crate::tabs::conferences::get_cur_conference_name();
         let title = get_text_args("dirs_editor_title", HashMap::from([("conference".to_string(), conference_name)]));
 
-        let block = super::list_editor_frame(
-            title,
-            get_text("icb_setup_key_conf_list_help"),
-            self.detail.is_open() || self.save_changes.is_open(),
-        );
+        let block = super::list_editor_frame(title, "icb_setup_key_conf_list_help", self.detail.is_open() || self.save_changes.is_open());
 
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { horizontal: 1, vertical: 1 });
@@ -109,7 +105,7 @@ impl<'a> Page for DirsEditor<'a> {
 
         if self.detail.is_open() {
             let area = area.inner(Margin { vertical: 3, horizontal: 3 });
-            self.detail.render(frame, area, get_text("dirs_edit_directory_title"), String::new());
+            self.detail.render(frame, area, get_text("dirs_edit_directory_title"), "");
         }
         self.save_changes.render(frame, area);
     }

@@ -7,13 +7,15 @@ use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry
 use icy_board_tui::{
     TerminalType,
     app::get_screen_size,
-    chrome::{dim_background, dirty_title, key_hint, status_line},
+    chrome::{dim_background, dirty_title, status_line},
     get_text, get_text_args,
+    hotkeys::HotkeyBar,
     pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
     theme::{Theme, get_tui_theme},
 };
+#[cfg(test)]
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use strum_macros::{Display, FromRepr};
@@ -171,27 +173,40 @@ mod localization_tests {
     fn dos_layout_keeps_active_keys_and_labeled_previews_visible() {
         let mut text = DEFAULT_DISPLAY_TEXT.clone();
         let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
-        for (mode, keys) in [
-            (Mode::Command, vec!["F2", "F3", "F4", "Enter", "Q/Esc"]),
-            (Mode::Edit, vec!["F2/F3", "F4", "Enter", "Esc"]),
-            (Mode::Filter, vec!["Enter/Esc"]),
-            (Mode::Jump, vec!["Enter", "Esc"]),
-            (Mode::RequestQuit, vec!["←/→", "Enter", "Esc"]),
+        for (mode, preset) in [
+            (Mode::Command, "mkicbtxt_command_keys"),
+            (Mode::Edit, "mkicbtxt_edit_keys"),
+            (Mode::Filter, "mkicbtxt_filter_keys"),
+            (Mode::Jump, "mkicbtxt_jump_keys"),
+            (Mode::RequestQuit, "mkicbtxt_quit_keys"),
         ] {
             app.mode = mode;
-            let buffer = render(&mut app, 80, 25);
-            let footer = row(&buffer, 23);
-            for key in keys {
-                assert!(footer.contains(key), "{mode:?}: {footer}");
-            }
-            if mode == Mode::Edit {
-                let screen = (0..25).map(|y| row(&buffer, y)).join("\n");
-                for label in [
-                    "icbtext_edit_original_text_title",
-                    "icbtext_edit_preview_text_title",
-                    "icbtext_edit_edit_text_title",
-                ] {
-                    assert!(screen.contains(&get_text(label)), "{screen}");
+            assert_eq!(app.hotkeys().entries, HotkeyBar::for_id(preset).entries);
+            for width in [80, 40] {
+                let buffer = render(&mut app, width, 25);
+                let bar = app.hotkeys();
+                let rows = bar.rows(width);
+                let first = 24 - bar.height(width);
+                for (offset, expected) in rows.iter().enumerate() {
+                    let actual = row(&buffer, first + offset as u16);
+                    assert_eq!(actual.trim(), expected.to_string().trim(), "{mode:?}: {actual}");
+                    assert_eq!(expected.alignment, Some(Alignment::Center));
+                    assert!(expected.width() <= width as usize);
+                }
+                // Every action label survives wrapping, rather than falling back to bare keys.
+                let footer = (first..24).map(|y| row(&buffer, y)).join(" ");
+                for entry in bar.entries {
+                    assert!(footer.contains(&entry.label), "{mode:?}: {footer}");
+                }
+                if mode == Mode::Edit {
+                    let screen = (0..first).map(|y| row(&buffer, y)).join("\n");
+                    for label in [
+                        "icbtext_edit_original_text_title",
+                        "icbtext_edit_preview_text_title",
+                        "icbtext_edit_edit_text_title",
+                    ] {
+                        assert!(screen.contains(&get_text(label)), "{screen}");
+                    }
                 }
             }
         }
@@ -211,7 +226,24 @@ mod localization_tests {
         app.mode = Mode::Command;
         let buffer = render(&mut app, 20, 5);
         assert!(row(&buffer, 4).trim_start().starts_with("1/"));
-        assert!(row(&buffer, 3).contains("F2 F3 F4 Enter Q/Esc"));
+        assert!(app.hotkeys().height(20) > 1);
+        let first = 4 - app.hotkeys().height(20).min(4);
+        assert_eq!(row(&buffer, first).trim(), app.hotkeys().rows(20)[0].to_string().trim());
+    }
+
+    #[test]
+    fn measured_footer_preserves_filter_context_status_and_live_filter_semantics() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        press(&mut app, KeyCode::F(2));
+        press(&mut app, KeyCode::Char('a'));
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.filter, "a");
+        let buffer = render(&mut app, 80, 25);
+        assert!(row(&buffer, 1).contains(&get_text_args("icbtext_filter_text", HashMap::from([("filter".into(), "a".into())]))));
+        assert!(row(&buffer, 24).contains(&app.record_tab.request_status().status_line));
+        press(&mut app, KeyCode::F(3));
+        assert!(!app.hotkeys().entries.iter().any(|entry| entry.keys.contains(&KeyCode::F(2))));
     }
 }
 
@@ -263,7 +295,9 @@ impl<'a> App<'a> {
                 let screen = get_screen_size(frame, self.full_screen);
                 self.ui(frame, screen);
                 match self.mode {
-                    Mode::Edit if screen.height >= 13 && screen.width >= 24 => self.edit_state.set_cursor_position(frame),
+                    Mode::Edit if screen.height.saturating_sub(1 + self.hotkeys().height(screen.width)) >= 12 && screen.width >= 24 => {
+                        self.edit_state.set_cursor_position(frame)
+                    }
                     Mode::Jump => self.edit_state.set_cursor_position(frame),
                     Mode::Filter => self.filter_state.set_cursor_position(frame),
                     _ => {}
@@ -429,10 +463,13 @@ impl<'a> App<'a> {
     }
 
     fn ui(&mut self, frame: &mut Frame, area: Rect) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
-        let [title_bar, mut tab, key_bar, status_line] = vertical.areas(area);
-
         Block::new().style(get_tui_theme().background).render(area, frame.buffer_mut());
+        let [body, status_line] = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
+        let hotkeys = self.hotkeys();
+        let key_height = hotkeys.height(body.width).min(body.height);
+        let content = Rect::new(body.x, body.y, body.width, body.height - key_height);
+        let key_bar = Rect::new(body.x, content.bottom(), body.width, key_height);
+        let [title_bar, mut tab] = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(content);
         self.render_title_bar(title_bar, frame.buffer_mut());
 
         if !self.filter.is_empty() && tab.height > 0 {
@@ -446,10 +483,10 @@ impl<'a> App<'a> {
 
         match self.mode {
             // The dialog fills twelve lines and cannot be folded; below that the list stays.
-            Mode::Edit if area.height < 13 || area.width < 24 => {}
+            Mode::Edit if content.height < 12 || content.width < 24 => {}
             Mode::Edit => {
                 let edit_height = 12;
-                let edit_area = centered(area, area.width.saturating_sub(3), edit_height);
+                let edit_area = centered(content, content.width.saturating_sub(3), edit_height);
 
                 dim_background(frame.buffer_mut(), area);
                 Clear.render(edit_area, frame.buffer_mut());
@@ -553,7 +590,7 @@ impl<'a> App<'a> {
                     .render(area, frame.buffer_mut());
             }
             Mode::Filter => {
-                let filter_area = centered(area, area.width.saturating_sub(5), 3);
+                let filter_area = centered(content, content.width.saturating_sub(5), 3);
 
                 dim_background(frame.buffer_mut(), area);
                 Clear.render(filter_area, frame.buffer_mut());
@@ -574,7 +611,7 @@ impl<'a> App<'a> {
             }
             Mode::Jump => {
                 let jump_size = 31;
-                let jump_area = centered(area, jump_size, 3);
+                let jump_area = centered(content, jump_size, 3);
 
                 dim_background(frame.buffer_mut(), area);
                 Clear.render(jump_area, frame.buffer_mut());
@@ -595,7 +632,11 @@ impl<'a> App<'a> {
             }
             Mode::RequestQuit => {
                 let save_text = format!("{} ", get_text("icbtext_save_changes"));
-                let save_area = centered(area, Line::from(save_text.as_str()).width().saturating_add(10).min(u16::MAX as usize) as u16, 3);
+                let save_area = centered(
+                    content,
+                    Line::from(save_text.as_str()).width().saturating_add(10).min(u16::MAX as usize) as u16,
+                    3,
+                );
 
                 dim_background(frame.buffer_mut(), area);
                 Clear.render(save_area, frame.buffer_mut());
@@ -617,7 +658,7 @@ impl<'a> App<'a> {
             _ => {}
         }
         // Keep active controls legible above the dimmed background, even on a tiny terminal.
-        self.render_key_help_view(key_bar, frame.buffer_mut());
+        hotkeys.render(key_bar, frame.buffer_mut());
         self.render_status_line(status_line, frame.buffer_mut());
     }
 
@@ -688,38 +729,14 @@ impl<'a> App<'a> {
         self.get_tab_mut().render(frame, area);
     }
 
-    fn render_key_help_view(&self, area: Rect, buf: &mut Buffer) {
-        let keys = match self.mode {
-            Mode::RequestQuit => vec![
-                ("←/→", format!("{}/{}", get_text("yes"), get_text("no"))),
-                ("Enter", get_text("key_desc_quit")),
-                ("Esc", get_text("key_desc_back")),
-            ],
-            Mode::Filter => vec![("Enter/Esc", get_text("key_desc_back"))],
-            Mode::Jump => vec![("Enter", get_text("key_desc_accept")), ("Esc", get_text("key_desc_cancel"))],
-            Mode::Edit => vec![
-                ("F2/F3", get_text("key_desc_next_prev_style")),
-                ("F4", get_text("key_desc_restore")),
-                ("Enter", get_text("key_desc_accept")),
-                ("Esc", get_text("key_desc_cancel")),
-            ],
-            _ => vec![
-                ("F2", get_text("key_desc_filter")),
-                ("F3", get_text("key_desc_jump")),
-                ("F4", get_text("key_desc_restore")),
-                ("Enter", get_text("key_desc_edit")),
-                ("Q/Esc", get_text("key_desc_quit")),
-            ],
-        };
-        let hints = keys.iter().map(|(key, desc)| format!("{key} {desc}")).join("  ");
-        // On narrow screens retain every key before spending space on descriptions.
-        let hints = if Line::from(hints.as_str()).width() > usize::from(area.width) {
-            keys.iter().map(|(key, _)| *key).join(" ")
-        } else {
-            hints
-        };
-        Block::new().style(get_tui_theme().key_binding_description).render(area, buf);
-        key_hint(hints).render(area, buf);
+    fn hotkeys(&self) -> HotkeyBar {
+        HotkeyBar::for_id(match self.mode {
+            Mode::RequestQuit => "mkicbtxt_quit_keys",
+            Mode::Filter => "mkicbtxt_filter_keys",
+            Mode::Jump => "mkicbtxt_jump_keys",
+            Mode::Edit => "mkicbtxt_edit_keys",
+            _ => "mkicbtxt_command_keys",
+        })
     }
 
     fn render_status_line(&self, area: Rect, buf: &mut Buffer) {

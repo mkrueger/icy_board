@@ -8,9 +8,10 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    chrome::{dim_background, key_hint},
+    chrome::dim_background,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
+    hotkeys::HotkeyBar,
     select_menu::MenuItem,
     tab_page::{Page, PageMessage},
     theme::{config_title, get_tui_theme},
@@ -190,13 +191,7 @@ impl Page for TableEditPage {
         Clear.render(area, frame.buffer_mut());
 
         if let Some(message) = &self.message {
-            render_box(
-                frame,
-                area,
-                edit_title(self.kind),
-                get_text("icbsm_done_keys"),
-                vec![Line::from(message.clone())],
-            );
+            render_box(frame, area, edit_title(self.kind), "icbsm_done_keys", vec![Line::from(message.clone())]);
             return;
         }
 
@@ -208,7 +203,7 @@ impl Page for TableEditPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(edit_title(self.kind), get_tui_theme().dialog_box_title))
-            .title_bottom(key_hint(get_text("icbsm_table_keys")));
+            .title_bottom(HotkeyBar::for_id("icbsm_table_keys").line());
         block.render(area, frame.buffer_mut());
 
         let inner = area.inner(Margin { vertical: 1, horizontal: 2 });
@@ -318,19 +313,19 @@ impl Page for TableApplyPage {
 
     fn render(&mut self, frame: &mut Frame, disp_area: Rect) {
         let (line, bottom) = if let Some(result) = &self.result {
-            (result.clone(), get_text("icbsm_done_keys"))
+            (result.clone(), "icbsm_done_keys")
         } else if self.entries.is_empty() {
-            (get_text("icbsm_table_empty"), get_text("icbsm_done_keys"))
+            (get_text("icbsm_table_empty"), "icbsm_done_keys")
         } else {
             (
                 get_text_args(
                     "icbsm_apply_table_question",
                     HashMap::from([("count".to_string(), self.entries.len().to_string())]),
                 ),
-                get_text("icbsm_question_keys"),
+                "icbsm_question_keys",
             )
         };
-        render_question(frame, disp_area, &line, &bottom);
+        render_question(frame, disp_area, &line, bottom);
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
@@ -353,7 +348,8 @@ impl Page for TableApplyPage {
 pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, bottom: &str) {
     let backdrop = frame.area();
     dim_background(frame.buffer_mut(), backdrop);
-    let content_width = question.chars().count().max(bottom.chars().count()) as u16;
+    let hotkeys = HotkeyBar::for_id(bottom);
+    let content_width = Line::from(question).width().max(hotkeys.line().width()).min(u16::MAX as usize) as u16;
     // A narrow terminal decides the width, so the box never asks for more than there is.
     let available = disp_area.width.saturating_sub(4);
     let width = (content_width + 12).min(available).max(36.min(available));
@@ -371,7 +367,7 @@ pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, botto
         .border_set(BORDER_SET)
         .border_style(get_tui_theme().menu_box)
         .padding(Padding::new(2, 2, 1, 0))
-        .title_bottom(key_hint(bottom));
+        .title_bottom(hotkeys.line());
 
     Paragraph::new(Text::from(question.to_string()))
         .style(get_tui_theme().item)
@@ -380,7 +376,7 @@ pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, botto
         .render(area, frame.buffer_mut());
 }
 
-fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, lines: Vec<Line<'static>>) {
+fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: &str, lines: Vec<Line<'static>>) {
     let block = Block::new()
         .style(get_tui_theme().background)
         .borders(Borders::ALL)
@@ -389,7 +385,7 @@ fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, line
         .padding(Padding::new(2, 2, 1, 0))
         .title_alignment(Alignment::Center)
         .title(Span::styled(title, get_tui_theme().dialog_box_title))
-        .title_bottom(key_hint(bottom));
+        .title_bottom(HotkeyBar::for_id(bottom).line());
 
     Paragraph::new(Text::from(lines))
         .style(get_tui_theme().item)
@@ -410,4 +406,31 @@ pub fn counter_init_from_option(option: u32) -> CounterInit {
 
 pub fn counter_scope(files: bool, bytes: bool) -> CounterScope {
     CounterScope { files, bytes }
+}
+
+#[cfg(test)]
+mod hotkey_tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn question_measures_wrapped_actions_separately_from_its_message() {
+        for width in [80, 40] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 25)).unwrap();
+            terminal
+                .draw(|frame| render_question(frame, Rect::new(0, 1, width, 23), "QUESTION", "icbsm_question_keys"))
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            let rows: Vec<String> = (0..25).map(|y| (0..width).map(|x| buffer[(x, y)].symbol()).collect()).collect();
+            let screen = rows.join(" ");
+            assert!(screen.contains("QUESTION"));
+            for entry in HotkeyBar::for_id("icbsm_question_keys").entries {
+                assert!(screen.contains(&entry.key_text()));
+                assert!(screen.contains(&entry.label));
+            }
+            let content_row = rows.iter().position(|row| row.contains("QUESTION")).unwrap();
+            let footer_row = rows.iter().position(|row| row.contains("F2")).unwrap();
+            assert!(content_row < footer_row);
+        }
+    }
 }

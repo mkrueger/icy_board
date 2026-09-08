@@ -342,8 +342,8 @@ impl<'a> EventListEditor<'a> {
             height,
         );
         Clear.render(popup, frame.buffer_mut());
-        let block =
-            super::popup_frame(get_text("event_editor_history_title")).title_bottom(icy_board_tui::chrome::key_hint(get_text("event_editor_history_keys")));
+        let block = super::popup_frame(get_text("event_editor_history_title"))
+            .title_bottom(icy_board_tui::hotkeys::HotkeyBar::for_id("event_editor_history_keys").line());
         let mut lines = vec![Line::from(history.description.clone())];
         let value = |key: &str, text: String| Line::from(format!("{}: {text}", get_text(key)));
         if let Some(entry) = history.entries.get(history.selected) {
@@ -404,7 +404,7 @@ impl Page for EventListEditor<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
         let modal = self.detail.is_open() || self.history.is_some() || self.save_changes.is_open();
-        let frame_block = super::list_editor_frame(get_text("event_editor_title"), String::new(), modal);
+        let frame_block = super::list_editor_frame(get_text("event_editor_title"), "", modal);
         let inner = frame_block.inner(area);
         frame_block.render(area, frame.buffer_mut());
         if inner.width > 1 && inner.height > 5 {
@@ -422,8 +422,8 @@ impl Page for EventListEditor<'_> {
                 footer,
                 vec![
                     Line::from(get_text("event_editor_mode_legend")).style(get_tui_theme().config_title),
-                    icy_board_tui::chrome::key_hint(get_text("event_editor_keys")),
-                    icy_board_tui::chrome::key_hint(get_text("event_editor_keys_more")),
+                    icy_board_tui::hotkeys::HotkeyBar::for_id("event_editor_keys").line(),
+                    icy_board_tui::hotkeys::HotkeyBar::for_id("event_editor_keys_more").line(),
                 ],
                 modal,
             );
@@ -440,8 +440,8 @@ impl Page for EventListEditor<'_> {
                 height,
             );
             Clear.render(popup, frame.buffer_mut());
-            let block =
-                super::popup_frame(get_text("event_editor_detail_title")).title_bottom(icy_board_tui::chrome::key_hint(get_text("event_editor_detail_keys")));
+            let block = super::popup_frame(get_text("event_editor_detail_title"))
+                .title_bottom(icy_board_tui::hotkeys::HotkeyBar::for_id("event_editor_detail_keys").line());
             let content = block.inner(popup);
             block.render(popup, frame.buffer_mut());
             if content.width > 1 && content.height > 0 {

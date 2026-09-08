@@ -103,7 +103,7 @@ fn panel(frame: &mut Frame, area: Rect, title: &str, help: &str) -> Rect {
         .border_set(icy_board_tui::BORDER_SET)
         .title_alignment(Alignment::Center)
         .title(Span::styled(get_text(title), get_tui_theme().dialog_box_title))
-        .title_bottom(icy_board_tui::chrome::key_hint(get_text(help)))
+        .title_bottom(icy_board_tui::hotkeys::HotkeyBar::for_id(help).line())
         .style(get_tui_theme().dialog_box)
         .render(area, frame.buffer_mut());
     area.inner(Margin { horizontal: 2, vertical: 2 })

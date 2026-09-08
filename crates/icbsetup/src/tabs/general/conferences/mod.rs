@@ -154,7 +154,7 @@ impl Page for ConferenceListEditor {
 
         Clear.render(disp_area, frame.buffer_mut());
 
-        let block = crate::editors::standalone_editor_frame(get_text("icb_setup_key_conf_list_help"), false);
+        let block = crate::editors::standalone_editor_frame("icb_setup_key_conf_list_help", false);
         block.render(disp_area, frame.buffer_mut());
 
         let val = get_text("conf_list_title");

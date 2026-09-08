@@ -8,9 +8,8 @@ use ratatui::{
 
 use crate::{
     BORDER_SET,
-    chrome::key_hint,
     config_menu::{EditMessage, ResultState},
-    get_text,
+    hotkeys::HotkeyBar,
     message_box::MessageBox,
     select_menu::{SelectMenu, SelectMenuState},
     tab_page::{Page, PageMessage},
@@ -62,7 +61,7 @@ mod tests {
                 .underline_color(ratatui::style::Color::Reset)
         );
         assert!(row_text(buffer, 2).contains("Settings"));
-        assert!(row_text(buffer, 24).contains(&get_text("icb_setup_key_menu_help")));
+        assert!(row_text(buffer, 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_help").line().to_string()));
         assert_eq!(row_text(buffer, 3).chars().filter(|ch| *ch == '─').count(), 76);
         menu.handle_key_press(KeyCode::Down.into());
         let (state, _) = menu.handle_key_press(KeyCode::F(1).into());
@@ -74,7 +73,7 @@ mod tests {
         assert_eq!(terminal.backend().buffer()[(25, 5)].symbol(), "A");
         menu.handle_key_press(KeyCode::Esc.into());
         terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
-        assert!(row_text(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_help")));
+        assert!(row_text(terminal.backend().buffer(), 24).contains(&HotkeyBar::for_id("icb_setup_key_menu_help").line().to_string()));
         assert_eq!(menu.state.selected, 1);
     }
 
@@ -132,7 +131,7 @@ impl IcbSetupMenuUI {
             .border_style(get_tui_theme().menu_box)
             .title_alignment(ratatui::layout::Alignment::Center);
         if self.sub_pages.is_empty() {
-            block = block.title_bottom(key_hint(get_text("icb_setup_key_menu_help")));
+            block = block.title_bottom(HotkeyBar::for_id("icb_setup_key_menu_help").line());
         }
         block.render(disp_area, frame.buffer_mut());
 

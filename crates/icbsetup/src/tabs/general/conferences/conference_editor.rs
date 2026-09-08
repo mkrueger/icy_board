@@ -525,15 +525,15 @@ impl Page for ConferenceEditor {
             height: disp_area.height,
         };
 
-        let mut bottom_text = get_text("icb_setup_key_menu_help");
+        let mut bottom_text = "icb_setup_key_menu_help";
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
             && item.editable()
         {
-            bottom_text = get_text("icb_setup_key_menu_browse_help");
+            bottom_text = "icb_setup_key_menu_browse_help";
             let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
             if path.is_file() {
-                bottom_text = get_text("icb_setup_key_menu_edit_help");
+                bottom_text = "icb_setup_key_menu_edit_help";
             }
         }
 
@@ -628,7 +628,7 @@ mod tests {
             *page.menu.get_item_mut(page.state.selected).unwrap() = ListItem::new("Test".into(), value).with_editable(editable);
             terminal.draw(|frame| page.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
             let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
-            assert!(border.contains(&get_text(help_key)), "incorrect conference help: {border}");
+            assert!(border.contains(&crate::editors::hint_text(help_key)), "incorrect conference help: {border}");
         }
     }
 

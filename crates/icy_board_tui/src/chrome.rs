@@ -1,9 +1,12 @@
-//! Shared DOS chrome: no key remapping, data mutation or additional screen rows.
+//! Shared DOS chrome: dirty titles, dimmed backdrops and bounded status lines.
+//!
+//! Structured key hints and responsive footers live in [`crate::hotkeys`].
+//! Neither module remaps keys or changes application data or input dispatch.
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Widget},
 };
 
@@ -15,62 +18,6 @@ pub fn dirty_title(title: impl Into<String>, dirty: bool) -> String {
         title.push_str(" *");
     }
     title
-}
-
-fn is_key(token: &str) -> bool {
-    let key = token.trim_matches(|ch: char| matches!(ch, '[' | ']' | '(' | ')' | ',' | ':'));
-    matches!(
-        key,
-        "Esc"
-            | "ESC"
-            | "Enter"
-            | "Return"
-            | "Tab"
-            | "Ins"
-            | "Insert"
-            | "Del"
-            | "Delete"
-            | "Entf"
-            | "Einfg"
-            | "PgUp"
-            | "PgDn"
-            | "Home"
-            | "End"
-            | "Pos1"
-            | "Ende"
-            | "Space"
-            | "↑"
-            | "↓"
-            | "←"
-            | "→"
-            | "↑↓"
-            | "←→"
-    ) || key.strip_prefix('F').is_some_and(|n| n.parse::<u8>().is_ok_and(|n| (1..=12).contains(&n)))
-        || key.starts_with("Ctrl+")
-        || key.starts_with("Alt+")
-        || key.starts_with("Shift+")
-}
-
-/// Preserve localized text exactly, while distinguishing key names from labels.
-pub fn key_hint(text: impl Into<String>) -> Line<'static> {
-    let theme = get_tui_theme();
-    let text = text.into();
-    let mut spans = Vec::new();
-    let mut token = String::new();
-    for ch in text.chars().chain(std::iter::once('\0')) {
-        if ch.is_whitespace() || matches!(ch, '=' | '/' | '·' | '|' | '\0') {
-            if !token.is_empty() {
-                let style = if is_key(&token) { theme.key_binding } else { theme.key_binding_description };
-                spans.push(Span::styled(std::mem::take(&mut token), style));
-            }
-            if ch != '\0' {
-                spans.push(Span::styled(ch.to_string(), theme.key_binding_description));
-            }
-        } else {
-            token.push(ch);
-        }
-    }
-    Line::from(spans)
 }
 
 /// Only the content recedes: the surface keeps its colour, highlights go grey.
@@ -110,19 +57,6 @@ pub fn status_line(buf: &mut Buffer, area: Rect, context: &str, clock: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn hints_preserve_localized_text_and_style_keys_separately() {
-        let text = " F1=Hilfe  Enter Bearbeiten · Esc Zurück  PgUp/PgDn ";
-        let line = key_hint(text);
-        assert_eq!(line.to_string(), text);
-        assert!(line.spans.iter().any(|s| s.content == "F1" && s.style == get_tui_theme().key_binding));
-        assert!(
-            line.spans
-                .iter()
-                .any(|s| s.content == "Hilfe" && s.style == get_tui_theme().key_binding_description)
-        );
-    }
 
     #[test]
     fn status_is_bounded_and_context_survives_tiny_areas() {

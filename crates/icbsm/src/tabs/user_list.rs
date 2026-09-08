@@ -6,7 +6,8 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::user_base::UserBase;
-use icy_board_tui::chrome::{dim_background, dirty_title, key_hint};
+use icy_board_tui::chrome::{dim_background, dirty_title};
+use icy_board_tui::hotkeys::{Hotkey, HotkeyBar};
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
 use icy_board_tui::save_changes_dialog::SaveChangesMessage;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
@@ -274,26 +275,52 @@ impl UserList {
         }
     }
 
-    /// Tells the sysop what the list is filtered and sorted by, and which keys do that.
-    fn footer(&self) -> String {
-        let sort = get_text(self.sort.label());
+    #[cfg(test)]
+    fn hotkeys(&self) -> HotkeyBar {
+        self.hotkeys_with_sort(Some(false))
+    }
+
+    /// `None` omits the sort action, `Some(true)` shows only the current order.
+    fn hotkeys_with_sort(&self, sort: Option<bool>) -> HotkeyBar {
         if self.searching {
-            get_text_args(
-                "icbsm_user_list_search",
-                std::collections::HashMap::from([("search".to_string(), self.search.clone())]),
-            )
-        } else if self.search.is_empty() {
-            get_text_args("icbsm_user_list_keys", std::collections::HashMap::from([("sort".to_string(), sort)]))
-        } else {
-            get_text_args(
-                "icbsm_user_list_filtered",
-                std::collections::HashMap::from([
-                    ("search".to_string(), self.search.clone()),
-                    ("count".to_string(), self.view.len().to_string()),
-                    ("sort".to_string(), sort),
-                ]),
-            )
+            return HotkeyBar::for_id("icbsm_user_list_search");
         }
+        let mut bar = HotkeyBar::for_id("icbsm_user_list_actions");
+        // F2 is ignored by the handler until the list has unsaved changes.
+        bar.entries.retain(|entry| self.has_changes || !entry.keys.contains(&KeyCode::F(2)));
+        let Some(short) = sort else { return bar };
+        let order = get_text(self.sort.label());
+        let label = if short {
+            order
+        } else {
+            format!("{} ({order})", icy_board_tui::get_text("hotkey_sort"))
+        };
+        bar.append(HotkeyBar::new([Hotkey::new(KeyCode::F(4), label)]))
+    }
+
+    /// Search and count stay context text; only the keys carry hint styling.
+    /// Long translations drop the context, then the sort wording and finally
+    /// the sort action, rather than being clipped on the border.
+    fn footer(&self, width: usize) -> Line<'static> {
+        for (context, sort) in [(true, Some(false)), (false, Some(false)), (false, Some(true))] {
+            let line = self.footer_line(context, sort);
+            if line.width() <= width {
+                return line;
+            }
+        }
+        self.footer_line(false, None)
+    }
+
+    fn footer_line(&self, context: bool, sort: Option<bool>) -> Line<'static> {
+        let mut spans = Vec::new();
+        if context && (self.searching || !self.search.is_empty()) {
+            spans.push(Span::styled(
+                format!(" {}: {}  ·  {} ", icy_board_tui::get_text("hotkey_search"), self.search, self.view.len()),
+                get_tui_theme().description_text,
+            ));
+        }
+        spans.extend(self.hotkeys_with_sort(sort).line().spans);
+        Line::from(spans).centered()
     }
 
     /// Border-only context: never take a row away from the list or search.
@@ -401,7 +428,7 @@ impl Page for UserList {
             block = block.title(summary);
         }
         if self.save_dialog.is_none() {
-            block = block.title_bottom(key_hint(self.footer()));
+            block = block.title_bottom(self.footer(usize::from(area.width.saturating_sub(2))));
         }
         block.render(area, frame.buffer_mut());
 
@@ -525,7 +552,7 @@ mod rendering_tests {
         let buffer = terminal.backend().buffer();
         assert_eq!(list.selected_user(), Some(1));
         assert!(row_text(buffer, 4).contains("Bob"));
-        assert!(row_text(buffer, 23).contains(&list.footer()));
+        assert!(row_text(buffer, 23).contains(&list.footer(74).to_string()));
     }
 
     #[test]
@@ -558,6 +585,35 @@ mod rendering_tests {
                 assert_eq!(actual[(x, y)], expected[(x, y)]);
             }
         }
-        assert!(!row_text(actual, 23).contains("F3"));
+        assert!(!(18..24).any(|y| row_text(actual, y).contains("F3")));
+    }
+
+    #[test]
+    fn actions_are_conditional_and_context_is_not_parsed_as_keys() {
+        let mut list = list();
+        for dirty in [false, true] {
+            list.has_changes = dirty;
+            for sort in [SortOrder::Record, SortOrder::Name, SortOrder::Security, SortOrder::LastOn] {
+                list.sort = sort;
+                let bar = list.hotkeys();
+                assert_eq!(bar.entries.iter().any(|entry| entry.keys == [KeyCode::F(2)]), dirty);
+                let sort_actions: Vec<_> = bar.entries.iter().filter(|entry| entry.keys == [KeyCode::F(4)]).collect();
+                assert_eq!(sort_actions.len(), 1);
+                assert!(sort_actions[0].label.contains(&get_text(sort.label())));
+                let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+                terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+                let buffer = terminal.backend().buffer();
+                assert!(row_text(buffer, 23).contains(&list.footer(74).to_string()));
+                // Where F4 still fits, its label names the current order.
+                let footer = list.footer(74).to_string();
+                assert!(!footer.contains("F4") || footer.contains(&get_text(sort.label())), "{footer}");
+                assert!(row_text(buffer, 4).contains("Alice"));
+            }
+        }
+        list.search = "F2 Enter Esc".into();
+        list.searching = true;
+        list.rebuild_view();
+        assert_eq!(list.hotkeys().entries, HotkeyBar::for_id("icbsm_user_list_search").entries);
+        assert!(list.footer(74).to_string().contains("F2 Enter Esc"));
     }
 }

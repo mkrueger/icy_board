@@ -8,8 +8,9 @@ use ratatui::{
 
 use crate::{
     BORDER_SET,
-    chrome::{dim_background, key_hint},
+    chrome::dim_background,
     get_text,
+    hotkeys::HotkeyBar,
     tab_page::{InfoState, Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -41,7 +42,7 @@ mod tests {
             .unwrap();
         let buffer = terminal.backend().buffer();
         assert_eq!(buffer[(0, 0)], expected[(0, 0)]);
-        for (y, text) in [(10, message.title.clone()), (14, get_text("message_box_dismiss"))] {
+        for (y, text) in [(10, message.title.clone()), (14, HotkeyBar::for_id("message_box_dismiss").line().to_string())] {
             let row: String = (0..80).map(|x| buffer[(x, y)].symbol()).collect();
             assert!(row.contains(&text));
         }
@@ -103,7 +104,7 @@ impl Page for MessageBox {
             .padding(Padding::new(1, 1, 1, 0))
             .title_alignment(ratatui::layout::Alignment::Center)
             .title(Span::styled(self.title.clone(), get_tui_theme().dialog_box_title))
-            .title_bottom(key_hint(get_text("message_box_dismiss")));
+            .title_bottom(HotkeyBar::for_id("message_box_dismiss").line());
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)

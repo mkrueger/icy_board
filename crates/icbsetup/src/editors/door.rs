@@ -191,9 +191,9 @@ impl<'a> Page for DoorEditor<'a> {
         let block = super::list_editor_frame(
             title,
             if self.mode == EditCommandMode::Config {
-                get_text("doors_editor_key_help")
+                "doors_editor_key_help"
             } else {
-                get_text("doors_editor_key_help_door")
+                "doors_editor_key_help_door"
             },
             modal,
         );
@@ -215,7 +215,7 @@ impl<'a> Page for DoorEditor<'a> {
             frame,
             area.inner(Margin { vertical: 4, horizontal: 3 }),
             get_text("doors_editor_edit_title"),
-            String::new(),
+            "",
         );
         self.save_changes.render(frame, area);
     }
@@ -489,10 +489,10 @@ mod tests {
             terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
             let border: String = (0..80).map(|x| terminal.backend().buffer()[(x, 23)].symbol()).collect();
             if let Some(hint) = hint {
-                assert!(border.contains(&get_text(hint)));
+                assert!(border.contains(&crate::editors::hint_text(hint)));
             } else {
-                assert!(!border.contains(&get_text("doors_editor_key_help")));
-                assert!(!border.contains(&get_text("doors_editor_key_help_door")));
+                assert!(!border.contains(&crate::editors::hint_text("doors_editor_key_help")));
+                assert!(!border.contains(&crate::editors::hint_text("doors_editor_key_help_door")));
             }
         };
 

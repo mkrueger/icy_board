@@ -103,7 +103,7 @@ impl<'a> Page for CommandsEditor<'a> {
 
         let block = super::list_editor_frame(
             get_text("command_editor_title"),
-            get_text("icb_setup_key_conf_list_help"),
+            "icb_setup_key_conf_list_help",
             self.detail.is_open() || self.save_changes.is_open(),
         );
         block.render(area, frame.buffer_mut());
@@ -112,7 +112,7 @@ impl<'a> Page for CommandsEditor<'a> {
 
         if self.detail.is_open() {
             let area = area.inner(Margin { vertical: 5, horizontal: 3 });
-            self.detail.render(frame, area, get_text("command_editor_editor"), String::new());
+            self.detail.render(frame, area, get_text("command_editor_editor"), "");
         }
 
         self.save_changes.render(frame, area);

@@ -17,12 +17,7 @@ use icy_board_engine::icy_board::{
         event_history::{EventHistory, EventHistoryEntry, EventResult, LOG_DIRECTORY},
     },
 };
-use icy_board_tui::{
-    app::get_screen_size,
-    chrome::{dim_background, key_hint},
-    get_text,
-    theme::get_tui_theme,
-};
+use icy_board_tui::{app::get_screen_size, chrome::dim_background, get_text};
 use ratatui::{
     Frame, Terminal,
     backend::Backend,
@@ -506,13 +501,13 @@ impl EventScreen {
     }
 
     fn ui_at(&mut self, frame: &mut Frame, full_screen: bool, now: DateTime<Local>) {
-        let theme = get_tui_theme();
+        let theme = crate::node_monitoring_screen::monitor_theme();
         let area = get_screen_size(frame, full_screen);
         frame.render_widget(Clear, area);
         Block::new().style(theme.background).render(area, frame.buffer_mut());
         let block = Block::bordered()
             .title(Line::styled(format!(" {} ", get_text("event_runtime_picker_title")), theme.dialog_box_title))
-            .title_bottom(key_hint(get_text("event_runtime_picker_keys")))
+            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("event_runtime_picker_keys"))
             .border_style(theme.dialog_box)
             .style(theme.background);
         let inner = block.inner(area);
@@ -607,7 +602,7 @@ impl EventScreen {
                 format!(" {}{execution_position} ", get_text("event_runtime_history_title")),
                 theme.dialog_box_title,
             ))
-            .title_bottom(key_hint(get_text("event_runtime_detail_keys")));
+            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("event_runtime_detail_keys"));
         let detail_area = detail_block.inner(history);
         let paragraph = Paragraph::new(self.detail(now)).wrap(Wrap { trim: true }).style(theme.value);
         let max_scroll = paragraph
@@ -676,7 +671,7 @@ impl EventScreen {
                         ratatui::text::Span::raw("    "),
                         ratatui::text::Span::styled(format!(" {no} "), no_style),
                     ]),
-                    key_hint(get_text("event_runtime_confirm_keys")),
+                    crate::node_monitoring_screen::dos_hotkeys("event_runtime_confirm_keys"),
                 ])
                 .style(theme.background),
                 choices,
@@ -1206,16 +1201,16 @@ mod tests {
         assert!(text.contains("nightly.sh"), "the selected command belongs on screen");
         assert!(text.contains(&get_text("event_runtime_disabled")));
         assert!(text.contains(&get_text("event_runtime_next_column")));
-        assert!(text.contains(&get_text("event_runtime_picker_keys")));
+        assert!(text.contains(&crate::node_monitoring_screen::dos_hotkeys("event_runtime_picker_keys").to_string()));
         screen.confirm_key(KeyCode::Enter);
         terminal.draw(|frame| screen.ui(frame, false)).unwrap();
         let buffer = terminal.backend().buffer().clone();
         let text = buffer.content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains(&get_text("event_runtime_confirm_title")));
         assert!(text.contains(&get_text("event_runtime_no")));
-        assert!(text.contains(&get_text("event_runtime_confirm_keys")));
+        assert!(text.contains(&crate::node_monitoring_screen::dos_hotkeys("event_runtime_confirm_keys").to_string()));
         // Cancel is preselected and has to look like it.
-        let theme = get_tui_theme();
+        let theme = crate::node_monitoring_screen::monitor_theme();
         assert!(buffer.content().iter().any(|cell| cell.bg == theme.selected_item.bg.unwrap()));
     }
 

@@ -7,13 +7,14 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::group_list::Group;
 use icy_board_engine::icy_board::group_list::GroupList;
-use icy_board_tui::chrome::{dim_background, dirty_title, key_hint};
+use icy_board_tui::chrome::{dim_background, dirty_title};
 use icy_board_tui::config_menu::ConfigEntry;
 use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::config_menu::TextFlags;
+use icy_board_tui::hotkeys::HotkeyBar;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
 use icy_board_tui::theme::{config_title, get_tui_theme};
 use icy_board_tui::{get_text, get_text_args};
@@ -244,7 +245,7 @@ impl Page for GroupEditor {
             .border_type(BorderType::Double)
             .title(Span::styled(get_text("icbsm_menu_groups"), get_tui_theme().dialog_box_title));
         if !self.in_edit_mode {
-            block = block.title_bottom(key_hint(get_text("icbsm_menu_keys")));
+            block = block.title_bottom(HotkeyBar::for_id("icbsm_menu_keys").line());
         }
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { vertical: 1, horizontal: 1 });
@@ -278,7 +279,7 @@ impl Page for GroupEditor {
                     dirty_title(get_text("icbsm_menu_groups"), dirty),
                     get_tui_theme().dialog_box_title,
                 ))
-                .title_bottom(key_hint(format!("␛ {}", get_text("key_desc_back"))))
+                .title_bottom(HotkeyBar::for_id("icbsm_group_edit_keys").line())
                 .render(popup, frame.buffer_mut());
             self.render_editor(frame, popup);
         }
@@ -362,6 +363,6 @@ mod rendering_tests {
         let text: String = (0..80).map(|x| actual[(x, 10)].symbol()).collect();
         assert!(text.contains("Sysops"));
         let footer: String = (0..80).map(|x| actual[(x, 14)].symbol()).collect();
-        assert!(footer.contains(&format!("␛ {}", get_text("key_desc_back"))));
+        assert!(footer.contains(&HotkeyBar::for_id("icbsm_group_edit_keys").line().to_string()));
     }
 }

@@ -417,7 +417,7 @@ fn zconnect_forms_fit_80x25_in_the_selected_locale() {
             ListKind::Areas(_) => ["zconnect_remote_board", "zconnect_local_area", "zconnect_read_only", "zconnect_areas_keys"],
         };
         for label in labels {
-            assert!(rows.contains(&get_text(label)), "clipped list label: {label}");
+            assert!(rows.contains(&crate::editors::hint_text(label)), "clipped list label: {label}");
         }
     }
 }

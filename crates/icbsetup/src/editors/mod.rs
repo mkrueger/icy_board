@@ -19,7 +19,7 @@ use std::path::Path;
 
 use icy_board_tui::{
     config_menu::{ConfigMenu, ConfigMenuState, ListValue},
-    get_text, get_text_args,
+    get_text_args,
     tab_page::{InfoState, PageMessage},
     theme::get_tui_theme,
 };
@@ -65,16 +65,11 @@ fn reset_config_state(state: &mut ConfigMenuState) {
 }
 
 /// Nested forms have no status line; advertise browsing on their own border.
-fn path_browse_hint<T>(menu: &ConfigMenu<T>, state: &ConfigMenuState) -> String {
-    if !state.is_path_browser_open()
+fn path_browse_hint<T>(menu: &ConfigMenu<T>, state: &ConfigMenuState) -> bool {
+    !state.is_path_browser_open()
         && menu
             .get_item(state.selected)
             .is_some_and(|item| item.editable() && matches!(item.value, ListValue::Path(_)))
-    {
-        get_text("path_browser_shortcut")
-    } else {
-        String::new()
-    }
 }
 
 #[cfg(test)]
@@ -128,5 +123,15 @@ mod tests {
         });
         assert!(matches!(message, PageMessage::Close));
         assert_eq!(std::fs::read(path).unwrap(), b"saved");
+    }
+}
+
+/// Footer IDs now render typed key hints; other IDs stay plain translations.
+#[cfg(test)]
+pub(crate) fn hint_text(id: &str) -> String {
+    if icy_board_tui::hotkeys::presets::PRESET_IDS.contains(&id) {
+        icy_board_tui::hotkeys::HotkeyBar::for_id(id).line().to_string()
+    } else {
+        icy_board_tui::get_text(id)
     }
 }

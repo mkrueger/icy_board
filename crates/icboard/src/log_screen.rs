@@ -11,7 +11,7 @@ use std::{
 use codepages::tables::CP437_TO_UNICODE;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS};
-use icy_board_tui::{app::get_screen_size, chrome::key_hint, get_text as text, theme::get_tui_theme};
+use icy_board_tui::{app::get_screen_size, get_text as text};
 use ratatui::{
     Frame, Terminal,
     backend::Backend,
@@ -649,13 +649,13 @@ impl LogScreen {
     }
 
     fn ui(&mut self, frame: &mut Frame, full_screen: bool) {
-        let theme = get_tui_theme();
+        let theme = crate::node_monitoring_screen::monitor_theme();
         let area = get_screen_size(frame, full_screen);
         frame.render_widget(Clear, area);
         Block::new().style(theme.background).render(area, frame.buffer_mut());
         let block = Block::bordered()
             .title(Line::styled(format!(" {} ", text("log_view_title")), theme.dialog_box_title))
-            .title_bottom(key_hint(text(self.keys_id())))
+            .title_bottom(crate::node_monitoring_screen::dos_hotkeys(self.keys_id()))
             .border_style(theme.dialog_box)
             .style(theme.background);
         let inner = block.inner(area);
@@ -782,15 +782,15 @@ impl LogScreen {
             search,
         );
         if self.editing.is_none() {
-            frame.render_widget(key_hint(text("log_view_mode_keys")), search_keys);
+            frame.render_widget(crate::node_monitoring_screen::dos_hotkeys("log_view_mode_keys"), search_keys);
         }
         frame.render_widget(Paragraph::new(text("log_view_tail")).style(theme.description_text), bounds);
         frame.render_widget(
-            key_hint(text(if self.editing.is_some() {
+            crate::node_monitoring_screen::dos_hotkeys(if self.editing.is_some() {
                 "log_view_search_keys"
             } else {
                 "log_view_navigation"
-            })),
+            }),
             keys,
         );
     }
@@ -1442,14 +1442,14 @@ mod tests {
                         &text("log_view_context"),
                         &text("log_view_size"),
                         &text("log_view_mtime"),
-                        &text("log_view_file_keys"),
-                        &text("log_view_mode_keys"),
+                        &crate::node_monitoring_screen::dos_hotkeys("log_view_file_keys").to_string(),
+                        &crate::node_monitoring_screen::dos_hotkeys("log_view_mode_keys").to_string(),
                     ] {
                         assert!(rendered.contains(expected), "missing {expected:?}");
                     }
                     let selected = buffer.content().iter().find(|cell| cell.symbol() == "Ä").unwrap();
-                    assert_eq!(selected.fg, get_tui_theme().selected_item.fg.unwrap());
-                    assert_eq!(selected.bg, get_tui_theme().selected_item.bg.unwrap());
+                    assert_eq!(selected.fg, crate::node_monitoring_screen::monitor_theme().selected_item.fg.unwrap());
+                    assert_eq!(selected.bg, crate::node_monitoring_screen::monitor_theme().selected_item.bg.unwrap());
                     let row = buffer
                         .content()
                         .chunks(usize::from(width))
@@ -1492,8 +1492,8 @@ mod tests {
                 let rendered = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
                 assert!(rendered.contains("row 99"));
                 assert!(rendered.contains(&text("log_view_title")));
-                assert!(rendered.contains(&text("log_view_keys")));
-                assert!(rendered.contains(&text("log_view_navigation")));
+                assert!(rendered.contains(&crate::node_monitoring_screen::dos_hotkeys("log_view_keys").to_string()));
+                assert!(rendered.contains(&crate::node_monitoring_screen::dos_hotkeys("log_view_navigation").to_string()));
             }
             screen.handle_key(KeyCode::Char('/'));
             terminal.draw(|frame| screen.ui(frame, true)).unwrap();

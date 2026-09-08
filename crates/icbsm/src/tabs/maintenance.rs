@@ -9,9 +9,9 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    chrome::key_hint,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
+    hotkeys::HotkeyBar,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -686,7 +686,7 @@ impl MaintenancePage {
         self.stage = Stage::Done { report };
     }
 
-    fn render_lines(&self, frame: &mut Frame, area: Rect, title: String, bottom: String, lines: Vec<Line<'static>>) {
+    fn render_lines(&self, frame: &mut Frame, area: Rect, title: String, bottom: &str, lines: Vec<Line<'static>>) {
         let block = Block::new()
             .style(get_tui_theme().background)
             .borders(Borders::ALL)
@@ -695,7 +695,7 @@ impl MaintenancePage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(title, get_tui_theme().dialog_box_title))
-            .title_bottom(key_hint(bottom));
+            .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)
@@ -712,13 +712,13 @@ impl Page for MaintenancePage {
 
         // A run that could not write says so whatever stage it stopped in.
         if let Some(error) = self.error.clone() {
-            self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), vec![Line::from(error)]);
+            self.render_lines(frame, area, self.op.title(), "icbsm_done_keys", vec![Line::from(error)]);
             return;
         }
 
         match &self.stage {
             Stage::Confirm => {
-                super::render_question(frame, disp_area, &get_text("icbsm_are_you_sure"), &get_text("icbsm_question_keys"));
+                super::render_question(frame, disp_area, &get_text("icbsm_are_you_sure"), "icbsm_question_keys");
             }
             Stage::Criteria => {
                 let block = Block::new()
@@ -729,7 +729,7 @@ impl Page for MaintenancePage {
                     .padding(Padding::new(2, 2, 1, 0))
                     .title_alignment(Alignment::Center)
                     .title(Span::styled(self.op.title(), get_tui_theme().dialog_box_title))
-                    .title_bottom(key_hint(get_text("icbsm_criteria_keys")));
+                    .title_bottom(HotkeyBar::for_id("icbsm_criteria_keys").line());
                 block.render(area, frame.buffer_mut());
 
                 let inner = area.inner(Margin { vertical: 1, horizontal: 2 });
@@ -757,7 +757,7 @@ impl Page for MaintenancePage {
                     lines.push(Line::from(""));
                     lines.push(Line::from(get_text("icbsm_preview_pack_warning")));
                 }
-                self.render_lines(frame, area, self.op.title(), get_text("icbsm_preview_keys"), lines);
+                self.render_lines(frame, area, self.op.title(), "icbsm_preview_keys", lines);
             }
             Stage::Done { report } => {
                 let mut lines = vec![Line::from(get_text_args(
@@ -774,7 +774,7 @@ impl Page for MaintenancePage {
                     lines.push(Line::from(""));
                     lines.push(Line::from(get_text("icbsm_done_backup_hint")));
                 }
-                self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), lines);
+                self.render_lines(frame, area, self.op.title(), "icbsm_done_keys", lines);
             }
         }
 
@@ -782,7 +782,7 @@ impl Page for MaintenancePage {
             && !matches!(self.stage, Stage::Done { .. })
         {
             let lines = vec![Line::from(error.clone())];
-            self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), lines);
+            self.render_lines(frame, area, self.op.title(), "icbsm_done_keys", lines);
         }
     }
 
@@ -885,16 +885,16 @@ impl Page for UndoPage {
         let mut lines = Vec::new();
         let bottom = if let Some(message) = &self.message {
             lines.push(Line::from(message.clone()));
-            get_text("icbsm_done_keys")
+            "icbsm_done_keys"
         } else if let Some(time) = user_maintenance::backup_time(&users_file) {
             lines.push(Line::from(get_text_args(
                 "icbsm_undo_prompt",
                 HashMap::from([("date".to_string(), time.format("%Y-%m-%d %H:%M:%S").to_string())]),
             )));
-            get_text("icbsm_undo_keys")
+            "icbsm_undo_keys"
         } else {
             lines.push(Line::from(get_text("icbsm_undo_no_backup")));
-            get_text("icbsm_done_keys")
+            "icbsm_done_keys"
         };
 
         let block = Block::new()
@@ -905,7 +905,7 @@ impl Page for UndoPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(get_text("icbsm_undo_title"), get_tui_theme().dialog_box_title))
-            .title_bottom(key_hint(bottom));
+            .title_bottom(HotkeyBar::for_id(bottom).line());
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)

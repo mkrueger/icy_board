@@ -443,12 +443,12 @@ fn event_editor_table_and_all_detail_labels_fit_at_80x25() {
         "event_editor_header_description",
         "event_editor_header_command",
     ] {
-        assert!(rows.iter().any(|row| row.contains(&get_text(key))), "missing {key}: {rows:?}");
+        assert!(rows.iter().any(|row| row.contains(&crate::editors::hint_text(key))), "missing {key}: {rows:?}");
     }
     // Both legend rows stay inside the frame, directly below the mode legend.
     let legend = rows.iter().position(|row| row.contains(&get_text("event_editor_mode_legend"))).unwrap();
-    assert!(rows[legend + 1].contains(&get_text("event_editor_keys")));
-    assert!(rows[legend + 2].contains(&get_text("event_editor_keys_more")));
+    assert!(rows[legend + 1].contains(&crate::editors::hint_text("event_editor_keys")));
+    assert!(rows[legend + 2].contains(&crate::editors::hint_text("event_editor_keys_more")));
     assert!(rows[23].trim_matches(|ch: char| !ch.is_alphanumeric()).is_empty());
     // A modal owns the keyboard, so the list legend must step aside.
     for open in [KeyCode::Enter, KeyCode::F(6), KeyCode::Esc] {
@@ -461,11 +461,18 @@ fn event_editor_table_and_all_detail_labels_fit_at_80x25() {
         }
         let covered = screen(&mut editor);
         for key in ["event_editor_mode_legend", "event_editor_keys", "event_editor_keys_more"] {
-            assert!(!covered.iter().any(|row| row.contains(&get_text(key))), "{key} stays visible: {covered:?}");
+            assert!(
+                !covered.iter().any(|row| row.contains(&crate::editors::hint_text(key))),
+                "{key} stays visible: {covered:?}"
+            );
         }
         press(&mut editor, KeyCode::Esc);
         assert!(!editor.save_changes.is_open());
-        assert!(screen(&mut editor).iter().any(|row| row.contains(&get_text("event_editor_keys"))));
+        assert!(
+            screen(&mut editor)
+                .iter()
+                .any(|row| row.contains(&crate::editors::hint_text("event_editor_keys")))
+        );
     }
     // Active marker, mode letter, full time and day mask stay in separate columns.
     let record = rows.iter().find(|row| row.contains("1)")).unwrap_or_else(|| panic!("{rows:?}"));
@@ -492,7 +499,7 @@ fn event_editor_table_and_all_detail_labels_fit_at_80x25() {
             "event_editor_execution",
             "event_editor_detail_keys",
         ] {
-            assert!(rows.iter().any(|row| row.contains(&get_text(key))), "missing {key}: {rows:?}");
+            assert!(rows.iter().any(|row| row.contains(&crate::editors::hint_text(key))), "missing {key}: {rows:?}");
         }
         for row in &rows[6..18] {
             assert_eq!(row.chars().nth(4), Some('║'), "{row}");
@@ -531,7 +538,10 @@ fn event_editor_parent_table_geometry_stays_stable_under_every_modal() {
         assert_eq!(editor.table.table_state.offset(), offset, "parent table resized under {open:?}");
         assert_eq!(editor.table.table_state.selected(), Some(29));
         for key in ["event_editor_mode_legend", "event_editor_keys", "event_editor_keys_more"] {
-            assert!(!covered.iter().any(|row| row.contains(&get_text(key))), "{key} stays visible under {open:?}");
+            assert!(
+                !covered.iter().any(|row| row.contains(&crate::editors::hint_text(key))),
+                "{key} stays visible under {open:?}"
+            );
         }
         assert!(matches!(press(&mut editor, KeyCode::Esc), PageMessage::None));
         assert!(!editor.detail.is_open());
@@ -669,7 +679,7 @@ fn event_editor_online_warning_help_and_aligned_values_fit_at_80x25() {
         "event_editor_end_time",
         "event_editor_detail_keys",
     ] {
-        assert!(rows.iter().any(|row| row.contains(&get_text(key))), "{key}: {rows:?}");
+        assert!(rows.iter().any(|row| row.contains(&crate::editors::hint_text(key))), "{key}: {rows:?}");
     }
     // Every single-column label uses the same delimiter cell, even in German.
     let columns: Vec<_> = rows
@@ -754,7 +764,7 @@ fn event_editor_history_reads_while_scheduler_owns_lease_without_recovering_pend
         "event_editor_history_log_time",
         "event_editor_result_nonzero_exit",
     ] {
-        assert!(rows.iter().any(|row| row.contains(&get_text(key))), "{key}: {rows:?}");
+        assert!(rows.iter().any(|row| row.contains(&crate::editors::hint_text(key))), "{key}: {rows:?}");
     }
     let display = rows.join("\n");
     assert!(display.contains("2026-09-07T03:00:00+00:00"));

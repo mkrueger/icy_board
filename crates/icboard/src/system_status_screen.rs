@@ -14,7 +14,7 @@ use icy_board_engine::icy_board::{
     bbs::{BBS, EventMaintenancePhase, ListenerStatus},
     state::NodeState,
 };
-use icy_board_tui::{app::get_screen_size, chrome::key_hint, get_text, theme::get_tui_theme};
+use icy_board_tui::{app::get_screen_size, get_text};
 use ratatui::{
     Frame, Terminal,
     backend::Backend,
@@ -314,7 +314,7 @@ impl SystemStatusScreen {
     }
 
     fn lines(&self, width: u16) -> Vec<Line<'static>> {
-        let theme = get_tui_theme();
+        let theme = crate::node_monitoring_screen::monitor_theme();
         let unavailable = || get_text("system_status_unavailable");
         let status_row = |key: &str, value: String, warning: bool| {
             Line::from(vec![
@@ -490,12 +490,12 @@ impl SystemStatusScreen {
     }
 
     fn ui(&mut self, frame: &mut Frame, full_screen: bool) {
-        let theme = get_tui_theme();
+        let theme = crate::node_monitoring_screen::monitor_theme();
         let area = get_screen_size(frame, full_screen);
         frame.render_widget(Clear, area);
         let block = Block::bordered()
             .title(Line::styled(format!(" {} ", get_text("system_status_title")), theme.dialog_box_title))
-            .title_bottom(key_hint(get_text("system_status_keys")))
+            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("system_status_keys"))
             .border_style(theme.dialog_box)
             .style(theme.background);
         let inner = block.inner(area);
