@@ -4328,7 +4328,7 @@ message_box_error_title= Fehler
 message_box_dismiss= ENTER drücken
 no_file_name_given=Für diesen Eintrag ist kein Dateiname konfiguriert.
 
-event_runtime_picker_title = Ereignisse — Jetzt ausführen
+event_runtime_picker_title = Ereignis-Monitor
 event_runtime_picker_keys = ↑↓ Auswahl  Enter Start  F5/R Verlauf laden  Esc Zurück
 event_runtime_event = Ereignis
 event_runtime_enabled_column = Aktiv
@@ -4362,7 +4362,7 @@ event_runtime_skipped_busy = Überspr.: belegt
 event_runtime_expired = Abgelaufen
 event_runtime_superseded = Überholt
 event_runtime_queued_active = Geplant / aktiv
-event_runtime_history_title = Läufe — neueste zuerst; Cache; F5/R lädt neu
+event_runtime_history_title = Läufe
 event_runtime_detail_keys = Bild↑ Älter  Bild↓ Neuer  ←→ Details scrollen  L Ausgabe
 event_runtime_history_error = Ereignisverlauf nicht lesbar
 event_runtime_no_history = Keine Läufe für dieses Ereignis erfasst.

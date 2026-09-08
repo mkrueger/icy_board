@@ -4891,7 +4891,7 @@ message_box_error_title= Error
 message_box_dismiss= Press ENTER 
 no_file_name_given=No file name has been configured for this entry.
 
-event_runtime_picker_title = Events — Run Event Now
+event_runtime_picker_title = Event Monitor
 event_runtime_picker_keys = ↑↓ Select  Enter Run now  F5/R Refresh history  Esc Back
 event_runtime_event = Event
 event_runtime_enabled_column = Enabled
@@ -4925,7 +4925,7 @@ event_runtime_skipped_busy = Skipped: busy
 event_runtime_expired = Expired
 event_runtime_superseded = Superseded
 event_runtime_queued_active = Queued / active
-event_runtime_history_title = Runs — newest first; cached; F5/R refresh
+event_runtime_history_title = Runs
 event_runtime_detail_keys = PgUp Older  PgDn Newer  ←→ Scroll details  L Output
 event_runtime_history_error = Cannot read event history
 event_runtime_no_history = No recorded runs for this event.

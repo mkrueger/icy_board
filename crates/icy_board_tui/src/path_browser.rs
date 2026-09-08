@@ -17,10 +17,16 @@ use crate::{get_text, theme::get_tui_theme};
 fn explorer_theme() -> ExplorerTheme {
     let theme = get_tui_theme();
     ExplorerTheme::new()
-        .with_style(theme.dialog_box)
-        .with_block(Block::default().borders(Borders::ALL).style(theme.dialog_box).border_style(theme.dialog_box))
-        .with_item_style(theme.table)
-        .with_dir_style(theme.config_title)
+        .with_style(theme.description_text)
+        .with_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(theme.description_text)
+                .border_style(theme.dialog_box),
+        )
+        // Plain files recede; only directories and the selection are emphasised.
+        .with_item_style(theme.description_text)
+        .with_dir_style(theme.menu_title)
         .with_highlight_item_style(theme.selected_item)
         .with_highlight_dir_style(theme.selected_item)
 }
@@ -146,6 +152,7 @@ impl PathBrowser {
 
     pub(crate) fn render(&self, area: Rect, frame: &mut Frame) {
         let theme = get_tui_theme();
+        let area = Self::modal_area(frame.area(), area);
         frame.render_widget(Clear, area);
         let block = Block::default()
             .borders(Borders::ALL)
@@ -165,17 +172,30 @@ impl PathBrowser {
         if let Some(explorer) = &self.explorer {
             frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()).style(theme.value), path);
             if explorer.files().is_empty() {
-                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(theme.table), files);
+                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(theme.description_text), files);
             } else if !files.is_empty() {
                 frame.render_widget_ref(explorer.widget(), files);
             }
         }
         frame.render_widget(
-            Paragraph::new(get_text("path_browser_keys")).style(theme.table).wrap(Wrap { trim: false }),
+            Paragraph::new(get_text("path_browser_keys"))
+                .style(theme.description_text)
+                .wrap(Wrap { trim: false }),
             help,
         );
         if let Some(message) = &self.error {
             frame.render_widget(Paragraph::new(message.as_str()).style(theme.false_value).wrap(Wrap { trim: false }), error);
+        }
+    }
+
+    /// Browsing needs room, so this is a modal over the whole frame rather than
+    /// the popup rectangle its caller owns. The app's title bar and status line
+    /// stay readable; a frame too small for them keeps the caller's area.
+    fn modal_area(frame: Rect, area: Rect) -> Rect {
+        if frame.height > 6 && frame.width > 8 {
+            Rect::new(frame.x, frame.y + 1, frame.width, frame.height - 2)
+        } else {
+            area
         }
     }
 }
@@ -303,16 +323,20 @@ mod tests {
                 panic!("missing text: {text}");
             };
             assert_text(&get_text("path_browser_title"), theme.dialog_box_title);
-            assert_text("Enter:", theme.table);
+            assert_text("Enter:", theme.description_text);
             assert_text("Example error", theme.false_value);
-            assert_text("other.txt", theme.table);
-            assert_text("selected.txt", if select_directory { theme.table } else { theme.selected_item });
-            assert_text("../", if select_directory { theme.selected_item } else { theme.config_title });
+            assert_text("other.txt", theme.description_text);
+            assert_text("selected.txt", if select_directory { theme.description_text } else { theme.selected_item });
+            assert_text("../", if select_directory { theme.selected_item } else { theme.menu_title });
+            assert_ne!(theme.description_text.fg, theme.menu_title.fg, "directories stay distinguishable");
+            // The modal starts below the title bar and ends above the status line.
             assert_eq!(
-                (buffer[(0, 0)].fg, buffer[(0, 0)].bg),
+                (buffer[(0, 1)].fg, buffer[(0, 1)].bg),
                 (theme.dialog_box.fg.unwrap(), theme.dialog_box.bg.unwrap())
             );
-            assert_eq!((buffer[(1, 1)].fg, buffer[(1, 1)].bg), (theme.value.fg.unwrap(), theme.value.bg.unwrap()));
+            assert_eq!((buffer[(1, 2)].fg, buffer[(1, 2)].bg), (theme.value.fg.unwrap(), theme.value.bg.unwrap()));
+            assert_eq!(buffer[(0, 0)], ratatui::buffer::Cell::EMPTY);
+            assert_eq!(buffer[(0, 24)], ratatui::buffer::Cell::EMPTY);
         }
     }
 
@@ -328,9 +352,16 @@ mod tests {
         assert!(text.contains("visible.txt"));
         assert!(text.contains(&get_text("path_browser_title")));
         assert!(text.contains("Esc:"));
+        // A caller's small popup no longer limits the browser.
+        terminal.draw(|frame| browser.render(Rect::new(30, 10, 20, 6), frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let row: String = (0..100).map(|x| buffer[(x, 1)].symbol()).collect();
+        assert!(row.contains(&get_text("path_browser_title")), "{row}");
+        assert!((0..100).map(|x| buffer[(x, 23)].symbol()).any(|symbol| symbol != " "));
         for width in 0..10 {
             for height in 0..10 {
-                terminal.draw(|frame| browser.render(Rect::new(0, 0, width, height), frame)).unwrap();
+                let mut tiny = Terminal::new(TestBackend::new(width.max(1), height.max(1))).unwrap();
+                tiny.draw(|frame| browser.render(Rect::new(0, 0, width, height), frame)).unwrap();
             }
         }
     }

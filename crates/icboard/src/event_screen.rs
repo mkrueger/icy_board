@@ -23,7 +23,7 @@ use ratatui::{
     backend::Backend,
     layout::{Constraint, Layout, Rect},
     text::Line,
-    widgets::{Block, Clear, Paragraph, Row, Table, TableState, Widget, Wrap},
+    widgets::{Block, Cell, Clear, Paragraph, Row, Table, TableState, Widget, Wrap},
 };
 use tokio::sync::Mutex;
 
@@ -511,29 +511,29 @@ impl EventScreen {
             .title_bottom(cws_chrome::hotkeys("event_runtime_picker_keys"));
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let [status, list, history] = Layout::vertical([Constraint::Length(2), Constraint::Min(3), Constraint::Length(12)]).areas(inner);
         let alert = self
             .runtime
             .failure
             .clone()
             .or_else(|| self.notice.clone())
             .or_else(|| self.runtime.request_error.clone());
-        let status_text = [self.runtime.online_text(), alert.clone()]
-            .into_iter()
-            .flatten()
-            .map(|text| sanitize(&text))
-            .collect::<Vec<_>>()
-            .join("\n");
-        frame.render_widget(
-            Paragraph::new(status_text).style(if alert.is_some() { theme.false_value } else { theme.description_text }),
-            status,
-        );
+        let mut status_lines = Vec::new();
+        if let Some(online) = self.runtime.online_text() {
+            status_lines.push(Line::styled(sanitize(&online), theme.description_text));
+        }
+        if let Some(alert) = &alert {
+            status_lines.push(Line::styled(sanitize(alert), theme.false_value));
+        }
+        // Status sits under the list and claims no row while there is nothing to say.
+        let [list, status, history] =
+            Layout::vertical([Constraint::Min(3), Constraint::Length(status_lines.len() as u16), Constraint::Length(12)]).areas(inner);
+        frame.render_widget(Paragraph::new(status_lines), status);
         let rows = self
             .events
             .iter()
             .enumerate()
             .map(|(index, event)| {
-                let enabled = get_text(if event.enabled { "event_runtime_enabled" } else { "event_runtime_disabled" });
+                let enabled = if event.enabled { "✓" } else { "✗" };
                 let result = if self.runtime.pending.contains(&event.id) {
                     get_text("event_runtime_queued_active")
                 } else {
@@ -542,22 +542,18 @@ impl EventScreen {
                         .unwrap_or_else(|| "—".into())
                 };
                 Row::new(vec![
-                    self.label(index),
-                    enabled,
-                    format!("{:02}:{:02}", event.time.get_hour(), event.time.get_minute()),
-                    event.days.to_string(),
-                    format!("{}/{}", execution_text(event.execution), mode_text(event.mode)),
-                    self.next_run(event, now),
-                    result,
+                    Cell::from(self.label(index)),
+                    Cell::from(Line::from(enabled).centered()),
+                    Cell::from(format!("{:02}:{:02}", event.time.get_hour(), event.time.get_minute())),
+                    Cell::from(event.days.to_string()),
+                    Cell::from(format!("{}/{}", execution_text(event.execution), mode_text(event.mode))),
+                    Cell::from(self.next_run(event, now)),
+                    Cell::from(result),
                 ])
             })
             .collect::<Vec<_>>();
-        // Translated words decide the width; "No" and "Nein" are not the same size.
-        let enabled_width = ["event_runtime_enabled", "event_runtime_disabled", "event_editor_header_enabled"]
-            .into_iter()
-            .map(|key| get_text(key).chars().count() as u16)
-            .max()
-            .unwrap_or(3);
+        // The marks are one cell wide, so only the translated heading sets the width.
+        let enabled_width = Line::raw(get_text("event_editor_header_enabled")).width().max(1) as u16;
         let table = Table::new(
             rows,
             [
@@ -573,13 +569,13 @@ impl EventScreen {
         .style(theme.table)
         .header(
             Row::new(vec![
-                get_text("event_runtime_event"),
-                get_text("event_editor_header_enabled"),
-                get_text("event_editor_header_time"),
-                get_text("event_editor_header_days"),
-                get_text("event_runtime_mode_column"),
-                get_text("event_runtime_next_column"),
-                get_text("event_runtime_result_column"),
+                Cell::from(get_text("event_runtime_event")),
+                Cell::from(Line::from(get_text("event_editor_header_enabled")).centered()),
+                Cell::from(get_text("event_editor_header_time")),
+                Cell::from(get_text("event_editor_header_days")),
+                Cell::from(get_text("event_runtime_mode_column")),
+                Cell::from(get_text("event_runtime_next_column")),
+                Cell::from(get_text("event_runtime_result_column")),
             ])
             .style(theme.config_title),
         )
@@ -1220,7 +1216,7 @@ mod tests {
         let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains("Nightly event"));
         assert!(text.contains("nightly.sh"), "the selected command belongs on screen");
-        assert!(text.contains(&get_text("event_runtime_disabled")));
+        assert!(text.contains('✗'), "the disabled event is marked, not spelled out");
         assert!(text.contains(&get_text("event_runtime_next_column")));
         assert!(text.contains(&cws_chrome::hotkeys("event_runtime_picker_keys").to_string()));
         screen.confirm_key(KeyCode::Enter);
@@ -1233,6 +1229,32 @@ mod tests {
         // Cancel is preselected and has to look like it.
         let theme = cws_chrome::theme();
         assert!(buffer.content().iter().any(|cell| cell.bg == theme.selected_item.bg.unwrap()));
+    }
+
+    #[test]
+    fn the_table_starts_at_the_frame_and_status_stays_below_it() {
+        let mut screen = screen();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        let mut area = Rect::default();
+        terminal
+            .draw(|frame| {
+                area = get_screen_size(frame, false);
+                screen.ui(frame, false);
+            })
+            .unwrap();
+        let row = |buffer: &ratatui::buffer::Buffer, y: u16| (area.x..area.right()).map(|x| buffer[(x, y)].symbol()).collect::<String>();
+        let header = row(terminal.backend().buffer(), area.y + 1);
+        assert!(header.contains(&get_text("event_runtime_event")), "no blank row above the table: {header}");
+        assert!(row(terminal.backend().buffer(), area.y + 2).contains("Nightly event"));
+        // The reserved status row is given back to the list while it is silent.
+        let history_top = area.bottom() - 13;
+        assert!(row(terminal.backend().buffer(), history_top).contains(&get_text("event_runtime_history_title")));
+        screen.notice = Some("Queue refused".into());
+        terminal.draw(|frame| screen.ui(frame, false)).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(row(buffer, history_top - 1).contains("Queue refused"), "status belongs under the table");
+        assert!(row(buffer, history_top).contains(&get_text("event_runtime_history_title")));
+        assert!(row(buffer, area.y + 1).contains(&get_text("event_runtime_event")));
     }
 
     #[tokio::test]
