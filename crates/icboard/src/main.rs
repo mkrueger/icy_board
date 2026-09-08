@@ -644,11 +644,9 @@ fn check_board_tool_status(path: &std::path::Path, status: std::process::ExitSta
     }
 }
 
-fn init_terminal() -> Res<ratatui::DefaultTerminal> {
-    color_eyre::install()?;
+fn init_terminal() -> Res<icy_board_tui::TerminalType> {
+    let terminal = icy_board_tui::term::init()?;
     install_panic_hook();
-    let terminal = ratatui::init();
-    icy_board_tui::term::apply_dos_palette()?;
     Ok(terminal)
 }
 
@@ -670,15 +668,12 @@ fn install_panic_hook() {
         let backtrace = std::backtrace::Backtrace::force_capture();
         log::error!("panic in thread '{thread}' at {location}: {message}\n{backtrace}");
         ratatui::restore();
-        let _ = icy_board_tui::term::restore_palette();
         original(panic_info);
     }));
 }
 
 pub fn restore_terminal() -> Res<()> {
-    ratatui::restore();
-    icy_board_tui::term::restore_palette()?;
-    Ok(())
+    Ok(icy_board_tui::term::restore()?)
 }
 
 pub fn print_error<A: Display>(error: A) {

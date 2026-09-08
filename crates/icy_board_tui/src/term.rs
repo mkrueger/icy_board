@@ -10,78 +10,183 @@ use crossterm::{
     terminal::{self, Clear, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use icy_engine::DOS_DEFAULT_PALETTE;
-use ratatui::{TerminalOptions, Viewport};
+use ratatui::{
+    Terminal, TerminalOptions, Viewport,
+    backend::{Backend, ClearType, CrosstermBackend, WindowSize},
+    buffer::Cell,
+    layout::{Position, Size},
+    style::Color,
+};
 use terminfo::{Database, capability as cap};
 
 use crate::{TerminalType, theme::DOS_ANSI_INDEX};
 
-static PALETTE_ACTIVE: AtomicBool = AtomicBool::new(false);
+static RESTORE_HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 
-fn write_dos_palette(mut writer: impl Write) -> io::Result<()> {
-    writer.write_all(b"\x1b]4")?;
-    for (ansi_index, dos_index) in DOS_ANSI_INDEX.into_iter().enumerate() {
-        let color = &DOS_DEFAULT_PALETTE[usize::from(dos_index)];
-        let (red, green, blue) = color.rgb();
-        write!(writer, ";{ansi_index};rgb:{red:02X}/{green:02X}/{blue:02X}")?;
+fn install_restore_hook() {
+    if RESTORE_HOOK_INSTALLED.swap(true, Ordering::AcqRel) {
+        return;
     }
-    writer.write_all(b"\x1b\\")?;
-    writer.flush()
+    let original = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let _ = restore();
+        original(panic_info);
+    }));
 }
 
-fn reset_dos_palette(mut writer: impl Write) -> io::Result<()> {
-    writer.write_all(b"\x1b]104;0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15\x1b\\")?;
-    writer.flush()
-}
-
-fn supports_osc_palette(terminfo_supports_osc4: bool, terminal_program: Option<&str>, known_terminal_host: bool) -> bool {
-    let terminal_program_supports_osc4 =
+fn rgb_capability(
+    override_mode: Option<&str>,
+    color_term: Option<&str>,
+    term: Option<&str>,
+    terminal_program: Option<&str>,
+    known_truecolor_host: bool,
+    terminfo_truecolor: bool,
+) -> bool {
+    match override_mode.map(str::to_ascii_lowercase).as_deref() {
+        Some("rgb" | "truecolor" | "24bit") => return true,
+        Some("indexed" | "ansi" | "16color") => return false,
+        _ => {}
+    }
+    if color_term.is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "truecolor" | "24bit")) {
+        return true;
+    }
+    if term.is_some_and(|value| {
+        let value = value.to_ascii_lowercase();
+        value.contains("truecolor") || value.contains("24bit") || value.ends_with("-direct")
+    }) {
+        return true;
+    }
+    let terminal_program_supports_rgb =
         terminal_program.is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "vscode" | "wezterm" | "iterm.app" | "hyper"));
-
-    terminfo_supports_osc4 || terminal_program_supports_osc4 || known_terminal_host
+    terminfo_truecolor || terminal_program_supports_rgb || known_truecolor_host
 }
 
-fn terminal_supports_osc_palette() -> bool {
-    let terminfo_supports_osc4 = Database::from_env()
-        .ok()
-        .and_then(|info| info.get::<cap::InitializeColor>().map(|init| init.as_ref().starts_with(b"\x1b]4")))
-        .unwrap_or(false);
+pub fn terminal_supports_rgb() -> bool {
+    let terminfo_truecolor = Database::from_env().ok().is_some_and(|info| {
+        info.get::<cap::TrueColor>().is_some() || (info.get::<cap::SetTrueColorForeground>().is_some() && info.get::<cap::SetTrueColorBackground>().is_some())
+    });
     let terminal_program = std::env::var("TERM_PROGRAM").ok();
-    let known_terminal_host = ["VTE_VERSION", "KITTY_WINDOW_ID", "ALACRITTY_WINDOW_ID", "KONSOLE_VERSION", "WT_SESSION"]
+    let known_truecolor_host = ["KITTY_WINDOW_ID", "ALACRITTY_WINDOW_ID", "KONSOLE_VERSION", "WT_SESSION"]
         .into_iter()
-        .any(|name| std::env::var_os(name).is_some());
+        .any(|name| std::env::var_os(name).is_some())
+        || std::env::var("VTE_VERSION")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .is_some_and(|version| version >= 3600);
 
-    supports_osc_palette(terminfo_supports_osc4, terminal_program.as_deref(), known_terminal_host)
+    rgb_capability(
+        std::env::var("ICY_BOARD_COLOR_MODE").ok().as_deref(),
+        std::env::var("COLORTERM").ok().as_deref(),
+        std::env::var("TERM").ok().as_deref(),
+        terminal_program.as_deref(),
+        known_truecolor_host,
+        terminfo_truecolor,
+    )
 }
 
-pub fn apply_dos_palette() -> io::Result<()> {
-    if !terminal_supports_osc_palette() {
-        return Ok(());
-    }
-    write_dos_palette(std::io::stdout())?;
-    PALETTE_ACTIVE.store(true, Ordering::Release);
-    Ok(())
+fn dos_rgb_for_ansi_color(color: Color) -> Color {
+    let Color::Indexed(index @ 0..=15) = color else {
+        return color;
+    };
+    let (red, green, blue) = DOS_DEFAULT_PALETTE[usize::from(DOS_ANSI_INDEX[usize::from(index)])].rgb();
+    Color::Rgb(red, green, blue)
 }
 
-pub fn restore_palette() -> io::Result<()> {
-    if !PALETTE_ACTIVE.swap(false, Ordering::AcqRel) {
-        return Ok(());
+pub struct IcyBoardBackend<W: Write> {
+    inner: CrosstermBackend<W>,
+    rgb: bool,
+}
+
+impl<W: Write> IcyBoardBackend<W> {
+    pub fn new(writer: W) -> Self {
+        Self::with_rgb(writer, terminal_supports_rgb())
     }
-    reset_dos_palette(std::io::stdout())
+
+    fn with_rgb(writer: W, rgb: bool) -> Self {
+        Self {
+            inner: CrosstermBackend::new(writer),
+            rgb,
+        }
+    }
+}
+
+impl<W: Write> Backend for IcyBoardBackend<W> {
+    type Error = io::Error;
+
+    fn draw<'a, I>(&mut self, content: I) -> io::Result<()>
+    where
+        I: Iterator<Item = (u16, u16, &'a Cell)>,
+    {
+        if !self.rgb {
+            return self.inner.draw(content);
+        }
+        let cells: Vec<_> = content
+            .map(|(x, y, cell)| {
+                let mut cell = cell.clone();
+                cell.fg = dos_rgb_for_ansi_color(cell.fg);
+                cell.bg = dos_rgb_for_ansi_color(cell.bg);
+                (x, y, cell)
+            })
+            .collect();
+        self.inner.draw(cells.iter().map(|(x, y, cell)| (*x, *y, cell)))
+    }
+
+    fn append_lines(&mut self, n: u16) -> io::Result<()> {
+        self.inner.append_lines(n)
+    }
+
+    fn hide_cursor(&mut self) -> io::Result<()> {
+        self.inner.hide_cursor()
+    }
+
+    fn show_cursor(&mut self) -> io::Result<()> {
+        self.inner.show_cursor()
+    }
+
+    fn get_cursor_position(&mut self) -> io::Result<Position> {
+        self.inner.get_cursor_position()
+    }
+
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
+        self.inner.set_cursor_position(position)
+    }
+
+    fn clear(&mut self) -> io::Result<()> {
+        self.inner.clear()
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> io::Result<()> {
+        self.inner.clear_region(clear_type)
+    }
+
+    fn size(&self) -> io::Result<Size> {
+        self.inner.size()
+    }
+
+    fn window_size(&mut self) -> io::Result<WindowSize> {
+        self.inner.window_size()
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Backend::flush(&mut self.inner)
+    }
 }
 
 pub fn init() -> Result<TerminalType> {
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
-    apply_dos_palette()?;
 
     color_eyre::install()?;
+    install_restore_hook();
+    terminal::enable_raw_mode()?;
 
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let options = TerminalOptions {
         viewport: Viewport::Fullscreen,
     };
-    let mut terminal = ratatui::init_with_options(options);
+    let backend = IcyBoardBackend::new(stdout);
+    let mut terminal = Terminal::with_options(backend, options)?;
     terminal.clear()?;
     Ok(terminal)
 }
@@ -90,7 +195,6 @@ pub fn restore() -> Result<()> {
     let mut stdout = std::io::stdout();
     execute!(stdout, Clear(terminal::ClearType::All))?;
     ratatui::restore();
-    restore_palette()?;
     Ok(())
 }
 
@@ -108,12 +212,10 @@ pub fn with_terminal<T>(run: impl FnOnce() -> T) -> T {
     let mut stdout = std::io::stdout();
     let _ = terminal::disable_raw_mode();
     let _ = execute!(stdout, LeaveAlternateScreen);
-    let _ = restore_palette();
 
     let result = run();
 
     let _ = execute!(stdout, EnterAlternateScreen);
-    let _ = apply_dos_palette();
     let _ = terminal::enable_raw_mode();
     NEEDS_FULL_REDRAW.store(true, Ordering::Relaxed);
     result
@@ -138,31 +240,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dos_palette_programs_the_ansi_slots_with_dos_rgb_values() {
-        let mut output = Vec::new();
-
-        write_dos_palette(&mut output).unwrap();
-
-        assert!(output.starts_with(b"\x1b]4;0;rgb:00/00/00;1;rgb:AA/00/00"));
-        assert!(output.windows(b";4;rgb:00/00/AA".len()).any(|window| window == b";4;rgb:00/00/AA"));
-        assert!(output.ends_with(b";15;rgb:FF/FF/FF\x1b\\"));
+    fn rgb_support_uses_explicit_capabilities_without_guessing_from_256_colors() {
+        assert!(rgb_capability(None, Some("truecolor"), None, None, false, false));
+        assert!(rgb_capability(None, None, Some("xterm-direct"), None, false, false));
+        assert!(rgb_capability(None, None, None, Some("vscode"), false, false));
+        assert!(rgb_capability(None, None, None, None, true, false));
+        assert!(rgb_capability(None, None, None, None, false, true));
+        assert!(!rgb_capability(None, None, Some("xterm-256color"), None, false, false));
+        assert!(!rgb_capability(None, None, None, Some("unknown"), false, false));
     }
 
     #[test]
-    fn palette_reset_only_restores_the_slots_icy_board_changed() {
-        let mut output = Vec::new();
-
-        reset_dos_palette(&mut output).unwrap();
-
-        assert_eq!(output, b"\x1b]104;0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15\x1b\\");
+    fn color_mode_override_wins_over_detected_capabilities() {
+        assert!(rgb_capability(Some("rgb"), None, None, None, false, false));
+        assert!(!rgb_capability(
+            Some("indexed"),
+            Some("truecolor"),
+            Some("xterm-direct"),
+            Some("vscode"),
+            true,
+            true
+        ));
     }
 
     #[test]
-    fn palette_support_requires_osc4_terminfo_or_a_known_terminal_host() {
-        assert!(supports_osc_palette(true, None, false));
-        assert!(supports_osc_palette(false, Some("vscode"), false));
-        assert!(supports_osc_palette(false, None, true));
-        assert!(!supports_osc_palette(false, None, false));
-        assert!(!supports_osc_palette(false, Some("unknown"), false));
+    fn rgb_backend_translates_dos_slots_without_programming_the_terminal_palette() {
+        let mut output = Vec::new();
+        let mut backend = IcyBoardBackend::with_rgb(&mut output, true);
+        let mut cell = Cell::new("X");
+        cell.fg = Color::Indexed(4);
+        cell.bg = Color::Indexed(1);
+
+        backend.draw(std::iter::once((0, 0, &cell))).unwrap();
+
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("38;2;0;0;170"));
+        assert!(output.contains("48;2;170;0;0"));
+        assert!(!output.contains("]4;"));
+    }
+
+    #[test]
+    fn indexed_backend_keeps_ansi_colors_for_limited_terminals() {
+        let mut output = Vec::new();
+        let mut backend = IcyBoardBackend::with_rgb(&mut output, false);
+        let mut cell = Cell::new("X");
+        cell.fg = Color::Indexed(4);
+
+        backend.draw(std::iter::once((0, 0, &cell))).unwrap();
+
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("38;5;4"));
+        assert!(!output.contains("38;2;"));
     }
 }

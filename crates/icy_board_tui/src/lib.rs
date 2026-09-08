@@ -39,14 +39,14 @@ use i18n_embed::{
     fluent::{FluentLanguageLoader, fluent_language_loader},
 };
 use i18n_embed_fl::fl;
-use ratatui::{Terminal, backend::CrosstermBackend, symbols::border};
+use ratatui::{Terminal, symbols::border};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "i18n"] // path to the compiled localization resources
 struct Localizations;
 
-pub type TerminalType = Terminal<CrosstermBackend<std::io::Stdout>>;
+pub type TerminalType = Terminal<term::IcyBoardBackend<std::io::Stdout>>;
 
 use once_cell::sync::Lazy;
 pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
