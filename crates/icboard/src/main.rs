@@ -35,9 +35,11 @@ mod call_wait_screen;
 mod connections;
 mod event_scheduler;
 mod event_screen;
+mod log_screen;
 pub mod menu_runner;
 mod node_monitoring_screen;
 mod system_statistics_screen;
+mod system_status_screen;
 mod terminal_thread;
 mod tui;
 
@@ -175,6 +177,8 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     match IcyBoard::load(&config_file) {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
+            // Operator screens follow the palette the board owns, like the tools do.
+            icy_board_tui::theme::set_admin_theme(&icy_board.config.sysop.config_color_theme, &icy_board.config.sysop.config_color_configuration);
             let board_lock = Arc::new(Mutex::new(Some(BoardLock::acquire(&icy_board.root_path)?)));
             let recovered = icy_board_engine::icy_board::upload_quarantine::UploadQuarantine::new(icy_board.config.upload_processing.quarantine_path.clone())
                 .recover_interrupted()?;
@@ -188,7 +192,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 let cmd = if let Some(ppe) = &arguments.ppe {
                     CallWaitMessage::RunPPE(ppe.clone(), None, None, None)
                 } else {
-                    CallWaitMessage::User(false)
+                    CallWaitMessage::User
                 };
                 run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
                 restore_terminal()?;
@@ -457,15 +461,13 @@ mod event_operator_tests {
     }
 
     #[tokio::test]
-    async fn both_exit_variants_reject_before_touching_terminal_or_process() {
+    async fn exit_rejects_before_touching_terminal_or_process() {
         let mut bbs = Arc::new(Mutex::new(BBS::new(1)));
         bbs.lock().await.request_event_run("queued".into()).unwrap();
         let board = Arc::new(Mutex::new(IcyBoard::new()));
         let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
-        for force in [false, true] {
-            let result = run_message(CallWaitMessage::Exit(force), &mut terminal, &board, &mut bbs, false, String::new(), None).await;
-            assert_eq!(result.unwrap_err().to_string(), icy_board_tui::get_text("event_runtime_exit_blocked"));
-        }
+        let result = run_message(CallWaitMessage::Exit, &mut terminal, &board, &mut bbs, false, String::new(), None).await;
+        assert_eq!(result.unwrap_err().to_string(), icy_board_tui::get_text("event_runtime_exit_blocked"));
     }
 }
 
@@ -483,7 +485,7 @@ where
 {
     match msg {
         CallWaitMessage::EventRestart => {} // Handled by the service owner above.
-        CallWaitMessage::User(_busy) => {
+        CallWaitMessage::User => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All))?;
             match Tui::local_mode(board, bbs, false, None, stuffed_chars).await {
                 Ok(mut tui) => {
@@ -524,7 +526,7 @@ where
                 }
             }
         }
-        CallWaitMessage::Sysop(_busy) => {
+        CallWaitMessage::Sysop => {
             stdout().execute(Clear(crossterm::terminal::ClearType::All))?;
             match Tui::local_mode(board, bbs, true, None, stuffed_chars).await {
                 Ok(mut tui) => {
@@ -538,11 +540,20 @@ where
                 }
             }
         }
-        CallWaitMessage::Exit(_busy) => {
+        CallWaitMessage::Exit => {
             reserve_operator_exit(bbs).await?;
             restore_terminal()?;
             print_exit_screen();
             process::exit(0);
+        }
+        CallWaitMessage::EventMonitor => {
+            event_screen::run(terminal, board, bbs, full_screen).await?;
+        }
+        CallWaitMessage::LogViewer => {
+            log_screen::run(terminal, board, bbs, full_screen).await?;
+        }
+        CallWaitMessage::SystemStatus => {
+            system_status_screen::run(terminal, board, bbs, full_screen).await?;
         }
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(board).await;

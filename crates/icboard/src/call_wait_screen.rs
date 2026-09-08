@@ -45,10 +45,13 @@ fn program_title(version: &str, hash: &str) -> String {
 pub enum CallWaitMessage {
     /// Scheduler asks the service owner for a stop/reload/restart handshake.
     EventRestart,
-    User(bool),
-    Sysop(bool),
-    Exit(bool),
+    User,
+    Sysop,
+    Exit,
     Monitor,
+    EventMonitor,
+    LogViewer,
+    SystemStatus,
 
     ToggleCallLog,
     TogglePageBell,
@@ -86,35 +89,35 @@ impl CallWaitScreen {
         let buttons = vec![
             // Row 1
             Button {
-                title: get_text("call_wait_screen_user_button_busy"),
-                description: get_text("call_wait_screen_user_button_busy_descr"),
-                message: CallWaitMessage::User(true),
+                title: get_text("call_wait_screen_user_button"),
+                description: get_text("call_wait_screen_user_button_descr"),
+                message: CallWaitMessage::User,
             },
             Button {
-                title: get_text("call_wait_screen_sysop_button_busy"),
-                description: get_text("call_wait_screen_sysop_button_busy_descr"),
-                message: CallWaitMessage::Sysop(true),
+                title: get_text("call_wait_screen_sysop_button"),
+                description: get_text("call_wait_screen_sysop_button_descr"),
+                message: CallWaitMessage::Sysop,
             },
             Button {
-                title: get_text("call_wait_screen_dos_button_busy"),
-                description: get_text("call_wait_screen_dos_button_busy_descr"),
-                message: CallWaitMessage::Exit(true),
+                title: get_text("call_wait_screen_exit_button"),
+                description: get_text("call_wait_screen_exit_button_descr"),
+                message: CallWaitMessage::Exit,
             },
             // Row 2
             Button {
-                title: get_text("call_wait_screen_user_button_not_busy"),
-                description: get_text("call_wait_screen_user_button_not_busy_descr"),
-                message: CallWaitMessage::User(false),
+                title: get_text("call_wait_screen_log_button"),
+                description: get_text("call_wait_screen_log_button_descr"),
+                message: CallWaitMessage::LogViewer,
             },
             Button {
-                title: get_text("call_wait_screen_sysop_button_not_busy"),
-                description: get_text("call_wait_screen_sysop_button_not_busy_descr"),
-                message: CallWaitMessage::Sysop(false),
+                title: get_text("call_wait_screen_status_button"),
+                description: get_text("call_wait_screen_status_button_descr"),
+                message: CallWaitMessage::SystemStatus,
             },
             Button {
-                title: get_text("call_wait_screen_dos_button_not_busy"),
-                description: get_text("call_wait_screen_dos_button_not_busy_descr"),
-                message: CallWaitMessage::Exit(false),
+                title: get_text("call_wait_screen_event_monitor_button"),
+                description: get_text("call_wait_screen_event_monitor_button_descr"),
+                message: CallWaitMessage::EventMonitor,
             },
             // Row 3
             Button {
@@ -369,12 +372,8 @@ impl CallWaitScreen {
                     continue;
                 }
                 match key.code {
-                    KeyCode::F(6) => {
-                        crate::event_screen::run(terminal, board, bbs, full_screen).await?;
-                        continue;
-                    }
                     KeyCode::Esc => {
-                        return Ok(CallWaitMessage::Exit(false));
+                        return Ok(CallWaitMessage::Exit);
                     }
                     KeyCode::Down | KeyCode::Char('s') => self.set_if_valid(self.x, self.y + 1),
                     KeyCode::Up | KeyCode::Char('w') => self.set_if_valid(self.x, self.y - 1),
@@ -443,11 +442,6 @@ impl CallWaitScreen {
                 Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
                     .style(Style::new().white())
                     .right_aligned(),
-            )
-            .title_bottom(
-                Line::from(format!(" {} ", get_text("event_runtime_menu_key")))
-                    .style(Style::new().white())
-                    .left_aligned(),
             )
             .title_bottom(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).right_aligned())
             .style(Style::new().bg(DOS_BLUE))
@@ -776,7 +770,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn online_snapshot_keeps_callwait_buttons_and_f6_visible() {
+    async fn online_snapshot_keeps_callwait_buttons_and_the_event_monitor_visible() {
         let board = Arc::new(Mutex::new(IcyBoard::new()));
         let mut screen = CallWaitScreen::new(&board).await.unwrap();
         let bbs = Arc::new(Mutex::new(BBS::new(1)));
@@ -793,9 +787,48 @@ mod tests {
         terminal.draw(|frame| screen.ui(frame, false)).unwrap();
         let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains("ONLINE: Foreground report"));
-        assert!(text.contains(&get_text("event_runtime_menu_key")));
+        assert!(text.contains(&get_text("call_wait_screen_event_monitor_button")));
         assert!(text.contains(&screen.buttons[0].title));
         assert_eq!(screen.buttons.len(), 15);
+    }
+
+    /// The events screen has to stay reachable without a hidden function key.
+    #[tokio::test]
+    async fn the_event_monitor_replaces_the_duplicate_shell_button() {
+        let board = Arc::new(Mutex::new(IcyBoard::new()));
+        let screen = CallWaitScreen::new(&board).await.unwrap();
+        assert_eq!(
+            screen.buttons.iter().filter(|button| matches!(button.message, CallWaitMessage::Exit)).count(),
+            1
+        );
+        let monitor = screen
+            .buttons
+            .iter()
+            .position(|button| matches!(button.message, CallWaitMessage::EventMonitor))
+            .expect("event monitor button");
+        assert_eq!(screen.buttons[monitor].title, get_text("call_wait_screen_event_monitor_button"));
+    }
+
+    #[tokio::test]
+    async fn operator_buttons_have_distinct_actions_and_visible_labels() {
+        let board = Arc::new(Mutex::new(IcyBoard::new()));
+        let screen = CallWaitScreen::new(&board).await.unwrap();
+        assert_eq!(screen.buttons.len(), 15);
+        assert!(matches!(screen.buttons[0].message, CallWaitMessage::User));
+        assert!(matches!(screen.buttons[1].message, CallWaitMessage::Sysop));
+        assert!(matches!(screen.buttons[2].message, CallWaitMessage::Exit));
+        assert!(matches!(screen.buttons[3].message, CallWaitMessage::LogViewer));
+        assert!(matches!(screen.buttons[4].message, CallWaitMessage::SystemStatus));
+        assert!(matches!(screen.buttons[5].message, CallWaitMessage::EventMonitor));
+        assert!(matches!(screen.buttons[6].message, CallWaitMessage::ToggleCallLog));
+        assert!(matches!(screen.buttons[12].message, CallWaitMessage::ToggleStatistics));
+        assert!(matches!(screen.buttons[14].message, CallWaitMessage::ShowStatistics));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| screen.ui(frame, false)).unwrap();
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
+        for button in &screen.buttons[..6] {
+            assert!(text.contains(&button.title), "missing button {}", button.title);
+        }
     }
 
     #[test]

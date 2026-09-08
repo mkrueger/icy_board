@@ -86,7 +86,7 @@ Left/Right or Shift-Tab/Tab cycle mode and execution; Enter only moves down.
    Optional positive integer. Runs at ``time + n * interval_minutes`` on each
    selected weekday, ending at ``end_time`` or the end of that day. Completion time
    does not shift the slots. Omit for one slot per selected day. Monthly/date-mask
-   schedules are not implemented.
+   schedules and calendar date ranges are not implemented.
 
    On backlog, only the newest due, not-yet-claimed scheduled occurrence per
    stable event ID is retained. Older due, unclaimed slots are journaled as
@@ -235,13 +235,80 @@ New binaries read old journals unchanged. Older binaries do not recognize the
 serialized result ``superseded``: journals containing it are not backward
 compatible with those binaries. Account for this before downgrading.
 
-Manual execution at call-wait
------------------------------
+Manual execution from the Event Monitor
+---------------------------------------
 
-F6 opens the runtime Events menu. Up/Down and Home/End select; R or F5 refreshes
+The call-wait button rows are **User / Sysop / Exit** followed by
+**Log Viewer / System Status / Event Monitor**. Event Monitor opens the runtime
+Events menu and replaces the runtime F6 shortcut. F6 still opens/refreshes
+history in ICBSetup; there is no runtime F6 shortcut. Up/Down and Home/End
+select; R or F5 refreshes
 the loaded-board list and read-only history snapshot (not the event file on disk);
-Esc or F6 closes. Enter opens a default-No confirmation. Left/Right or Tab toggles,
+Esc closes. Enter opens a default-No confirmation. Left/Right or Tab toggles,
 Enter accepts, Esc cancels. Pressing Enter twice alone does not run the event.
+
+The **Candidate** column (**Kandidat** in German) is the next future local
+weekday/daily schedule slot, **not a guaranteed start or the scheduler backlog**.
+Details show its local timestamp/countdown, global scheduling off, event disabled,
+invalid settings, no weekdays, today not selected or an ended daily latest-start
+window as applicable. A waiting due Maintenance window comes from the runtime
+snapshot, not an inferred Online backlog. There are no calendar date-range
+settings.
+
+History is **cached, newest first**, and refreshes about every five seconds or
+with R/F5. PageUp selects an older execution, PageDown a newer one, without
+wrapping. Left/Right scroll the wrapped detail rows. An explicitly selected run
+survives refresh while its key remains in history; otherwise selection returns
+to the latest run. Details include result, manual/scheduled origin, duration or
+elapsed time, exit code and log path. Time starts at the journal's attempted
+start, not verified process runtime. Pending entries with a start and no finish
+show elapsed time; interrupted/wait-error entries and missing/inconsistent times
+show unknown duration. A missing exit code is not treated as success.
+
+L opens output for the **selected execution**, including pending Online output
+when recorded. There is no fallback to another run's log. Canonical path checks
+allow only the journal's restricted regular ``.log`` filenames directly under
+board-root ``event_logs``; traversal, outside paths, symlink directories/files
+and special files are rejected. Missing/unreadable/invalid logs are reported.
+This validates the path at open time; it is not a filesystem sandbox against
+concurrent external replacements.
+
+Output opens in the shared log viewer as a **fixed UTF-8 file**, with replacement
+characters for invalid bytes rather than CP437 decoding. Tab source switching
+and E severity filtering are disabled. Reads/searches cover only the newest
+**256 KiB / 2000 lines / 2048 displayed characters per line**. / edits the query,
+Enter commits and Esc cancels. T toggles filter/context; n/N select next/previous
+matching rows with wraparound and pause follow. F toggles follow. Pausing freezes
+the loaded content and size/UTC modification metadata, including pending read
+completion; resuming requests a fresh read immediately, or immediately after
+an existing read completes and its stale result is discarded. A newly selected
+source still gets one initial snapshot while paused. Following reopens the file
+about every second. Rotation detection uses Unix device/inode changes only;
+truncation uses sampled size decreases. Changes between samples, including
+truncate-and-regrow, can be missed. Esc returns to Event Monitor.
+
+There is **no interrupt or kill button**. Esc closes the view/dialog, not a
+queued or running command. Elapsed-time warnings do not impose a timeout.
+
+Log Viewer and System Status are read-only and return automatically to their
+owning call-wait screen for offline maintenance or restart handling. They do not
+acknowledge the listener handshake or reopen admission. System Status shows
+actual local listeners separately from configured endpoints: addresses are
+published after successful binding, and the supervisor marks completed services
+stopped. Bound-but-login-gated listeners are distinct from stopped services;
+web admin is not a BBS login endpoint. State age and, when the row fits, its UTC
+transition timestamp are shown. This does not prove public reachability through
+NAT or firewalls. Configuration, runtime, nodes and disk each report independent
+last-success UTC timestamps, ages and fresh/stale status. Samples become stale
+at two seconds old, immediately on busy/read-failed results, or after two seconds
+of a pending disk read. A failed refresh never advances its last-success time;
+disk read failure clears the disk value. Never-sampled/pending states are explicit.
+Disk values show **available/total GiB and percent available**. A display-only
+warning means **strictly less than 1 GiB OR strictly less than 10% available**;
+it does not change runtime admission, upload or event policy.
+See :doc:`icy_board` for log sources, bounded reads and controls, uptime, free
+disk space, node counts and runtime errors. Statistics reset stays in
+the statistics monitor.
 
 A confirmed manual request overrides global scheduling off, disabled status,
 weekday, start and end bounds, but not execution/caller policy. Maintenance Fixed

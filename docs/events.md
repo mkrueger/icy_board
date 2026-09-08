@@ -1,4 +1,4 @@
-# Timed events: source review, 2026-09-07
+# Timed events: source review, 2026-09-08
 
 This describes the current working-tree implementation, including the event editor
 and scheduler/restart changes. The PCBoard comparison is grounded in the bundled
@@ -20,8 +20,8 @@ not schedule automatically. This is not the full PCBoard event record.
 - `interval_minutes`, when present, is a positive integer: slots are anchored at
   `time + n × interval_minutes` on each selected weekday, not at the previous
   completion. Slots end at `end_time`, or at the end of the day when omitted.
-  Without an interval there is one slot per selected day. There is no monthly or
-  date-mask schedule.
+  Without an interval there is one slot per selected day. There is no monthly,
+  date-mask or calendar date-range schedule.
 - `warning_minutes`, when present, is a positive integer. After that elapsed
   command duration the runtime logs **Running long**; it is not a kill timeout.
 - `execution` selects `maintenance` (drain/reload) or `online` (no drain/reload),
@@ -164,12 +164,61 @@ do not delete the journal's occurrence keys to trim logs, because they are the
 replay barrier. Lost history cannot prove previous execution. Commands have no
 forced time limit; `warning_minutes` only logs a warning (and marks Online status).
 
-At runtime, **F6 on call-wait opens the Events menu**. Up/Down and Home/End select
+At runtime, the **Event Monitor button on the call waiting screen opens the Events
+menu**. The first button row is **User / Sysop / Exit**; the second is
+**Log Viewer / System Status / Event Monitor**. Event Monitor replaces the runtime
+F6 shortcut; **F6 remains in the ICBSetup event editor/history only**.
+Up/Down and Home/End select
 a record; **R or F5** refreshes the loaded-board list and read-only history snapshot;
-**Esc or F6** closes. Enter opens a **default-No** confirmation; Left/Right or Tab
+**Esc** closes. Enter opens a **default-No** confirmation; Left/Right or Tab
 toggles the choice, Enter accepts, and Esc cancels. A second Enter alone does not
-run anything. The menu shows execution/mode, queued/active state, latest result
-and log path; refresh is not an event-file reload.
+run anything. The menu shows execution/mode, queued/active state and latest result;
+refresh is not an event-file reload. History is cached, with an automatic refresh
+about every five seconds rather than a journal read on every redraw.
+
+The **Candidate** column (**Kandidat** in German) and detail countdown describe
+the next future slot calculated from the event's local weekday/daily schedule,
+**not a guaranteed start or a view of retained scheduler backlog**. Details
+separately report global scheduling off, event disabled, invalid settings, no
+weekdays, today not selected, and an ended daily latest-start window. A due,
+unexpired Maintenance window may show waiting from the runtime snapshot; this
+does not infer an Online backlog. There are no calendar date-range settings.
+
+The history pane shows **runs, newest first**, with a selected-run counter.
+**PgUp/PgDn select older/newer executions** for the selected event, without
+wrapping. **Left/Right scroll detail rows**. An explicitly selected execution is
+retained across refresh while its key remains in history; otherwise the latest
+run is selected. Details include manual/scheduled origin, result, duration or
+elapsed time, exit code, command, description, log path and journal diagnostics.
+Duration is measured from the journal's attempted start, not verified process
+runtime. Pending entries with a start but no finish show elapsed time;
+interrupted/wait-error entries and missing/inconsistent times show unknown
+duration. A missing exit code is not assumed to be success.
+
+**L opens output for that exact selected execution**, including pending Online
+output when recorded; a missing log never falls back to another run. The stored
+path must name a regular `.log` file directly in board-root `event_logs`, using
+the journal's restricted filename format. Canonical checks reject paths outside
+that directory, traversal, symlink directories/files and special files. Missing,
+unreadable and invalid paths are reported in the monitor. Validation is a check
+at open time, not a filesystem sandbox against concurrent external replacement.
+
+Event output uses the shared bounded, read-only log viewer in **fixed UTF-8**
+mode; invalid UTF-8 is replaced, not decoded as CP437. **Tab and E are disabled**.
+Search covers only the newest **256 KiB / 2000 lines / 2048 displayed characters
+per line**. **/** edits the case-insensitive query; Enter commits, Esc cancels.
+**T** toggles filter/context, and **n/N** move to next/previous matching rows with
+wraparound and pause following. **F** toggles follow; paused content and file
+size/UTC modification metadata stay frozen even when a pending read completes.
+Re-enabling follow requests fresh data immediately (or as soon as the existing
+read completes, discarding its stale result). A newly selected source gets one
+initial snapshot even while paused. While following, the file is reopened about
+every second. Rotation detection compares Unix device/inode identity only;
+truncation compares sampled sizes. Changes between samples, including
+truncate-and-regrow, can be missed. Esc returns to the monitor, not to a shell.
+
+There is **no interrupt/kill button**. Closing the monitor or log view does not
+cancel queued/running work, and `warning_minutes` never terminates a command.
 
 Confirmed manual runs override global scheduling off, a disabled record, weekday,
 start and end restrictions, but retain execution and caller policy: Maintenance
@@ -224,6 +273,26 @@ scheduled time, draining callers, stopping services, running, reloading, or
 restarting. During the handshake it redraws every 250 ms without cancelling the
 operation. Reload/lock errors show repair instructions and keep admission closed;
 a stalled operation is not treated as permission to reopen the board unsafely.
+
+The read-only **Log Viewer** and **System Status** return automatically to their
+owning call-wait screen when offline maintenance or a restart requires this
+handshake. They never acknowledge listener shutdown/restart or reopen admission.
+System Status distinguishes configured endpoints from actual local listeners:
+addresses are published after successful binding, and service completion is
+marked stopped by the supervisor. Bound-but-login-gated is distinct from stopped;
+web admin is not a BBS login endpoint. State age is shown, with the UTC transition
+timestamp when the row fits. Running locally does not prove public reachability
+through NAT or firewalls. Configuration, runtime, nodes and disk have independent
+last-success UTC timestamps and sample ages: stale at two seconds, immediately
+on busy/read-failed results, or after a disk read has been pending two seconds.
+Cached values never advance a failed source's timestamp; failed disk reads clear
+the disk value. Never-sampled and pending states are explicit. Disk display is
+**available/total GiB and percent available**; its display-only warning means
+**strictly less than 1 GiB OR strictly less than 10% available**, not a new runtime
+policy. See the
+[call-wait guide](source/icy_board.rst) for log sources, bounded reads and controls,
+uptime, disk space, node counts and runtime errors. Statistics reset
+remains in the statistics monitor.
 
 Sources: [runtime handshake](../crates/icboard/src/event_scheduler.rs),
 [main service ownership/restart](../crates/icboard/src/main.rs#L174-L463),

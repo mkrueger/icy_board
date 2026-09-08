@@ -200,6 +200,10 @@ async fn occupied_endpoint_fails_without_tasks(index: usize) {
     assert!(error.contains(NAMES[index]), "wrong service in error: {error}");
     assert!(error.contains(&fixture.addresses[index].port().to_string()), "missing failed port: {error}");
     assert!(generation.services.is_empty(), "no task may spawn before all enabled listeners bind");
+    assert!(
+        fixture.bbs.lock().await.runtime_listeners.is_empty(),
+        "failed preparation must not publish running diagnostics"
+    );
     assert!(!generation.token.is_cancelled(), "preparation failure must not poison the caller's token");
     fixture.assert_no_nodes().await;
     // In particular, SSH/admin failures must drop the earlier Telnet listener;
@@ -380,12 +384,26 @@ async fn tcp_and_http_smoke_with_closed_admission(fixture: &Fixture) {
 async fn all_four_listeners_survive_three_start_stop_rebind_cycles_tcp_and_http_only() {
     let mut fixture = Fixture::new([true; 4]).await;
     fixture.release_except(None);
+    let started_at = fixture.bbs.lock().await.started_at;
     for _ in 0..3 {
         let mut generation = Generation::new();
+        let before_start = chrono::Utc::now();
         let admin = fixture.start(&mut generation).await.unwrap().expect("admin must be enabled");
+        let after_start = chrono::Utc::now();
         assert_eq!(admin.url, format!("http://{}/", fixture.addresses[ADMIN]));
         // Do not print, compare, or depend on a generated/environment admin token.
         assert_eq!(generation.services.len(), 4);
+        {
+            let bbs = fixture.bbs.lock().await;
+            assert_eq!(bbs.started_at, started_at, "listener restarts must preserve uptime");
+            assert_eq!(bbs.runtime_listeners.len(), 4);
+            for (index, status) in bbs.runtime_listeners.iter().enumerate() {
+                assert_eq!(status.name, NAMES[index]);
+                assert_eq!(status.address, fixture.addresses[index]);
+                assert!(status.running);
+                assert!(status.changed_at >= before_start && status.changed_at <= after_start);
+            }
+        }
         tcp_and_http_smoke_with_closed_admission(&fixture).await;
         // Keep a separate, incomplete SSH transport alive across cancellation.
         // A successful bind after stop alone would not detect a leaked transport.
@@ -393,7 +411,11 @@ async fn all_four_listeners_survive_three_start_stop_rebind_cycles_tcp_and_http_
         let mut prefix = [0; 4];
         timeout(DEADLINE, pending_ssh.read_exact(&mut prefix)).await.unwrap().unwrap();
         assert_eq!(&prefix, b"SSH-");
+        let before_stop = chrono::Utc::now();
         generation.stop().await;
+        let after_stop = chrono::Utc::now();
+        let stopped = fixture.bbs.lock().await.runtime_listeners.clone();
+        assert!(stopped.iter().all(|status| status.changed_at >= before_stop && status.changed_at <= after_stop));
         timeout(DEADLINE, async {
             let mut buffer = [0; 512];
             while pending_ssh.read(&mut buffer).await.unwrap() != 0 {}
@@ -402,10 +424,124 @@ async fn all_four_listeners_survive_three_start_stop_rebind_cycles_tcp_and_http_
         .expect("stopped SSH generation retained an incomplete transport");
         // Stop is idempotent and normal cancellation must not latch a failure.
         generation.stop().await;
+        assert_eq!(
+            fixture.bbs.lock().await.runtime_listeners,
+            stopped,
+            "idempotent stop must retain transition timestamps"
+        );
         assert!(fixture.bbs.lock().await.event_scheduler_error.is_none());
+        assert!(fixture.bbs.lock().await.runtime_listeners.iter().all(|status| !status.running));
         assert!(fixture.bbs.lock().await.event_maintenance);
         fixture.assert_no_nodes().await;
         fixture.assert_rebindable_except(None).await;
+    }
+}
+
+#[tokio::test]
+async fn port_zero_publishes_actual_bound_endpoints_and_failed_restart_keeps_stopped_diagnostics() {
+    let mut fixture = Fixture::new([true; 4]).await;
+    fixture.release_except(None);
+    {
+        let mut board = fixture.board.lock().await;
+        board.config.login_server.telnet.port = 0;
+        board.config.login_server.ssh.port = 0;
+        board.config.login_server.secure_websocket.port = 0;
+        board.config.board.web_admin.port = 0;
+    }
+    let mut generation = Generation::new();
+    let admin = timeout(DEADLINE, fixture.start(&mut generation)).await.unwrap().unwrap().unwrap();
+    {
+        let bbs = fixture.bbs.lock().await;
+        assert_eq!(bbs.runtime_listeners.len(), 4);
+        for (index, status) in bbs.runtime_listeners.iter().enumerate() {
+            assert_eq!(status.name, NAMES[index]);
+            assert!(status.running);
+            assert!(status.address.ip().is_loopback());
+            assert_ne!(status.address.port(), 0, "must publish the allocated port, not configuration");
+            fixture.addresses[index] = status.address;
+        }
+    }
+    assert_eq!(admin.url, format!("http://{}/", fixture.addresses[ADMIN]));
+    // Proves published addresses actually serve; closed admission still permits
+    // listener readiness and must not be inferred from the diagnostics vector.
+    tcp_and_http_smoke_with_closed_admission(&fixture).await;
+    generation.stop().await;
+    let previous = fixture.bbs.lock().await.runtime_listeners.clone();
+    assert!(previous.iter().all(|status| !status.running));
+    let conflict = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+    fixture.board.lock().await.config.board.web_admin.port = conflict.local_addr().unwrap().port();
+    let mut next = Generation::new();
+    assert!(start_error(fixture.start(&mut next).await).contains("Web admin"));
+    assert!(next.services.is_empty());
+    assert_eq!(
+        fixture.bbs.lock().await.runtime_listeners,
+        previous,
+        "failed preparation must not publish a partial generation"
+    );
+    next.stop().await;
+}
+
+#[tokio::test]
+async fn joined_child_marks_only_matching_listener_stopped_before_failure_latch() {
+    for mode in 0..4 {
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let changed_at = chrono::Utc::now() - chrono::Duration::seconds(60);
+        bbs.lock().await.runtime_listeners = vec![
+            ListenerStatus {
+                name: "Observed service".into(),
+                address,
+                running: true,
+                changed_at,
+            },
+            ListenerStatus {
+                name: "Other service".into(),
+                address,
+                running: true,
+                changed_at,
+            },
+        ];
+        let mut generation = Generation::new();
+        let (finish, ready) = tokio::sync::oneshot::channel();
+        spawn_service(
+            &mut generation.services,
+            "Observed service",
+            bbs.clone(),
+            generation.token.clone(),
+            async move {
+                let _listener = listener;
+                ready.await.unwrap();
+                match mode {
+                    0 | 3 => Ok(()),
+                    1 => Err("synthetic failure".into()),
+                    _ => panic!("synthetic listener panic"),
+                }
+            },
+        );
+        assert!(bbs.lock().await.runtime_listeners.iter().all(|status| status.running));
+        if mode == 3 {
+            generation.token.cancel();
+        }
+        let before_stop = chrono::Utc::now();
+        finish.send(()).unwrap();
+        timeout(DEADLINE, generation.services.join_next()).await.unwrap().unwrap().unwrap();
+        {
+            let bbs = bbs.lock().await;
+            assert!(!bbs.runtime_listeners[0].running);
+            assert_eq!(bbs.runtime_listeners[0].address, address);
+            assert!(bbs.runtime_listeners[0].changed_at >= before_stop);
+            assert!(bbs.runtime_listeners[0].changed_at <= chrono::Utc::now());
+            assert_eq!(bbs.runtime_listeners[1].changed_at, changed_at);
+            assert!(bbs.runtime_listeners[1].running, "another service must not be marked stopped");
+            assert_eq!(bbs.event_scheduler_error.is_some(), mode != 3);
+            assert_eq!(bbs.admissions_closed(), mode != 3);
+        }
+        generation.stop().await;
+        assert!(
+            TcpListener::bind(address).await.is_ok(),
+            "child must release its listener before publishing stopped"
+        );
     }
 }
 

@@ -6,7 +6,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard,
-        bbs::{BBS, EventMaintenancePhase, EventMaintenanceStatus},
+        bbs::{BBS, EventMaintenancePhase, EventMaintenanceStatus, ListenerStatus},
     },
 };
 use tokio::{net::TcpListener, sync::Mutex, task::JoinSet};
@@ -85,6 +85,18 @@ fn spawn_service(
         let mut task = JoinSet::new();
         task.spawn(run);
         let result = task.join_next().await.unwrap();
+        // Capture completion before waiting for the diagnostics lock.
+        let stopped_at = chrono::Utc::now();
+        {
+            let mut bbs = bbs.lock().await;
+            // Unique service names within a generation; start requires the old
+            // supervisor set to be drained. Release the lock before latching
+            // failure (which takes it again); never join a child while held.
+            if let Some(status) = bbs.runtime_listeners.iter_mut().find(|status| status.name == name) {
+                status.running = false;
+                status.changed_at = stopped_at;
+            }
+        }
         if !token.is_cancelled() {
             let detail = match result {
                 Ok(Ok(())) => "unexpected completion".into(),
@@ -127,15 +139,35 @@ pub(crate) async fn start_connections(
     };
     let admin = prepare_admin(board, bbs, config_file).await?;
 
+    // Query actual addresses before publication. Address-query failures roll
+    // back all prepared sockets just like bind failures, without a partial view.
+    let mut statuses = Vec::new();
+    for (name, address) in [
+        ("Telnet", telnet.as_ref().map(TcpListener::local_addr)),
+        ("SSH", ssh.as_ref().map(bbs::ssh::PreparedSsh::local_addr)),
+        ("Secure WebSocket", websocket.as_ref().map(TcpListener::local_addr)),
+        ("Web admin", admin.as_ref().map(|admin| admin.listener.local_addr())),
+    ] {
+        if let Some(address) = address {
+            statuses.push(ListenerStatus {
+                name: name.into(),
+                address: address.map_err(|error| format!("{name} local address: {error}"))?,
+                running: true,
+                changed_at: chrono::Utc::now(),
+            });
+        }
+    }
+
     // Preparation can await DNS/binding. Recheck the sticky safety latch before
     // publishing any services, atomically with failure publication and admission.
-    let admission = bbs.lock().await;
+    let mut admission = bbs.lock().await;
     if let Some(error) = &admission.event_scheduler_error {
         return Err(format!("Listener start blocked by runtime failure: {error}").into());
     }
     if token.is_cancelled() {
         return Err("Listener start cancelled during preparation".into());
     }
+    admission.runtime_listeners = statuses;
     if let Some(listener) = telnet {
         let run = bbs::serve_telnet_connections(listener, board.clone(), bbs.clone());
         let cancel = token.clone();

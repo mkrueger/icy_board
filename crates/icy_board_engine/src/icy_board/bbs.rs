@@ -1,8 +1,10 @@
 use icy_net::ConnectionType;
 use std::{
     collections::{HashSet, VecDeque},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
+    time::Instant,
 };
 use tokio::sync::{Mutex, mpsc};
 
@@ -68,7 +70,24 @@ pub struct OnlineEventStatus {
     pub running_long: bool,
 }
 
+/// Read-only listener diagnostics, never an admission gate or restart handshake.
+/// The address is the actual bound endpoint, including assigned port/fallback.
+/// Stopped entries retain their last bound address.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ListenerStatus {
+    pub name: String,
+    pub address: SocketAddr,
+    pub running: bool,
+    /// UTC time of the actual bound/running or stopped transition, not a UI refresh.
+    pub changed_at: chrono::DateTime<chrono::Utc>,
+}
+
 pub struct BBS {
+    /// Runtime uptime origin, preserved across listener/configuration restarts.
+    pub started_at: Instant,
+    /// Read-only diagnostics: never gates admission or acknowledges maintenance.
+    /// Replaced atomically only after every enabled listener is prepared.
+    pub runtime_listeners: Vec<ListenerStatus>,
     pub open_connections: Arc<Mutex<Vec<Option<NodeState>>>>,
     pub bbs_channels: Vec<Option<tokio::sync::mpsc::Sender<BBSMessage>>>,
     pub group_chat: Arc<Mutex<GroupChatState>>,
@@ -219,6 +238,8 @@ impl BBS {
             vec2.push(None);
         }
         BBS {
+            started_at: Instant::now(),
+            runtime_listeners: Vec::new(),
             open_connections: Arc::new(Mutex::new(vec)),
             bbs_channels: vec2,
             group_chat: Arc::new(Mutex::new(GroupChatState::default())),
@@ -240,6 +261,27 @@ impl BBS {
 #[cfg(test)]
 mod event_lifecycle_tests {
     use super::*;
+
+    #[test]
+    fn listener_diagnostics_never_gate_admission() {
+        let mut bbs = BBS::new(1);
+        assert!(bbs.runtime_listeners.is_empty());
+        assert!(!bbs.admissions_closed());
+        bbs.runtime_listeners.push(ListenerStatus {
+            name: "Telnet".into(),
+            address: "127.0.0.1:12345".parse().unwrap(),
+            running: false,
+            changed_at: chrono::Utc::now(),
+        });
+        assert!(!bbs.admissions_closed());
+        bbs.event_maintenance = true;
+        bbs.runtime_listeners[0].running = true;
+        assert!(bbs.admissions_closed());
+        bbs.event_maintenance = false;
+        bbs.operator_maintenance = true;
+        bbs.runtime_listeners.clear();
+        assert!(bbs.admissions_closed());
+    }
 
     #[test]
     fn manual_event_queue_refuses_duplicates_active_requests_and_failed_scheduler() {

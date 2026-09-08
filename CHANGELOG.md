@@ -10,6 +10,28 @@ releases.
 
 ### Added
 
+- Call-wait Log Viewer with bounded, read-only application/caller logs, follow
+  and search. T switches filter/context; n/N navigate matches with wraparound.
+  Pausing freezes content and size/UTC modification metadata, including pending
+  reads; resuming requests fresh data immediately after any old read completes.
+  Reads/searches stay within 256 KiB, 2000 lines and 2048 characters per line.
+  Rotation notices use sampled Unix device/inode changes; truncation notices use
+  size decreases, so changes between samples can be missed.
+  System Status adds uptime, actual local listeners, node counts and runtime
+  errors, bound-but-login-gated state and transition age/time. Disk values show
+  available/total GiB and percent available, warning strictly below 1 GiB OR 10%.
+  Configuration/runtime/node/disk freshness is independent, with UTC timestamps,
+  sample ages, a two-second stale threshold and explicit busy/failure/pending states.
+  These diagnostics are read-only and do not alter runtime policy.
+
+- Event Monitor shows a schedule **Candidate**, not a guaranteed start, and
+  weekday/daily-window restrictions (no calendar date-range settings). Cached
+  history is newest first; PgUp/PgDn select older/newer runs, Left/Right scroll
+  details, and L opens the selected execution's canonically guarded output under
+  `event_logs`. Fixed event output is UTF-8, with Tab/E disabled. Duration/elapsed
+  time and exit codes reflect journal data, not verified process runtime.
+  There is no interrupt/kill button. All three screens have English and German text.
+
 - Accounting setup and operator documentation, with per-use/per-minute command
   and door rates, legacy CMD.LST rate import, and credit for accepted uploads
   including successful intake awaiting manual approval. See the
@@ -369,6 +391,11 @@ releases.
   `MESSAGE` statement are unchanged, and writing a message is still theirs.
 
 ### Changed
+
+- Call-wait now offers User / Sysop / Exit, then Log Viewer / System Status /
+  Event Monitor. Local logins keep network services running; Exit stops the
+  application and services without opening a shell. Event Monitor replaces
+  runtime F6; setup history keeps F6, and statistics reset stays in its monitor.
 
 - PPL 4.00 constant declarations reject numeric values outside their declared
   range (`CONST BYTE N = 257` is an error). Dependent and module constants use

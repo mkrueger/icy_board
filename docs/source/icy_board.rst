@@ -12,26 +12,147 @@ Call Waiting Screen
 The call waiting screen is what you see when you start Icy Board. It's like the PCBoard call 
 waiting screen but modernized a bit. All important Icy Board configuration utilities are accessible from here.
 
+The first button row is **User / Sysop / Exit**. The second is
+**Log Viewer / System Status / Event Monitor**. The old Busy/Not Busy choices
+are gone: local logins do not stop network services.
+
 Options Explained
 -----------------
 
-User - Busy/Not Busy
-~~~~~~~~~~~~~~~~~~~~
+User
+~~~~
 
-Log in as a regular user. This gets you to login prompt. 
-You can log in as any user that exists in the users file.
+Open a local login prompt for any user in the users file. Network services and
+the event scheduler keep running; normal admission and maintenance gates apply.
 
-Sysop - Busy/Not Busy
-~~~~~~~~~~~~~~~~~~~~~~
-Log in as sysop. This gets you to the command prompt directly.
+Sysop
+~~~~~
+Log in locally as sysop, directly at the command prompt. Network services keep
+running; this is not a Busy mode or a bypass of maintenance admission gates.
 
-Shell - Busy/Not Busy
-~~~~~~~~~~~~~~~~~~~~~
-Just quits the Call Waiting Screen. Historical reasons...
+Exit
+~~~~
+Exit the IcyBoard application and stop its services. This does not open a shell.
+
+Log Viewer
+~~~~~~~~~~
+Read the application log and the configured caller log without modifying either.
+The application path is the actual configuration path with its extension replaced
+by ``.log`` (``config_file.with_extension("log")``), not a hard-coded filename.
+The caller source uses ``paths.caller_log``, resolved against the board root.
+Native logs are UTF-8; imported caller records that are not valid UTF-8 fall back
+to CP437.
+
+While following, the viewer samples about once per second and reopens the file.
+Reads and searches cover only the newest 256 KiB, at most 2000 lines and
+2048 displayed characters per line, not the whole file. A leading partial line
+is discarded. These are display limits, not log retention or rotation settings.
+Only regular files are accepted; final symlinks and special files are rejected.
+Missing, unconfigured or unreadable sources are reported in the viewer. Terminal
+controls are stripped, and web-admin token entries are hidden and not searchable.
+
+The metadata row shows the opened file's size in bytes and modification time in
+UTC (or unknown). A read failure clears the old content and marks metadata
+unavailable. Replacement/rotation is detected by device/inode changes **on Unix
+only**; truncation is detected by a smaller sampled size. These are comparisons
+between successful samples, not filesystem notifications: truncate-and-regrow or
+changes entirely between samples can be missed. A detected change remains shown
+across normal refreshes. This is not comprehensive rotation detection.
+
+* Tab switches between application and caller sources and clears the text filter.
+* F toggles following; initially it is on. Pausing freezes the loaded tail and
+   its metadata, even if an outstanding read finishes. A newly selected source
+   still receives one initial snapshot while paused. Re-enabling follow requests
+   a fresh read immediately; if an older read is pending, its result is discarded
+   and the fresh read starts as soon as it completes, without another refresh delay.
+* E toggles warning/error records for the application source only, using actual
+   log-level headers rather than words in the message.
+* / edits a case-insensitive substring search. Enter applies it; Esc cancels the
+   edit and preserves the committed query. Apply an empty query to clear it.
+   Typing alone does not change the displayed matches.
+* T switches between matching-lines-only filtering and context mode, which keeps
+   surrounding lines visible and highlights matching rows. The application
+   warning/error restriction still applies in both modes.
+* n/N select the next/previous matching row, wrapping at either end. Match
+   navigation pauses following and centers the selection where possible. The
+   counter shows the selected match and total matches (0 means none selected).
+* Up/Down scroll lines, PageUp/PageDown scroll pages, and Home/End move to the
+   first/last page. These vertical navigation keys turn following off; F resumes it.
+* Left/Right pan horizontally. Esc outside search editing returns to the owner.
+
+Event Monitor's L key opens the selected execution's output in this same viewer,
+as a **fixed UTF-8 file** (invalid UTF-8 uses replacement characters, not CP437).
+Tab source switching and E severity filtering are disabled there; follow, search,
+context and navigation remain available. Esc returns to Event Monitor. Its path
+must pass the event monitor's canonical, regular-file checks directly beneath
+the board-root ``event_logs`` directory; missing/invalid paths are reported, not
+replaced with output from another execution.
+
+System Status
+~~~~~~~~~~~~~
+This read-only view shows server uptime (days and hh:mm:ss), new-login admission,
+active/total nodes, the board root, disk space, maintenance state, runtime/request
+errors and any active Online event. Disk values are **available/total GiB and
+percent available** for the board-root filesystem. A display-only low-space
+warning appears when available space is strictly **less than 1 GiB OR less than
+10%** of total. Exactly 1 GiB or 10% alone does not trigger that condition; the
+other condition can still trigger it. Unknown totals/percentages are labelled
+unavailable. This warning does not change admission, upload or event policy.
+
+Configuration, runtime, nodes and disk have independent freshness rows: last
+successful sample in UTC, age in seconds, and fresh/stale status with busy,
+read-failed or pending reasons where applicable. Normal configuration/node/disk
+refresh is about once per second; runtime is checked each UI loop. Samples become
+stale at two seconds old (or immediately on a busy/read-failed result); a pending
+disk read also becomes stale after two seconds. Contention retains the last
+successful value without advancing its timestamp. A disk read failure instead
+clears the disk value but retains its last-success timestamp. Sources with no
+successful sample are explicitly marked; one source's refresh never makes
+another source look fresh.
+
+Telnet, SSH, secure WebSocket and web-admin entries distinguish configured
+addresses/enabled flags from actual local listener addresses and running state.
+Actual listeners are published only after successful binding; the supervisor
+marks them stopped when their service task completes. An enabled configuration
+alone does not mean a listener is running. Bound listeners with BBS logins gated
+are distinguished from stopped services; web admin is not a BBS login endpoint.
+Listener rows show time since the state transition and, when the full row fits,
+its UTC timestamp. A running local listener does **not** prove public reachability
+through NAT, a firewall or a proxy.
+
+Up/Down, PageUp/PageDown and Home/End scroll; Esc returns to call-wait. Both
+System Status and Log Viewer return automatically to the owning call-wait screen
+when offline maintenance or a restart requires its service-management handshake.
+Neither viewer acknowledges that handshake or reopens admission itself.
+
+Event Monitor
+~~~~~~~~~~~~~
+Show the timed events, their last result and their history, and run one now.
+The scheduler keeps running while this screen is open; see :doc:`events`.
+This button replaces the runtime F6 shortcut. F6 remains available for history
+in the ICBSetup event editor, not as a call-wait shortcut.
+
+Up/Down and Home/End select events. The **Candidate** column is a future schedule
+slot, not a guaranteed start or the scheduler's retained backlog. Details show
+the local candidate time/countdown and applicable disabled, invalid, weekday or
+daily-window restrictions. There are no calendar date-range settings.
+
+History is cached, newest first: PageUp selects an older execution, PageDown a
+newer one. Left/Right scroll wrapped detail rows; L opens output for that exact
+execution, including pending Online output when recorded. R/F5 requests a refresh
+of the loaded-board list and journal, also refreshed about every five seconds;
+it does not reload the event configuration file. Details show duration/elapsed
+time and exit code where known. Times measure journal attempted starts, not
+verified process runtime; interrupted/wait-error durations are unknown.
+
+Enter opens a default-No run confirmation; choose Yes explicitly to queue a
+manual run. There is **no interrupt or kill button**: Esc closes a view or dialog,
+not a running command. Warnings do not impose a command timeout.
 
 Call Log - On/Off
 ~~~~~~~~~~~~~~~~~
-Toggle call logging. If on, all calls are logged to icboard.log.
+Toggle caller logging to the configured ``paths.caller_log`` file. This is
+separate from the application log and from the read-only Log Viewer.
 
 Page Bell - On/Off
 ~~~~~~~~~~~~~~~~~~~
@@ -103,7 +224,14 @@ installation. Its main menu is shown in :doc:`installation`.
 ICBMoni
 ~~~~~~~
 Start the monitor utility. This is a TUI utility to monitor system activity.
-Nodes & logged on users and which ports Icy Board is listening on.
+It shows nodes and logged-on users. Use System Status for actual listener state.
+
+Show Statistics
+~~~~~~~~~~~~~~~
+The statistics monitor retains the all-time and today counters and their reset
+action. Del asks for confirmation before resetting all statistics, including the
+caller number; Y confirms. Statistics reset is not part of System Status or
+Log Viewer.
 
 What a Caller Sees
 ------------------

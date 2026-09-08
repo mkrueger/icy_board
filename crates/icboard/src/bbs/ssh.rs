@@ -32,6 +32,11 @@ pub struct PreparedSsh {
 }
 
 impl PreparedSsh {
+    /// Actual bound address, including port-zero allocation or fallback binding.
+    pub fn local_addr(&self) -> std::io::Result<std::net::SocketAddr> {
+        self.listener.local_addr()
+    }
+
     pub async fn bind(ssh: SSH) -> Res<Self> {
         let mut rng: StdRng = rand::make_rng();
         let config = russh::server::Config {
