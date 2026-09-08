@@ -53,6 +53,8 @@ pub struct Theme {
     pub table_inactive: Style,
     pub help_box: Style,
     pub help_header: Style,
+    pub help_text: Style,
+    pub help_description: Style,
 
     pub swatch: bool,
 }
@@ -140,6 +142,10 @@ impl Theme {
             table_inactive: dos_attribute_style(colors[8]),
             help_box: dos_attribute_style(colors[15]),
             help_header: dos_attribute_style(colors[16]),
+            // PCBoard keeps the help window's frame, body and instruction bar
+            // apart: 15 Help Box, 18 Help Text, 19 Help Description.
+            help_text: dos_attribute_style(colors[18]),
+            help_description: dos_attribute_style(colors[19]),
             swatch: false,
         }
     }
@@ -189,6 +195,8 @@ pub static CLASSIC_THEME: Theme = Theme {
 
     help_box: Style::new().bg(DOS_GREEN).fg(DOS_BLACK),
     help_header: Style::new().bg(DOS_GREEN).fg(DOS_YELLOW),
+    help_text: Style::new().bg(DOS_GREEN).fg(DOS_BLACK),
+    help_description: Style::new().bg(DOS_RED).fg(DOS_YELLOW),
 
     text_field_text: Style::new().bg(DOS_RED).fg(DOS_WHITE),
     text_field_filler_char: ' ',
@@ -243,6 +251,8 @@ pub static DEFAULT_THEME: Theme = Theme {
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
     help_header: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
+    help_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_description: Style::new().bg(DOS_RED).fg(DOS_YELLOW),
 
     swatch: true,
 };
@@ -283,6 +293,8 @@ pub const POLISHED_THEME: Theme = Theme {
     table_inactive: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
     help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
     help_header: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN).add_modifier(Modifier::BOLD),
+    help_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_description: Style::new().bg(DOS_CYAN).fg(DOS_WHITE),
     swatch: false,
 };
 

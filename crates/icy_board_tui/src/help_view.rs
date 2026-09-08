@@ -7,8 +7,11 @@ use md_tui::util::colors::ColorConfig;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Margin, Rect};
+use ratatui::style::Modifier;
 use ratatui::widgets::{Block, BorderType, Borders, ScrollbarState, Widget};
 
+use crate::get_text;
+use crate::hotkeys::{Hotkey, HotkeyBar};
 use crate::theme::get_tui_theme;
 
 /// necessary as ScrollbarState fields are private
@@ -26,41 +29,43 @@ impl Default for HelpViewState {
 
 impl HelpViewState {
     pub fn new() -> Self {
+        // PCBoard colours the help window's body with "Help Text", not with
+        // the frame's "Help Box" attribute.
         let cfg: ColorConfig = ColorConfig {
-            italic_color: get_tui_theme().help_box.fg.unwrap(),
-            bold_color: get_tui_theme().help_box.fg.unwrap(),
-            striketrough_color: get_tui_theme().help_box.fg.unwrap(),
-            bold_italic_color: get_tui_theme().help_box.fg.unwrap(),
+            italic_color: get_tui_theme().help_text.fg.unwrap(),
+            bold_color: get_tui_theme().help_text.fg.unwrap(),
+            striketrough_color: get_tui_theme().help_text.fg.unwrap(),
+            bold_italic_color: get_tui_theme().help_text.fg.unwrap(),
 
-            code_fg_color: get_tui_theme().help_box.fg.unwrap(),
-            code_bg_color: get_tui_theme().help_box.bg.unwrap(),
+            code_fg_color: get_tui_theme().help_text.fg.unwrap(),
+            code_bg_color: get_tui_theme().help_text.bg.unwrap(),
 
-            link_color: get_tui_theme().help_box.fg.unwrap(),
+            link_color: get_tui_theme().help_text.fg.unwrap(),
 
-            link_selected_fg_color: get_tui_theme().help_box.fg.unwrap(),
-            link_selected_bg_color: get_tui_theme().help_box.bg.unwrap(),
+            link_selected_fg_color: get_tui_theme().help_text.fg.unwrap(),
+            link_selected_bg_color: get_tui_theme().help_text.bg.unwrap(),
 
-            code_block_bg_color: get_tui_theme().help_box.bg.unwrap(),
+            code_block_bg_color: get_tui_theme().help_text.bg.unwrap(),
 
             heading_fg_color: get_tui_theme().help_header.fg.unwrap(),
             heading_bg_color: get_tui_theme().help_header.bg.unwrap(),
 
-            table_header_fg_color: get_tui_theme().help_box.fg.unwrap(),
-            table_header_bg_color: get_tui_theme().help_box.bg.unwrap(),
+            table_header_fg_color: get_tui_theme().help_text.fg.unwrap(),
+            table_header_bg_color: get_tui_theme().help_text.bg.unwrap(),
 
-            quote_bg_color: get_tui_theme().help_box.bg.unwrap(),
+            quote_bg_color: get_tui_theme().help_text.bg.unwrap(),
 
-            file_tree_selected_fg_color: get_tui_theme().help_box.fg.unwrap(),
-            file_tree_page_count_color: get_tui_theme().help_box.fg.unwrap(),
-            file_tree_name_color: get_tui_theme().help_box.fg.unwrap(),
-            file_tree_path_color: get_tui_theme().help_box.fg.unwrap(),
+            file_tree_selected_fg_color: get_tui_theme().help_text.fg.unwrap(),
+            file_tree_page_count_color: get_tui_theme().help_text.fg.unwrap(),
+            file_tree_name_color: get_tui_theme().help_text.fg.unwrap(),
+            file_tree_path_color: get_tui_theme().help_text.fg.unwrap(),
 
-            quote_important: get_tui_theme().help_box.fg.unwrap(),
-            quote_warning: get_tui_theme().help_box.fg.unwrap(),
-            quote_tip: get_tui_theme().help_box.fg.unwrap(),
-            quote_note: get_tui_theme().help_box.fg.unwrap(),
-            quote_caution: get_tui_theme().help_box.fg.unwrap(),
-            quote_default: get_tui_theme().help_box.fg.unwrap(),
+            quote_important: get_tui_theme().help_text.fg.unwrap(),
+            quote_warning: get_tui_theme().help_text.fg.unwrap(),
+            quote_tip: get_tui_theme().help_text.fg.unwrap(),
+            quote_note: get_tui_theme().help_text.fg.unwrap(),
+            quote_caution: get_tui_theme().help_text.fg.unwrap(),
+            quote_default: get_tui_theme().help_text.fg.unwrap(),
         };
 
         md_tui::util::colors::set_color_config(cfg);
@@ -143,7 +148,51 @@ impl HelpViewState {
     }
 
     fn content_area(&self) -> Rect {
-        self.area.inner(Margin { horizontal: 2, vertical: 2 })
+        let inner = self.area.inner(Margin { horizontal: 2, vertical: 2 });
+        // The bar sits above the frame; the first row fits in the bottom margin.
+        let reserved = Self::hint_height(self.hint_width()).saturating_sub(1);
+        Rect {
+            height: inner.height.saturating_sub(reserved),
+            ..inner
+        }
+    }
+
+    /// The bar spans the frame's interior, wider than the text column.
+    fn hint_width(&self) -> u16 {
+        self.area.width.saturating_sub(2)
+    }
+
+    /// The window's own keys, in PCBoard's instruction-bar position.
+    fn hints() -> HotkeyBar {
+        let style = get_tui_theme().help_description;
+        HotkeyBar::new([
+            Hotkey::alternatives([KeyCode::Up, KeyCode::Down], get_text("hotkey_scroll")),
+            Hotkey::alternatives([KeyCode::PageUp, KeyCode::PageDown], get_text("hotkey_page")),
+            Hotkey::new(KeyCode::Home, get_text("hotkey_first")),
+            Hotkey::new(KeyCode::End, get_text("hotkey_last")),
+            Hotkey::new(KeyCode::Esc, get_text("hotkey_close")),
+        ])
+        .with_styles(style.add_modifier(Modifier::BOLD), style)
+    }
+
+    fn hint_height(width: u16) -> u16 {
+        Self::hints().rows(width).len().min(2) as u16
+    }
+
+    fn render_hints(&self, buf: &mut Buffer) {
+        if self.area.width < 4 || self.area.height < 3 {
+            return;
+        }
+        let width = self.hint_width();
+        let height = Self::hint_height(width);
+        if height == 0 {
+            return;
+        }
+        let area = Rect::new(self.area.x + 1, self.area.bottom() - 1 - height, width, height);
+        Block::new().style(get_tui_theme().help_description).render(area, buf);
+        for (line, row) in Self::hints().rows(width).into_iter().zip(area.rows()) {
+            line.render(row, buf);
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
@@ -152,6 +201,7 @@ impl HelpViewState {
             markdown.set_scroll(self.scroll);
             let block = Block::new()
                 .style(get_tui_theme().help_box)
+                .border_style(get_tui_theme().help_text)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Double);
             block.render(self.area, frame.buffer_mut());
@@ -163,7 +213,7 @@ impl HelpViewState {
             // md-tui places every component at an absolute buffer row and clips against the
             // plain area height, so it only renders correctly in a buffer starting at row zero.
             let mut page = Buffer::empty(Rect::new(area.x, 0, area.width, area.height));
-            page.set_style(page.area, get_tui_theme().help_box);
+            page.set_style(page.area, get_tui_theme().help_text);
             for child in markdown.children() {
                 if let Component::TextComponent(comp) = child {
                     if comp.y_offset().saturating_sub(comp.scroll_offset()) >= area.height || comp.y_offset() + comp.height() <= comp.scroll_offset() {
@@ -180,6 +230,7 @@ impl HelpViewState {
                     buffer[(x, area.y + y)] = page[(x, y)].clone();
                 }
             }
+            self.render_hints(frame.buffer_mut());
         }
     }
 
@@ -278,5 +329,48 @@ mod tests {
         for row in rows.iter().filter(|row| row.contains("entry")) {
             assert!(row.trim_start().starts_with('║'), "content escaped the frame:\n{screen}");
         }
+    }
+
+    #[test]
+    fn frame_body_and_instruction_bar_use_their_own_pcboard_colours() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        let mut state = HelpViewState::new();
+        terminal
+            .draw(|frame| {
+                state.set_area(crate::app::get_screen_size(frame, false));
+            })
+            .unwrap();
+        state.set_content(LIST_HELP);
+        terminal.draw(|frame| state.draw(frame)).unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        let theme = get_tui_theme();
+        let cell = |x: u16, y: u16| buffer[(x, y)].clone();
+        let at = |needle: &str| {
+            buffer
+                .area
+                .rows()
+                .find_map(|row| {
+                    let text: String = row.columns().map(|c| buffer[(c.x, c.y)].symbol().to_string()).collect();
+                    text.contains(needle).then(|| (text.find(needle).unwrap() as u16, row.y))
+                })
+                .unwrap_or_else(|| panic!("{needle} not rendered"))
+        };
+
+        let (x, y) = at("╔");
+        assert_eq!(cell(x, y).style().fg, theme.help_text.fg, "the frame follows the text colour");
+        assert_eq!(cell(x, y).style().bg, theme.help_box.bg);
+
+        let (x, y) = at("How callers");
+        assert_eq!(cell(x, y).style().fg, theme.help_text.fg, "body text is Help Text, not Help Box");
+
+        let (x, y) = at("Mode");
+        assert_eq!(cell(x, y).style().fg, theme.help_header.fg);
+
+        let (x, y) = at(&get_text("hotkey_close"));
+        assert_eq!(cell(x, y).style().bg, theme.help_description.bg, "the bar uses Help Description");
+        assert!(state.area.contains(ratatui::layout::Position::new(x, y)), "the bar stays inside the frame");
+        assert!(y < state.area.bottom() - 1, "the bar sits above the bottom border");
+        assert!(y >= state.content_area().bottom(), "the bar never covers help text");
     }
 }
