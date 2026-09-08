@@ -45,6 +45,16 @@ releases.
   including successful intake awaiting manual approval. See the
   [accounting guide](docs/accounting.md) for modes, funding and limits.
 
+- An optional token-protected web administration interface hosted by the
+  running board, with overview diagnostics, live configuration editing and
+  upload-quarantine management. It binds to localhost by default and shares
+  the engine's validation and save paths rather than maintaining a second
+  configuration model.
+
+- FTN routing and AreaFix, including per-link passwords, subscription updates,
+  passthru-area creation, forwarding unknown requests to an uplink and result
+  netmail. ICBSetup can edit the board's AKAs, links and routes.
+
 - `ppld --check --strict` fails on unsupported, unimplemented or partially
   implemented references; ordinary `--check` remains informational.
 

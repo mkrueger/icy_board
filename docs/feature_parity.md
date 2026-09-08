@@ -45,7 +45,7 @@ If something is missing just let me know.
 | @ Macro support | 80% | Most work, including accounting credit macros; event/off-hours, free-space and a few caller/password macros remain stubs |
 | File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
 | Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
-| FTN Mailer | 70% | Leaf/point scan, poll and toss over BinkP work; no answering side, AreaFix, per-user netmail or setup UI for AKA/links |
+| FTN Mailer | 80% | Leaf/point scan, poll and toss over BinkP, routing, AreaFix and setup UI for AKAs/links work; no answering side or per-user netmail |
 | ZCONNECT networking | Limited leaf support | Public text import/export, ZIP/ZMODEM outbound polling, retry checkpoints and setup UI; no private-mail gateway or listener. External peer interoperability remains unverified; see [ZCONNECT](zconnect.md). |
 | Up/Download  | 90%  | Commands need to be checked for 100% parity, but protocols should work |
 | Statistics | 80%  | Board and caller activity, daily rollover and per-file download counts work; PCBoard's per-node statistics are not modelled |
