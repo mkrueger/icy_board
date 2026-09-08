@@ -4619,43 +4619,184 @@ mnu_app_external_change = Die Zieldatei wurde außerhalb des Editors geändert. 
 mnu_app_exists = Die Zieldatei existiert bereits; --create überschreibt sie nicht.
 
 recovery_title = Passwort per E-Mail zurücksetzen
+board_config_general = Allgemeine Einstellungen
+board_config_recovery = Passwortwiederherstellung
 recovery_enabled = Passwortwiederherstellung
 recovery_enabled-status = Standard AUS; ändert den Anmeldedialog bei Fehlern
 recovery_enabled-help =
-    Optionale E-Mail-Wiederherstellung ist standardmäßig AUS. Nach drei falschen
-    normalen Anmeldepasswörtern kann ein temporäres Passwort an die gespeicherte
-    E-Mail-Adresse gesendet werden. Aktivieren ändert Login-PPE/KBDSTUF-Dialoge.
-    Direkte PPEs bleiben unverändert. Erfordert Passwort-Hashes und ein aktuelles
-    Postfach. Gesperrte/gelöschte Benutzer und Sysops sind ausgeschlossen.
-    Keine Entsperrung, Webseite, Links oder Sicherheitsfragen. Das alte Passwort
-    gilt bis zum Speichern des neuen. Danach neu anmelden. Beim Speichern von
-    AUS werden offene Passwörter ungültig. Für die Anmeldung SSH oder TLS nutzen.
+    # Passwort per E-Mail wiederherstellen
+
+    Standardmäßig AUS. Nach drei falschen normalen Anmeldepasswörtern wird
+    berechtigten Benutzern mit gültiger gespeicherter E-Mail Hilfe angeboten.
+
+    - Temporäres Passwort nur an die gespeicherte E-Mail-Adresse
+    - Nicht für Sysops, gesperrte/gelöschte Konten oder ungehashte Passwörter
+    - Erfordert Argon2/BCrypt-Passwörter und eingerichtetes TLS-SMTP
+    - Ändert Login-PPE/KBDSTUF-Dialoge; direkte PPEs bleiben unverändert
+
+    Das temporäre Passwort erzwingt einen Passwortwechsel, dann Neuanmeldung.
+    Das alte Passwort gilt weiter, bis das neue gespeichert ist.
+
+    Beim Speichern von AUS werden offene temporäre Passwörter ungültig.
+    Keine Kontoentsperrung. Für die Anmeldung SSH oder TLS nutzen.
 recovery_smtp_host = SMTP-Server
+recovery_smtp_host-help =
+    # SMTP-Server
+
+    Mailserver für den Versand der Wiederherstellungsnachrichten.
+    Bei aktiver Wiederherstellung ist eine SMTP-Konfiguration erforderlich.
+
+    - Den vom Mailanbieter genannten Hostnamen eintragen
+    - Geprüftes TLS ist Pflicht; kein Rückfall auf Klartext
+    - Port und TLS-Modus in den eigenen Feldern einstellen
+
+    SMTP-Fehler verhindern keine normale Anmeldung.
 recovery_smtp_port = SMTP-Port
+recovery_smtp_port-help =
+    # SMTP-Port
+
+    Den vom Mailanbieter genannten Port eintragen.
+    Er muss zum gewählten TLS-Modus passen.
+
+    - 587: üblicherweise zwingendes STARTTLS
+    - 465: üblicherweise implizites TLS ab Verbindungsaufbau
+
+    Eine Portänderung stellt den TLS-Modus nicht automatisch um.
 recovery_implicit_tls = Implizites TLS (sonst STARTTLS)
 recovery_implicit_tls-status = Beide Modi erfordern geprüftes TLS
 recovery_implicit_tls-help =
-    Ja: implizites TLS, normalerweise Port 465. Nein: zwingend STARTTLS, Port 587.
-    Zertifikate werden geprüft. Kein Rückfall auf unverschlüsselte Verbindungen.
+    # SMTP-Transportsicherheit
+
+    Beide Einstellungen erfordern TLS mit Zertifikatsprüfung.
+
+    - Ja: implizites TLS ab Verbindungsaufbau, normalerweise Port 465
+    - Nein: zwingendes STARTTLS, normalerweise Port 587
+    - Kein Rückfall auf unverschlüsselte Verbindungen
+
+    Modus und Port müssen den Vorgaben des Mailanbieters entsprechen.
+    SMTP-TLS ist keine Ende-zu-Ende-Verschlüsselung der E-Mail.
 recovery_sender = E-Mail-Absenderadresse
+recovery_sender-help =
+    # E-Mail-Absenderadresse
+
+    Eine einzelne gültige E-Mail-Adresse als Absender eintragen.
+    Der SMTP-Anbieter muss den Versand mit dieser Adresse erlauben.
+
+    - Bei aktiver Wiederherstellung erforderlich
+    - Dies ist der Absender, nicht der Empfänger der Wiederherstellung
+
+    Versand nur an die gültige gespeicherte E-Mail-Adresse des Benutzers.
 recovery_smtp_username = SMTP-Benutzername
-recovery_smtp_password_env = Passwort-Umgebungsvariable
-recovery_smtp-help =
-    Natives TLS-SMTP sendet nur an die vorhandene E-Mail-Adresse des Benutzers.
-    Eine einzelne Absenderadresse, Server und Port angeben. Anmeldung optional.
-    Das Passwortfeld enthält den NAMEN EINER UMGEBUNGSVARIABLEN, kein Geheimnis.
-    Die Variable in der BBS-Dienstumgebung setzen. SMTP-Fehler verhindern keine
-    normale Anmeldung. Kein Wiederholungsversand. TLS ist keine Ende-zu-Ende-
-    Verschlüsselung der E-Mail.
+recovery_smtp_username-help =
+    # SMTP-Benutzername
+
+    Den vom SMTP-Anbieter genannten Benutzernamen eintragen.
+
+    - Leer: Relay ohne Authentifizierung verwenden
+    - Ausgefüllt: Anmeldung mit diesem Namen und einem SMTP-Passwort
+    - Auch ohne Authentifizierung bleibt TLS Pflicht
+
+    Das Relay muss den Versand von diesem BBS erlauben.
+recovery_smtp_password = SMTP-Passwort
+recovery_smtp_password-help =
+    # SMTP-Passwort
+
+    Bei SMTP-Authentifizierung das zugehörige Passwort direkt eintragen.
+
+    - Anzeige maskiert, Speicherung aber im Klartext in der TOML-Konfiguration
+    - Konfigurationsdatei und Backups vor fremdem Zugriff schützen
+    - Zugangsdaten zum Mailserver, kein BBS-Anmeldepasswort
+
+    Die bisherige Umgebungsvariable greift nur bei leerem direktem Passwort.
+    Bearbeiten dieses Feldes entfernt die Einstellung für diesen Ersatz.
+recovery_mail_template = E-Mail-Vorlagendatei
+recovery_mail_template-help =
+    # E-Mail-Vorlage
+
+    Optionaler UTF-8-Klartext, höchstens 64 KiB. Pfad absolut oder relativ
+    zum BBS-Hauptverzeichnis angeben.
+
+    - Leer: automatisch deutscher/englischer Text gemäß Benutzersprache
+    - Mit Datei: gleicher Text für alle Sprachen; Betreff bleibt automatisch
+    - F2 bearbeitet; F4 öffnet die Dateiauswahl
+    - F3 erstellt den englischen Standard, falls die Datei fehlt
+      Vorhandene Dateien werden niemals überschrieben.
+
+    # Platzhalter
+
+    - Optional: { "{{board_name}}" } und { "{{user_name}}" }
+    - Pflicht: { "{{password}}" } und { "{{ttl_minutes}}" }
+
+    Den Pflicht-Passwortwechsel und die folgende normale Anmeldung erklären.
+    Ungültige Vorlagendateien verhindern den Versand.
+recovery_advanced = Erweitert
 recovery_ttl = Gültigkeit (Minuten)
-recovery_cooldown = Kontosperrfrist (Minuten)
+recovery_ttl-help =
+    # Gültigkeit des temporären Passworts
+
+    Wie lange ein temporäres Wiederherstellungspasswort gilt, in Minuten.
+
+    - Standard: 30 Minuten
+    - Erlaubter Bereich: 1–60 Minuten
+    - Abgelaufene temporäre Passwörter können nicht verwendet werden
+
+    Das alte normale Passwort gilt, bis ein neues Passwort gespeichert ist.
+recovery_cooldown = Wartezeit je Anfrage (Minuten)
+recovery_cooldown-help =
+    # Wartezeit je Anfrage
+
+    Mindestabstand zwischen Wiederherstellungsanfragen für dasselbe Konto.
+
+    - Standard: 10 Minuten
+    - Erlaubter Bereich: 1–60 Minuten
+    - Begrenzt nur Anfragen; dies ist keine Kontosperre
+
+    Die normale Passwortanmeldung bleibt während der Wartezeit möglich.
 recovery_account_limit = Versand je Konto/Stunde
+recovery_account_limit-help =
+    # Versand je Konto und Stunde
+
+    Begrenzt Wiederherstellungsmails je Konto in den jeweils letzten
+    60 Minuten, nicht je voller Uhrzeitstunde.
+
+    - Standard: 3 Sendungen
+    - Erlaubter Bereich: 1–10 Sendungen
+    - Verbrauch bleibt gespeichert, auch über einen Neustart hinweg
+
+    Wartezeit je Anfrage und BBS-weite Grenze gelten zusätzlich.
 recovery_board_limit = Versand je BBS/Stunde
+recovery_board_limit-help =
+    # Versand je BBS und Stunde
+
+    Begrenzt Wiederherstellungsmails über alle Konten in den jeweils
+    letzten 60 Minuten, nicht je voller Uhrzeitstunde.
+
+    - Standard: 50 Sendungen
+    - Erlaubter Bereich: 1–500 Sendungen
+    - Verbrauch bleibt gespeichert, auch über einen Neustart hinweg
+
+    Diese gemeinsame Grenze gilt zusätzlich zu den Grenzen je Konto.
 recovery_attempts = Prüfversuche
+recovery_attempts-help =
+    # Prüfversuche für temporäre Passwörter
+
+    Begrenzt die Versuche zur Prüfung eines temporären Passworts.
+
+    - Standard: 5 Versuche
+    - Erlaubter Bereich: 1–10 Versuche
+    - Gilt nur für temporäre Passwörter, nicht für normale Anmeldepasswörter
+
+    Aufgebrauchte Versuche sperren die normale Passwortanmeldung nicht.
 recovery_timeout = SMTP-Zeitlimit (Sekunden)
-recovery_limits-help =
-    Standard: 30 Minuten gültig, 10 Minuten Sperrfrist, 3 Sendungen/Konto/Stunde,
-    50 Sendungen/BBS/Stunde, 5 Prüfversuche, 15 Sekunden SMTP-Zeitlimit.
-    Höchstens zwei parallele Hash-/Versandvorgänge. Versuche und Kontolimits
-    bleiben gespeichert. Temporäre Passwörter werden nur als Argon2-Hash abgelegt.
-recovery_invalid = Erforderlich: Argon2/BCrypt, gültige SMTP-Absenderadresse/Server/Port, Umgebungsvariable für Zugangsdaten und Grenzwerte im angezeigten Bereich. Einstellungen korrigieren oder Wiederherstellung ausschalten.
+recovery_timeout-help =
+    # SMTP-Zeitlimit
+
+    Höchstdauer für den SMTP-Versandvorgang.
+
+    - Standard: 15 Sekunden; erlaubter Bereich: 1–30 Sekunden
+    - Keine automatischen Wiederholungen oder Wiederholungswarteschlange
+    - Mehrdeutiges SMTP-Ergebnis zählt als unbekannt, nicht als Erfolg
+
+    Je Anfrage genau ein um sensible Daten bereinigter Ergebnis-Logeintrag.
+    SMTP-Fehler oder Zeitüberschreitungen verhindern keine normale Anmeldung.
+recovery_invalid = Erforderlich: Argon2/BCrypt, gültige SMTP-Absenderadresse/Server/Port, SMTP-Passwort bei Anmeldung und Grenzwerte im angezeigten Bereich. Einstellungen korrigieren oder Wiederherstellung ausschalten.

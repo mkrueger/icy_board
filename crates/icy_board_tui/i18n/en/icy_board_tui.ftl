@@ -5179,41 +5179,181 @@ mnu_app_external_change = The destination changed outside this editor. Save refu
 mnu_app_exists = The destination already exists; --create will not overwrite it.
 
 recovery_title = Email password recovery
+board_config_general = General Settings
+board_config_recovery = Password Recovery
 recovery_enabled = Enable password recovery
 recovery_enabled-status = Default OFF; changes failed-login dialogue
 recovery_enabled-help =
-    Optional email recovery is OFF by default. After three failed normal login
-    passwords, offer a temporary password sent only to the saved email address.
-    Enabling changes login PPE/KBDSTUF dialogue. Direct PPEs are unchanged.
-    Requires hashed passwords and a current mailbox. Disabled/deleted users and
-    sysops cannot recover. No account unlock, browser, link or security question.
-    The old password stays valid until a new password is saved. Then relogin.
-    Disabling revokes pending passwords when settings are saved. Use SSH or TLS.
+    # Email password recovery
+
+    OFF by default. After three wrong normal login passwords, recovery is
+    offered only to eligible users with a valid saved email address.
+
+    - Sends a temporary password only to that saved address
+    - Excludes sysops, disabled/deleted accounts and unhashed passwords
+    - Requires Argon2/BCrypt passwords and configured TLS SMTP
+    - Changes login PPE/KBDSTUF dialogue; direct PPEs are unchanged
+
+    The temporary password requires a password change, then a fresh login.
+    The old password stays valid until the new password is saved.
+
+    Saving recovery as OFF revokes pending temporary passwords.
+    Recovery does not unlock accounts. Use SSH or TLS for login.
 recovery_smtp_host = SMTP host
+recovery_smtp_host-help =
+    # SMTP host
+
+    Enter the mail server used to send recovery messages.
+    SMTP configuration is required when recovery is enabled.
+
+    - Use the hostname supplied by your mail provider
+    - The server must support verified TLS; no plaintext fallback
+    - Set its port and TLS mode in the separate fields
+
+    SMTP failures do not prevent normal login.
 recovery_smtp_port = SMTP port
+recovery_smtp_port-help =
+    # SMTP port
+
+    Enter the port supplied by your mail provider.
+    The port must match the selected TLS mode.
+
+    - 587: normally mandatory STARTTLS
+    - 465: normally implicit TLS from connection start
+
+    Changing the port does not change the TLS mode automatically.
 recovery_implicit_tls = Implicit TLS (otherwise STARTTLS)
 recovery_implicit_tls-status = Both modes require verified TLS
 recovery_implicit_tls-help =
-    Yes: implicit TLS, normally port 465. No: mandatory STARTTLS, normally 587.
-    Certificate verification is required. Plaintext fallback is never allowed.
+    # SMTP transport security
+
+    Both settings require TLS with certificate verification.
+
+    - Yes: implicit TLS from connection start, normally port 465
+    - No: mandatory STARTTLS, normally port 587
+    - Plaintext fallback is never allowed
+
+    Match the mode and port to your provider's settings.
+    SMTP TLS is not end-to-end email encryption.
 recovery_sender = Sender email address
+recovery_sender-help =
+    # Sender email address
+
+    Enter one valid email address as the recovery message sender.
+    Use an address your SMTP provider permits you to send from.
+
+    - Required when recovery is enabled
+    - This is the sender, not the recovery recipient
+
+    Recovery mail goes only to the user's valid saved email address.
 recovery_smtp_username = SMTP username
-recovery_smtp_password_env = Password environment variable
-recovery_smtp-help =
-    Native TLS SMTP sends only to the existing user email address.
-    Enter a single sender address, server and port. Authentication is optional.
-    The password field contains an ENVIRONMENT VARIABLE NAME, never a secret.
-    Set that variable in the BBS service environment. SMTP failures do not stop
-    ordinary login. No retry spool. SMTP TLS is not end-to-end email encryption.
+recovery_smtp_username-help =
+    # SMTP username
+
+    Enter the username supplied by your SMTP provider.
+
+    - Empty: use an unauthenticated relay
+    - Non-empty: authenticate with this username and an SMTP password
+    - TLS remains mandatory even without authentication
+
+    The relay must permit sending from this BBS.
+recovery_smtp_password = SMTP password
+recovery_smtp_password-help =
+    # SMTP password
+
+    Enter the SMTP credential directly when authentication is used.
+
+    - Masked on screen, but stored as plaintext in the TOML configuration
+    - Protect the configuration file and its backups from other users
+    - This is a mail server credential, not a BBS login password
+
+    The legacy environment-variable fallback works only when this direct
+    password is empty. Editing this field clears that fallback setting.
+recovery_mail_template = Email template file
+recovery_mail_template-help =
+    # Recovery email template
+
+    Optional UTF-8 plain-text body, at most 64 KiB. Use an absolute path
+    or a path relative to the BBS root directory.
+
+    - Empty: automatic English/German text matching the user's locale
+    - Configured: the same body for all languages; subject stays automatic
+    - F2 edits; F4 browses for a file
+    - F3 creates the English default if absent; never overwrites a file
+
+    # Placeholders
+
+    - Optional: { "{{board_name}}" } and { "{{user_name}}" }
+    - Required: { "{{password}}" } and { "{{ttl_minutes}}" }
+
+    Explain the mandatory password change and subsequent normal login.
+    Invalid template files prevent sending.
+recovery_advanced = Advanced
 recovery_ttl = Lifetime (minutes)
-recovery_cooldown = Account cooldown (minutes)
+recovery_ttl-help =
+    # Temporary password lifetime
+
+    How long a temporary recovery password remains valid, in minutes.
+
+    - Default: 30 minutes
+    - Allowed range: 1–60 minutes
+    - An expired temporary password cannot be used
+
+    The old normal password remains valid until a new password is saved.
+recovery_cooldown = Request cooldown (minutes)
+recovery_cooldown-help =
+    # Request cooldown
+
+    Minimum wait between recovery requests for the same account.
+
+    - Default: 10 minutes
+    - Allowed range: 1–60 minutes
+    - Limits recovery requests only; this is not an account lock
+
+    Normal password login remains available during the wait.
 recovery_account_limit = Account sends per hour
+recovery_account_limit-help =
+    # Account sends per hour
+
+    Limits recovery mail for one account over a rolling hour.
+
+    - Default: 3 sends
+    - Allowed range: 1–10 sends
+    - Usage is persisted; restarting does not reset the limit
+
+    The request cooldown and board-wide limit also apply.
 recovery_board_limit = Board sends per hour
+recovery_board_limit-help =
+    # Board sends per hour
+
+    Limits recovery mail across all accounts over a rolling hour.
+
+    - Default: 50 sends
+    - Allowed range: 1–500 sends
+    - Usage is persisted; restarting does not reset the limit
+
+    This shared limit applies in addition to each account's limits.
 recovery_attempts = Verification attempts
+recovery_attempts-help =
+    # Temporary password attempts
+
+    Limits attempts to verify a temporary recovery password.
+
+    - Default: 5 attempts
+    - Allowed range: 1–10 attempts
+    - Applies only to temporary passwords, not normal login passwords
+
+    Exhausting these attempts does not lock normal password login.
 recovery_timeout = SMTP timeout (seconds)
-recovery_limits-help =
-    Defaults: 30 minute lifetime, 10 minute cooldown, 3 sends/account/hour,
-    50 sends/board/hour, 5 verification attempts and 15 second SMTP deadline.
-    Two concurrent hash/send operations maximum. Attempts and account issuance
-    limits persist. Temporary passwords are stored only as Argon2 hashes.
-recovery_invalid = Recovery needs Argon2/BCrypt, valid SMTP sender/host/port, an environment variable for credentials, and limits within the displayed ranges. Correct the settings or turn recovery off.
+recovery_timeout-help =
+    # SMTP timeout
+
+    Maximum time allowed for the SMTP send operation.
+
+    - Default: 15 seconds; allowed range: 1–30 seconds
+    - No automatic retries or retry queue
+    - An ambiguous SMTP result is recorded as unknown, not success
+
+    Each request produces exactly one sanitized outcome log entry.
+    SMTP failures or timeouts do not prevent normal login.
+recovery_invalid = Recovery needs Argon2/BCrypt, valid SMTP sender/host/port, a password for SMTP authentication, and limits within the displayed ranges. Correct the settings or turn recovery off.

@@ -7,14 +7,58 @@ use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags, Value},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,
+    icbsetupmenu::IcbSetupMenuUI,
+    select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
 };
 
 pub struct BoardConfiguration {
-    menu: ICBConfigMenuUI,
+    menu: IcbSetupMenuUI,
+    board: Arc<Mutex<IcyBoard>>,
 }
 
 impl BoardConfiguration {
+    pub fn new(board: Arc<Mutex<IcyBoard>>) -> Self {
+        Self {
+            menu: IcbSetupMenuUI::new(SelectMenu::new(vec![
+                MenuItem::new(0, 'A', get_text("board_config_general")),
+                MenuItem::new(1, 'B', get_text("board_config_recovery")),
+            ]))
+            .with_center_title(get_text("board_config_title")),
+            board,
+        }
+    }
+}
+
+impl Page for BoardConfiguration {
+    fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        self.menu.render(frame, area);
+    }
+
+    fn request_status(&self) -> ResultState {
+        self.menu.request_status()
+    }
+
+    fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
+        if key.code == crossterm::event::KeyCode::Esc {
+            return PageMessage::Close;
+        }
+        let (_, selected) = self.menu.handle_key_press(key);
+        match selected {
+            Some(0) => PageMessage::OpenSubPage(Box::new(GeneralBoardSettings::new(self.board.clone()))),
+            Some(1) => PageMessage::OpenSubPage(Box::new(super::configuration_options::password_recovery::PasswordRecovery::new(
+                self.board.clone(),
+            ))),
+            _ => PageMessage::None,
+        }
+    }
+}
+
+pub struct GeneralBoardSettings {
+    menu: ICBConfigMenuUI,
+}
+
+impl GeneralBoardSettings {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let label_width = 16;
         let menu = {
@@ -118,7 +162,7 @@ impl BoardConfiguration {
     }
 }
 
-impl Page for BoardConfiguration {
+impl Page for GeneralBoardSettings {
     fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
         self.menu.render(frame, disp_area)
     }
@@ -136,8 +180,45 @@ mod tests {
     use ratatui::{Terminal, backend::TestBackend};
 
     #[test]
+    fn recovery_is_accessible_under_board_configuration_at_80_by_25() {
+        use crossterm::event::KeyCode;
+        let board = Arc::new(Mutex::new(IcyBoard::default()));
+        let mut page = BoardConfiguration::new(board.clone());
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        let screen = |terminal: &Terminal<TestBackend>| {
+            (0..25)
+                .map(|y| (0..80).map(|x| terminal.backend().buffer()[(x, y)].symbol()).collect::<String>())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        terminal.draw(|f| page.render(f, f.area())).unwrap();
+        for key in ["board_config_general", "board_config_recovery"] {
+            assert_ne!(get_text(key), key);
+            assert!(screen(&terminal).contains(&get_text(key)));
+        }
+        page.handle_key_press(KeyEvent::from(KeyCode::Down));
+        let PageMessage::OpenSubPage(mut recovery) = page.handle_key_press(KeyEvent::from(KeyCode::Enter)) else {
+            panic!("expected recovery page");
+        };
+        terminal.draw(|f| recovery.render(f, f.area())).unwrap();
+        assert!(screen(&terminal).contains(&get_text("recovery_title")));
+        assert!(screen(&terminal).contains(&get_text("recovery_smtp_password")));
+        assert!(matches!(recovery.handle_key_press(KeyEvent::from(KeyCode::Esc)), PageMessage::Close));
+        page.handle_key_press(KeyEvent::from(KeyCode::Up));
+        let PageMessage::OpenSubPage(mut general) = page.handle_key_press(KeyEvent::from(KeyCode::Enter)) else {
+            panic!("expected existing settings");
+        };
+        terminal.draw(|f| general.render(f, f.area())).unwrap();
+        assert!(screen(&terminal).contains(&get_text("board_name")));
+        let mut old = super::super::configuration_options::ConfigurationOptions::new(board);
+        terminal.draw(|f| old.render(f, f.area())).unwrap();
+        assert!(!screen(&terminal).contains(&get_text("recovery_title")));
+        assert!(!screen(&terminal).contains(&get_text("board_config_recovery")));
+    }
+
+    #[test]
     fn upper_labels_are_fully_visible_at_80_columns() {
-        let mut page = BoardConfiguration::new(Arc::new(Mutex::new(IcyBoard::default())));
+        let mut page = GeneralBoardSettings::new(Arc::new(Mutex::new(IcyBoard::default())));
         let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
         terminal.draw(|frame| page.render(frame, frame.area())).unwrap();
         let buffer = terminal.backend().buffer();

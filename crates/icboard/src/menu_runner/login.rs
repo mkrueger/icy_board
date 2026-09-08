@@ -747,7 +747,14 @@ impl PcbBoardCommand {
         };
 
         if !check_password {
-            if recovery_enabled && !self.state.session.request_logoff {
+            let offer_recovery = recovery_enabled && !self.state.session.request_logoff && {
+                let board = self.state.get_board().await;
+                board
+                    .users
+                    .get(self.state.session.cur_user_id as usize)
+                    .is_some_and(icy_board_engine::icy_board::password_recovery::has_recovery_email)
+            };
+            if offer_recovery {
                 let answer = self
                     .state
                     .input_field(
@@ -759,22 +766,17 @@ impl PcbBoardCommand {
                         display_flags::YESNO | display_flags::NEWLINE | display_flags::FIELDLEN,
                     )
                     .await?;
-                if answer == self.state.session.yes_char.to_uppercase().to_string() {
+                if answer.eq_ignore_ascii_case(&self.state.session.yes_char.to_string()) {
                     let service = self.state.get_board().await.password_recovery_service.clone();
                     // The response must not reveal eligibility, mailbox, throttling or delivery.
-                    if service
-                        .issue(&self.state.board, self.state.session.cur_user_id as usize, Utc::now())
-                        .await
-                        .is_err()
-                    {
-                        log::warn!("Password recovery request could not be completed");
-                    }
+                    let _ = service.issue(&self.state.board, self.state.session.cur_user_id as usize, Utc::now()).await;
                     self.state.display_text(IceText::RecoveryRequestAccepted, display_flags::NEWLINE).await?;
                     self.state.session.last_password.clear();
                     self.state.session.emsi = None;
                     self.state.hangup().await?;
                     return Ok(false);
                 }
+                log::info!("Recovery email: user index {}: offer declined or cancelled", self.state.session.cur_user_id);
             }
             log::warn!("Login from {} at {} password failed", self.state.session.user_name, Local::now().to_rfc2822());
             if self.state.get_board().await.config.system_control.allow_password_failure_comment {

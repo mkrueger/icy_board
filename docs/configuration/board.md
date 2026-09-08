@@ -72,7 +72,7 @@ when launching the board from different working directories.
 
 ## Optional email password recovery
 
-ICBSetup → Configuration Options → Email password recovery configures the
+ICBSetup → Board Configuration → Password Recovery configures the
 `[password_recovery]` table. All fields have the following defaults, even in
 an otherwise empty table. Save and reload the board configuration to apply changes.
 
@@ -84,7 +84,9 @@ an otherwise empty table. Save and reload the board configuration to apply chang
 | `implicit_tls` | false | False requires STARTTLS; true uses implicit TLS (usually port 465). Certificate verification is always enabled; no plaintext fallback. |
 | `sender` | `""` | Required single email address, no display name or mailbox list. |
 | `smtp_username` | `""` | Empty for unauthenticated relay; otherwise SMTP login name. |
-| `smtp_password_env` | `""` | Environment variable **name**, not its value. Required with a username; letters, digits and underscore only. Set its secret value in the BBS service environment, not TOML. |
+| `smtp_password` | `""` | Direct SMTP password, required with a username unless the legacy environment fallback is used. Masked in setup, stored as plaintext in TOML; protect the configuration and backups. |
+| `smtp_password_env` | `""` | Legacy environment-variable name, used only when `smtp_password` is empty. Direct password takes precedence; editing the password in setup clears this fallback. |
+| `mail_template` | `""` | Optional UTF-8 plain-text email body file; relative to the BBS directory or absolute. Empty uses the built-in English/German text. |
 | `ttl_minutes` | 30 | 1–60; finite lifetime. |
 | `cooldown_minutes` | 10 | 1–60 between requests for an account. |
 | `account_per_hour` | 3 | 1–10 issuance attempts per account per rolling hour. |
@@ -99,7 +101,9 @@ sysop-level accounts, deleted/disabled accounts, empty credentials and invalid
 or absent saved email addresses are ineligible. Recovery never unlocks an account.
 
 After three failed **normal BBS login** password attempts, appended ICBTEXT 781
-offers delivery, default No. No preserves the existing failure-comment/hangup
+offers delivery, default No, only when the account has a valid saved email address.
+Otherwise the recovery prompt is skipped without reading extra input.
+No preserves the existing failure-comment/hangup
 order. Yes sends only to `User.email`, gives the same generic acknowledgement
 regardless of eligibility, limits or SMTP result, then disconnects. There is no
 destination question, browser, link, new listener or PPL recovery API. Generic
@@ -108,7 +112,7 @@ changes failed-login dialogue: review custom login PPEs and KBDSTUF scripts firs
 
 The email contains a random 12-character, case-insensitive, 60-bit temporary
 password. The user base stores only its salted Argon2 hash, expiry, attempts,
-challenge identity and security binding. Email templates are English or German
+challenge identity and security binding. Built-in email templates are English or German
 according to the user's language; no PPE or macro executes in the message.
 The old password remains valid until temporary verification **and** a new
 permanent password are committed together in one atomic user-base file
@@ -117,6 +121,31 @@ policy and differ from both current and temporary passwords. Recovery grants
 only this restricted change stage, before LOGON surveys, accounting and menus.
 Cancellation, disconnect or save failure grants no access. Success requires a
 fresh normal login. Normal-password login cancels outstanding recovery.
+
+### Custom recovery email text
+
+Set `mail_template` to your own text file in the recovery settings. Copy and adapt
+[the English example](../../assets/password_recovery_en.txt) or
+[the German example](../../assets/password_recovery_de.txt). The file is the body,
+not a complete email: sender, recipient and localized subject remain automatic.
+A configured file is used for **all** user languages; there is no language-suffix lookup.
+
+Supported literal placeholders are `{{board_name}}`, `{{user_name}}`,
+`{{password}}` and `{{ttl_minutes}}`. The password and lifetime placeholders are
+required. Include instructions to choose a new password and then log in again,
+and explain that unsolicited mail can be ignored without changing the old password.
+Substitution is single-pass: placeholders inside a user or board name are not evaluated.
+No HTML rendering, PPE execution or BBS macro expansion takes place.
+
+The file is read afresh for each eligible, rate-limited request, so text edits
+do not require restarting the BBS. UTF-8 with or without a BOM is accepted,
+up to 64 KiB (rendered body at most 128 KiB). Missing/unreadable files, invalid UTF-8,
+unknown/unclosed placeholders or missing required placeholders prevent sending;
+there is no silent fallback and no new challenge replaces the previous one.
+Such requests still count toward issuance limits. Template errors never include
+the message body or password. The template file is never modified by recovery.
+
+### Recovery state and limits
 
 Ordinary password/name/alias/email/security/disable/delete changes invalidate
 challenges. Revisions prevent stale W/PPE/ICBSM/profile saves from restoring old
@@ -136,6 +165,17 @@ no per-IP throttling, retry spool, automatic resend or detached mail task. A
 definite SMTP failure revokes that challenge; ambiguous timeout leaves only its
 expiring hash and does not change the old password. Outages do not block ordinary
 password login. No arbitrary external email is sent by the test suite.
+
+The board log records one final entry per recovery request using only the
+zero-based internal user index: success (accepted by the SMTP relay) or failure
+with a sanitized reason, including SMTP status codes where available.
+Separate request/start/transport-error entries are not emitted.
+Timeout means acceptance is unknown. Success is not confirmation of delivery
+to the inbox. Passwords, message bodies, recipient addresses and SMTP credentials
+are not included. Pre-send reasons include missing/invalid email, excluded sysop
+accounts, unhashed passwords, invalid configuration, cooldown, hourly limits,
+busy workers and account/configuration changes. Template errors are logged by
+category; other local preparation/persistence errors receive a generic failure entry.
 
 **Trust and transport:** stored email addresses have no ownership-verification
 marker. Enabling explicitly trusts their current ownership; stale/reassigned

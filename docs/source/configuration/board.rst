@@ -124,7 +124,7 @@ Top-level layout
 Optional email password recovery
 --------------------------------
 
-ICBSetup → Configuration Options → Email password recovery configures the
+ICBSetup → Board Configuration → Password Recovery configures the
 ``[password_recovery]`` table. Every field defaults when omitted. Save and
 reload the board configuration to apply changes.
 
@@ -154,14 +154,22 @@ reload the board configuration to apply changes.
    * - ``smtp_username``
      - ``""``
      - Empty for unauthenticated relay; otherwise SMTP login name.
+   * - ``smtp_password``
+     - ``""``
+     - Direct SMTP password. Masked in setup, stored as plaintext in TOML.
+       Protect the configuration and backups. Required with a username unless
+       the legacy environment fallback is used.
    * - ``smtp_password_env``
      - ``""``
-     - Environment variable NAME, not its value. Required with a username;
-       letters, digits and underscore only. Set the secret in the BBS service
-       environment, never TOML.
+     - Legacy environment-variable name used only when the direct password is empty.
+       Editing the password in setup clears this fallback.
    * - ``ttl_minutes``
      - 30
      - 1–60, finite lifetime.
+   * - ``mail_template``
+     - ``""``
+     - Optional UTF-8 plain-text body file, relative to the BBS directory or absolute.
+       Empty uses the built-in English/German text.
    * - ``cooldown_minutes``
      - 10
      - 1–60 between account requests.
@@ -184,7 +192,9 @@ disabled/deleted users, empty credentials and missing/invalid saved addresses
 are excluded. No account unlock or security-question fallback.
 
 After three failed normal BBS password attempts, appended ICBTEXT 781 offers
-delivery (default No). No keeps the original failure-comment/hangup order. Yes
+delivery (default No), only if the account has a valid saved email address.
+Otherwise the prompt is skipped without reading extra input.
+No keeps the original failure-comment/hangup order. Yes
 sends only to ``User.email``, gives a generic acknowledgement regardless of
 eligibility, limits or SMTP result, and disconnects. There is no destination
 question, browser, link, listener or PPL recovery API. Generic password checks
@@ -193,7 +203,7 @@ failed-login dialogue; review custom login PPEs and KBDSTUF scripts first.
 
 The random 12-character case-insensitive temporary password carries 60 bits.
 Only its salted Argon2 hash, expiry, attempt count, identity and security binding
-are persisted. English/German email templates follow the user language and
+are persisted. Built-in English/German email templates follow the user language and
 never execute PPEs or macros. The old password stays valid until verification
 and the new permanent password are committed together by one atomic user-base
 replacement. The new password must satisfy length/name/history policy and
@@ -201,6 +211,42 @@ differ from current and temporary passwords. The restricted change stage runs
 before LOGON surveys, accounting and menus. Cancel, disconnect or failed save
 grants no access. Success requires normal relogin. Normal-password login cancels
 pending recovery.
+
+Custom recovery email text
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The board log records one final entry per recovery request using only the
+zero-based internal user index: success (accepted by the SMTP relay) or failure
+with a sanitized reason, including SMTP status codes where available.
+Separate request/start/transport-error entries are not emitted.
+Timeout means acceptance is unknown. Success does not confirm inbox delivery.
+No passwords, message bodies, recipient addresses or SMTP credentials are logged.
+Pre-send reasons include missing/invalid email, excluded sysops, unhashed
+passwords, invalid configuration, cooldown, hourly limits, busy workers and
+account/configuration changes. Template errors are logged by category; other
+local preparation/persistence errors receive a generic failure entry.
+
+Set ``mail_template`` to a UTF-8 plain-text body file. Example letters are supplied
+in the repository assets as ``password_recovery_en.txt`` and ``password_recovery_de.txt``.
+Sender, recipient and localized subject remain automatic. A configured template
+is used for all user languages, without language-suffix lookup.
+
+Literal placeholders: ``{{board_name}}``, ``{{user_name}}``, ``{{password}}`` and
+``{{ttl_minutes}}``. The last two are required. Explain the mandatory password
+change and subsequent normal login, and that unsolicited mail can be ignored
+while the old password stays valid. Substitution is single-pass; user data cannot
+introduce further substitutions. No HTML rendering, PPE or BBS macro execution.
+
+The file is read afresh for each eligible, rate-limited request; text edits need
+no restart. UTF-8 with or without BOM is accepted, at most 64 KiB (rendered body
+at most 128 KiB). Unreadable/missing files, invalid UTF-8, unknown/unclosed
+placeholders and missing required placeholders prevent sending without fallback
+or replacement of an existing challenge. Requests still count toward issuance
+limits. Errors never include the message body or password. Recovery never writes
+to the template file.
+
+Recovery state and limits
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Password/name/alias/email/security/disable/delete edits invalidate challenges.
 Credential revisions prevent stale W/PPE/ICBSM/profile saves restoring old

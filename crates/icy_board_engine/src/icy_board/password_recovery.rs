@@ -1,5 +1,6 @@
 //! Normal-login-only recovery. Proof is not a logged-in session or a permanent password.
 use std::{
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -13,7 +14,7 @@ use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor, messag
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tokio::sync::Semaphore;
+use tokio::{io::AsyncReadExt, sync::Semaphore};
 
 use super::{
     IcyBoard,
@@ -22,7 +23,7 @@ use super::{
 };
 use crate::Res;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PasswordRecoveryConfig {
     pub enabled: bool,
@@ -32,7 +33,9 @@ pub struct PasswordRecoveryConfig {
     pub implicit_tls: bool,
     pub sender: String,
     pub smtp_username: String,
+    pub smtp_password: String,
     pub smtp_password_env: String,
+    pub mail_template: PathBuf,
     pub ttl_minutes: u32,
     pub cooldown_minutes: u32,
     pub account_per_hour: u32,
@@ -50,7 +53,9 @@ impl Default for PasswordRecoveryConfig {
             implicit_tls: false,
             sender: String::new(),
             smtp_username: String::new(),
+            smtp_password: String::new(),
             smtp_password_env: String::new(),
+            mail_template: PathBuf::new(),
             ttl_minutes: 30,
             cooldown_minutes: 10,
             account_per_hour: 3,
@@ -62,6 +67,20 @@ impl Default for PasswordRecoveryConfig {
 }
 
 impl PasswordRecoveryConfig {
+    fn smtp_credential(&self) -> Result<String, &'static str> {
+        if !self.smtp_password.is_empty() {
+            return Ok(self.smtp_password.clone());
+        }
+        let password = std::env::var(&self.smtp_password_env).map_err(|error| match error {
+            std::env::VarError::NotPresent => "SMTP password missing; enter it in the recovery settings or set the legacy environment variable",
+            std::env::VarError::NotUnicode(_) => "configured password environment variable is not valid Unicode",
+        })?;
+        if password.is_empty() {
+            return Err("configured password environment variable is empty");
+        }
+        Ok(password)
+    }
+
     pub fn validate(&self, storage: PasswordStorageMethod) -> Result<(), &'static str> {
         if !self.enabled {
             return Ok(());
@@ -80,9 +99,10 @@ impl PasswordRecoveryConfig {
         if self.smtp_username.len() > 254
             || self.smtp_username.contains(['\r', '\n'])
             || (!self.smtp_username.is_empty()
+                && self.smtp_password.is_empty()
                 && (self.smtp_password_env.is_empty() || !self.smtp_password_env.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')))
         {
-            return Err("SMTP credentials must reference a password environment variable");
+            return Err("SMTP authentication requires a password or a legacy password environment variable");
         }
         if !(1..=60).contains(&self.ttl_minutes)
             || !(1..=60).contains(&self.cooldown_minutes)
@@ -97,12 +117,93 @@ impl PasswordRecoveryConfig {
     }
 }
 
+impl std::fmt::Debug for PasswordRecoveryConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PasswordRecoveryConfig")
+            .field("enabled", &self.enabled)
+            .field("smtp_password", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 fn mailbox(value: &str) -> Option<Mailbox> {
     if value.len() > 254 || value.contains(['\r', '\n']) {
         return None;
     }
     // Accept only the stored address, not a display name or mailbox list.
     value.parse::<lettre::Address>().ok().map(|address| Mailbox::new(None, address))
+}
+
+const MAX_MAIL_TEMPLATE_BYTES: usize = 64 * 1024;
+
+async fn load_mail_template(root: &Path, configured: &Path) -> Res<Option<String>> {
+    if configured.as_os_str().is_empty() {
+        return Ok(None);
+    }
+    let path = root.join(configured);
+    let metadata = tokio::fs::metadata(&path).await.map_err(|_| "Recovery mail template unavailable")?;
+    if !metadata.is_file() || metadata.len() > MAX_MAIL_TEMPLATE_BYTES as u64 {
+        return Err("Recovery mail template must be a regular file of at most 64 KiB".into());
+    }
+    let file = tokio::fs::File::open(path).await.map_err(|_| "Recovery mail template unavailable")?;
+    let mut bytes = Vec::new();
+    file.take(MAX_MAIL_TEMPLATE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(|_| "Recovery mail template unreadable")?;
+    if bytes.len() > MAX_MAIL_TEMPLATE_BYTES {
+        return Err("Recovery mail template exceeds 64 KiB".into());
+    }
+    let text = String::from_utf8(bytes).map_err(|_| "Recovery mail template must be UTF-8")?;
+    Ok(Some(text.trim_start_matches('\u{feff}').to_string()))
+}
+
+pub fn default_mail_template(german: bool) -> &'static str {
+    if german {
+        "{{board_name}}\n\nHallo {{user_name}},\nIhr temporaeres Passwort: {{password}}\nGueltig fuer {{ttl_minutes}} Minuten. Melden Sie sich normal am BBS an und waehlen Sie ein neues Passwort. Danach erneut anmelden.\nFalls nicht angefordert, ignorieren Sie diese E-Mail. Ihr bisheriges Passwort bleibt gueltig.\n"
+    } else {
+        "{{board_name}}\n\nHello {{user_name}},\nYour temporary password: {{password}}\nValid for {{ttl_minutes}} minutes. Log in normally to the BBS and choose a new password, then log in again.\nIf you did not request this email, ignore it. Your existing password remains valid.\n"
+    }
+}
+
+fn render_mail_template(template: &str, board_name: &str, user_name: &str, password: &str, ttl_minutes: u32) -> Res<String> {
+    let ttl = ttl_minutes.to_string();
+    let mut result = String::new();
+    let mut remaining = template;
+    let mut has_password = false;
+    let mut has_ttl = false;
+    // Parse only the template, never placeholders embedded in substituted user data.
+    while let Some(start) = remaining.find("{{") {
+        result.push_str(&remaining[..start]);
+        remaining = &remaining[start + 2..];
+        let end = remaining.find("}}").ok_or("Unclosed recovery mail placeholder")?;
+        let value = match &remaining[..end] {
+            "board_name" => board_name,
+            "user_name" => user_name,
+            "password" => {
+                has_password = true;
+                password
+            }
+            "ttl_minutes" => {
+                has_ttl = true;
+                &ttl
+            }
+            _ => return Err("Unknown recovery mail placeholder".into()),
+        };
+        if result.len().saturating_add(value.len()) > MAX_MAIL_TEMPLATE_BYTES * 2 {
+            return Err("Rendered recovery mail exceeds 128 KiB".into());
+        }
+        result.push_str(value);
+        remaining = &remaining[end + 2..];
+    }
+    if !has_password || !has_ttl {
+        return Err("Recovery mail template requires password and ttl_minutes placeholders".into());
+    }
+    result.push_str(remaining);
+    if result.len() > MAX_MAIL_TEMPLATE_BYTES * 2 || result.contains('\0') {
+        return Err("Invalid recovery mail body".into());
+    }
+    Ok(result)
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -191,19 +292,37 @@ pub fn merge_security(local: &User, baseline: &User, live: &User, merged: &mut U
 }
 
 fn eligible(board: &IcyBoard, index: usize) -> bool {
+    ineligible_reason(board, index).is_none()
+}
+
+pub fn has_recovery_email(user: &User) -> bool {
+    mailbox(&user.email).is_some()
+}
+
+fn ineligible_reason(board: &IcyBoard, index: usize) -> Option<&'static str> {
     let c = &board.config;
-    c.password_recovery.enabled
-        && c.password_recovery.validate(c.system_control.password_storage_method).is_ok()
-        && index != 0
-        && board.users.get(index).is_some_and(|u| {
-            !u.flags.delete_flag
-                && !u.flags.disabled_flag
-                && u.security_level < c.sysop_command_level.sysop
-                && u.exp_security_level < c.sysop_command_level.sysop
-                && !u.password.password.is_empty()
-                && matches!(u.password.password, Password::Argon2(_) | Password::BCrypt(_))
-                && mailbox(&u.email).is_some()
-        })
+    if !c.password_recovery.enabled {
+        return Some("recovery disabled");
+    }
+    if let Err(reason) = c.password_recovery.validate(c.system_control.password_storage_method) {
+        return Some(reason);
+    }
+    let Some(u) = board.users.get(index) else {
+        return Some("user not found");
+    };
+    if index == 0 || u.security_level >= c.sysop_command_level.sysop || u.exp_security_level >= c.sysop_command_level.sysop {
+        return Some("sysop account excluded");
+    }
+    if u.flags.delete_flag || u.flags.disabled_flag {
+        return Some("account deleted or disabled");
+    }
+    if u.password.password.is_empty() || !matches!(u.password.password, Password::Argon2(_) | Password::BCrypt(_)) {
+        return Some("account requires a hashed password");
+    }
+    if !has_recovery_email(u) {
+        return Some("saved email address missing or invalid");
+    }
+    None
 }
 
 fn usable(user: &User, challenge: &RecoveryChallenge, now: DateTime<Utc>, max_attempts: u32) -> bool {
@@ -234,31 +353,92 @@ fn challenge_id() -> Res<String> {
 pub trait MailSender: Send + Sync {
     /// Errors must be categories only: never return a body, address or SMTP credential.
     async fn send(&self, config: &PasswordRecoveryConfig, to: &str, subject: &str, body: String) -> Result<(), ()>;
+
+    /// Return only sanitized diagnostics, never raw server replies or credentials.
+    async fn send_detailed(&self, config: &PasswordRecoveryConfig, to: &str, subject: &str, body: String) -> Result<(), String> {
+        self.send(config, to, subject, body).await.map_err(|_| "send failed".to_string())
+    }
 }
 
 pub struct SmtpMailSender;
 
+fn recovery_message(config: &PasswordRecoveryConfig, to: &str, subject: &str, body: String) -> Result<Message, String> {
+    use lettre::message::{
+        SinglePart,
+        header::{ContentTransferEncoding, ContentType},
+    };
+
+    Message::builder()
+        .from(mailbox(&config.sender).ok_or("invalid sender address")?)
+        .to(mailbox(to).ok_or("invalid recipient address")?)
+        .subject(subject)
+        .singlepart(
+            SinglePart::builder()
+                .header(ContentType::TEXT_PLAIN)
+                .header(ContentTransferEncoding::Base64)
+                .body(body),
+        )
+        .map_err(|_| "could not construct email message".into())
+}
+
+fn smtp_failure_details(error: &lettre::transport::smtp::Error) -> String {
+    use std::error::Error;
+    if let Some(code) = error.status() {
+        let code = code.to_string();
+        let hint = match code.as_str() {
+            "530" => "authentication or STARTTLS required",
+            "534" | "535" => "authentication rejected; check username, password or app password",
+            "538" => "encryption required for authentication",
+            _ if error.is_transient() => "temporary SMTP rejection",
+            _ => "permanent SMTP rejection; check relay permissions, sender and recipient",
+        };
+        return format!("SMTP {code}: {hint}");
+    }
+    if error.is_tls() {
+        return "TLS negotiation or certificate verification failed; check hostname, certificate and TLS mode".into();
+    }
+    if error.is_timeout() {
+        return "network timeout; SMTP acceptance may be unknown".into();
+    }
+    let mut source = error.source();
+    while let Some(cause) = source {
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            // Only the typed OS error kind is safe; source messages can contain secrets.
+            return format!("connection/network error ({:?}); check SMTP host, port and connectivity", io.kind());
+        }
+        source = cause.source();
+    }
+    if error.is_response() {
+        "invalid SMTP response; check SMTP port and TLS mode".into()
+    } else if error.is_client() {
+        "SMTP client/protocol error; check STARTTLS and supported authentication mechanisms".into()
+    } else if error.is_transport_shutdown() {
+        "SMTP transport shut down".into()
+    } else {
+        "connection/network error; check DNS, SMTP host, port and connectivity".into()
+    }
+}
+
 #[async_trait]
 impl MailSender for SmtpMailSender {
     async fn send(&self, config: &PasswordRecoveryConfig, to: &str, subject: &str, body: String) -> Result<(), ()> {
-        let message = Message::builder()
-            .from(mailbox(&config.sender).ok_or(())?)
-            .to(mailbox(to).ok_or(())?)
-            .subject(subject)
-            .body(body)
-            .map_err(|_| ())?;
+        self.send_detailed(config, to, subject, body).await.map_err(|_| ())
+    }
+
+    async fn send_detailed(&self, config: &PasswordRecoveryConfig, to: &str, subject: &str, body: String) -> Result<(), String> {
+        let message = recovery_message(config, to, subject, body)?;
         let builder = if config.implicit_tls {
             AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_host)
         } else {
             AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.smtp_host)
         }
-        .map_err(|_| ())?;
+        .map_err(|error| format!("transport setup failed: {}", smtp_failure_details(&error)))?;
         let mut builder = builder.port(config.smtp_port).timeout(Some(Duration::from_secs(config.timeout_seconds.into())));
         if !config.smtp_username.is_empty() {
-            let password = std::env::var(&config.smtp_password_env).map_err(|_| ())?;
+            let password = config.smtp_credential()?;
             builder = builder.credentials(Credentials::new(config.smtp_username.clone(), password));
         }
-        builder.build().send(message).await.map(|_| ()).map_err(|_| ())
+        builder.build().send(message).await.map(|_| ()).map_err(|error| smtp_failure_details(&error))
     }
 }
 
@@ -310,13 +490,26 @@ impl RecoveryService {
     }
 
     pub async fn issue(&self, board: &Arc<tokio::sync::Mutex<IcyBoard>>, index: usize, now: DateTime<Utc>) -> Res<bool> {
+        let mut outcome = "local preparation or persistence error".to_string();
+        let result = self.issue_requested(board, index, now, &mut outcome).await;
+        if matches!(result, Ok(true)) {
+            log::info!("Recovery email: user index {index}: success ({outcome})");
+        } else {
+            log::warn!("Recovery email: user index {index}: failed ({outcome})");
+        }
+        result
+    }
+
+    async fn issue_requested(&self, board: &Arc<tokio::sync::Mutex<IcyBoard>>, index: usize, now: DateTime<Utc>, outcome: &mut String) -> Res<bool> {
         let Ok(slot) = self.slots.clone().try_acquire_owned() else {
+            *outcome = "recovery workers busy".into();
             return Ok(false);
         };
         let generation = self.generation.load(Ordering::SeqCst);
-        let (config, user, board_name) = {
+        let (config, user, board_name, root_path) = {
             let mut b = board.lock().await;
-            if !eligible(&b, index) {
+            if let Some(reason) = ineligible_reason(&b, index) {
+                *outcome = reason.into();
                 return Ok(false);
             }
             let config = b.config.password_recovery.clone();
@@ -328,10 +521,12 @@ impl RecoveryService {
                 .iter()
                 .any(|t| *t > now || *t + chrono::Duration::minutes(config.cooldown_minutes.into()) > now)
             {
+                *outcome = "account cooldown".into();
                 return Ok(false);
             }
             user.recovery_issues.retain(|t| *t + chrono::Duration::hours(1) > now);
             if user.recovery_issues.len() >= config.account_per_hour as usize {
+                *outcome = "account hourly limit".into();
                 return Ok(false);
             }
             {
@@ -345,6 +540,7 @@ impl RecoveryService {
                     .filter(|t| **t + chrono::Duration::hours(1) > now)
                     .count();
                 if issues.iter().any(|t| *t > now) || issues.len().max(persisted) >= config.board_per_hour as usize {
+                    *outcome = "board hourly limit or clock rollback".into();
                     return Ok(false);
                 }
                 issues.push(now);
@@ -354,9 +550,26 @@ impl RecoveryService {
                 b.users[index] = previous;
                 return Err(e);
             }
-            (config, b.users[index].clone(), b.config.board.name.clone())
+            (config, b.users[index].clone(), b.config.board.name.clone(), b.root_path.clone())
         };
+        let template = tokio::time::timeout(
+            Duration::from_secs(config.timeout_seconds.into()),
+            load_mail_template(&root_path, &config.mail_template),
+        )
+        .await
+        .map_err(|_| "Recovery mail template read timed out")
+        .and_then(|result| result.map_err(|_| "Recovery mail template unreadable or invalid"))
+        .inspect_err(|_| *outcome = "template unavailable, invalid or timed out".into())?;
+        let german = user.language.to_ascii_lowercase().starts_with("de");
         let secret = random_secret()?;
+        let body = render_mail_template(
+            template.as_deref().unwrap_or_else(|| default_mail_template(german)),
+            &board_name,
+            &user.name,
+            &secret,
+            config.ttl_minutes,
+        )
+        .inspect_err(|_| *outcome = "invalid mail template".into())?;
         let plain = secret.clone();
         let (hash, slot) = tokio::task::spawn_blocking(move || (Password::new_argon2(plain), slot)).await?;
         let challenge = RecoveryChallenge {
@@ -377,6 +590,7 @@ impl RecoveryService {
                 || security_fingerprint(&b.users[index]) != challenge.context
                 || b.users[index].credential_revision != challenge.revision
             {
+                *outcome = "account or configuration changed during request".into();
                 return Ok(false);
             }
             let previous = b.users[index].clone();
@@ -386,22 +600,10 @@ impl RecoveryService {
                 return Err(e);
             }
         }
-        let german = user.language.to_ascii_lowercase().starts_with("de");
-        let body = if german {
-            format!(
-                "{board_name}\n\nHallo {},\nIhr temporaeres Passwort: {secret}\nGueltig fuer {} Minuten. Melden Sie sich normal am BBS an und waehlen Sie ein neues Passwort. Danach erneut anmelden.\nFalls nicht angefordert, ignorieren Sie diese E-Mail. Ihr bisheriges Passwort bleibt gueltig.\n",
-                user.name, config.ttl_minutes
-            )
-        } else {
-            format!(
-                "{board_name}\n\nHello {},\nYour temporary password: {secret}\nValid for {} minutes. Log in normally to the BBS and choose a new password, then log in again.\nIf you did not request this email, ignore it. Your existing password remains valid.\n",
-                user.name, config.ttl_minutes
-            )
-        };
         // Awaited by the caller: no detached SMTP jobs, retry spool or startup sends.
         let result = tokio::time::timeout(
             Duration::from_secs(config.timeout_seconds.into()),
-            self.sender.send(
+            self.sender.send_detailed(
                 &config,
                 &user.email,
                 if german { "BBS temporaeres Passwort" } else { "BBS temporary password" },
@@ -409,14 +611,20 @@ impl RecoveryService {
             ),
         )
         .await;
+        *outcome = match &result {
+            Ok(Ok(())) => "accepted by SMTP relay".into(),
+            Ok(Err(reason)) => reason.clone(),
+            Err(_) => "send timed out; SMTP acceptance unknown".into(),
+        };
         drop(slot);
-        if matches!(result, Ok(Err(()))) {
+        if matches!(result, Ok(Err(_))) {
             let mut b = board.lock().await;
             if b.users.get(index).and_then(|u| u.recovery.as_ref()).is_some_and(|c| c.id == challenge.id) {
                 let previous = b.users[index].clone();
                 b.users[index].recovery = None;
                 if let Err(e) = b.save_userbase() {
                     b.users[index] = previous;
+                    outcome.push_str("; failed to persist challenge revocation");
                     return Err(e);
                 }
             }
@@ -684,6 +892,7 @@ mod tests {
     fn configuration_is_off_for_old_files_and_rejects_unsafe_settings() {
         let default: PasswordRecoveryConfig = toml::from_str("").unwrap();
         assert!(!default.enabled);
+        assert!(default.mail_template.as_os_str().is_empty());
         assert_eq!(default.ttl_minutes, 30);
         let mut config = default;
         config.enabled = true;
@@ -699,6 +908,154 @@ mod tests {
         table.remove("password_recovery");
         let decoded: super::super::icb_config::IcbConfig = table.try_into().unwrap();
         assert!(!decoded.password_recovery.enabled);
+    }
+
+    #[test]
+    fn recovery_mime_preserves_template_lines_and_unicode() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+
+        let config = PasswordRecoveryConfig {
+            sender: "bbs@example.invalid".into(),
+            ..Default::default()
+        };
+        for template in [
+            default_mail_template(false).to_string(),
+            default_mail_template(true).to_string(),
+            format!(
+                "Grüße {{user}} = unverändert\n\n{}\n{{{{password}}}} / {{{{ttl_minutes}}}}\n",
+                "Lange Zeile äöü = ".repeat(100)
+            ),
+        ] {
+            let body = render_mail_template(&template, "BBS", "Test Caller", "TEST-SECRET", 30).unwrap();
+            let message = recovery_message(&config, "caller@example.invalid", "Password recovery", body.clone()).unwrap();
+            let wire = String::from_utf8(message.formatted()).unwrap();
+            let (headers, encoded) = wire.split_once("\r\n\r\n").unwrap();
+            assert!(headers.contains("MIME-Version: 1.0"), "{headers}");
+            assert!(headers.contains("Content-Type: text/plain; charset=utf-8"), "{headers}");
+            assert!(headers.contains("Content-Transfer-Encoding: base64"), "{headers}");
+            let compact: String = encoded.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+            let decoded = String::from_utf8(STANDARD.decode(compact).unwrap()).unwrap();
+            assert_eq!(decoded.replace("\r\n", "\n"), body);
+        }
+    }
+
+    #[test]
+    fn direct_smtp_password_roundtrips_and_overrides_legacy_env_without_debug_leak() {
+        let config = PasswordRecoveryConfig {
+            enabled: true,
+            smtp_host: "smtp.example.invalid".into(),
+            sender: "bbs@example.invalid".into(),
+            smtp_username: "sender".into(),
+            smtp_password: "Case Sensitive! ä $ PASSWORD".into(),
+            smtp_password_env: "invalid old reference!".into(),
+            ..Default::default()
+        };
+        assert!(config.validate(PasswordStorageMethod::Argon2).is_ok());
+        assert_eq!(config.smtp_credential().unwrap(), config.smtp_password);
+        let text = toml::to_string(&config).unwrap();
+        let decoded: PasswordRecoveryConfig = toml::from_str(&text).unwrap();
+        assert_eq!(decoded.smtp_credential().unwrap(), config.smtp_password);
+        assert!(!format!("{config:?}").contains(&config.smtp_password));
+        let mut missing = config;
+        missing.smtp_password.clear();
+        missing.smtp_password_env.clear();
+        assert!(missing.validate(PasswordStorageMethod::Argon2).is_err());
+        missing.smtp_username.clear();
+        assert!(missing.validate(PasswordStorageMethod::Argon2).is_ok());
+        assert!(toml::from_str::<PasswordRecoveryConfig>("").unwrap().smtp_password.is_empty());
+    }
+
+    #[test]
+    fn mail_template_substitution_is_single_pass_and_validated() {
+        let rendered = render_mail_template(
+            "{{board_name}} / {{user_name}} / {{password}} / {{ttl_minutes}} / {{password}}",
+            "Board {{password}}",
+            "User {{ttl_minutes}}",
+            "SECRET",
+            30,
+        )
+        .unwrap();
+        assert_eq!(rendered, "Board {{password}} / User {{ttl_minutes}} / SECRET / 30 / SECRET");
+        for template in [
+            "",
+            "{{password}}",
+            "{{ttl_minutes}}",
+            "{{password}} {{ttl_minutes}} {{unknown}}",
+            "{{password}} {{ttl_minutes}} {{unclosed",
+            "{{password}} {{ttl_minutes}}\0",
+        ] {
+            let error = render_mail_template(template, "BBS", "User", "SECRET", 30).unwrap_err();
+            assert!(!error.to_string().contains("SECRET"));
+        }
+        assert!(render_mail_template("{{password}}{{ttl_minutes}}{{user_name}}", "BBS", &"x".repeat(128 * 1024), "SECRET", 30).is_err());
+    }
+
+    #[tokio::test]
+    async fn mail_template_loader_bounds_and_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("letter.txt");
+        assert!(load_mail_template(dir.path(), Path::new("")).await.unwrap().is_none());
+        assert!(load_mail_template(dir.path(), Path::new("missing.txt")).await.is_err());
+        assert!(load_mail_template(dir.path(), dir.path()).await.is_err());
+        std::fs::write(&path, "\u{feff}Grüße\r\n{{password}} {{ttl_minutes}}\r\n").unwrap();
+        for configured in [Path::new("letter.txt"), path.as_path()] {
+            assert_eq!(
+                load_mail_template(dir.path(), configured).await.unwrap().unwrap(),
+                "Grüße\r\n{{password}} {{ttl_minutes}}\r\n"
+            );
+        }
+        std::fs::write(&path, [0xff]).unwrap();
+        assert!(load_mail_template(dir.path(), &path).await.is_err());
+        std::fs::write(&path, vec![b'x'; MAX_MAIL_TEMPLATE_BYTES + 1]).unwrap();
+        assert!(load_mail_template(dir.path(), &path).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn custom_mail_templates_reach_sender_and_keep_secrets_out_of_files() {
+        for (language, template, prefix) in [
+            ("en", include_str!("../../../../assets/password_recovery_en.txt"), "Your temporary password: "),
+            ("de", include_str!("../../../../assets/password_recovery_de.txt"), "Ihr temporäres Passwort: "),
+        ] {
+            let (dir, board, service, capture) = fixture();
+            let path = dir.path().join("letter.txt");
+            std::fs::write(&path, template).unwrap();
+            {
+                let mut b = board.lock().await;
+                b.config.board.name = "Test BBS".into();
+                b.users[1].language = language.into();
+                b.config.password_recovery.mail_template = "letter.txt".into();
+                let encoded = toml::to_string(&b.config.password_recovery).unwrap();
+                let decoded: PasswordRecoveryConfig = toml::from_str(&encoded).unwrap();
+                assert_eq!(decoded, b.config.password_recovery);
+            }
+            let now = Utc::now();
+            assert!(service.issue(&board, 1, now).await.unwrap());
+            let body = capture.bodies.lock().unwrap()[0].clone();
+            let temporary = body.lines().find_map(|line| line.strip_prefix(prefix)).unwrap().to_string();
+            assert_eq!(body, render_mail_template(template, "Test BBS", "Test Caller", &temporary, 30).unwrap());
+            assert!(!body.contains("{{"));
+            assert_eq!(std::fs::read_to_string(path).unwrap(), template);
+            assert!(!std::fs::read_to_string(dir.path().join("users.toml")).unwrap().contains(&temporary));
+            let proof = proof(&service, &board, temporary, now).await;
+            assert!(service.complete(&board, &proof, "brand-new".into(), now).await.unwrap());
+        }
+    }
+
+    #[tokio::test]
+    async fn broken_configured_template_never_sends_or_replaces_existing_challenge() {
+        let (dir, board, service, capture) = fixture();
+        let now = Utc::now();
+        assert!(service.issue(&board, 1, now).await.unwrap());
+        let original = toml::to_string(board.lock().await.users[1].recovery.as_ref().unwrap()).unwrap();
+        board.lock().await.config.password_recovery.mail_template = "letter.txt".into();
+        assert!(service.issue(&board, 1, now + chrono::Duration::minutes(10)).await.is_err());
+        std::fs::write(dir.path().join("letter.txt"), "Forgot the password placeholder").unwrap();
+        assert!(service.issue(&board, 1, now + chrono::Duration::minutes(20)).await.is_err());
+        assert_eq!(capture.bodies.lock().unwrap().len(), 1);
+        let b = board.lock().await;
+        assert_eq!(toml::to_string(b.users[1].recovery.as_ref().unwrap()).unwrap(), original);
+        assert!(b.users[1].password.password.is_valid("old-secret"));
+        assert_eq!(service.slots.available_permits(), 2);
     }
 
     #[test]
@@ -912,6 +1269,125 @@ mod tests {
     impl MailSender for NeverSend {
         async fn send(&self, _: &PasswordRecoveryConfig, _: &str, _: &str, _: String) -> Result<(), ()> {
             std::future::pending().await
+        }
+    }
+
+    #[tokio::test]
+    async fn smtp_error_details_keep_codes_but_not_server_reply_secrets() {
+        use tokio::{io::AsyncWriteExt, net::TcpListener};
+        for (code, expected) in [
+            (535, "authentication rejected"),
+            (450, "temporary SMTP rejection"),
+            (550, "permanent SMTP rejection"),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let server = tokio::spawn(async move {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                stream
+                    .write_all(format!("{code} PRIVATE-PASSWORD private@example.invalid\r\n").as_bytes())
+                    .await
+                    .unwrap();
+            });
+            let message = Message::builder()
+                .from("sender@example.invalid".parse().unwrap())
+                .to("recipient@example.invalid".parse().unwrap())
+                .body("PRIVATE-BODY".to_string())
+                .unwrap();
+            let error = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay("localhost")
+                .unwrap()
+                .port(port)
+                .timeout(Some(Duration::from_secs(2)))
+                .build()
+                .send(message)
+                .await
+                .unwrap_err();
+            server.await.unwrap();
+            let details = smtp_failure_details(&error);
+            assert!(details.contains(&format!("SMTP {code}")), "{details}");
+            assert!(details.contains(expected), "{details}");
+            assert!(!details.contains("PRIVATE"));
+            assert!(!details.contains("@"));
+        }
+    }
+
+    #[tokio::test]
+    async fn mail_delivery_logs_report_outcomes_without_secrets() {
+        struct DeliveryLog {
+            thread: std::thread::ThreadId,
+            entries: Mutex<Vec<(log::Level, String)>>,
+        }
+        impl log::Log for DeliveryLog {
+            fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+                metadata.target() == module_path!().trim_end_matches("::tests") && std::thread::current().id() == self.thread
+            }
+            fn log(&self, record: &log::Record<'_>) {
+                if self.enabled(record.metadata()) {
+                    self.entries.lock().unwrap().push((record.level(), record.args().to_string()));
+                }
+            }
+            fn flush(&self) {}
+        }
+        // Tokio's current-thread test runtime isolates these records from parallel tests.
+        let logger = Box::leak(Box::new(DeliveryLog {
+            thread: std::thread::current().id(),
+            entries: Mutex::new(Vec::new()),
+        }));
+        log::set_logger(logger).unwrap();
+        log::set_max_level(log::LevelFilter::Info);
+
+        let (_dir, board, service, capture) = fixture();
+        assert!(service.issue(&board, 1, Utc::now()).await.unwrap());
+        let successful_secret = secret(&capture);
+        let failed_capture = Arc::new(Capture {
+            fail: true,
+            ..Default::default()
+        });
+        let (_failed_dir, failed_board, failed_service) = fixture_with(failed_capture.clone());
+        assert!(!failed_service.issue(&failed_board, 1, Utc::now()).await.unwrap());
+        let failed_secret = secret(&failed_capture);
+        let (_timeout_dir, timeout_board, timeout_service) = fixture_with(Arc::new(NeverSend));
+        timeout_board.lock().await.config.password_recovery.timeout_seconds = 1;
+        assert!(!timeout_service.issue(&timeout_board, 1, Utc::now()).await.unwrap());
+
+        let now = Utc::now();
+        assert!(!service.issue(&board, 1, now).await.unwrap());
+        assert!(!service.issue(&board, 0, now).await.unwrap());
+        board.lock().await.users[1].email.clear();
+        assert!(!service.issue(&board, 1, now).await.unwrap());
+        board.lock().await.users[1].email = "caller@example.invalid".into();
+        board.lock().await.config.password_recovery.mail_template = "missing.txt".into();
+        assert!(service.issue(&board, 1, now + chrono::Duration::minutes(11)).await.is_err());
+
+        let (_smtp_dir, smtp_board, smtp_service) = fixture_with(Arc::new(SmtpMailSender));
+        {
+            let mut b = smtp_board.lock().await;
+            b.config.password_recovery.smtp_username = "private-login".into();
+            // A fresh random environment name avoids mutating the process environment.
+            b.config.password_recovery.smtp_password_env = format!("ICB_RECOVERY_TEST_{}", challenge_id().unwrap());
+        }
+        assert!(!smtp_service.issue(&smtp_board, 1, now).await.unwrap());
+
+        let entries = logger.entries.lock().unwrap();
+        assert_eq!(entries.len(), 8);
+        let expected = [
+            "Recovery email: user index 1: success (accepted by SMTP relay)",
+            "Recovery email: user index 1: failed (send failed)",
+            "Recovery email: user index 1: failed (send timed out; SMTP acceptance unknown)",
+            "Recovery email: user index 1: failed (account cooldown)",
+            "Recovery email: user index 0: failed (sysop account excluded)",
+            "Recovery email: user index 1: failed (saved email address missing or invalid)",
+            "Recovery email: user index 1: failed (template unavailable, invalid or timed out)",
+            "Recovery email: user index 1: failed (SMTP password missing; enter it in the recovery settings or set the legacy environment variable)",
+        ];
+        for (index, expected) in expected.iter().enumerate() {
+            assert_eq!(entries[index].1, *expected);
+            assert_eq!(entries[index].0, if index == 0 { log::Level::Info } else { log::Level::Warn });
+        }
+        for (_, message) in entries.iter() {
+            for private in [&successful_secret, &failed_secret, "old-secret", "caller@example.invalid", "Test Caller"] {
+                assert!(!message.contains(private));
+            }
         }
     }
 

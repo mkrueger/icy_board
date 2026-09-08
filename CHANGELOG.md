@@ -14,9 +14,11 @@ releases.
   After three failed passwords, callers can request mail to their saved address;
   temporary verification requires a new password and normal relogin, without
   admitting the caller to surveys, accounting or menus. Includes bounded TLS
-  SMTP, environment-referenced credentials, hash-only expiring challenges,
+  SMTP, directly configurable SMTP credentials (legacy environment fallback), hash-only expiring challenges,
   issuance/attempt limits, atomic credential replacement, stale-session write
-  protection, English/German setup help and appended ICBTEXT 781–784. Requires
+  protection, English/German setup help and appended ICBTEXT 781–784. An
+  optional UTF-8 mail-body template can customize the letter using board,
+  user, temporary-password and lifetime placeholders. Requires
   hashed credentials; sysops and inactive accounts are excluded. See the
   [configuration and security constraints](docs/configuration/board.md#optional-email-password-recovery).
 

@@ -244,6 +244,7 @@ pub struct ListItem<T> {
     need_update: bool,
 
     pub path_editor: Option<Box<dyn Fn(T, PathBuf) -> PageMessage>>,
+    pub path_initial_content: Option<String>,
 }
 
 impl<T> ListItem<T> {
@@ -265,6 +266,7 @@ impl<T> ListItem<T> {
             help: String::new(),
             edit_width: 0,
             path_editor: None,
+            path_initial_content: None,
             editable: true,
             need_update: false,
         }
@@ -272,6 +274,11 @@ impl<T> ListItem<T> {
 
     pub fn editable(&self) -> bool {
         self.editable
+    }
+
+    pub fn with_path_initial_content(mut self, content: impl Into<String>) -> Self {
+        self.path_initial_content = Some(content.into());
+        self
     }
 
     pub fn with_editable(mut self, editable: bool) -> Self {

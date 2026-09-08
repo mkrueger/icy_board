@@ -131,7 +131,7 @@ impl ICBConfigMenuUI {
                 return PageMessage::InfoBox(InfoState::Warning, get_text("no_file_name_given"));
             }
             if key.code == crossterm::event::KeyCode::F(3) && !path.exists() && can_create_file(&path) {
-                return match create_empty_file(&path) {
+                return match create_file_with_content(&path, item.path_initial_content.as_deref().unwrap_or("")) {
                     Ok(()) => PageMessage::ResultState(self.request_status()),
                     Err(e) => {
                         log::error!("Error creating {}: {}", path.display(), e);
@@ -189,8 +189,11 @@ fn uses_graphics_editor(path: &std::path::Path) -> bool {
         .is_some_and(|extension| matches!(extension.to_ascii_lowercase().as_str(), "ans" | "ansi" | "icy" | "pcb" | "rip"))
 }
 
-fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
-    std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+fn create_file_with_content(path: &std::path::Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()?;
     Ok(())
 }
 

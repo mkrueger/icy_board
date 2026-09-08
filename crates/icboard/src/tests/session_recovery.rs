@@ -98,22 +98,71 @@ fn password_recovery_board(root: &Path) -> (Arc<Mutex<IcyBoard>>, Arc<RecoveryMa
 
 #[tokio::test]
 async fn password_recovery_failed_three_sends_only_registered_mail_and_disconnects() {
+    for answer in ["y\r", "Y\r"] {
+        let dir = tempfile::tempdir().unwrap();
+        let (board, mail) = password_recovery_board(dir.path());
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let mut session = Session::start_with_password(board.clone(), bbs, 1, "wrong").await;
+        session.send("wrong\rwrong\r").await;
+        session.expect("Send a temporary password").await;
+        assert!(mail.0.lock().unwrap().is_empty());
+        session.send(answer).await;
+        let output = session.finish().await;
+        assert_eq!(output.matches("[recovery-wrong]").count(), 3, "{output}");
+        assert_eq!(output.matches("Send a temporary password").count(), 1, "{output}");
+        assert!(output.contains("If eligible"), "{output}");
+        assert!(!output.contains(COMMAND));
+        assert_eq!(mail.0.lock().unwrap().len(), 1);
+        assert!(board.lock().await.users[1].password.password.is_valid("old-secret"));
+        assert!(board.lock().await.users[1].recovery.is_some());
+    }
+}
+
+#[tokio::test]
+async fn password_recovery_sysop_request_is_acknowledged_but_never_sent() {
     let dir = tempfile::tempdir().unwrap();
     let (board, mail) = password_recovery_board(dir.path());
-    let bbs = Arc::new(Mutex::new(BBS::new(1)));
-    let mut session = Session::start_with_password(board.clone(), bbs, 1, "wrong").await;
+    {
+        let mut b = board.lock().await;
+        b.users[1].security_level = b.config.sysop_command_level.sysop;
+        b.save_userbase().unwrap();
+    }
+    let mut session = Session::start_with_password(board.clone(), Arc::new(Mutex::new(BBS::new(1))), 1, "wrong").await;
     session.send("wrong\rwrong\r").await;
     session.expect("Send a temporary password").await;
-    assert!(mail.0.lock().unwrap().is_empty());
-    session.send("Y\r").await;
+    session.send("y\r").await;
     let output = session.finish().await;
-    assert_eq!(output.matches("[recovery-wrong]").count(), 3, "{output}");
-    assert_eq!(output.matches("Send a temporary password").count(), 1, "{output}");
     assert!(output.contains("If eligible"), "{output}");
     assert!(!output.contains(COMMAND));
-    assert_eq!(mail.0.lock().unwrap().len(), 1);
-    assert!(board.lock().await.users[1].password.password.is_valid("old-secret"));
-    assert!(board.lock().await.users[1].recovery.is_some());
+    assert!(mail.0.lock().unwrap().is_empty());
+    assert!(board.lock().await.users[1].recovery.is_none());
+}
+
+#[tokio::test]
+async fn password_recovery_without_valid_email_skips_offer_and_preserves_failure_comment() {
+    for email in ["", "   ", "invalid", "one@example.invalid,two@example.invalid"] {
+        let dir = tempfile::tempdir().unwrap();
+        let (board, mail) = password_recovery_board(dir.path());
+        {
+            let mut b = board.lock().await;
+            b.users[1].email = email.into();
+            b.config.system_control.allow_password_failure_comment = true;
+            b.save_userbase().unwrap();
+        }
+        let mut session = Session::start_with_password(board.clone(), Arc::new(Mutex::new(BBS::new(1))), 1, "wrong").await;
+        session.send("wrong\rwrong\r").await;
+        session.expect("leave a comment to the sysop").await;
+        session.send("N\r").await;
+        let output = session.finish().await;
+        assert_eq!(output.matches("[recovery-wrong]").count(), 3, "{output}");
+        assert!(!output.contains("Send a temporary password"), "{output}");
+        assert!(!output.contains("If eligible"), "{output}");
+        assert!(!output.contains(COMMAND), "{output}");
+        assert!(mail.0.lock().unwrap().is_empty());
+        let b = board.lock().await;
+        assert!(b.users[1].recovery.is_none());
+        assert!(b.users[1].recovery_issues.is_empty());
+    }
 }
 
 #[tokio::test]
