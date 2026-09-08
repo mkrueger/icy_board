@@ -1291,6 +1291,7 @@ kept in a variable still answers with what the session became:
 | `PageLength` | `INTEGER` | Lines before a `MORE` prompt |
 | `Language` | `STRING` | Selected language |
 | `IsLocal`, `IsSysop` | `BOOLEAN` | How the caller got on |
+| `RequestPasswordRecovery(userName)` | `BOOLEAN` | Request recovery mail for a login name or alias |
 
 ```PPL
 PRINTLN "Node ", Session.Node, ", ", Session.MinutesLeft, " minutes left"
@@ -1299,6 +1300,27 @@ PRINTLN "In ", Session.Conference.Name, " on ", Board.Name
 
 Where a conference, area or directory sits is asked of the thing itself:
 `Session.Conference.Number`, `Session.Area.Number`, `Session.Directory.Number`.
+
+### Requesting password recovery
+
+`Session.RequestPasswordRecovery(userName)` (language/runtime 400) requests a
+temporary password using the existing recovery service and only the target
+account's saved email address. Names and aliases match case-insensitively, with
+surrounding whitespace ignored. It can be called from login, direct-PPE or
+ordinary sessions, including sysop tools acting for another user. The PPE
+controls access and dialogue; the function does not check caller permissions,
+print anything, disconnect, switch users or authenticate anyone.
+
+`FALSE` means recovery is globally disabled. Otherwise `TRUE` means the request
+was accepted, **not** that mail was sent. Unknown/empty names, excluded accounts,
+rate limits, persistence and SMTP failures have the same public result and do
+not publish details through `Error.Last()` or enter `ON ERROR`; a completed call
+clears an earlier error. Details are logged for the sysop. Existing target-account
+exclusions and account/board limits still apply, with no extra per-connection cap.
+Temporary-password verification and the mandatory password change remain in the
+native login. A successful normal-password login cancels that account's pending
+recovery, so a login PPE should end the connection after its confirmation when
+requesting recovery for the caller.
 
 ### The session and the user are not the same thing
 

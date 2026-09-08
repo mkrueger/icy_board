@@ -249,3 +249,172 @@ fn session_is_read_live() {
 
     assert_eq!(output, "5\n");
 }
+
+mod password_recovery {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+    use crate::icy_board::{
+        IcyBoard, IcyBoardSerializer,
+        icb_config::PasswordStorageMethod,
+        password_recovery::{MailSender, PasswordRecoveryConfig, RecoveryService},
+        user_base::{Password, UserBase},
+    };
+
+    #[derive(Default)]
+    struct Mail {
+        recipients: Mutex<Vec<String>>,
+        fail: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl MailSender for Mail {
+        async fn send(&self, _: &PasswordRecoveryConfig, to: &str, _: &str, _: String) -> Result<(), ()> {
+            self.recipients.lock().unwrap().push(to.to_string());
+            if self.fail { Err(()) } else { Ok(()) }
+        }
+    }
+
+    fn seed(board: &mut IcyBoard, mail: Arc<Mail>) {
+        board.config.system_control.password_storage_method = PasswordStorageMethod::Argon2;
+        board.config.password_recovery = PasswordRecoveryConfig {
+            enabled: true,
+            smtp_host: "smtp.example.invalid".into(),
+            sender: "board@example.invalid".into(),
+            ..Default::default()
+        };
+        board.password_recovery_service = Arc::new(RecoveryService::new(mail));
+        board.users[0].security_level = 0;
+        let mut user = User {
+            name: "Target User".into(),
+            alias: "TargetAlias".into(),
+            email: "target@example.invalid".into(),
+            ..Default::default()
+        };
+        user.password.password = Password::new_argon2("old-password");
+        board.users.new_user(user);
+    }
+
+    #[test]
+    fn request_password_recovery_requires_runtime_400_and_a_name() {
+        let source = "PRINTLN Session.RequestPasswordRecovery(\"Target User\")";
+        for runtime in [330, 340] {
+            assert!(!compile_errors_with_runtime(source, runtime).is_empty());
+        }
+        assert!(compile_errors_with_runtime(source, 400).is_empty());
+        assert!(!compile_errors_with_runtime("Session.RequestPasswordRecovery()", 400).is_empty());
+        assert!(!compile_errors_with_runtime("Session.RequestPasswordRecovery(\"a\", \"b\")", 400).is_empty());
+    }
+
+    #[test]
+    fn request_password_recovery_sends_persists_and_keeps_the_caller() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("users.toml");
+        let mail = Arc::new(Mail::default());
+        let output = run_ppl_on(
+            r#"
+            PRINTLN Session.IsSysop, "|", Session.SecurityLevel
+            REGEX bad = REGEX.Compile("[")
+            PRINTLN Session.RequestPasswordRecovery("  targetalias  ")
+            PRINTLN Error.Last().OK
+            PRINTLN Session.User.Name, "|", Session.User.RecordNumber
+            Session.User.City = "Caller City"
+            PRINTLN "still running"
+            "#,
+            |board| {
+                seed(board, mail.clone());
+                board.config.paths.user_file = file.clone();
+            },
+        );
+        assert_eq!(output, "0|0\n1\n1\nSYSOP|1\nstill running\n");
+        assert_eq!(*mail.recipients.lock().unwrap(), ["target@example.invalid"]);
+        let users = UserBase::load(&file).unwrap();
+        assert!(users[1].recovery.is_some());
+        assert!(users[1].password.password.is_valid("old-password"));
+        assert!(users[0].recovery.is_none());
+        assert_eq!(users[0].city_or_state, "Caller City");
+    }
+
+    #[test]
+    fn request_password_recovery_disabled_returns_false_without_sending() {
+        let mail = Arc::new(Mail::default());
+        let output = run_ppl_on(
+            r#"
+            REGEX bad = REGEX.Compile("[")
+            PRINTLN Session.RequestPasswordRecovery("Target User")
+            PRINTLN Error.Last().OK
+            "#,
+            |board| {
+                seed(board, mail.clone());
+                board.config.password_recovery.enabled = false;
+            },
+        );
+        assert_eq!(output, "0\n1\n");
+        assert!(mail.recipients.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn request_password_recovery_hides_unknown_excluded_and_failed_requests() {
+        for case in ["unknown", "empty", "sysop", "disabled", "deleted", "email", "plaintext", "smtp", "save"] {
+            let mail = Arc::new(Mail {
+                fail: case == "smtp",
+                ..Default::default()
+            });
+            let name = match case {
+                "unknown" => "Nobody",
+                "empty" => " ",
+                "sysop" => "SYSOP",
+                _ => "Target User",
+            };
+            let output = run_ppl_on(
+                &format!(
+                    "REGEX bad = REGEX.Compile(\"[\")\nON ERROR GOTO Failed\nPRINTLN Session.RequestPasswordRecovery(\"{name}\")\nPRINTLN Error.Last().OK\nEXIT\n:Failed\nPRINTLN \"unexpected handler\""
+                ),
+                |board| {
+                    seed(board, mail.clone());
+                    match case {
+                        "disabled" => board.users[1].flags.disabled_flag = true,
+                        "deleted" => board.users[1].flags.delete_flag = true,
+                        "email" => board.users[1].email.clear(),
+                        "plaintext" => board.users[1].password.password = Password::PlainText("old-password".into()),
+                        "save" => board.config.paths.user_file = board.root_path.clone(),
+                        _ => {}
+                    }
+                },
+            );
+            assert_eq!(output, "1\n1\n", "{case}");
+            assert_eq!(mail.recipients.lock().unwrap().len(), usize::from(case == "smtp"), "{case}");
+        }
+    }
+
+    #[test]
+    fn request_password_recovery_reuses_limits_not_a_per_connection_cap() {
+        for board_limit in [1, 50] {
+            let mail = Arc::new(Mail::default());
+            let output = run_ppl_on(
+                r#"
+                PRINTLN Session.RequestPasswordRecovery("Target User")
+                PRINTLN Session.RequestPasswordRecovery("Target User")
+                PRINTLN Session.RequestPasswordRecovery("Other User")
+                PRINTLN Error.Last().OK
+                "#,
+                |board| {
+                    seed(board, mail.clone());
+                    board.config.password_recovery.board_per_hour = board_limit;
+                    let mut other = board.users[1].clone();
+                    other.name = "Other User".into();
+                    other.alias.clear();
+                    other.email = "other@example.invalid".into();
+                    board.users.new_user(other);
+                },
+            );
+            assert_eq!(output, "1\n1\n1\n1\n");
+            let expected = if board_limit == 1 {
+                vec!["target@example.invalid"]
+            } else {
+                vec!["target@example.invalid", "other@example.invalid"]
+            };
+            assert_eq!(*mail.recipients.lock().unwrap(), expected);
+        }
+    }
+}

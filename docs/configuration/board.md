@@ -106,7 +106,9 @@ Otherwise the recovery prompt is skipped without reading extra input.
 No preserves the existing failure-comment/hangup
 order. Yes sends only to `User.email`, gives the same generic acknowledgement
 regardless of eligibility, limits or SMTP result, then disconnects. There is no
-destination question, browser, link, new listener or PPL recovery API. Generic
+destination question, browser, link or new listener. PPL 4.00 can request the same
+service with `Session.RequestPasswordRecovery(userName)`; the PPE controls its
+own dialogue and access. Generic
 password checks and direct `/PPE` execution are unchanged. Enabling intentionally
 changes failed-login dialogue: review custom login PPEs and KBDSTUF scripts first.
 

@@ -471,6 +471,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if id == SESSION_ID as u8 {
         return match member.to_ascii_lowercase().as_str() {
+            "requestpasswordrecovery" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-request-password-recovery")),
             "conference" | "area" | "directory" | "user" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-context")),
             "username" | "aliasname" | "securitylevel" | "node" | "minutesleft" | "pagelength" | "language" | "islocal" | "issysop" => {
                 Some(fl!(LANGUAGE_LOADER, "hint-member-session-value"))
@@ -668,6 +669,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "font" => "hint-param-font",
         "file" => "hint-param-file",
         "password" => "hint-param-password",
+        "username" => "hint-param-user-name",
         "service" => "hint-param-service",
         "account" => "hint-param-account",
         "index" => "hint-param-index",

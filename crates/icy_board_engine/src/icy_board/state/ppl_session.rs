@@ -26,6 +26,7 @@ member_name!(PAGE_LENGTH, "PageLength");
 member_name!(LANGUAGE, "Language");
 member_name!(IS_LOCAL, "IsLocal");
 member_name!(IS_SYSOP, "IsSysop");
+member_name!(REQUEST_PASSWORD_RECOVERY, "RequestPasswordRecovery");
 
 /// This call, as it stands right now. Unlike `Board` it is read live, so a
 /// value kept in a variable still answers with what the session became.
@@ -56,6 +57,11 @@ impl UserData for PplSession {
         for name in [&*IS_LOCAL, &*IS_SYSOP] {
             registry.add_property(name.clone(), VariableType::Boolean, false);
         }
+        registry.add_named_function(
+            REQUEST_PASSWORD_RECOVERY.clone(),
+            vec![("userName", VariableType::UnboundedString)],
+            VariableType::Boolean,
+        );
     }
 }
 
@@ -128,10 +134,31 @@ impl UserDataValue for PplSession {
 
     async fn call_function(
         &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
+        vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        _arguments: &[VariableValue],
+        arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *REQUEST_PASSWORD_RECOVERY {
+            let user_name = arguments[0].as_string();
+            let (enabled, index, service) = {
+                let board = vm.icy_board_state.get_board().await;
+                (
+                    board.config.password_recovery.enabled,
+                    board.users.find_by_name(&user_name),
+                    board.password_recovery_service.clone(),
+                )
+            };
+            if enabled {
+                if let Some(index) = index {
+                    // Delivery and eligibility details stay in the service's log, never in Error.Last().
+                    let _ = service.issue(&vm.icy_board_state.board, index, chrono::Utc::now()).await;
+                } else {
+                    log::info!("PPL recovery email: user not found");
+                }
+            }
+            vm.operation_succeeded();
+            return Ok(VariableValue::new_bool(enabled));
+        }
         Err(format!("Unknown SESSION function {name}").into())
     }
 
