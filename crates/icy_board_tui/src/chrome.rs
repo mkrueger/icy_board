@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, Widget},
 };
 
-use crate::theme::{DOS_DARK_GRAY, get_tui_theme};
+use crate::theme::{DOS_DARK_GRAY, Theme, get_tui_theme};
 
 pub fn dirty_title(title: impl Into<String>, dirty: bool) -> String {
     let mut title = title.into();
@@ -22,7 +22,11 @@ pub fn dirty_title(title: impl Into<String>, dirty: bool) -> String {
 
 /// Only the content recedes: the surface keeps its colour, highlights go grey.
 pub fn dim_background(buf: &mut Buffer, area: Rect) {
-    let theme = get_tui_theme();
+    dim_background_with_theme(buf, area, get_tui_theme());
+}
+
+/// Dim a surface drawn with an explicit palette, independent of admin settings.
+pub fn dim_background_with_theme(buf: &mut Buffer, area: Rect, theme: Theme) {
     let Some(dimmed) = theme.table_inactive.fg else { return };
     let area = area.intersection(*buf.area());
     for y in area.y..area.bottom() {
@@ -57,6 +61,19 @@ pub fn status_line(buf: &mut Buffer, area: Rect, context: &str, clock: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_palette_dimming_preserves_blue_monitor_surface() {
+        use crate::theme::{DOS_BLUE, DOS_RED, POLISHED_THEME};
+        let area = Rect::new(0, 0, 6, 3);
+        let mut buf = Buffer::empty(area);
+        buf.set_style(area, POLISHED_THEME.background);
+        buf[(2, 1)].set_bg(DOS_RED);
+        dim_background_with_theme(&mut buf, area, POLISHED_THEME);
+        assert_eq!(buf[(0, 0)].bg, DOS_BLUE);
+        assert_eq!(buf[(2, 1)].bg, DOS_DARK_GRAY);
+        assert_eq!(buf[(0, 0)].fg, POLISHED_THEME.table_inactive.fg.unwrap());
+    }
 
     #[test]
     fn status_is_bounded_and_context_survives_tiny_areas() {

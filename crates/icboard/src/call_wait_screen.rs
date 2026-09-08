@@ -5,8 +5,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{Res, SHOW_TOTAL_STATS, event_screen::RuntimeStatus};
-use chrono::{Local, Timelike};
+use crate::{Res, SHOW_TOTAL_STATS, cws_chrome, event_screen::RuntimeStatus};
+use chrono::Local;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -24,9 +24,9 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Margin, Position, Rect},
     prelude::Backend,
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::Line,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Clear, Paragraph, Widget, Wrap},
 };
 
 use tokio::sync::Mutex;
@@ -224,7 +224,7 @@ impl CallWaitScreen {
         redraw.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             status.refresh(bbs);
-            terminal.draw(|frame| Self::event_ui(frame, full_screen, &status, self.error_message.as_deref()))?;
+            terminal.draw(|frame| Self::event_ui(frame, full_screen, &status, self.error_message.as_deref(), &self.date_format))?;
             tokio::select! {
                 result = &mut operation => return Ok(result),
                 _ = redraw.tick() => {},
@@ -232,7 +232,7 @@ impl CallWaitScreen {
         }
     }
 
-    fn event_ui(frame: &mut Frame, full_screen: bool, runtime: &RuntimeStatus, operator_error: Option<&str>) {
+    fn event_ui(frame: &mut Frame, full_screen: bool, runtime: &RuntimeStatus, operator_error: Option<&str>, date_format: &str) {
         let area = get_screen_size(frame, full_screen);
         let mut args = std::collections::HashMap::new();
         let mut failed = false;
@@ -290,12 +290,7 @@ impl CallWaitScreen {
             Paragraph::new(text)
                 .wrap(Wrap { trim: true })
                 .style(Style::new().fg(DOS_WHITE).bg(if failed { DOS_RED } else { DOS_BLUE }))
-                .block(
-                    Block::bordered()
-                        .border_type(BorderType::Double)
-                        .title(get_text("event_runtime_title"))
-                        .title_bottom(Line::from(Local::now().format(" %H:%M:%S ").to_string()).right_aligned()),
-                ),
+                .block(cws_chrome::screen(&get_text("event_runtime_title"), date_format, Local::now(), area.width)),
             area,
         );
     }
@@ -347,7 +342,7 @@ impl CallWaitScreen {
             }
             if self.runtime.offline || self.runtime.failure.is_some() {
                 self.selected = None;
-                terminal.draw(|frame| Self::event_ui(frame, full_screen, &self.runtime, self.error_message.as_deref()))?;
+                terminal.draw(|frame| Self::event_ui(frame, full_screen, &self.runtime, self.error_message.as_deref(), &self.date_format))?;
                 tokio::time::sleep(Duration::from_millis(250)).await;
                 continue;
             }
@@ -429,25 +424,18 @@ impl CallWaitScreen {
     fn ui(&self, frame: &mut Frame, full_screen: bool) {
         let now = Local::now();
 
-        let dt = now.format(&self.date_format);
-
         let ver = VERSION.to_string();
         let area = get_screen_size(frame, full_screen);
         let screen_area = area;
 
-        let b = Block::default()
-            .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())
-            .title_top(Line::from(program_title(&ver, GIT_HASH)).fg(DOS_YELLOW).centered())
-            .title(
-                Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
-                    .style(Style::new().white())
-                    .right_aligned(),
-            )
-            .title_bottom(Line::from("  (C) Copyright Mike Krüger, 2024 ").style(Style::new().white()).right_aligned())
-            .style(Style::new().bg(DOS_BLUE))
+        let b = Block::bordered()
             .border_type(BorderType::Double)
-            .border_style(Style::new().white())
-            .borders(Borders::ALL);
+            .border_style(Style::new().fg(DOS_WHITE).bg(DOS_BLUE))
+            .style(Style::new().bg(DOS_BLUE))
+            .title_top(Line::styled(now.format(&format!(" {} ", self.date_format)).to_string(), Style::new().fg(DOS_WHITE)).left_aligned())
+            .title_top(Line::styled(program_title(&ver, GIT_HASH), Style::new().fg(DOS_YELLOW)).centered())
+            .title_top(Line::styled(now.format(" %H:%M:%S ").to_string(), Style::new().fg(DOS_WHITE)).right_aligned())
+            .title_bottom(Line::styled("  (C) Copyright Mike Krüger, 2024 ", Style::new().fg(DOS_WHITE)).right_aligned());
         frame.render_widget(b, area);
         let vertical: Layout = Layout::vertical([
             Constraint::Length(1),
@@ -611,7 +599,7 @@ impl CallWaitScreen {
             Paragraph::new(format!("{message}\n\nPress any key to continue."))
                 .wrap(Wrap { trim: true })
                 .style(Style::new().fg(DOS_WHITE).bg(DOS_RED))
-                .block(Block::bordered().title(" Error ").border_type(BorderType::Double))
+                .block(cws_chrome::panel("Error"))
                 .render(popup, frame.buffer_mut());
         }
     }
@@ -742,6 +730,47 @@ mod tests {
     use super::*;
     use ratatui::backend::TestBackend;
 
+    #[tokio::test]
+    async fn main_keeps_white_frame_and_plain_title_while_subscreens_use_red_titles() {
+        let mut board = IcyBoard::default();
+        board.config.board.date_format = "DATE".into();
+        let board = Arc::new(Mutex::new(board));
+        let screen = CallWaitScreen::new(&board).await.unwrap();
+        for full_screen in [false, true] {
+            let mut terminal = Terminal::new(TestBackend::new(132, 40)).unwrap();
+            let mut area = Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, full_screen);
+                    screen.ui(frame, full_screen);
+                })
+                .unwrap();
+            let buf = terminal.backend().buffer();
+            let title = program_title(&VERSION.to_string(), GIT_HASH);
+            let width = Line::raw(&title).width() as u16;
+            let start = area.x + (area.width - width) / 2;
+            let rendered: String = (start..start + width).map(|x| buf[(x, area.y)].symbol()).collect();
+            assert_eq!(rendered, title);
+            for x in start..start + width {
+                assert_eq!(buf[(x, area.y)].fg, DOS_YELLOW);
+                assert_eq!(buf[(x, area.y)].bg, DOS_BLUE);
+            }
+            let date: String = (area.x + 2..area.x + 6).map(|x| buf[(x, area.y)].symbol()).collect();
+            assert_eq!(date, "DATE");
+            let time: String = (area.right() - 10..area.right() - 2).map(|x| buf[(x, area.y)].symbol()).collect();
+            assert!(chrono::NaiveTime::parse_from_str(&time, "%H:%M:%S").is_ok());
+            assert_eq!(buf[(area.x, area.y)].symbol(), "╔");
+            assert_eq!(buf[(area.x, area.y)].fg, DOS_WHITE);
+            assert_eq!(buf[(area.right() - 1, area.bottom() - 1)].symbol(), "╝");
+            assert_eq!(buf[(area.right() - 1, area.bottom() - 1)].fg, DOS_WHITE);
+            assert!((area.x..area.right()).all(|x| buf[(x, area.bottom() - 1)].bg == DOS_BLUE));
+            terminal
+                .draw(|frame| CallWaitScreen::event_ui(frame, full_screen, &RuntimeStatus::default(), None, "DATE"))
+                .unwrap();
+            cws_chrome::assert_header(terminal.backend().buffer(), area, &get_text("event_runtime_title"));
+        }
+    }
+
     #[test]
     fn the_title_names_the_commit_when_it_is_known() {
         assert_eq!(program_title("0.2.1", "a1b2c3d"), "  IcyBoard v0.2.1 (a1b2c3d)  ");
@@ -756,14 +785,16 @@ mod tests {
         };
         let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
         terminal
-            .draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, Some("Board lock unavailable")))
+            .draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, Some("Board lock unavailable"), "%m/%d/%y"))
             .unwrap();
         let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains("OFFLINE"));
         assert!(text.contains("Board lock unavailable"));
         assert!(text.contains(&get_text("event_runtime_gate_closed")));
         runtime.failure = Some("Sticky journal failure".into());
-        terminal.draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, None)).unwrap();
+        terminal
+            .draw(|frame| CallWaitScreen::event_ui(frame, false, &runtime, None, "%m/%d/%y"))
+            .unwrap();
         let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains("Sticky journal failure"));
         assert!(text.contains("OFFLINE"));

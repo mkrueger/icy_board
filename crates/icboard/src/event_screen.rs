@@ -17,7 +17,7 @@ use icy_board_engine::icy_board::{
         event_history::{EventHistory, EventHistoryEntry, EventResult, LOG_DIRECTORY},
     },
 };
-use icy_board_tui::{app::get_screen_size, chrome::dim_background, get_text};
+use icy_board_tui::{app::get_screen_size, chrome::dim_background_with_theme, get_text};
 use ratatui::{
     Frame, Terminal,
     backend::Backend,
@@ -27,7 +27,7 @@ use ratatui::{
 };
 use tokio::sync::Mutex;
 
-use crate::{Res, log_screen::sanitize};
+use crate::{Res, cws_chrome, log_screen::sanitize};
 
 /// Long enough to keep the operator's key, short enough to keep the clock and
 /// the queue state moving.
@@ -189,6 +189,7 @@ enum Action {
 
 #[derive(Default)]
 struct EventScreen {
+    date_format: String,
     events: Vec<BoardEvent>,
     history: Vec<EventHistoryEntry>,
     history_error: Option<String>,
@@ -211,6 +212,7 @@ impl EventScreen {
         }
         // Do not queue behind board reload or block return to the owner handshake.
         let Ok(board) = board.try_lock() else { return false };
+        self.date_format = board.config.board.date_format.clone();
         let selected_id = self.selected().map(|event| event.id.clone());
         self.events = board.events.iter().cloned().collect();
         self.schedule_enabled = board.config.event.enabled;
@@ -501,15 +503,12 @@ impl EventScreen {
     }
 
     fn ui_at(&mut self, frame: &mut Frame, full_screen: bool, now: DateTime<Local>) {
-        let theme = crate::node_monitoring_screen::monitor_theme();
+        let theme = cws_chrome::theme();
         let area = get_screen_size(frame, full_screen);
         frame.render_widget(Clear, area);
         Block::new().style(theme.background).render(area, frame.buffer_mut());
-        let block = Block::bordered()
-            .title(Line::styled(format!(" {} ", get_text("event_runtime_picker_title")), theme.dialog_box_title))
-            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("event_runtime_picker_keys"))
-            .border_style(theme.dialog_box)
-            .style(theme.background);
+        let block = cws_chrome::screen(&get_text("event_runtime_picker_title"), &self.date_format, now, area.width)
+            .title_bottom(cws_chrome::hotkeys("event_runtime_picker_keys"));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let [status, list, history] = Layout::vertical([Constraint::Length(2), Constraint::Min(3), Constraint::Length(12)]).areas(inner);
@@ -596,13 +595,8 @@ impl EventScreen {
             let index = runs.iter().position(|entry| entry.key == selected.key).unwrap_or(0) + 1;
             format!(" ({index}/{})", runs.len())
         });
-        let detail_block = Block::bordered()
-            .border_style(theme.dialog_box)
-            .title(Line::styled(
-                format!(" {}{execution_position} ", get_text("event_runtime_history_title")),
-                theme.dialog_box_title,
-            ))
-            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("event_runtime_detail_keys"));
+        let detail_block = cws_chrome::panel(&format!("{}{execution_position}", get_text("event_runtime_history_title")))
+            .title_bottom(cws_chrome::hotkeys("event_runtime_detail_keys"));
         let detail_area = detail_block.inner(history);
         let paragraph = Paragraph::new(self.detail(now)).wrap(Wrap { trim: true }).style(theme.value);
         let max_scroll = paragraph
@@ -621,12 +615,9 @@ impl EventScreen {
                 area.width.min(74),
                 area.height.min(19),
             );
-            dim_background(frame.buffer_mut(), area);
+            dim_background_with_theme(frame.buffer_mut(), area, theme);
             frame.render_widget(Clear, popup);
-            let block = Block::bordered()
-                .title(Line::styled(format!(" {} ", get_text("event_runtime_confirm_title")), theme.menu_box_title))
-                .border_style(theme.menu_box)
-                .style(theme.background);
+            let block = cws_chrome::panel(&get_text("event_runtime_confirm_title"));
             let inner = block.inner(popup);
             frame.render_widget(block, popup);
             let [details, help, choices] = Layout::vertical([Constraint::Length(4), Constraint::Min(1), Constraint::Length(2)]).areas(inner);
@@ -671,7 +662,7 @@ impl EventScreen {
                         ratatui::text::Span::raw("    "),
                         ratatui::text::Span::styled(format!(" {no} "), no_style),
                     ]),
-                    crate::node_monitoring_screen::dos_hotkeys("event_runtime_confirm_keys"),
+                    cws_chrome::hotkeys("event_runtime_confirm_keys"),
                 ])
                 .style(theme.background),
                 choices,
@@ -789,6 +780,36 @@ mod tests {
     use chrono::TimeZone;
     use icy_board_engine::datetime::{IcbDoW, IcbTime};
     use ratatui::backend::TestBackend;
+
+    #[test]
+    fn event_header_and_confirmation_keep_the_runtime_palette() {
+        use icy_board_tui::theme::DOS_BLUE;
+        let mut screen = screen();
+        screen.date_format = "DATE".into();
+        for full_screen in [false, true] {
+            screen.confirmation = None;
+            let mut terminal = Terminal::new(TestBackend::new(132, 40)).unwrap();
+            let mut area = Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, full_screen);
+                    screen.ui(frame, full_screen);
+                })
+                .unwrap();
+            cws_chrome::assert_header(terminal.backend().buffer(), area, &get_text("event_runtime_picker_title"));
+            screen.confirm_key(KeyCode::Enter);
+            terminal.draw(|frame| screen.ui(frame, full_screen)).unwrap();
+            let buf = terminal.backend().buffer();
+            // The outer blue surface is not a highlighted admin-theme cell.
+            assert_eq!(buf[(area.x + 1, area.y + 1)].bg, DOS_BLUE);
+            let popup_x = area.x + area.width.saturating_sub(74) / 2;
+            let popup_y = area.y + area.height.saturating_sub(19) / 2;
+            assert_eq!(buf[(popup_x, popup_y)].symbol(), "╔");
+            let title = format!("[ {} ]", get_text("event_runtime_confirm_title"));
+            let row: String = (popup_x..popup_x + 74).map(|x| buf[(x, popup_y)].symbol()).collect();
+            assert!(row.contains(&title));
+        }
+    }
 
     fn at(year: i32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> DateTime<Local> {
         Local.with_ymd_and_hms(year, month, day, hour, minute, second).earliest().unwrap()
@@ -1201,16 +1222,16 @@ mod tests {
         assert!(text.contains("nightly.sh"), "the selected command belongs on screen");
         assert!(text.contains(&get_text("event_runtime_disabled")));
         assert!(text.contains(&get_text("event_runtime_next_column")));
-        assert!(text.contains(&crate::node_monitoring_screen::dos_hotkeys("event_runtime_picker_keys").to_string()));
+        assert!(text.contains(&cws_chrome::hotkeys("event_runtime_picker_keys").to_string()));
         screen.confirm_key(KeyCode::Enter);
         terminal.draw(|frame| screen.ui(frame, false)).unwrap();
         let buffer = terminal.backend().buffer().clone();
         let text = buffer.content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains(&get_text("event_runtime_confirm_title")));
         assert!(text.contains(&get_text("event_runtime_no")));
-        assert!(text.contains(&crate::node_monitoring_screen::dos_hotkeys("event_runtime_confirm_keys").to_string()));
+        assert!(text.contains(&cws_chrome::hotkeys("event_runtime_confirm_keys").to_string()));
         // Cancel is preselected and has to look like it.
-        let theme = crate::node_monitoring_screen::monitor_theme();
+        let theme = cws_chrome::theme();
         assert!(buffer.content().iter().any(|cell| cell.bg == theme.selected_item.bg.unwrap()));
     }
 

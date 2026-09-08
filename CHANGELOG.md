@@ -112,6 +112,10 @@ releases.
   instead of per-tool hint strings; runtime keys are unchanged.
   See the [developer guide](docs/hotkey_bars.md).
 
+- The call-wait subscreens share one frame: yellow double borders, a centered
+  bracketed title, the board's date format on the left and the clock on the
+  right. The main call-wait screen keeps its own white frame and plain title.
+
 ### Fixed
 
 - W/LANG profile saves no longer finalize accounting. Logoff waits for enclosing

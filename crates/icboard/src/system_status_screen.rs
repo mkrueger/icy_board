@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -19,11 +19,11 @@ use ratatui::{
     Frame, Terminal,
     backend::Backend,
     text::{Line, Span},
-    widgets::{Block, Clear, Paragraph, Wrap},
+    widgets::{Clear, Paragraph, Wrap},
 };
 use tokio::{sync::Mutex, task::JoinHandle};
 
-use crate::{Res, event_screen::RuntimeStatus};
+use crate::{Res, cws_chrome, event_screen::RuntimeStatus};
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 // Nonzero: a zero-timeout poll can lose keys in the shared crossterm reader.
@@ -209,6 +209,7 @@ impl Drop for DiskJob {
 
 #[derive(Default)]
 struct SystemStatusScreen {
+    date_format: String,
     runtime: RuntimeStatus,
     started_at: Option<Instant>,
     listeners: Option<Vec<ListenerStatus>>,
@@ -251,6 +252,7 @@ impl SystemStatusScreen {
     fn refresh(&mut self, board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) {
         self.refresh_runtime(bbs);
         if let Ok(board) = board.try_lock() {
+            self.date_format = board.config.board.date_format.clone();
             if self.root.as_ref() != Some(&board.root_path) {
                 self.disk = None;
                 self.disk_freshness = Freshness::default();
@@ -314,7 +316,7 @@ impl SystemStatusScreen {
     }
 
     fn lines(&self, width: u16) -> Vec<Line<'static>> {
-        let theme = crate::node_monitoring_screen::monitor_theme();
+        let theme = cws_chrome::theme();
         let unavailable = || get_text("system_status_unavailable");
         let status_row = |key: &str, value: String, warning: bool| {
             Line::from(vec![
@@ -490,14 +492,11 @@ impl SystemStatusScreen {
     }
 
     fn ui(&mut self, frame: &mut Frame, full_screen: bool) {
-        let theme = crate::node_monitoring_screen::monitor_theme();
+        let theme = cws_chrome::theme();
         let area = get_screen_size(frame, full_screen);
         frame.render_widget(Clear, area);
-        let block = Block::bordered()
-            .title(Line::styled(format!(" {} ", get_text("system_status_title")), theme.dialog_box_title))
-            .title_bottom(crate::node_monitoring_screen::dos_hotkeys("system_status_keys"))
-            .border_style(theme.dialog_box)
-            .style(theme.background);
+        let block = cws_chrome::screen(&get_text("system_status_title"), &self.date_format, Local::now(), area.width)
+            .title_bottom(cws_chrome::hotkeys("system_status_keys"));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         self.page = inner.height;
@@ -564,6 +563,23 @@ mod tests {
     use super::*;
     use icy_board_engine::icy_board::bbs::EventMaintenanceStatus;
     use ratatui::backend::TestBackend;
+
+    #[test]
+    fn status_uses_common_header_in_fixed_and_fullscreen_modes() {
+        let mut screen = screen();
+        screen.date_format = "DATE".into();
+        for full_screen in [false, true] {
+            let mut terminal = Terminal::new(TestBackend::new(132, 40)).unwrap();
+            let mut area = ratatui::layout::Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, full_screen);
+                    screen.ui(frame, full_screen);
+                })
+                .unwrap();
+            cws_chrome::assert_header(terminal.backend().buffer(), area, &get_text("system_status_title"));
+        }
+    }
 
     fn screen() -> SystemStatusScreen {
         let mut screen = SystemStatusScreen {

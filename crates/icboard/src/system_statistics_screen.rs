@@ -3,15 +3,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::Res;
-use chrono::{Local, Timelike};
+use crate::{Res, cws_chrome};
+use chrono::Local;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{IcyBoard, statistics::Statistics};
-use icy_board_tui::{
-    app::get_screen_size,
-    get_text,
-    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
-};
+use icy_board_tui::{app::get_screen_size, get_text};
 use ratatui::{prelude::*, widgets::*};
 
 #[derive(PartialEq)]
@@ -22,8 +18,40 @@ pub enum SystemStatisticsScreenMessage {
 
 const NUM_LINES: usize = 1 + 2 * 6;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn statistics_uses_common_header_in_fixed_and_fullscreen_modes() {
+        let mut screen = SystemStatisticsScreen {
+            statistics: Statistics::default(),
+            date_format: "DATE".into(),
+            scroll_state: ScrollbarState::default().content_length(NUM_LINES),
+            table_state: TableState::default().with_selected(0),
+            confirming_reset: false,
+        };
+        for full_screen in [false, true] {
+            let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(132, 40)).unwrap();
+            let mut area = Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, full_screen);
+                    screen.ui(frame, full_screen);
+                })
+                .unwrap();
+            cws_chrome::assert_header(terminal.backend().buffer(), area, &get_text("icb_system_statistics_title"));
+            let buf = terminal.backend().buffer();
+            if area.right() < buf.area.right() {
+                assert_eq!(buf[(area.right(), area.y + 2)].symbol(), " ");
+            }
+        }
+    }
+}
+
 pub struct SystemStatisticsScreen {
     statistics: Statistics,
+    date_format: String,
     scroll_state: ScrollbarState,
     table_state: TableState,
     /// Set once Del has been pressed; the reset wipes the all time figures, so it takes
@@ -33,9 +61,11 @@ pub struct SystemStatisticsScreen {
 
 impl SystemStatisticsScreen {
     pub async fn new(board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Self {
-        let statistics = board.lock().await.statistics.clone();
+        let board = board.lock().await;
+        let statistics = board.statistics.clone();
         Self {
             statistics,
+            date_format: board.config.board.date_format.clone(),
             scroll_state: ScrollbarState::default().content_length(NUM_LINES),
             table_state: TableState::default().with_selected(0),
             confirming_reset: false,
@@ -132,21 +162,7 @@ impl SystemStatisticsScreen {
 
         let area: Rect = get_screen_size(frame, full_screen);
 
-        let b = Block::default()
-            .title_alignment(Alignment::Left)
-            .title(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white()))
-            .title_alignment(Alignment::Center)
-            .title(Line::from(
-                Span::from(get_text("icb_system_statistics_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold()),
-            ))
-            .title_alignment(Alignment::Right)
-            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
-            .title_alignment(Alignment::Center)
-            .title_bottom(crate::node_monitoring_screen::dos_hotkeys(footer))
-            .style(Style::new().bg(DOS_BLUE))
-            .border_type(BorderType::Double)
-            .border_style(Style::new().fg(DOS_YELLOW))
-            .borders(Borders::ALL);
+        let b = cws_chrome::screen(&get_text("icb_system_statistics_title"), &self.date_format, now, area.width).title_bottom(cws_chrome::hotkeys(footer));
         b.render(area, frame.buffer_mut());
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
@@ -157,7 +173,7 @@ impl SystemStatisticsScreen {
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
-            .style(Style::default().fg(DOS_LIGHT_CYAN).bg(DOS_BLUE).bold())
+            .style(cws_chrome::theme().config_title)
             .height(1);
         let rows = vec![
             Row::new(vec![
@@ -222,16 +238,16 @@ impl SystemStatisticsScreen {
         )
         .header(header)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
-        .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
+        .row_highlight_style(cws_chrome::theme().selected_item)
+        .style(cws_chrome::theme().table)
         .highlight_spacing(HighlightSpacing::Always);
         let mut area = area.inner(Margin { vertical: 1, horizontal: 1 });
-        area.width -= 1;
+        area.width = area.width.saturating_sub(1);
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 
-    fn render_scrollbar(&mut self, frame: &mut Frame, _area: Rect) {
-        let area = frame.area().inner(Margin { vertical: 1, horizontal: 0 });
+    fn render_scrollbar(&mut self, frame: &mut Frame, area: Rect) {
+        let area = area.inner(Margin { vertical: 1, horizontal: 0 });
         let mut scroll_state = self
             .scroll_state
             .position(self.table_state.offset())
@@ -240,6 +256,7 @@ impl SystemStatisticsScreen {
 
         frame.render_stateful_widget(
             Scrollbar::default()
+                .style(cws_chrome::theme().dialog_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")

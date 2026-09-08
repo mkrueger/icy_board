@@ -5,37 +5,19 @@ use std::{
 };
 
 use crate::Res;
-use chrono::{Local, Timelike};
+use chrono::Local;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, state::NodeState};
 use icy_board_tui::{
     app::get_screen_size,
     get_text, get_text_args,
-    hotkeys::HotkeyBar,
-    theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW, POLISHED_THEME, Theme},
+    theme::{DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_YELLOW},
 };
 use icy_net::ConnectionType;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::Mutex;
 
-/// Screens opened from the call-wait screen keep its DOS palette instead of the
-/// administration theme, so every monitor looks the same.
-pub fn monitor_theme() -> Theme {
-    Theme {
-        dialog_box: Style::new().fg(DOS_YELLOW).bg(DOS_BLUE),
-        dialog_box_title: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
-        menu_box: Style::new().fg(DOS_YELLOW).bg(DOS_BLUE),
-        menu_box_title: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
-        key_binding: Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold(),
-        key_binding_description: Style::new().fg(DOS_YELLOW).bg(DOS_RED),
-        ..POLISHED_THEME
-    }
-}
-
-pub fn dos_hotkeys(id: &str) -> Line<'static> {
-    let theme = monitor_theme();
-    HotkeyBar::for_id(id).with_styles(theme.key_binding, theme.key_binding_description).line()
-}
+use crate::cws_chrome;
 
 pub enum NodeMonitoringScreenMessage {
     Exit,
@@ -50,6 +32,7 @@ pub struct WebAdminInfo {
 
 pub struct NodeMonitoringScreen {
     nodes: usize,
+    date_format: String,
     scroll_state: ScrollbarState,
     table_state: TableState,
 }
@@ -83,9 +66,11 @@ impl Info {
 
 impl NodeMonitoringScreen {
     pub async fn new(board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Self {
-        let nodes = board.lock().await.config.board.num_nodes;
+        let board = board.lock().await;
+        let nodes = board.config.board.num_nodes;
         Self {
             nodes: nodes as usize,
+            date_format: board.config.board.date_format.clone(),
             scroll_state: ScrollbarState::default().content_length(nodes as usize),
             table_state: TableState::default().with_selected(0),
         }
@@ -221,21 +206,7 @@ impl NodeMonitoringScreen {
         }
         let area: Rect = get_screen_size(frame, full_screen);
 
-        let b = Block::default()
-            .title_alignment(Alignment::Left)
-            .title(Line::from(format!(" {} ", now.date_naive())).style(Style::new().white()))
-            .title_alignment(Alignment::Center)
-            .title(Line::from(
-                Span::from(get_text("icbmoni_title")).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED).bold()),
-            ))
-            .title_alignment(Alignment::Right)
-            .title(Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap())).style(Style::new().white()))
-            .title_alignment(Alignment::Center)
-            .title_bottom(dos_hotkeys(footer))
-            .style(Style::new().bg(DOS_BLUE))
-            .border_type(BorderType::Double)
-            .border_style(Style::new().fg(DOS_YELLOW))
-            .borders(Borders::ALL);
+        let b = cws_chrome::screen(&get_text("icbmoni_title"), &self.date_format, now, area.width).title_bottom(cws_chrome::hotkeys(footer));
         b.render(area, frame.buffer_mut());
         let extra_lines = if web_admin.is_some() { 2usize } else { 0 };
         // One separator row plus the top/bottom margins; keep the footer free.
@@ -283,7 +254,7 @@ impl NodeMonitoringScreen {
         .into_iter()
         .map(Cell::from)
         .collect::<Row>()
-        .style(Style::default().fg(DOS_LIGHT_CYAN).bg(DOS_BLUE).bold())
+        .style(cws_chrome::theme().config_title)
         .height(1);
         let rows = infos.iter().enumerate().map(|(i, node_state)| {
             if let Some(state) = node_state {
@@ -342,8 +313,8 @@ impl NodeMonitoringScreen {
         )
         .header(header)
         .column_spacing(1)
-        .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
-        .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
+        .row_highlight_style(cws_chrome::theme().selected_item)
+        .style(cws_chrome::theme().table)
         .highlight_spacing(HighlightSpacing::Never);
         let mut area = area.inner(Margin { vertical: 1, horizontal: 1 });
         area.width = area.width.saturating_sub(1);
@@ -360,6 +331,7 @@ impl NodeMonitoringScreen {
 
         frame.render_stateful_widget(
             Scrollbar::default()
+                .style(cws_chrome::theme().dialog_box)
                 .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
@@ -374,11 +346,30 @@ impl NodeMonitoringScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icy_board_tui::theme::DOS_BLUE;
     use ratatui::backend::TestBackend;
+
+    #[test]
+    fn monitor_uses_common_header_in_fixed_and_fullscreen_modes() {
+        let mut screen = screen(4);
+        screen.date_format = "DATE".into();
+        for full_screen in [false, true] {
+            let mut terminal = Terminal::new(TestBackend::new(132, 40)).unwrap();
+            let mut area = Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, full_screen);
+                    screen.ui(frame, &[None, None, None, None], &[], None, full_screen);
+                })
+                .unwrap();
+            cws_chrome::assert_header(terminal.backend().buffer(), area, &get_text("icbmoni_title"));
+        }
+    }
 
     fn screen(nodes: usize) -> NodeMonitoringScreen {
         NodeMonitoringScreen {
             nodes,
+            date_format: "%m/%d/%y".into(),
             scroll_state: ScrollbarState::default().content_length(nodes),
             table_state: TableState::default().with_selected(0),
         }

@@ -33,6 +33,7 @@ const WEB_ADMIN_TOKEN_ENV: &str = "ICBADMIN_TOKEN";
 pub mod bbs;
 mod call_wait_screen;
 mod connections;
+mod cws_chrome;
 mod event_scheduler;
 mod event_screen;
 mod log_screen;
@@ -357,7 +358,6 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         }
         Err(err) => {
             log::error!("while loading icy board configuration: {}", err);
-            print_error(err.to_string());
             Err(err)
         }
     }

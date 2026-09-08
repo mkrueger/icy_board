@@ -78,7 +78,12 @@ The active theme supplies `key_binding` for chords and `key_binding_description`
 for labels. Styles are read at layout/render time unless `with_styles(key, label)`
 overrides them: deterministic theme tests do that, and so do the call-wait
 monitors, which keep the call-wait screen's DOS palette through
-`node_monitoring_screen::dos_hotkeys` instead of the administration theme.
+`cws_chrome::hotkeys` instead of the administration theme. Their shared chrome
+also supplies yellow double borders, a centered red `[ Title ]`, the board's
+configured date format at the left and the clock at the right. Panel titles and
+modal dimming use the same runtime palette, independent of admin settings.
+The normal call-wait main screen retains its white double border and plain
+yellow title on blue; the bracketed red titles apply to its subscreens only.
 Do not hard-code per-tool colours anywhere else.
 
 ## Modes, conditions and overlays
