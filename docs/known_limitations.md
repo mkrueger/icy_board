@@ -24,7 +24,7 @@ procedure and this page as its risk checklist.
 | Sysop numeric commands | Commands `9`, `10`, `14` and `15` are missing. The level named for command 10 protects `PPE` instead; commands `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16` work. |
 | Message reader | Inside the read loop, export (`X`), `EDIT`, `FORWARD`, `VIEW` and the capture actions (`C`, `D`, `Z`) are recognised and answered but do not run. |
 | ICBSM | Editing users and groups, sorting and packing the user file, the bulk edits over a selection of users and the security level tables. Reports, index files and the user info file of the original have no equivalent here. |
-| German help | 20 of 52 help files are translated. The English set is complete apart from the sysop help, which PCBoard never shipped either. |
+| Command help | Generation installs 68 substantive English topics, including sysop help `1`–`16`. Help for unimplemented commands `9`, `10`, `14` and `15` documents compatibility limits, not new functionality. Translated output is a file-naming workflow over sysop-supplied sources, not a shipped localization. See [Command help](#command-help). |
 
 ## Works, but not the way PCBoard did it
 
@@ -54,6 +54,62 @@ procedure and this page as its risk checklist.
 	exactly-once guarantee. Journal failures close admission pending repair/restart.
 	History and command-log retention are unbounded; rotate logs separately and
 	retain journal keys.
+
+### Command help
+
+New boards install generated English help without language suffixes;
+imported/custom help is not automatically replaced. Generation changes neither
+general artwork, admin TUI help nor
+ICBTEXT. Original `.icy` assets remain as migration provenance, not the source
+for new-board help rendering.
+
+All 68 English topics now contain substantive help. The fourteen former
+title-only placeholders have been completed and numeric topics `hlp1` through
+`hlp16` added. This covers the fixed file-name mappings in the original PCBoard
+[help dispatcher](../pcboard/pcb-main/SOURCE/DISPLAY/HELP.C), including sysop
+commands `1`–`15`, plus Icy Board's command `16` and its additional topics.
+Arbitrary custom help names still need sysop-supplied files. Virtual `HLPMORE`
+and `HLPXFRMORE` pagination help remains in ICBTEXT rather than generated files.
+Commands `9`, `10`, `14` and `15` are still unimplemented; their help topics
+explain compatibility limitations and do not enable those commands.
+
+Title-only sources, including local overrides, are rejected by the source loader.
+Check and generation fail before writing outputs or installation bookkeeping.
+The 20 legacy German Markdown sources under `crates/icy_board_help/data/de/`
+and catalog translation metadata remain unreviewed in the repository for a
+future, separate localization feature. German sources are not embedded,
+exported or generated, and no shipped translation is installed.
+
+`icbsetup genhelp --language ger` only suffixes the generated file names. It
+does not select a translated source, is not checked against the board's language
+definitions and performs no translation-coverage validation: the sysop exports
+the flat English source bundle, translates it and passes it back with
+`--sources`. Existing German help files and custom variants on installed boards
+are neither modified nor deleted. Runtime fallback, custom variant precedence and
+the CLI's German UI localization remain unchanged.
+
+Generated width is fixed (40–79 columns), not responsive to each caller, and the
+embedded English topics do not render below 68 columns.
+Generated help is UTF-8 with the required BOM by default; `--cp437` writes the
+legacy encoding and rejects characters it cannot represent. The renderer retains
+support for German and other content within these encoding constraints. Verify
+actual terminal output and pagination locally; there is no preview command.
+
+Generation settings are command line flags only. There is no board configuration
+for them, so a theme, width, encoding, source directory or language chosen once
+has to be passed again on the next run; a leftover `[help_generation]` section in
+an older `icboard.toml` is ignored.
+
+Installation into a board requires an offline board lock. Managed local edits are
+protected; `--adopt` applies to unmanaged files, while `--replace-modified`
+explicitly replaces edited managed files. Conflicts abort the whole batch; single
+topics cannot be selected. Atomic replacement is per file, not per batch:
+interrupted transactions require journal/backup recovery on the next apply.
+Backups are retained without automatic rotation. `icbsetup genhelp --output DIR`
+skips the board entirely and therefore keeps no lock, ledger or backups, so its
+output cannot be repaired or re-adopted later. See the
+[command help guide](gettingstarted.md#command-help) for the commands, the
+generation flags, source overrides and the recovery locations under `main/`.
 
 ## Import
 

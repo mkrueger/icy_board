@@ -1,0 +1,16 @@
+[package]
+name = "icy_board_help"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "MIT"
+
+[dependencies]
+pulldown-cmark = "0.13"
+serde.workspace = true
+toml.workspace = true
+codepages.workspace = true
+sha2.workspace = true
+unicode-width = "0.2"
+rust-embed.workspace = true
+thiserror.workspace = true

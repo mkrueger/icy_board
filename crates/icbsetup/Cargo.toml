@@ -12,6 +12,7 @@ icy_board_buildinfo = { workspace = true }
 [dependencies]
 icy_engine = { workspace = true }
 icy_board_engine = { workspace = true }
+icy_board_help = { workspace = true }
 icy_board_tui = { workspace = true }
 icy_net = { workspace = true }
 dizbase = { workspace = true }
@@ -44,6 +45,6 @@ fastrand = { workspace = true }
 reqwest = { version = "0.13", features = ["blocking"] }
 sha2 = { workspace = true }
 zip = { workspace = true }
-
-[dev-dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
 tempfile = { workspace = true }

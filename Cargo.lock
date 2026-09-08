@@ -3873,6 +3873,7 @@ dependencies = [
  "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
+ "icy_board_help",
  "icy_board_tui",
  "icy_engine",
  "icy_engine_gui",
@@ -3922,6 +3923,7 @@ dependencies = [
  "icy_board_buildinfo",
  "icy_board_cli",
  "icy_board_engine",
+ "icy_board_help",
  "icy_board_tui",
  "icy_engine",
  "icy_net",
@@ -3934,11 +3936,13 @@ dependencies = [
  "relative-path 2.0.1",
  "reqwest",
  "semver",
+ "serde",
  "sha2 0.10.9",
  "strum",
  "substring",
  "tempfile",
  "thiserror 2.0.20",
+ "toml 1.1.4+spec-1.1.0",
  "tui-markdown",
  "unicase",
  "walkdir",
@@ -4145,6 +4149,20 @@ dependencies = [
  "zip",
  "zune-core 0.5.3",
  "zune-jpegxl",
+]
+
+[[package]]
+name = "icy_board_help"
+version = "0.2.1"
+dependencies = [
+ "codepages",
+ "pulldown-cmark",
+ "rust-embed",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "toml 1.1.4+spec-1.1.0",
+ "unicode-width",
 ]
 
 [[package]]

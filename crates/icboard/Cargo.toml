@@ -62,4 +62,5 @@ russh = { workspace = true }
 async-trait = { workspace = true }
 
 [dev-dependencies]
+icy_board_help = { workspace = true }
 tempfile = "3"

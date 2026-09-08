@@ -26,6 +26,7 @@ use walkdir::WalkDir;
 pub mod app;
 mod create;
 pub mod editors;
+pub mod genhelp;
 mod import;
 pub mod tabs;
 
@@ -54,6 +55,8 @@ struct Cli {
 
 #[derive(Subcommand, PartialEq, Debug)]
 enum Commands {
+    #[command(name = "genhelp", about = icy_board_cli::text("icbsetup", "genhelp-about"))]
+    GenHelp(genhelp::GenHelp),
     #[command(name = "import", about = icy_board_cli::text("icbsetup", "import-about"))]
     Import(Import),
     #[command(name = "create", about = icy_board_cli::text("icbsetup", "create-about"))]
@@ -208,6 +211,13 @@ fn main() -> Result<()> {
     }
 
     match &arguments.command {
+        Some(Commands::GenHelp(command)) => {
+            if let Err(error) = genhelp::run(command) {
+                print_error(error.to_string());
+                process::exit(1);
+            }
+            return Ok(());
+        }
         Some(Commands::Import(Import { name, out, map, dry_run })) => {
             let mut mappings = Vec::new();
             for mapping in map {

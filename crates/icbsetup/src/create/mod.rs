@@ -21,6 +21,7 @@ use icy_board_engine::{
         icb_config::IcbConfig,
         icb_text::DEFAULT_DISPLAY_TEXT,
         language::{Language, SupportedLanguages},
+        lock::BoardLock,
         message_area::{AreaList, MessageArea},
         sec_levels::{SecurityLevel, SecurityLevelDefinitions},
         statistics::Statistics,
@@ -39,63 +40,6 @@ pub struct IcyBoardCreator {
     logger: ConsoleLogger,
 }
 
-lazy_static::lazy_static! {
-    static ref HELP_FILES: Vec<(&'static str, Vec<u8>)> = vec![
-        ("hlpa", include_bytes!("../../data/new_bbs/help/hlpa.icy").to_vec()),
-        ("hlpalias", include_bytes!("../../data/new_bbs/help/hlpalias.icy").to_vec()),
-        ("hlpb", include_bytes!("../../data/new_bbs/help/hlpb.icy").to_vec()),
-        ("hlpbrd", include_bytes!("../../data/new_bbs/help/hlpbrd.icy").to_vec()),
-        ("hlpchat", include_bytes!("../../data/new_bbs/help/hlpchat.icy").to_vec()),
-        ("hlpc", include_bytes!("../../data/new_bbs/help/hlpc.icy").to_vec()),
-        ("hlpcmenu", include_bytes!("../../data/new_bbs/help/hlpcmenu.icy").to_vec()),
-        ("hlpd", include_bytes!("../../data/new_bbs/help/hlpd.icy").to_vec()),
-        ("hlpe", include_bytes!("../../data/new_bbs/help/hlpe.icy").to_vec()),
-        ("hlpendr", include_bytes!("../../data/new_bbs/help/hlpendr.icy").to_vec()),
-        ("hlpf", include_bytes!("../../data/new_bbs/help/hlpf.icy").to_vec()),
-        ("hlpflag", include_bytes!("../../data/new_bbs/help/hlpflag.icy").to_vec()),
-        ("hlpfscrn", include_bytes!("../../data/new_bbs/help/hlpfscrn.icy").to_vec()),
-        ("hlpg", include_bytes!("../../data/new_bbs/help/hlpg.icy").to_vec()),
-        ("hlph", include_bytes!("../../data/new_bbs/help/hlph.icy").to_vec()),
-        ("hlp!", include_bytes!("../../data/new_bbs/help/hlp!.icy").to_vec()),
-        ("hlpi", include_bytes!("../../data/new_bbs/help/hlpi.icy").to_vec()),
-        ("hlpj", include_bytes!("../../data/new_bbs/help/hlpj.icy").to_vec()),
-        ("hlpk", include_bytes!("../../data/new_bbs/help/hlpk.icy").to_vec()),
-        ("hlpl", include_bytes!("../../data/new_bbs/help/hlpl.icy").to_vec()),
-        ("hlplang", include_bytes!("../../data/new_bbs/help/hlplang.icy").to_vec()),
-        ("hlpm", include_bytes!("../../data/new_bbs/help/hlpm.icy").to_vec()),
-        ("hlpnews", include_bytes!("../../data/new_bbs/help/hlpnews.icy").to_vec()),
-        ("hlpn", include_bytes!("../../data/new_bbs/help/hlpn.icy").to_vec()),
-        ("hlpo", include_bytes!("../../data/new_bbs/help/hlpo.icy").to_vec()),
-        ("hlpopen", include_bytes!("../../data/new_bbs/help/hlpopen.icy").to_vec()),
-        ("hlpp", include_bytes!("../../data/new_bbs/help/hlpp.icy").to_vec()),
-        ("hlpppe", include_bytes!("../../data/new_bbs/help/hlpppe.icy").to_vec()),
-        ("hlpq", include_bytes!("../../data/new_bbs/help/hlpq.icy").to_vec()),
-        ("hlpqwk", include_bytes!("../../data/new_bbs/help/hlpqwk.icy").to_vec()),
-        ("hlpreg", include_bytes!("../../data/new_bbs/help/hlpreg.icy").to_vec()),
-        ("hlpsel", include_bytes!("../../data/new_bbs/help/hlpsel.icy").to_vec()),
-        ("hlprep", include_bytes!("../../data/new_bbs/help/hlprep.icy").to_vec()),
-        ("hlpr", include_bytes!("../../data/new_bbs/help/hlpr.icy").to_vec()),
-        ("hlprm", include_bytes!("../../data/new_bbs/help/hlprm.icy").to_vec()),
-        ("hlpsec", include_bytes!("../../data/new_bbs/help/hlpsec.icy").to_vec()),
-        ("hlps", include_bytes!("../../data/new_bbs/help/hlps.icy").to_vec()),
-        ("hlpsrch", include_bytes!("../../data/new_bbs/help/hlpsrch.icy").to_vec()),
-        ("hlptest", include_bytes!("../../data/new_bbs/help/hlptest.icy").to_vec()),
-        ("hlpt", include_bytes!("../../data/new_bbs/help/hlpt.icy").to_vec()),
-        ("hlpts", include_bytes!("../../data/new_bbs/help/hlpts.icy").to_vec()),
-        ("hlpu", include_bytes!("../../data/new_bbs/help/hlpu.icy").to_vec()),
-        ("hlpusers", include_bytes!("../../data/new_bbs/help/hlpusers.icy").to_vec()),
-        ("hlpv", include_bytes!("../../data/new_bbs/help/hlpv.icy").to_vec()),
-        ("hlpwho", include_bytes!("../../data/new_bbs/help/hlpwho.icy").to_vec()),
-        ("hlpw", include_bytes!("../../data/new_bbs/help/hlpw.icy").to_vec()),
-        ("hlpx", include_bytes!("../../data/new_bbs/help/hlpx.icy").to_vec()),
-        ("hlpy", include_bytes!("../../data/new_bbs/help/hlpy.icy").to_vec()),
-        ("hlpz", include_bytes!("../../data/new_bbs/help/hlpz.icy").to_vec()),
-        ("hlp@", include_bytes!("../../data/new_bbs/help/hlp@.icy").to_vec()),
-        ("hlp@w", include_bytes!("../../data/new_bbs/help/hlp@w.icy").to_vec()),
-        ("hlparea", include_bytes!("../../data/new_bbs/help/hlparea.icy").to_vec()),
-    ];
-}
-
 impl IcyBoardCreator {
     pub fn new(destination: &Path) -> Self {
         Self {
@@ -107,6 +51,7 @@ impl IcyBoardCreator {
     pub fn create(&mut self) -> Res<()> {
         self.logger.start_action(format!("Creating IcyBoard at {}", self.destination.display()));
         fs::create_dir_all(&self.destination)?;
+        let _lock = BoardLock::acquire(&self.destination)?;
         fs::create_dir_all(self.destination.join("main"))?;
         fs::create_dir_all(self.destination.join("art/help"))?;
 
@@ -119,20 +64,7 @@ impl IcyBoardCreator {
         config.qwk_settings.bbs_id = "QWKMAIL".to_string();
 
         self.logger.start_action("Creating required paths.".to_string());
-        fs::create_dir_all(self.destination.join(&config.paths.help_path))?;
-
-        let options = SaveOptions {
-            format: FormatOptions::Character(CharacterFormatOptions {
-                screen_prep: ScreenPreperation::ClearScreen,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        for hlp in HELP_FILES.iter() {
-            let path = self.destination.join(&config.paths.help_path).join(hlp.0);
-            convert_to_pcb_opt(&path, &hlp.1, &options)?;
-        }
+        crate::genhelp::install_defaults(&self.destination, &config)?;
 
         fs::create_dir_all(self.destination.join(&config.paths.tmp_work_path))?;
         fs::create_dir_all(self.destination.join(&config.paths.security_file_path))?;
@@ -459,6 +391,109 @@ impl IcyBoardCreator {
         base.push(conf);
         base.save(conf_path)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icy_board_help::{RenderOptions, catalog, render, sha256};
+
+    fn assert_default_help(destination: &Path) {
+        let creator = IcyBoardCreator::new(destination);
+        let config = IcbConfig::new();
+        fs::create_dir_all(&creator.destination).unwrap();
+        let _lock = BoardLock::acquire(&creator.destination).unwrap();
+
+        // Exercise creation's help installer without creating or printing SYSOP credentials.
+        crate::genhelp::install_defaults(&creator.destination, &config).unwrap();
+
+        let output = creator.destination.join(&config.paths.help_path);
+        let resolved_output = output.canonicalize().unwrap();
+        let ledger_path = creator.destination.join("main/help-generation.toml");
+        let ledger_bytes = fs::read(&ledger_path).unwrap();
+        let ledger: toml::Value = toml::from_str(std::str::from_utf8(&ledger_bytes).unwrap()).unwrap();
+        assert_eq!(ledger["schema_version"].as_integer(), Some(1));
+        let entries = ledger["entries"].as_array().unwrap();
+        let sources = catalog::sources(None).unwrap();
+        assert_eq!(sources.len(), 68);
+        assert_eq!(entries.len(), sources.len());
+        assert_eq!(fs::read_dir(&output).unwrap().count(), sources.len());
+        for number in 1..=16 {
+            assert!(output.join(format!("hlp{number}.pcb")).is_file());
+        }
+
+        let options = RenderOptions {
+            clear_screen: true,
+            ..Default::default()
+        };
+        assert_eq!(options.encoding, icy_board_help::Encoding::Utf8);
+        assert!(
+            fs::read(output.join("hlpa.pcb")).unwrap().starts_with(&[0xEF, 0xBB, 0xBF]),
+            "new boards get UTF-8 help"
+        );
+        for source in &sources {
+            let name = format!("{}.pcb", source.topic);
+            let expected = render(&source.markdown, &options).unwrap().bytes;
+            assert_eq!(fs::read(output.join(&name)).unwrap(), expected, "{name}");
+            let matching: Vec<_> = entries.iter().filter(|entry| entry["name"].as_str() == Some(name.as_str())).collect();
+            assert_eq!(matching.len(), 1, "{name}");
+            let entry = matching[0];
+            assert_eq!(entry["output"].as_str(), resolved_output.to_str(), "{name}");
+            assert_eq!(entry["hash"].as_str(), Some(sha256(&expected).as_str()), "{name}");
+            assert_eq!(entry["source_hash"].as_str(), Some(source.source_hash.as_str()), "{name}");
+            let settings_hash = entry["settings_hash"].as_str().unwrap();
+            assert_eq!(settings_hash.len(), 64);
+            assert!(settings_hash.bytes().all(|byte| byte.is_ascii_hexdigit()));
+            assert_eq!(entry["settings_hash"], entries[0]["settings_hash"]);
+        }
+
+        let backups = creator.destination.join("main/help-generation.backups");
+        let transactions = fs::read_dir(&backups).unwrap().count();
+        assert_eq!(transactions, 1);
+        crate::genhelp::install_defaults(&creator.destination, &config).unwrap();
+        assert_eq!(fs::read(&ledger_path).unwrap(), ledger_bytes);
+        assert_eq!(fs::read_dir(&backups).unwrap().count(), transactions);
+        assert!(!creator.destination.join("main/help-generation.pending.toml").exists());
+        assert!(config.paths.language_file.as_os_str().is_empty());
+        assert!(!creator.destination.join("main/languages.toml").exists());
+        assert!(!creator.destination.join(&config.paths.user_file).exists());
+    }
+
+    #[test]
+    fn creation_help_matches_catalog_and_ledger() {
+        let directory = tempfile::tempdir().unwrap();
+        assert_default_help(&directory.path().join("new-board"));
+    }
+
+    #[test]
+    fn creation_help_supports_relative_destination() {
+        let cwd = std::env::current_dir().unwrap();
+        let directory = tempfile::Builder::new().prefix(".creation-help-test-").tempdir_in(&cwd).unwrap();
+        let destination = directory.path().strip_prefix(&cwd).unwrap().join("new-board");
+        assert!(destination.is_relative());
+        assert_default_help(&destination);
+    }
+
+    #[test]
+    fn creation_help_ignores_malformed_language_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = IcbConfig::new();
+        config.paths.language_file = "languages.toml".into();
+        let language_file = directory.path().join(&config.paths.language_file);
+        let malformed = b"[[languages\nnot valid TOML";
+        fs::write(&language_file, malformed).unwrap();
+        let _lock = BoardLock::acquire(directory.path()).unwrap();
+        for _ in 0..2 {
+            crate::genhelp::install_defaults(directory.path(), &config).unwrap();
+            let output = directory.path().join(&config.paths.help_path);
+            assert_eq!(fs::read_dir(&output).unwrap().count(), 68);
+            for source in catalog::sources(None).unwrap() {
+                assert!(output.join(format!("{}.pcb", source.topic)).is_file());
+                assert!(!output.join(format!("{}.ger.pcb", source.topic)).exists());
+            }
+            assert_eq!(fs::read(&language_file).unwrap(), malformed);
+        }
     }
 }
 

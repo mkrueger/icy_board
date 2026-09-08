@@ -1,0 +1,477 @@
+# source_hash fingerprints the exact English Markdown bytes (SHA-256).
+# Empty upstream_hash means no English revision has been reviewed for this translation.
+# After review, set status = "reviewed" and upstream_hash to the current English hash.
+# legacy_source_hash fingerprints the original artwork, not translated Markdown.
+version = 1
+
+[[topics]]
+id = "hlp!"
+locales = ["en", "de"]
+source_hash = "99737ef9772e3564c4761fb83747d9264552bb42f05bd2fa8626981830c30a22"
+legacy_source_hash = "ddd798a6d23c9bd3fce149823fdc59c3f2cd94bc4ee13db86598b3fbbc4c0243"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "c31761ab789cc8b7164b96e826c6ff60be2dd863117e9aca9815c3701d00920f"
+
+[[topics]]
+id = "hlp1"
+locales = ["en"]
+source_hash = "8591e52eb20aec8eab6ce910f587aef36dad67f694005417b7ea1fd26cd84562"
+
+[[topics]]
+id = "hlp10"
+locales = ["en"]
+source_hash = "60372e37b5d091b785097d964662d9293fb19acca32af97474176503d2addb76"
+
+[[topics]]
+id = "hlp11"
+locales = ["en"]
+source_hash = "4b6e00a0dbb823435ebbf72706e2cf28a0c94da26b7974c58aabaf47ec6e4a0d"
+
+[[topics]]
+id = "hlp12"
+locales = ["en"]
+source_hash = "1e44b11bcde0cecd5e234373de9d645d93373865fcd71ba10282adab2157f494"
+
+[[topics]]
+id = "hlp13"
+locales = ["en"]
+source_hash = "fee427e46a3a495c6117b04819bd9bfcbedde2f36802717f69b4cd0fb344c1cc"
+
+[[topics]]
+id = "hlp14"
+locales = ["en"]
+source_hash = "5648fa8da754e8d05e82480e2dc679acea278a66b8653ec16647209916fc7000"
+
+[[topics]]
+id = "hlp15"
+locales = ["en"]
+source_hash = "2736402f5b0b37ba1cd278bfd83c399584087dcb113901b2ee7b3802c983cf39"
+
+[[topics]]
+id = "hlp16"
+locales = ["en"]
+source_hash = "d86ed65e9ee3875a99d6f902a17d76897d0dedc36a7d81ae1be25e08363f0e63"
+
+[[topics]]
+id = "hlp2"
+locales = ["en"]
+source_hash = "f38f15354cacdd5bf65b41831cee346adbfa7968b44e8c400019ceded9bbbeac"
+
+[[topics]]
+id = "hlp3"
+locales = ["en"]
+source_hash = "b5125dda95e5cc0389d37d33a7a390a41d66b3a0b15fb179e234780360fa07c2"
+
+[[topics]]
+id = "hlp4"
+locales = ["en"]
+source_hash = "ee21e75acfba3f327b5717db8e38dde528de6c716f51b288becc73e04dbe9118"
+
+[[topics]]
+id = "hlp5"
+locales = ["en"]
+source_hash = "194f126101cb1e0f4d34276a46a8ca2f5130875482c51774c280477869ffd22c"
+
+[[topics]]
+id = "hlp6"
+locales = ["en"]
+source_hash = "68e5adb2a2866d8402d08c1c58ae43267b9c44b2169aa80fc72d6ae5c565585d"
+
+[[topics]]
+id = "hlp7"
+locales = ["en"]
+source_hash = "44ffced6661ac62832ef5872b6d0d9aafc0f143e734e1175c1529ead8d68ccfe"
+
+[[topics]]
+id = "hlp8"
+locales = ["en"]
+source_hash = "79732f2ebc613d538bd6e69c5a8df9586f2eb8ddd85eadbdbc1cabd974517fb4"
+
+[[topics]]
+id = "hlp9"
+locales = ["en"]
+source_hash = "5fc0a1d300873cfb6ab2efebcf502801815ae58ae21ed7527a00aa285ff458f3"
+
+[[topics]]
+id = "hlp@"
+locales = ["en"]
+source_hash = "e966890fad6103dc709100a22c42adbdddfa49d437a639c977feef31a8557b7b"
+legacy_source_hash = "e675e1528674ffd5aafd80240e8197bf1f02abd8c30dacd70219ae153bb0a6ee"
+
+[[topics]]
+id = "hlp@w"
+locales = ["en"]
+source_hash = "54cd803462aa7a1b9d3c6d628af23c1688ce16a23d93cd2e83c372ddf0a7c057"
+legacy_source_hash = "2d37ecf2d6a3ef319d13781cdf1998f9b6f88c87b28f83e3051b29e150c4aeb1"
+
+[[topics]]
+id = "hlpa"
+locales = ["en", "de"]
+source_hash = "7821c8e869e6bbf8ce29c2ac0c48d66c532c08f3a1ca543715920978ecff5fcb"
+legacy_source_hash = "5433f766b777b200443e89813b8c55101b696841c132cea329944318c1658d86"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "d7dac542d024c3ecfcc79569f0a3865873b3bc3a632e48ee0cc5dc295a5397e5"
+
+[[topics]]
+id = "hlpalias"
+locales = ["en", "de"]
+source_hash = "ec22f0d681445d1d7dd936876a22b7eabf3b6952d8c2e2c2d217e18b31920dac"
+legacy_source_hash = "252a21a62c8a14420033c9daeffc1c88c032b216f2125844207956a53514d7a7"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "c6f4ec2e063c8e839e02edf96cd568dfe3d0f23f3d7887109fe338bcd4b22c47"
+
+[[topics]]
+id = "hlparea"
+locales = ["en"]
+source_hash = "db4cf12bff4b3f836ef3185e62de8548b90399500ec519c4f790e912de28eb16"
+legacy_source_hash = "cf79ee7c145e9115467ae413ae964775ede917b1862d3ccac4d1d670761f5328"
+
+[[topics]]
+id = "hlpb"
+locales = ["en", "de"]
+source_hash = "af6eb8b49a500326627ac17d3a1e301655c2cf029cd846c54f756bd9e9436194"
+legacy_source_hash = "8cea234125c59c87129dac523ea52515e523724c8a93ae85d5286bdbaa05c547"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "4a6b093b3045835ff7d155dd0bbd733b11da2572dfe906009b45fca669baaeb5"
+
+[[topics]]
+id = "hlpbrd"
+locales = ["en", "de"]
+source_hash = "92ccb8b0c2c36a1581564b41310051a04e474c243d7eb87a3de469525346d21e"
+legacy_source_hash = "8862b3002f8fdf7534f505a59b8cd88a7e3ceb7a63e81f4e5b2a485e1c74e89f"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "d250143f2540898615c82ba7d2b8e5080b2ebd17ebf17bea9d2b0903210a48c8"
+
+[[topics]]
+id = "hlpc"
+locales = ["en", "de"]
+source_hash = "223b3139af809503581ba1f74e66915267b8cab06c83ff61ddb2e71309d78749"
+legacy_source_hash = "7545b1e9d8fe67da5cd893fa04e4bb33e05d095777b9bc9b5ceb5d025507ba79"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "268b5ff0b461941a9146de86dcf597d68496e1c50d827d5a24b28d85ec186d6e"
+
+[[topics]]
+id = "hlpchat"
+locales = ["en"]
+source_hash = "17f2d57fd5c357ad09d2cef7cffb956bda6a1785fe808106399fbec3c663d582"
+legacy_source_hash = "0e8cfb3ada08b59faa42a83b3a13dee29ef87ffd48bbd55e624ad19e0179ef72"
+
+[[topics]]
+id = "hlpcmenu"
+locales = ["en"]
+source_hash = "7534f6200c9cbfbe12458b0a482fc2d2546067a360592c3d976dc54baeba13e6"
+legacy_source_hash = "0e9b2e0c518d251174df25494f2cf6bdea374719a50d2ce37eec4467086785e7"
+
+[[topics]]
+id = "hlpd"
+locales = ["en"]
+source_hash = "3ed842fb918c139c4fc64f45196f2126d0b2d8efcee4dae5a006304bcb5cc4b1"
+legacy_source_hash = "f9ece804aabbd5803038aa28eb112c1b23e3c2f75da77f0736d1b70b47ded59d"
+
+[[topics]]
+id = "hlpe"
+locales = ["en"]
+source_hash = "aff205aa2f98ff673a998e755570de6506ea628da34aaf7f0a500979ab475cfa"
+legacy_source_hash = "f30548dcf8a9034c28d55b030ad4039407bbf12597962a2db558a839c9b32d32"
+
+[[topics]]
+id = "hlpendr"
+locales = ["en"]
+source_hash = "c7d3c173588c3472311ec5346ba775e083117542b637f88e3f6f2355b2a65682"
+legacy_source_hash = "5206b7e736bf630a42918e26db85d59f4d1419fafc32824d00940561969bffd6"
+
+[[topics]]
+id = "hlpf"
+locales = ["en"]
+source_hash = "f06ecb24a82c67cec4489ea579afa77b5616457688573b05baf07e13c49cc8e3"
+legacy_source_hash = "77cbe74977874b2f27c28cb326828bd8e0d0e0f142f7c4aa3e76e44b6ffb881e"
+
+[[topics]]
+id = "hlpflag"
+locales = ["en"]
+source_hash = "7bffdecfdba0289d33f19ef362da4dfe687ed93254562e7770603d7a792af22c"
+legacy_source_hash = "e2af47798a57620b5e70a36d80448aadf7740709e97292b720bd4d859e45e6a2"
+
+[[topics]]
+id = "hlpfscrn"
+locales = ["en"]
+source_hash = "0af195013e29397e6b6bf222c4b7db6e6631356db49c3351bcce6ba8ec229295"
+legacy_source_hash = "eeb858961887680f21997e5690deb8d259ec39b2f7cb751c5101342629de3bba"
+
+[[topics]]
+id = "hlpg"
+locales = ["en", "de"]
+source_hash = "9c0950b8e509eab569c2b662324bb462e7c11a1e0ee4310fa4b23505c6c98279"
+legacy_source_hash = "40963d893ec955b00e5b2007a1159233249b1f54f17687720d377326ed516c31"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "95e9d806aa84f93f9c47ef75d1870f09020d3d1de4bbfa483912e59b9f7235d8"
+
+[[topics]]
+id = "hlph"
+locales = ["en", "de"]
+source_hash = "671c20e490854f73f69760960fe0639c12d275dad6097f8dc6d12e9e57454e72"
+legacy_source_hash = "095ab37ea844374acf1d395debf1c9c97b9eca087f53a7de66544a8e3f043e08"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "16714738b17c8ef01f0bf409d1d2b3ebdb884dc3e07def684699b1711212d49e"
+
+[[topics]]
+id = "hlpi"
+locales = ["en", "de"]
+source_hash = "5126ce7e1102b75a721200acfbc1f71689596cab8e0732e31d395a900c22b677"
+legacy_source_hash = "1f09b2e14f6a99b59a4f7aa33566fda31ea1ea5d6ccd62987cd5426775c5522e"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "b5a5511fe3b4e9ef87dbea5f542d16bb1bfd29b809c0260c2d82cf8a96dda107"
+
+[[topics]]
+id = "hlpj"
+locales = ["en", "de"]
+source_hash = "73c2e06c485993c9b160431eefce37d11e1435d8fa1ab975f0d6b7312440b1ce"
+legacy_source_hash = "9e654e0b818da7e29b0dc9466d45f66d8319bbc60d92d260a0b84d137b0f24ac"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "0d5132fb81c003b6e0f2b4bc3324c98fdcca391b5a97094f741df288ac2bb4c7"
+
+[[topics]]
+id = "hlpk"
+locales = ["en", "de"]
+source_hash = "7085280859854b6a2dc87702d158d6c404554068ce3022ae86b603c2682a7e30"
+legacy_source_hash = "21e08e87b2106738c7f64a4a6acf9172bc5607548758a788e57051166dc12ff8"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "15ed24266dde402da50c47c7902fde360033131d73597fb7a4068bd5a0212e0b"
+
+[[topics]]
+id = "hlpl"
+locales = ["en"]
+source_hash = "582ea2ac985348c3a07f4f87d043444c35aa8604c268f9a9451993dd506dea74"
+legacy_source_hash = "935b68a2645655bebea9dc8689849b3091a7a8f2419e27a7da2928a482f252a4"
+
+[[topics]]
+id = "hlplang"
+locales = ["en"]
+source_hash = "4859bca00f055b8db2f90a062b00402373570d94eae8588f8ca17157793702f8"
+legacy_source_hash = "958efaddca5aae27d238f3298db8fba232479e343a6706d5b5fad5c0fac58cb5"
+
+[[topics]]
+id = "hlpm"
+locales = ["en", "de"]
+source_hash = "90632c83059e29d96c495bd00b771fd38edd441ed150a675891aaa3b30aa310a"
+legacy_source_hash = "580989b7fbbebd83c28fb25424b159c1ef6f729becc24de060b5da49a2f21f38"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "f8e0a0cacfa696bbd8edf61fcc6859015422208ee71023d79b5126879aa1c58d"
+
+[[topics]]
+id = "hlpn"
+locales = ["en"]
+source_hash = "737b261bac70effc71ecb15da7a89fe8807b61d759457a54968757213e8f2786"
+legacy_source_hash = "b7955eaa80506653e9f95b76b9cc1eb2d2469107f91070403946f7ec9917814c"
+
+[[topics]]
+id = "hlpnews"
+locales = ["en", "de"]
+source_hash = "656cd37452feac67874d18b47de6494201a7c221ac03991c3ac8febff6e49436"
+legacy_source_hash = "501b841802d254b4bd84bb1f92bcb569e2b4d99a3f45b19f320815447eb7badc"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "1565c5e7295a547c01b501e65ab648f3eef8b67cb3d12d94e1f04aaedc046b97"
+
+[[topics]]
+id = "hlpo"
+locales = ["en", "de"]
+source_hash = "5ff126e5bab1cd01e62526a4c5b15c19b82579a4003e0554f45b7b9002813118"
+legacy_source_hash = "3037b6f7c36b24b85dfca66ed3d4b96fe3ddf59394c19e7f4520cc8294d37aca"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "4e81ddec7cead205964fe8d80df1994aed34a631a2adbce2fa808d497d81e424"
+
+[[topics]]
+id = "hlpopen"
+locales = ["en"]
+source_hash = "cc4c3fd817668c96a71950baacd496af294e9de088223876716cb83a70e3c19e"
+legacy_source_hash = "21baeec0198cda3cfcba611d10faf6c249b0034b6e4f428298a4c925036342d7"
+
+[[topics]]
+id = "hlpp"
+locales = ["en", "de"]
+source_hash = "5fe6f2693e657f20863765611e64b54ad961c9ec48cfd07e46b16a95d76836f2"
+legacy_source_hash = "64e7338f9594ffcf486e33d2767dbdd7aa3c654775aa84aee2cf356204f1f3b8"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "59b402e40dbd5f165fe4f4441c2f99b56752783218d827001e10c923afbf9b38"
+
+[[topics]]
+id = "hlpppe"
+locales = ["en"]
+source_hash = "a8394949c75b6217b75446ae9c724f7fafa078c995ebfbdf0f952baea956eaa5"
+legacy_source_hash = "10648af7d54854949eedcfc371986e7845e6f44ad2e8fd6ea0657a1a75acb63b"
+
+[[topics]]
+id = "hlpq"
+locales = ["en"]
+source_hash = "9f42db0c9105c2896ddad8d8083aa9ba3ec4b42ea8c3361d6b372cc2b8515d2c"
+legacy_source_hash = "ef9d441a433213a35d21bafc780ff8fec0adc30254a5def27821f305995769be"
+
+[[topics]]
+id = "hlpqwk"
+locales = ["en"]
+source_hash = "011b77a5f148d7920c87dcb3fbffb315cd44aa1310f4fa162b7d4664a382c1fe"
+legacy_source_hash = "6fe0129fb87bf02da996143ace419e475e5d68e29686b99f685e5dd1692e8a9e"
+
+[[topics]]
+id = "hlpr"
+locales = ["en"]
+source_hash = "1c562400b3107f601080731cb5902af91126f2b3a25434378be514c35d6a4368"
+legacy_source_hash = "5be66fc66f4a89b44e8d4094b5f63e6192bcb952a6d1a4f84614ab9559bbf659"
+
+[[topics]]
+id = "hlpreg"
+locales = ["en"]
+source_hash = "ecc58efafef60d4ddf2798161493e73d4ca8b512feebc79994a1b74bf381b65b"
+legacy_source_hash = "37907185a4094d268bc51a89d4daa80d1d063ab2049c9ff2509ae12b23378a1b"
+
+[[topics]]
+id = "hlprep"
+locales = ["en"]
+source_hash = "76599b1e7147b3f815c3771189bdf8420fd67bc9f07f430a6310c22eda7db707"
+legacy_source_hash = "b87e8e2b5508818f37fd653794224b2edd06f4cb66fbf6a62217d20d00987259"
+
+[[topics]]
+id = "hlprm"
+locales = ["en"]
+source_hash = "3c58e8e652ff3855ed0b9969800d986782ea29e45eb74703c7ce4eab8ba987c8"
+legacy_source_hash = "3cf221bb9821694fcacff254314b4617cf5df671872f257f986d006a8a6f5dfa"
+
+[[topics]]
+id = "hlps"
+locales = ["en", "de"]
+source_hash = "81e3cf21a7c4c06ec524e6fba57497c3e6fc6910f994d4fb7f102efa5cf80f4a"
+legacy_source_hash = "32651a859a747d6f1977e4ca0c2afa47fc703c25b99373ce4531eccecb1cebb5"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "5e0b1ee66f146fdb66695e11d56f7f1bb7b81a2c77f35728dbf4f9fcebdee2a5"
+
+[[topics]]
+id = "hlpsec"
+locales = ["en"]
+source_hash = "dee98a83d3ea0217721a48b5bbe98a86154cebdc8dc969a88ae3fafa973337b8"
+legacy_source_hash = "87205b0b17cbaf84e35adfb1114d41aa6371b8617ff7caaaead1355a5d4ae3ff"
+
+[[topics]]
+id = "hlpsel"
+locales = ["en"]
+source_hash = "b1201c0b1cfc99ded0dc7a2aa56f5e0db93324de3cec3ac11273210fff674594"
+legacy_source_hash = "fdf767c1df2fd8f89b0109af2ec9cadbb1653fbf3e880bae94c2d5e37511d1f0"
+
+[[topics]]
+id = "hlpsrch"
+locales = ["en"]
+source_hash = "44ac0fc814187dcbb34c323cbcafd55cd4f4b0c0505e7f5871abbd92d01d080d"
+legacy_source_hash = "feea40f88e04a509aec90860c2b061387ee531e3e449a83f63a3c820f9b110a2"
+
+[[topics]]
+id = "hlpt"
+locales = ["en"]
+source_hash = "a39172d2ca6fa5eb6009e6f6b52e9328f6fdb34a4f90101b6b887b36cd96c89d"
+legacy_source_hash = "564e8434551f3572ea61ca8e3a1e2958b09e84fd30998361cc5116f736a5d22e"
+
+[[topics]]
+id = "hlptest"
+locales = ["en"]
+source_hash = "5521e2a5f164ee27a469108a0bb4d3dea1b657a61d746a70e11d47b67ef9542f"
+legacy_source_hash = "d66c7470deed15d403a9c8c4213c985a8a3b6630a85c64e55014a8ad4e2cd914"
+
+[[topics]]
+id = "hlpts"
+locales = ["en"]
+source_hash = "a289619bea32e9245d481b21bed12dac4c69ae5071d006fa07f16a570b0f6805"
+legacy_source_hash = "c02b518674e449febaffc2dbb82870b6465c810b4ec2391c17e920e319bc925d"
+
+[[topics]]
+id = "hlpu"
+locales = ["en"]
+source_hash = "48ab928016465e9398b515ac49d9a92bfaae1552332969202b1b55be41156405"
+legacy_source_hash = "f4fc22438d6f48c11e0c83c105f7f5922a40f5f87df99a899a638b60d38adaa3"
+
+[[topics]]
+id = "hlpusers"
+locales = ["en", "de"]
+source_hash = "4acfeb6081bfa7bf32e07d08c6dc95a1aa44aa0c42866970f85585a1ba273567"
+legacy_source_hash = "85ac224d5c6c074d1c7187d76e0608c1978da47a79c5a0636536926ec065f532"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "41fc3314741b889f3d8c11f664f5e2d3f410fa4e40106f4dcab1ee051f339858"
+
+[[topics]]
+id = "hlpv"
+locales = ["en", "de"]
+source_hash = "95b6b6365c4e23b1ad57f45c5a24f550f58d732050a5506ca77383c5075e6ab5"
+legacy_source_hash = "0e3f59df30e0d6520fbc1b0cd701d0029535e1ebc267dc771a2f43e420e9db72"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "4dffea1426bb1b3f72f1cf6e0a8da762d25d795f59826892265ff3ea2cca96ef"
+
+[[topics]]
+id = "hlpw"
+locales = ["en"]
+source_hash = "32d701f42375303b47b3e7edab0c4f9b1212ad9f7e9a33512592bcf63fbbeb0c"
+legacy_source_hash = "42de5a4eaf96f7939cb71f4b72a79997b1a8afa64317b2f3d0fd14ca7ff64e32"
+
+[[topics]]
+id = "hlpwho"
+locales = ["en", "de"]
+source_hash = "52d78f1216411ac324006803b46246532e9c2a987ed72199bc763cd5b4f3c98b"
+legacy_source_hash = "7ae689f7325fa226465ccbfeb62d449f8418c0b064315d8ac3202446480f1964"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "fa60faa5709092c897b0f564b6ef82ef5d75725420e80a12fd61f1825a17dca4"
+
+[[topics]]
+id = "hlpx"
+locales = ["en", "de"]
+source_hash = "7593bf7790f7ab3fe3e2f3a73fa9873a3fb7ffa018d5c0ab428f9f107e0cb67f"
+legacy_source_hash = "379cd8a92ace9e4db7905f41bf911a29420d69935a4d320198dc1aefe79479a7"
+[topics.translations.de]
+upstream_hash = ""
+status = "legacy-unreviewed"
+legacy_source_hash = "c9fcf5fcaae62d5bbce14a9ec2586588ab99153fd95516d1effb0c2ed8ef1d23"
+
+[[topics]]
+id = "hlpy"
+locales = ["en"]
+source_hash = "4fabb864c3a1e309991d3cd37e04d3ef86bb093613b72f4f18ce54d850540266"
+legacy_source_hash = "685be8e037e638dcfa92b3bc06cff807bf2108f9c0a96e0f74b2f813833523f1"
+
+[[topics]]
+id = "hlpz"
+locales = ["en"]
+source_hash = "772abe9179a550bad814987c9269426cfc591f00e05e86ce0158d83c6533b0ce"
+legacy_source_hash = "4c25f42ed60f121f5ad7959c4b992c0d5fed1e29e36ee1437ef8f8df7f9c184c"
