@@ -4963,3 +4963,217 @@ event_runtime_failed_hint = Scheduler stopped: repair and restart required; no a
 event_runtime_tools_blocked = Offline tools cannot start: callers, queued/active events or maintenance.
 event_runtime_exit_blocked = Exit refused: queued/active events or maintenance. Wait for completion; force Exit is not safe either.
 event_runtime_scheduler_stopped = Event scheduler terminated unexpectedly. Repair and restart required.
+
+# Menu editor: command and action drafts
+mnu_work_actions = Actions
+mnu_work_arguments = Arguments
+mnu_work_ppe_help = F4 selects only the file. Arguments include their separators; ;; preserves empty arguments. A space is added if no leading separator is supplied. Warning: spaces and ; split tokens; quotes offer no protection. Such paths remain unsafe even in raw mode (F2).
+mnu_work_ppe_path_error = The PPE path contains a space or ;. Choose a path without these separators. Quotes do not help. F2 allows raw editing at your own risk.
+mnu_work_activation = Activate
+mnu_work_selection = Select
+mnu_work_trigger = Trigger
+mnu_work_apply = Apply
+mnu_work_cancel = Discard
+mnu_work_new = New
+mnu_work_edit = Edit
+mnu_work_delete = Delete
+mnu_work_duplicate = Duplicate
+mnu_work_search = Search
+mnu_work_move = Reorder
+mnu_work_clear_filter = Clear filter
+mnu_work_fields_actions = Fields/actions
+mnu_work_raw = Raw/assisted
+mnu_work_normal = Normal
+mnu_work_highlight = Highlight
+mnu_work_empty = No entries. Insert opens a new draft.
+mnu_work_list_help = Insert: new draft; Enter: edit; Delete: remove; Ctrl-D: duplicate; /: search; PgUp/PgDn: reorder.
+mnu_work_filter_help = Type to filter; arrows select; Enter edits; Esc clears the filter. Reordering is disabled while filtering.
+mnu_work_action_keys = Ins: add  Enter: edit  Del: delete  1/2: move  Ctrl-D: copy
+    m: menu  p: PPE  d: door  q: quit-menu draft
+mnu_work_cat_files = Files
+mnu_work_cat_navigation = Navigation
+mnu_work_cat_board = Board
+mnu_work_cat_text = Text
+mnu_work_cat_commands = Commands
+mnu_work_type_help = Enter opens types; type to search names/categories; arrows select; Enter confirms; Esc closes.
+mnu_work_path_help = Path relative to the board root. F4 opens the file browser.
+mnu_work_conference_help = Conference number (starting at 0) or name. Enter opens known conferences; F2 allows raw input.
+mnu_work_context_help = Door/directory IDs start at 1 in the runtime conference. Choices require one unambiguous conference; F2 allows raw input.
+mnu_work_script_help = Script/survey number, starting at 1, in the runtime conference; not a file path.
+mnu_work_text_help = Literal text, including supported PCBoard codes. StuffText variants send this text to the keyboard buffer.
+mnu_work_no_parameter_help = This action needs no parameter. Existing raw text is preserved.
+mnu_work_raw_help = Raw action parameter. Its meaning depends on the command; F2 switches between raw and assisted input.
+mnu_work_trigger_help = Selection runs when highlighted; activation runs when chosen. F10 applies this action; Esc discards it.
+mnu_work_charge_use = Charge/use
+mnu_work_charge_minute = Charge/minute
+mnu_work_charge_help = Nonnegative finite charge; use a decimal point. Zero disables this surcharge.
+mnu_work_charge_error = Enter a finite, nonnegative charge using a decimal point.
+mnu_work_position_field_help = Zero-based x,y coordinates. Enter or F4 opens the position preview.
+mnu_work_position_help = Zero-based x,y coordinates, for example 10,5.
+mnu_work_position_error = Enter x,y with both coordinates between 0 and 65535.
+mnu_work_preview_error = Display file unavailable; using a blank preview
+mnu_work_time_error = Enter a whole number of seconds between 0 and 18446744073709551615.
+mnu_work_security_error = Invalid security expression. Correct it before applying.
+mnu_work_small_screen = Enlarge the editor area to at least 72x18. F10 applies the draft; Esc discards it.
+
+# Menu editor: general fields, including dynamically requested _status IDs
+mnu_general_tab = General
+mnu_general_title = Title
+mnu_general_title_status = Enter the title of the menu.
+mnu_general_display_file = Display file
+mnu_general_display_file_status = Menu background path relative to the board root. F4 opens the file browser.
+mnu_general_help_file = Help file
+mnu_general_help_file_status = Menu help path relative to the board root. F4 opens the file browser.
+mnu_general_menu_type = Menu type
+mnu_general_menu_type_status = Hotkey submits a single key immediately; Command and Lightbar submit input with Enter. Enter opens the type selection; Esc cancels it.
+mnu_general_prompt = Main prompt
+mnu_general_prompt_status = Main menu input prompt used by the runtime. Additional language prompts are stored separately but currently ignored at runtime.
+mnu_general_force_display = Force display
+mnu_general_force_display_status = The force_display flag is saved but ignored by the current menu runtime. Space toggles the stored value; it does not force display at runtime.
+mnu_general_pass_through = Pass through
+mnu_general_pass_through_status = The pass_through flag is saved but ignored by the current menu runtime. Space toggles the stored value; it does not enable runtime pass-through.
+mnu_general_type_hotkey = Hotkey
+mnu_general_type_lightbar = Lightbar
+mnu_general_type_command = Command
+mnu_general_select = Select
+mnu_general_cancel = Cancel
+mnu_general_move = Fields
+mnu_general_browse = Browse
+mnu_general_toggle = Toggle
+mnu_general_help = Help
+mnu_general_runtime_note = Flags force_display/pass_through are saved but ignored at runtime.
+
+# Menu editor: language-specific prompt overrides
+mnu_prompts_tab = Additional prompts
+mnu_prompts_extension = Language suffix (with dot)
+mnu_prompts_text = Prompt text
+mnu_prompts_language = Language
+mnu_prompts_language_status = Language whose file suffix selects this prompt. F3 accepts a suffix that is not in the board's language list.
+mnu_prompts_text_status = Prompt shown instead of the main prompt for that language, including color codes.
+mnu_prompts_default = Main prompt (no language, edited on the General page)
+mnu_prompts_default_empty = Empty: the menu asks without a prompt of its own.
+mnu_prompts_raw = Free suffix
+mnu_prompts_delete_entry = { $language }: { $prompt }
+mnu_prompts_apply = Apply
+mnu_prompts_discard = Discard
+mnu_prompts_cancel = Cancel
+mnu_prompts_move = Select
+mnu_prompts_edit = Edit
+mnu_prompts_new = New
+mnu_prompts_delete = Delete
+mnu_prompts_help = Help
+mnu_prompts_edit_title = Edit additional prompt
+mnu_prompts_edit_status = Choose the language and the prompt text. Up/Down switches fields, F3 allows a free suffix, F2 or F10 applies, Esc discards. Not used at runtime.
+mnu_prompts_status = A language prompt replaces the main prompt for one language, so every entry needs its language. Saved but ignored at runtime.
+mnu_prompts_runtime_note = Additional language prompts (e.g. .DEU) are saved but ignored at runtime. Only the main prompt is used; these are not follow-up questions.
+mnu_prompts_empty = No additional prompts. Insert opens a new draft.
+mnu_prompts_delete_title = Delete additional prompt
+mnu_prompts_delete_question = Delete this additional prompt? Enter confirms; Esc cancels.
+mnu_prompts_conflict = Additional prompts changed while this dialog was open. Nothing was applied. Cancel and reopen the dialog to use the current data.
+mnu_prompts_invalid_extension = Enter a language suffix without whitespace, control characters, commas or slashes; a leading dot is optional.
+mnu_prompts_duplicate = This language already has a prompt; a leading dot and letter case do not make it a different one.
+
+# Menu editor: validation
+mnu_check_action_position = GotoXY coordinates are malformed or outside the 80x25 preview
+mnu_check_display_missing = No regular display/help file found for Graphics, security 0, no language
+mnu_check_duplicate = Duplicate ASCII-case-insensitive keyword; the first matching entry wins
+mnu_check_empty_action = Empty text/command parameter; the effect may depend on caller tokens
+mnu_check_empty_keyword = Empty keyword without autorun or highlighted Enter activation
+mnu_check_empty_menu = No commands: the menu runtime cannot safely select an entry
+mnu_check_error = Error
+mnu_check_fees = Charges must be finite and non-negative
+mnu_check_file_missing = Referenced action file is missing or not a regular file
+mnu_check_hotkey = A multi-character keyword cannot be typed in Hotkey mode
+mnu_check_loop_zero = Loop autorun has a zero interval and can run on every timer check
+mnu_check_menu = Menu
+mnu_check_no_actions = No actions configured
+mnu_check_no_activation = No enabled Activation action; only Selection actions or disabled actions
+mnu_check_ok = No issues found by these checks; this is not a runtime guarantee
+mnu_check_overlap = Display strings overlap an earlier entry on the same row
+mnu_check_parameter = This file action requires a non-empty parameter
+mnu_check_position = Position or display width exceeds the 80x25 preview
+mnu_check_security_context = Security depends on caller/session data not simulated here
+mnu_check_security_invalid = Security expression cannot be safely evaluated as an access condition
+mnu_check_survey_number = Script requires a positive, one-based conference survey number, not a filename
+mnu_check_untypable = Keyword cannot be entered as one token using the runtime's 13-character input
+mnu_check_unused_options = Secondary prompts, force_display or pass_through are configured but not evaluated by the current menu runner
+mnu_check_warning = Warning
+
+# Menu editor: read-only preview
+mnu_preview_activation = Activation
+mnu_preview_allowed = Command security allows
+mnu_preview_autorun = Autorun / interval in seconds
+mnu_preview_background = Background
+mnu_preview_denied = Command security denies
+mnu_preview_details = Inspector
+mnu_preview_disabled = Disabled; no operation
+mnu_preview_entry = Entry
+mnu_preview_fees = Charges per use / per minute; not charged
+mnu_preview_file_limit = Background exceeds the 1 MiB preview limit
+mnu_preview_format = Executable, animation, binary or graphical format is not previewed
+mnu_preview_help =
+    This preview never executes actions, starts programs, stuffs input or charges an account.
+    Arrows use the runtime's positional navigation. Ctrl+arrows cycle all entries; Home/End select the first/last entry. Alt+arrows pan the background outside the issues panel.
+    Command/Lightbar input is submitted with Enter; Hotkey input is submitted immediately. Local keywords use the first ASCII-case-insensitive exact match, not abbreviations.
+    Enter shows the selected command's static action plan. Without typed input, runtime activation requires a non-empty highlighted string.
+    F2 opens/closes issues. Up/Down select an issue; Enter selects its command. PgUp/PgDn scroll complete text, including long individual issues.
+    F3 opens the inspector. F4 switches normal/highlight display. F5 reloads the background and checks.
+    F6/F7 decrease/increase security; Ctrl changes it by 10. Tab/Shift+Tab switch tabs. Escape remains an application command.
+mnu_preview_highlight = Highlight text
+mnu_preview_invalid = Invalid security expression
+mnu_preview_issues = Issues
+mnu_preview_reload = Reload
+mnu_app_back = Back
+mnu_app_save_anyway = Save anyway
+mnu_app_scroll = Scroll
+mnu_prompts_field = Field
+mnu_preview_load_error = Background could not be loaded
+mnu_preview_lock_error = Shared menu or board data is unavailable; no plan can be generated
+mnu_preview_no_match = No local exact match. Global commands, doors and remembered-command expansion are not simulated.
+mnu_preview_normal = Normal text
+mnu_preview_not_activated = Inspection only; no runtime Enter activation
+mnu_preview_prompt = Main prompt
+mnu_preview_read_only = READ ONLY - no execution
+mnu_preview_regular_file = Background must be a regular file
+mnu_preview_render_note = Static ANSI/PCB/Avatar text import with CP437 conversion. The 80x25 canvas is cropped, not scaled. Menu strings use PCB @X colors; inline ANSI controls are shown inertly. Runtime macros, mixed ANSI/PCB semantics, fonts and graphics are not fully emulated. The prompt uses a separate row; secondary prompts are inspector-only.
+mnu_preview_scope = Limited: Graphics, no language; caller/session context is not simulated.
+mnu_preview_secondary = Additional prompt, not evaluated
+mnu_preview_security = Security
+mnu_preview_selection = Selection
+mnu_preview_selection_note = The runtime invokes Selection actions on lightbar selection, including initial selection, without the command-level admission check. Individual action checks may still apply. This preview only describes them.
+mnu_preview_selection_only = Selection event only; not an Activation action
+mnu_preview_title = Preview / Test
+mnu_preview_trace = Read-only trace
+mnu_preview_trace_empty = Press Enter to inspect actions. Nothing is executed.
+mnu_preview_trace_note = This is a configured action list, not a simulated execution result. Action-specific permissions, conference state, billing, nested commands, logoff and other control flow are not evaluated. Autoruns are listed but never scheduled.
+mnu_preview_type = Menu type
+mnu_preview_unknown = Unknown; caller/session context required
+
+# Menu editor: application actions and save protection
+mnu_app_save = Save
+mnu_app_undo = Undo
+mnu_app_redo = Redo
+mnu_app_tabs = Tabs
+mnu_app_quit = Quit
+mnu_app_saved = Menu saved
+mnu_app_save_error = Could not save menu; your changes remain open
+mnu_app_issues = Review issues before saving. F8 saves anyway, Esc returns to editing.
+mnu_app_new = New menu; not saved yet
+mnu_app_help =
+    # Menu editor
+
+    Ctrl-S saves without closing, Ctrl-Z and Ctrl-Y undo and redo completed
+    edits, F9 opens Preview / Test, Tab changes tabs and Esc quits.
+
+    Dialogs own their apply and cancel keys: commands and actions apply with
+    F10, language prompts with F2 or F10, and Esc discards the current draft.
+    Apply a draft before saving the file; while a draft, choice list or file
+    browser is open, Ctrl-S does not reach the editor.
+
+    Saving checks the menu first. Issues are advisory: F8 saves anyway, Esc
+    returns to editing. A save is refused if the file changed on disk.
+
+    Up and Down scroll this help, Esc closes it.
+mnu_app_confirm_title = Save menu
+mnu_app_external_change = The destination changed outside this editor. Save refused; changes remain open.
+mnu_app_exists = The destination already exists; --create will not overwrite it.

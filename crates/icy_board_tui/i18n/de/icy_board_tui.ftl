@@ -4400,3 +4400,220 @@ event_runtime_failed_hint = Scheduler gestoppt: Reparatur und Neustart nötig; k
 event_runtime_tools_blocked = Offline-Werkzeuge gesperrt: Anrufer, geplante/aktive Ereignisse oder Wartung.
 event_runtime_exit_blocked = Exit verweigert: geplante/aktive Ereignisse oder Wartung. Ende abwarten; auch erzwungenes Exit ist nicht sicher.
 event_runtime_scheduler_stopped = Ereignis-Scheduler unerwartet beendet. Reparatur und Neustart nötig.
+
+# Menüeditor: Befehls- und Aktionsentwürfe
+mnu_work_actions = Aktionen
+mnu_work_arguments = Argumente
+mnu_work_ppe_help = F4 wählt nur die Datei. Argumente enthalten ihre Trenner; ;; erhält leere Argumente. Ohne führenden Trenner wird ein Leerzeichen ergänzt. Warnung: Leerzeichen und ; trennen Tokens, Anführungszeichen schützen nicht. Solche Pfade bleiben auch im Rohmodus (F2) unsicher.
+mnu_work_ppe_path_error = Der PPE-Pfad enthält Leerzeichen oder ;. Bitte einen Pfad ohne diese Trenner wählen. Anführungszeichen helfen nicht. F2 erlaubt die Rohbearbeitung auf eigenes Risiko.
+mnu_work_activation = Aktivierung
+mnu_work_selection = Auswahl
+mnu_work_trigger = Auslöser
+mnu_work_apply = Übernehmen
+mnu_work_cancel = Verwerfen
+mnu_work_new = Neu
+mnu_work_edit = Bearbeiten
+mnu_work_delete = Löschen
+mnu_work_duplicate = Duplizieren
+mnu_work_search = Suche
+mnu_work_move = Reihenfolge
+mnu_work_clear_filter = Filter aufheben
+mnu_work_fields_actions = Felder/Aktionen
+mnu_work_raw = Frei/Auswahl
+mnu_work_normal = Normal
+mnu_work_highlight = Hervorgehoben
+mnu_work_empty = Keine Einträge. Einfg öffnet einen neuen Entwurf.
+mnu_work_list_help = Einfg: neuer Entwurf; Enter: bearbeiten; Entf: löschen; Strg-D: duplizieren; /: suchen; Bild↑/↓: Reihenfolge.
+mnu_work_filter_help = Tippen filtert; Pfeile wählen; Enter bearbeitet; Esc hebt den Filter auf. Im Filter keine Änderung der Reihenfolge.
+mnu_work_action_keys = Einfg: neu  Enter: ändern  Entf: löschen  1/2: bewegen  Strg-D: Kopie
+    m: Menü  p: PPE  d: Door  q: Menü-verlassen-Entwurf
+mnu_work_cat_files = Dateien
+mnu_work_cat_navigation = Navigation
+mnu_work_cat_board = Board
+mnu_work_cat_text = Text
+mnu_work_cat_commands = Befehle
+mnu_work_type_help = Enter öffnet Typen; Tippen sucht Namen/Kategorien; Pfeile wählen; Enter bestätigt; Esc schließt.
+mnu_work_path_help = Pfad relativ zum Board-Stammverzeichnis. F4 öffnet den Dateibrowser.
+mnu_work_conference_help = Konferenznummer (ab 0) oder Name. Enter zeigt bekannte Konferenzen; F2 erlaubt freie Eingabe.
+mnu_work_context_help = Door-/Verzeichnisnummern beginnen bei 1 in der Laufzeitkonferenz. Auswahl nur bei eindeutigem Kontext; F2 erlaubt freie Eingabe.
+mnu_work_script_help = Skript-/Umfragenummer ab 1 in der Laufzeitkonferenz; kein Dateipfad.
+mnu_work_text_help = Wörtlicher Text einschließlich unterstützter PCBoard-Codes. StuffText-Varianten senden ihn an den Tastaturpuffer.
+mnu_work_no_parameter_help = Diese Aktion benötigt keinen Parameter. Vorhandener Rohtext bleibt erhalten.
+mnu_work_raw_help = Freier Aktionsparameter. Seine Bedeutung hängt vom Befehl ab; F2 wechselt zwischen freier und unterstützter Eingabe.
+mnu_work_trigger_help = Auswahl läuft beim Hervorheben, Aktivierung beim Auslösen. F10 übernimmt diese Aktion; Esc verwirft sie.
+mnu_work_charge_use = Gebühr/Aufruf
+mnu_work_charge_minute = Gebühr/Minute
+mnu_work_charge_help = Endliche, nichtnegative Gebühr mit Dezimalpunkt. Null deaktiviert diesen Zuschlag.
+mnu_work_charge_error = Eine endliche, nichtnegative Gebühr mit Dezimalpunkt eingeben.
+mnu_work_position_field_help = Nullbasierte x,y-Koordinaten. Enter oder F4 öffnet die Positionsvorschau.
+mnu_work_position_help = Nullbasierte x,y-Koordinaten, beispielsweise 10,5.
+mnu_work_position_error = x,y eingeben; beide Koordinaten müssen zwischen 0 und 65535 liegen.
+mnu_work_preview_error = Anzeigedatei nicht verfügbar; leere Vorschau
+mnu_work_time_error = Eine ganze Sekundenzahl zwischen 0 und 18446744073709551615 eingeben.
+mnu_work_security_error = Ungültiger Sicherheitsausdruck. Vor dem Übernehmen korrigieren.
+mnu_work_small_screen = Editorbereich auf mindestens 72x18 vergrößern. F10 übernimmt den Entwurf; Esc verwirft ihn.
+
+# Menüeditor: allgemeine Felder samt dynamisch angeforderten _status-IDs
+mnu_general_tab = Allgemein
+mnu_general_title = Titel
+mnu_general_title_status = Titel des Menüs eingeben.
+mnu_general_display_file = Anzeigedatei
+mnu_general_display_file_status = Pfad zum Menühintergrund relativ zum Board-Stammverzeichnis. F4 öffnet den Dateibrowser.
+mnu_general_help_file = Hilfedatei
+mnu_general_help_file_status = Pfad zur Menühilfe relativ zum Board-Stammverzeichnis. F4 öffnet den Dateibrowser.
+mnu_general_menu_type = Menütyp
+mnu_general_menu_type_status = Direktwahl übernimmt eine einzelne Taste sofort; Befehlseingabe und Auswahlbalken übernehmen mit Enter. Enter öffnet die Typauswahl; Esc bricht sie ab.
+mnu_general_prompt = Hauptprompt
+mnu_general_prompt_status = Haupt-Eingabeaufforderung des Menüs für die Laufzeit. Zusätzliche Sprachprompts werden separat gespeichert, zur Laufzeit aber derzeit ignoriert.
+mnu_general_force_display = Anzeige erzwingen
+mnu_general_force_display_status = Das Flag force_display wird gespeichert, von der aktuellen Menü-Runtime aber ignoriert. Leertaste schaltet den gespeicherten Wert um; die Anzeige wird zur Laufzeit nicht erzwungen.
+mnu_general_pass_through = Durchreichen
+mnu_general_pass_through_status = Das Flag pass_through wird gespeichert, von der aktuellen Menü-Runtime aber ignoriert. Leertaste schaltet den gespeicherten Wert um; Durchreichen wird zur Laufzeit nicht aktiviert.
+mnu_general_type_hotkey = Direktwahl
+mnu_general_type_lightbar = Auswahlbalken
+mnu_general_type_command = Befehlseingabe
+mnu_general_select = Wählen
+mnu_general_cancel = Abbrechen
+mnu_general_move = Felder
+mnu_general_browse = Durchsuchen
+mnu_general_toggle = Umschalten
+mnu_general_help = Hilfe
+mnu_general_runtime_note = Flags force_display/pass_through: gespeichert, zur Laufzeit ignoriert.
+
+# Menüeditor: sprachabhängige zusätzliche Eingabeaufforderungen
+mnu_prompts_tab = Zusatzprompts
+mnu_prompts_extension = Sprachsuffix (mit Punkt)
+mnu_prompts_text = Prompttext
+mnu_prompts_language = Sprache
+mnu_prompts_language_status = Sprache, deren Dateisuffix diesen Prompt auswählt. F3 erlaubt ein Suffix außerhalb der Sprachliste des Boards.
+mnu_prompts_text_status = Prompt, der für diese Sprache statt des Hauptprompts erscheint, einschließlich Farbcodes.
+mnu_prompts_default = Hauptprompt (ohne Sprache, wird unter Allgemein bearbeitet)
+mnu_prompts_default_empty = Leer: Das Menü fragt ohne eigenen Prompt ab.
+mnu_prompts_raw = Freies Suffix
+mnu_prompts_delete_entry = { $language }: { $prompt }
+mnu_prompts_apply = Übernehmen
+mnu_prompts_discard = Verwerfen
+mnu_prompts_cancel = Abbrechen
+mnu_prompts_move = Wählen
+mnu_prompts_edit = Bearbeiten
+mnu_prompts_new = Neu
+mnu_prompts_delete = Löschen
+mnu_prompts_help = Hilfe
+mnu_prompts_edit_title = Zusatzprompt bearbeiten
+mnu_prompts_edit_status = Sprache und Prompttext wählen. Auf/Ab wechselt das Feld, F3 erlaubt ein freies Suffix, F2 oder F10 übernimmt, Esc verwirft. Zur Laufzeit nicht genutzt.
+mnu_prompts_status = Ein Sprach-Prompt ersetzt den Hauptprompt für eine Sprache, daher braucht jeder Eintrag seine Sprache. Gespeichert, zur Laufzeit aber ignoriert.
+mnu_prompts_runtime_note = Sprach-Zusatzprompts (z. B. .DEU) werden gespeichert, zur Laufzeit ignoriert. Nur der Hauptprompt wird genutzt; keine Folgefragen.
+mnu_prompts_empty = Keine Zusatzprompts. Einfg öffnet einen neuen Entwurf.
+mnu_prompts_delete_title = Zusatzprompt löschen
+mnu_prompts_delete_question = Diesen Zusatzprompt löschen? Enter bestätigt; Esc bricht ab.
+mnu_prompts_conflict = Zusatzprompts wurden bei geöffnetem Dialog geändert. Nichts übernommen. Dialog abbrechen und mit den aktuellen Daten erneut öffnen.
+mnu_prompts_invalid_extension = Sprachsuffix ohne Leerraum-/Steuerzeichen, Kommas oder Schrägstriche eingeben; ein führender Punkt ist optional.
+mnu_prompts_duplicate = Für diese Sprache gibt es bereits einen Prompt; führender Punkt und Groß-/Kleinschreibung machen keinen Unterschied.
+
+# Menüeditor: Prüfungen
+mnu_check_action_position = GotoXY-Koordinaten sind fehlerhaft oder außerhalb der 80x25-Vorschau
+mnu_check_display_missing = Keine reguläre Anzeige-/Hilfedatei für Graphics, Sicherheitsstufe 0, ohne Sprache gefunden
+mnu_check_duplicate = Doppeltes Keyword ohne ASCII-Groß-/Kleinschreibung; der erste passende Eintrag gewinnt
+mnu_check_empty_action = Leerer Text-/Command-Parameter; die Wirkung kann von Eingabetokens abhängen
+mnu_check_empty_keyword = Leeres Keyword ohne Autorun oder hervorgehobene Enter-Aktivierung
+mnu_check_empty_menu = Keine Befehle: Die Menü-Runtime kann keinen Eintrag sicher auswählen
+mnu_check_error = Fehler
+mnu_check_fees = Gebühren müssen endlich und nicht negativ sein
+mnu_check_file_missing = Referenzierte Aktionsdatei fehlt oder ist keine reguläre Datei
+mnu_check_hotkey = Ein mehrstelliges Keyword kann im Hotkey-Modus nicht eingegeben werden
+mnu_check_loop_zero = Loop-Autorun hat Intervall null und kann bei jeder Timerprüfung laufen
+mnu_check_menu = Menü
+mnu_check_no_actions = Keine Aktionen konfiguriert
+mnu_check_no_activation = Keine aktive Activation-Aktion; nur Selection-Aktionen oder deaktivierte Aktionen
+mnu_check_ok = Diese Prüfungen haben keine Probleme gefunden; keine Laufzeitgarantie
+mnu_check_overlap = Anzeigetexte überlappen einen früheren Eintrag derselben Zeile
+mnu_check_parameter = Diese Dateiaktion benötigt einen nicht leeren Parameter
+mnu_check_position = Position oder Anzeigebreite überschreitet die 80x25-Vorschau
+mnu_check_security_context = Sicherheitsprüfung benötigt hier nicht simulierte Benutzer-/Sitzungsdaten
+mnu_check_security_invalid = Sicherheitsausdruck kann nicht sicher als Zugriffsbedingung ausgewertet werden
+mnu_check_survey_number = Script benötigt eine positive, einsbasierte Umfragenummer der Konferenz, keinen Dateinamen
+mnu_check_untypable = Keyword kann mit der 13-Zeichen-Eingabe der Runtime nicht als einzelnes Token eingegeben werden
+mnu_check_unused_options = Zusätzliche Prompts, force_display oder pass_through sind konfiguriert, werden vom aktuellen Menü-Runner aber nicht ausgewertet
+mnu_check_warning = Warnung
+
+# Menüeditor: schreibgeschützte Vorschau
+mnu_preview_activation = Aktivierung
+mnu_preview_allowed = Befehlssicherheit erlaubt
+mnu_preview_autorun = Autorun / Intervall in Sekunden
+mnu_preview_background = Hintergrund
+mnu_preview_denied = Befehlssicherheit verweigert
+mnu_preview_details = Inspektor
+mnu_preview_disabled = Deaktiviert; keine Operation
+mnu_preview_entry = Eintrag
+mnu_preview_fees = Gebühren pro Aufruf / Minute; keine Buchung
+mnu_preview_file_limit = Hintergrund überschreitet die Vorschaugrenze von 1 MiB
+mnu_preview_format = Ausführbares, Animations-, Binär- oder Grafikformat wird nicht angezeigt
+mnu_preview_help =
+    Diese Vorschau führt niemals Aktionen aus, startet keine Programme, speist keine Eingaben ein und bucht keine Gebühren.
+    Pfeile verwenden die Positionsnavigation der Runtime. Strg+Pfeile wechseln durch alle Einträge; Pos1/Ende wählen den ersten/letzten. Alt+Pfeile verschieben außerhalb der Problemliste den Bildausschnitt.
+    Command-/Lightbar-Eingaben werden mit Enter übernommen, Hotkey-Eingaben sofort. Lokale Keywords verwenden den ersten exakten Treffer ohne ASCII-Groß-/Kleinschreibung, keine Abkürzungen.
+    Enter zeigt den statischen Aktionsplan des gewählten Befehls. Ohne Texteingabe benötigt die Runtime einen nicht leeren Hervorhebungstext zur Aktivierung.
+    F2 öffnet/schließt Probleme. Auf/Ab wählen ein Problem; Enter wählt dessen Befehl. BildAuf/BildAb scrollen vollständige Texte, auch einzelne lange Probleme.
+    F3 öffnet den Inspektor. F4 wechselt Normal-/Hervorhebungsanzeige. F5 lädt Hintergrund und Prüfungen neu.
+    F6/F7 senken/erhöhen die Sicherheitsstufe; mit Strg um 10. Tab/Umschalt+Tab wechseln Register. Escape bleibt ein Anwendungsbefehl.
+mnu_preview_highlight = Hervorhebungstext
+mnu_preview_invalid = Ungültiger Sicherheitsausdruck
+mnu_preview_issues = Probleme
+mnu_preview_reload = Neu laden
+mnu_app_back = Zurück
+mnu_app_save_anyway = Trotzdem speichern
+mnu_app_scroll = Scrollen
+mnu_prompts_field = Feld
+mnu_preview_load_error = Hintergrund konnte nicht geladen werden
+mnu_preview_lock_error = Gemeinsame Menü- oder Boarddaten nicht verfügbar; kein Aktionsplan möglich
+mnu_preview_no_match = Kein lokaler exakter Treffer. Globale Befehle, Doors und die Wiederholung gemerkter Befehle werden nicht simuliert.
+mnu_preview_normal = Normaltext
+mnu_preview_not_activated = Nur Inspektion; keine Enter-Aktivierung der Runtime
+mnu_preview_prompt = Hauptprompt
+mnu_preview_read_only = NUR LESEN - keine Ausführung
+mnu_preview_regular_file = Hintergrund muss eine reguläre Datei sein
+mnu_preview_render_note = Statischer ANSI-/PCB-/Avatar-Textimport mit CP437-Konvertierung. Die 80x25-Zeichenfläche wird beschnitten, nicht skaliert. Menütexte verwenden PCB-@X-Farben; Inline-ANSI-Steuerzeichen erscheinen wirkungslos. Laufzeitmakros, gemischte ANSI-/PCB-Semantik, Schriftarten und Grafiken werden nicht vollständig emuliert. Der Prompt steht separat; Zusatzprompts erscheinen nur im Inspektor.
+mnu_preview_scope = Eingeschränkt: Graphics, ohne Sprache; kein echter Benutzer-/Sitzungskontext.
+mnu_preview_secondary = Zusatzprompt, nicht ausgewertet
+mnu_preview_security = Sicherheit
+mnu_preview_selection = Auswahl
+mnu_preview_selection_note = Die Runtime ruft Selection-Aktionen beim Lightbar-Auswählen einschließlich der Erstauswahl ohne Zugangskontrolle des Befehls auf. Einzelne Aktionen können weitere Prüfungen vornehmen. Diese Vorschau beschreibt sie ausschließlich.
+mnu_preview_selection_only = Nur Auswahlereignis; keine Activation-Aktion
+mnu_preview_title = Vorschau / Test
+mnu_preview_trace = Read-only-Trace
+mnu_preview_trace_empty = Enter zeigt die Aktionen. Es wird nichts ausgeführt.
+mnu_preview_trace_note = Dies ist die konfigurierte Aktionsliste, kein simuliertes Ausführungsergebnis. Aktionsrechte, Konferenzzustand, Abrechnung, verschachtelte Befehle, Abmeldung und weiterer Kontrollfluss werden nicht ausgewertet. Autoruns werden aufgeführt, aber niemals gestartet.
+mnu_preview_type = Menütyp
+mnu_preview_unknown = Unbekannt; Benutzer-/Sitzungskontext erforderlich
+
+# Menüeditor: Anwendungsaktionen und sicheres Speichern
+mnu_app_save = Speichern
+mnu_app_undo = Rückgängig
+mnu_app_redo = Wiederholen
+mnu_app_tabs = Register
+mnu_app_quit = Beenden
+mnu_app_saved = Menü gespeichert
+mnu_app_save_error = Menü konnte nicht gespeichert werden; Änderungen bleiben geöffnet
+mnu_app_issues = Probleme vor dem Speichern prüfen. F8 speichert trotzdem, Esc kehrt zur Bearbeitung zurück.
+mnu_app_new = Neues Menü; noch nicht gespeichert
+mnu_app_help =
+    # Menüeditor
+
+    Strg-S speichert ohne Beenden, Strg-Z und Strg-Y machen abgeschlossene
+    Änderungen rückgängig beziehungsweise wiederholen sie, F9 öffnet Vorschau /
+    Test, Tab wechselt das Register und Esc beendet.
+
+    Dialoge haben eigene Tasten zum Übernehmen und Abbrechen: Befehle und
+    Aktionen übernehmen mit F10, Sprach-Prompts mit F2 oder F10, Esc verwirft
+    den aktuellen Entwurf. Entwürfe vor dem Speichern übernehmen; solange ein
+    Entwurf, eine Auswahlliste oder der Dateibrowser offen ist, erreicht Strg-S
+    den Editor nicht.
+
+    Vor dem Speichern wird das Menü geprüft. Die Hinweise sind beratend: F8
+    speichert trotzdem, Esc kehrt zur Bearbeitung zurück. Wurde die Datei
+    zwischenzeitlich geändert, wird das Speichern verweigert.
+
+    Auf und Ab scrollen diese Hilfe, Esc schließt sie.
+mnu_app_confirm_title = Menü speichern
+mnu_app_external_change = Die Zieldatei wurde außerhalb des Editors geändert. Speichern verweigert; Änderungen bleiben geöffnet.
+mnu_app_exists = Die Zieldatei existiert bereits; --create überschreibt sie nicht.

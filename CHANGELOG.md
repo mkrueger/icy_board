@@ -10,6 +10,14 @@ releases.
 
 ### Added
 
+- `mkicbmnu --board/-b` accepts a BBS directory or configuration file;
+  `--check` validates menus without opening the editor or writing files.
+  The editor adds save-without-exit, undo/redo, isolated command/action drafts,
+  search and duplication, assisted action parameters, command charges,
+  language prompts and a read-only menu preview with static action traces.
+  New files are deferred until save and never overwrite existing destinations;
+  save failures retain the open document. See the [menu editor guide](docs/mkicbmnu.md).
+
 - Call-wait Log Viewer with bounded, read-only application/caller logs, follow
   and search. T switches filter/context; n/N navigate matches with wraparound.
   Pausing freezes content and size/UTC modification metadata, including pending

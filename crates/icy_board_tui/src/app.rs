@@ -50,6 +50,52 @@ impl SaveChoice {
     pub fn writes(self) -> bool {
         self != SaveChoice::Discard
     }
+
+    pub fn label(self) -> String {
+        get_text(match self {
+            SaveChoice::Save => "yes",
+            SaveChoice::QuickSave => "quick_save",
+            SaveChoice::Discard => "no",
+        })
+    }
+
+    /// The answer bar wraps around at both ends.
+    pub fn step(self, choices: &[SaveChoice], forward: bool) -> SaveChoice {
+        if choices.is_empty() {
+            return self;
+        }
+        let at = choices.iter().position(|choice| *choice == self).unwrap_or(0);
+        let at = if forward { at + 1 } else { at + choices.len() - 1 };
+        choices[at % choices.len()]
+    }
+}
+
+/// PCBSetup's save prompt: one centred box whose selected answer carries the
+/// lightbar. The caller dims the background it wants to recede.
+pub fn render_save_dialog(buf: &mut Buffer, area: Rect, choices: &[SaveChoice], selected: SaveChoice) {
+    let theme = get_tui_theme();
+    let mut spans = vec![Span::styled(format!("{} ", get_text("icbtext_save_changes")), theme.item)];
+    for (at, choice) in choices.iter().enumerate() {
+        if at > 0 {
+            spans.push(Span::styled("/", theme.item));
+        }
+        let style = if *choice == selected { theme.selected_item } else { theme.item };
+        spans.push(Span::styled(format!(" {} ", choice.label()), style));
+    }
+    let field = Line::from(spans);
+    let width = (field.width().saturating_add(4)).min(area.width as usize) as u16;
+    let height = area.height.min(3);
+    if width == 0 || height == 0 {
+        return;
+    }
+    let save_area = Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height);
+    Clear.render(save_area, buf);
+    Block::new()
+        .borders(Borders::ALL)
+        .style(theme.dialog_box)
+        .border_type(BorderType::Double)
+        .render(save_area, buf);
+    field.render(save_area.inner(Margin { horizontal: 2, vertical: 1 }), buf);
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -200,35 +246,7 @@ impl App {
         if self.mode == Mode::RequestQuit {
             let backdrop = frame.area();
             dim_background(frame.buffer_mut(), backdrop);
-            let theme = get_tui_theme();
-            let save_text = format!("{} ", get_text("icbtext_save_changes"));
-            let mut spans = vec![Span::styled(save_text, theme.item)];
-            for (at, choice) in self.choices().iter().enumerate() {
-                if at > 0 {
-                    spans.push(Span::styled("/", theme.item));
-                }
-                let label = match choice {
-                    SaveChoice::Save => get_text("yes"),
-                    SaveChoice::QuickSave => get_text("quick_save"),
-                    SaveChoice::Discard => get_text("no"),
-                };
-                let style = if *choice == self.save { theme.selected_item } else { theme.item };
-                spans.push(Span::styled(format!(" {label} "), style));
-            }
-            let field = Line::from(spans);
-            let width = field.width().saturating_add(4).min(area.width as usize) as u16;
-            let height = area.height.min(3);
-            let save_area = Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height);
-
-            Clear.render(save_area, frame.buffer_mut());
-
-            Block::new()
-                .borders(Borders::ALL)
-                .style(get_tui_theme().dialog_box)
-                .border_type(BorderType::Double)
-                .render(save_area, frame.buffer_mut());
-
-            field.render(save_area.inner(Margin { horizontal: 2, vertical: 1 }), frame.buffer_mut());
+            render_save_dialog(frame.buffer_mut(), area, self.choices(), self.save);
         }
     }
 
@@ -256,15 +274,11 @@ impl App {
     }
 
     fn next_choice(&self) -> SaveChoice {
-        let choices = self.choices();
-        let at = choices.iter().position(|choice| *choice == self.save).unwrap_or(0);
-        choices[(at + 1) % choices.len()]
+        self.save.step(self.choices(), true)
     }
 
     fn previous_choice(&self) -> SaveChoice {
-        let choices = self.choices();
-        let at = choices.iter().position(|choice| *choice == self.save).unwrap_or(0);
-        choices[(at + choices.len() - 1) % choices.len()]
+        self.save.step(self.choices(), false)
     }
     fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
         let area = screen.inner(Margin { horizontal: 2, vertical: 2 });

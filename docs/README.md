@@ -39,6 +39,7 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 | Guide | Use it for |
 | :--- | :--- |
 | [Command lists / CMD.LST](configuration/commands.md) | Add or override commands, launch PPEs and understand the native TOML and legacy import formats. |
+| [Menu editor](mkicbmnu.md) | Build menus with parameter assistance, preview, read-only checks, undo/redo and explicit BBS context. |
 | [PPL and PPEs](ppl.md) | Language overview, runtime compatibility and the toolchain. |
 | [PPL compiler](pplc.md) | Projects, language versions, output and diagnostics. |
 | [New in PPL 3.50 and 4.x](new_ppl.md) | Version matrix for loops, initializers, constants, enums, routine parameters, records and board objects. |
