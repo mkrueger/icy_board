@@ -194,8 +194,8 @@ impl App {
 
         Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
-        self.render_selected_tab(frame, tab);
         self.render_status_line(status_line, frame.buffer_mut());
+        self.render_selected_tab(frame, tab);
 
         if self.mode == Mode::RequestQuit {
             let backdrop = frame.area();
@@ -387,6 +387,52 @@ mod tests {
             if width >= 8 {
                 assert!(row_text(terminal.backend().buffer(), height - 1).starts_with(" F1 Help"));
             }
+        }
+    }
+
+    #[test]
+    fn path_browser_covers_status_and_stays_inside_setup_window() {
+        struct BrowserTab(crate::path_browser::PathBrowser);
+        impl TabPage for BrowserTab {
+            fn title(&self) -> String {
+                "Browser".into()
+            }
+            fn render(&mut self, frame: &mut Frame, _area: Rect) {
+                self.0.render(Rect::new(35, 12, 30, 4), frame);
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("visible.txt"), "test").unwrap();
+        for (width, height) in [(80, 25), (120, 36), (160, 50)] {
+            let browser = crate::path_browser::PathBrowser::new(std::path::Path::new(""), Some(root.path()));
+            let mut app = dialog(false);
+            app.mode = Mode::Command;
+            app.status_line = "UNDERLYING-STATUS-MUST-NOT-SHOW".into();
+            app.tabs = vec![Box::new(BrowserTab(browser))];
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            let mut area = Rect::default();
+            terminal
+                .draw(|frame| {
+                    area = get_screen_size(frame, false);
+                    app.ui(frame, area);
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            let text: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
+            assert!(text.contains("visible.txt"));
+            assert!(text.contains(&get_text("path_browser_title")));
+            assert!(!text.contains("UNDERLYING-STATUS"));
+            assert_eq!(area.width, 80);
+            assert_eq!(area.height, 25);
+            for y in 0..height {
+                for x in 0..width {
+                    if !area.contains(ratatui::layout::Position::new(x, y)) {
+                        assert_eq!(buffer[(x, y)], ratatui::buffer::Cell::EMPTY, "outside modal at {x},{y}");
+                    }
+                }
+            }
+            let bottom = row_text(buffer, area.bottom() - 1);
+            assert!(bottom.contains('─'));
         }
     }
 

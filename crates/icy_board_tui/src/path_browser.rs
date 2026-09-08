@@ -8,25 +8,29 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
+    style::{Color, Style},
     widgets::{Block, Borders, Clear, FrameExt, Paragraph, Wrap},
 };
 use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Input, Theme as ExplorerTheme};
 
-use crate::{get_text, theme::get_tui_theme};
+use crate::{
+    app::get_screen_size,
+    get_text,
+    theme::{DOS_LIGHT_GRAY, Theme, get_tui_theme},
+};
 
-fn explorer_theme() -> ExplorerTheme {
-    let theme = get_tui_theme();
+fn file_style(theme: Theme) -> Style {
+    Style::default().fg(DOS_LIGHT_GRAY).bg(theme.background.bg.unwrap_or(Color::Reset))
+}
+
+fn explorer_theme(theme: Theme) -> ExplorerTheme {
+    let files = file_style(theme);
     ExplorerTheme::new()
-        .with_style(theme.description_text)
-        .with_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(theme.description_text)
-                .border_style(theme.dialog_box),
-        )
+        .with_style(files)
+        .with_block(Block::default().borders(Borders::ALL).style(files).border_style(theme.dialog_box))
         // Plain files recede; only directories and the selection are emphasised.
-        .with_item_style(theme.description_text)
-        .with_dir_style(theme.menu_title)
+        .with_item_style(files)
+        .with_dir_style(theme.menu_title.bg(theme.background.bg.unwrap_or(Color::Reset)))
         .with_highlight_item_style(theme.selected_item)
         .with_highlight_dir_style(theme.selected_item)
 }
@@ -61,7 +65,7 @@ impl PathBrowser {
                 .find(|path| path.is_dir())
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, get_text("path_browser_missing")))?;
             let mut explorer = FileExplorerBuilder::default().working_dir(directory).build()?;
-            explorer.set_theme(explorer_theme());
+            explorer.set_theme(explorer_theme(get_tui_theme()));
             if target.file_name().is_some_and(|name| name.to_string_lossy().starts_with('.')) && target.is_file() {
                 explorer.handle(Input::ToggleShowHidden)?;
             }
@@ -150,9 +154,12 @@ impl PathBrowser {
         PathBrowserResult::Pending
     }
 
-    pub(crate) fn render(&self, area: Rect, frame: &mut Frame) {
-        let theme = get_tui_theme();
-        let area = Self::modal_area(frame.area(), area);
+    pub(crate) fn render(&self, _area: Rect, frame: &mut Frame) {
+        self.render_with_theme(frame, get_tui_theme());
+    }
+
+    fn render_with_theme(&self, frame: &mut Frame, theme: Theme) {
+        let area = get_screen_size(frame, false);
         frame.render_widget(Clear, area);
         let block = Block::default()
             .borders(Borders::ALL)
@@ -172,30 +179,19 @@ impl PathBrowser {
         if let Some(explorer) = &self.explorer {
             frame.render_widget(Paragraph::new(explorer.cwd().display().to_string()).style(theme.value), path);
             if explorer.files().is_empty() {
-                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(theme.description_text), files);
+                frame.render_widget(Paragraph::new(get_text("path_browser_empty")).style(file_style(theme)), files);
             } else if !files.is_empty() {
                 frame.render_widget_ref(explorer.widget(), files);
             }
         }
         frame.render_widget(
             Paragraph::new(get_text("path_browser_keys"))
-                .style(theme.description_text)
+                .style(file_style(theme))
                 .wrap(Wrap { trim: false }),
             help,
         );
         if let Some(message) = &self.error {
             frame.render_widget(Paragraph::new(message.as_str()).style(theme.false_value).wrap(Wrap { trim: false }), error);
-        }
-    }
-
-    /// Browsing needs room, so this is a modal over the whole frame rather than
-    /// the popup rectangle its caller owns. The app's title bar and status line
-    /// stay readable; a frame too small for them keeps the caller's area.
-    fn modal_area(frame: Rect, area: Rect) -> Rect {
-        if frame.height > 6 && frame.width > 8 {
-            Rect::new(frame.x, frame.y + 1, frame.width, frame.height - 2)
-        } else {
-            area
         }
     }
 }
@@ -323,18 +319,23 @@ mod tests {
                 panic!("missing text: {text}");
             };
             assert_text(&get_text("path_browser_title"), theme.dialog_box_title);
-            assert_text("Enter:", theme.description_text);
+            assert_text("Enter:", file_style(theme));
             assert_text("Example error", theme.false_value);
-            assert_text("other.txt", theme.description_text);
-            assert_text("selected.txt", if select_directory { theme.description_text } else { theme.selected_item });
-            assert_text("../", if select_directory { theme.selected_item } else { theme.menu_title });
-            assert_ne!(theme.description_text.fg, theme.menu_title.fg, "directories stay distinguishable");
-            // The modal starts below the title bar and ends above the status line.
+            assert_text("other.txt", file_style(theme));
+            assert_text("selected.txt", if select_directory { file_style(theme) } else { theme.selected_item });
+            assert_text(
+                "../",
+                if select_directory {
+                    theme.selected_item
+                } else {
+                    theme.menu_title.bg(theme.background.bg.unwrap_or(Color::Reset))
+                },
+            );
             assert_eq!(
-                (buffer[(0, 1)].fg, buffer[(0, 1)].bg),
+                (buffer[(10, 0)].fg, buffer[(10, 0)].bg),
                 (theme.dialog_box.fg.unwrap(), theme.dialog_box.bg.unwrap())
             );
-            assert_eq!((buffer[(1, 2)].fg, buffer[(1, 2)].bg), (theme.value.fg.unwrap(), theme.value.bg.unwrap()));
+            assert_eq!((buffer[(11, 1)].fg, buffer[(11, 1)].bg), (theme.value.fg.unwrap(), theme.value.bg.unwrap()));
             assert_eq!(buffer[(0, 0)], ratatui::buffer::Cell::EMPTY);
             assert_eq!(buffer[(0, 24)], ratatui::buffer::Cell::EMPTY);
         }
@@ -355,7 +356,7 @@ mod tests {
         // A caller's small popup no longer limits the browser.
         terminal.draw(|frame| browser.render(Rect::new(30, 10, 20, 6), frame)).unwrap();
         let buffer = terminal.backend().buffer();
-        let row: String = (0..100).map(|x| buffer[(x, 1)].symbol()).collect();
+        let row: String = (0..100).map(|x| buffer[(x, 0)].symbol()).collect();
         assert!(row.contains(&get_text("path_browser_title")), "{row}");
         assert!((0..100).map(|x| buffer[(x, 23)].symbol()).any(|symbol| symbol != " "));
         for width in 0..10 {
@@ -364,5 +365,35 @@ mod tests {
                 tiny.draw(|frame| browser.render(Rect::new(0, 0, width, height), frame)).unwrap();
             }
         }
+    }
+
+    #[test]
+    fn brown_description_palette_does_not_colour_files_or_help() {
+        use crate::theme::{CLASSIC_THEME, DOS_BLACK, DOS_BROWN};
+        let theme = Theme {
+            description_text: Style::default().fg(DOS_BLACK).bg(DOS_BROWN),
+            ..CLASSIC_THEME
+        };
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("plain-file.txt"), "test").unwrap();
+        let mut browser = PathBrowser::new(Path::new(""), Some(root.path()));
+        browser.explorer.as_mut().unwrap().set_theme(explorer_theme(theme));
+        let mut terminal = Terminal::new(TestBackend::new(120, 36)).unwrap();
+        terminal.draw(|frame| browser.render_with_theme(frame, theme)).unwrap();
+        let buffer = terminal.backend().buffer();
+        for text in ["plain-file.txt", "Enter:"] {
+            let mut found = false;
+            for y in 0..36 {
+                let row: String = (0..120).map(|x| buffer[(x, y)].symbol()).collect();
+                if let Some(offset) = row.find(text) {
+                    let x = ratatui::text::Line::raw(&row[..offset]).width() as u16;
+                    assert_eq!(buffer[(x, y)].fg, DOS_LIGHT_GRAY);
+                    assert_eq!(buffer[(x, y)].bg, DOS_BLACK);
+                    found = true;
+                }
+            }
+            assert!(found, "missing {text}");
+        }
+        assert!(buffer.content.iter().all(|cell| cell.bg != DOS_BROWN));
     }
 }
