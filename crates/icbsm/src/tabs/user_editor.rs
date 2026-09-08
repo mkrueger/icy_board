@@ -27,12 +27,14 @@ pub struct UserEditor {
     menu: ConfigMenu<Arc<Mutex<User>>>,
     icy_board: Arc<Mutex<IcyBoard>>,
     num_user: usize,
+    security_baseline: User,
     save_dialog: Option<SaveChangesDialog>,
 }
 
 impl UserEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, num_user: usize) -> Self {
         let user = icy_board.lock().unwrap().users.get(num_user).unwrap().clone();
+        let security_baseline = user.clone();
         let password_storage_method = icy_board.lock().unwrap().config.system_control.password_storage_method;
 
         let menu: ConfigMenu<Arc<Mutex<User>>> = {
@@ -494,6 +496,7 @@ impl UserEditor {
             }
         };
         Self {
+            security_baseline,
             state: ConfigMenuState::default(),
             menu,
             icy_board,
@@ -563,7 +566,14 @@ impl Page for UserEditor {
                     let edited = self.menu.obj.lock().unwrap().clone();
                     let mut board = self.icy_board.lock().unwrap();
                     let original = board.users[self.num_user].clone();
-                    board.users[self.num_user] = edited;
+                    let mut merged = edited.clone();
+                    if let Err(err) = icy_board_engine::icy_board::password_recovery::merge_security(&edited, &self.security_baseline, &original, &mut merged) {
+                        return PageMessage::InfoBox(
+                            InfoState::Error,
+                            get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), err.to_string())])),
+                        );
+                    }
+                    board.users[self.num_user] = merged;
                     match board.save_userbase() {
                         Ok(()) => PageMessage::Close,
                         Err(err) => {

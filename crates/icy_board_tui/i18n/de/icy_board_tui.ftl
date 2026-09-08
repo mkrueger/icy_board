@@ -4617,3 +4617,45 @@ mnu_app_help =
 mnu_app_confirm_title = Menü speichern
 mnu_app_external_change = Die Zieldatei wurde außerhalb des Editors geändert. Speichern verweigert; Änderungen bleiben geöffnet.
 mnu_app_exists = Die Zieldatei existiert bereits; --create überschreibt sie nicht.
+
+recovery_title = Passwort per E-Mail zurücksetzen
+recovery_enabled = Passwortwiederherstellung
+recovery_enabled-status = Standard AUS; ändert den Anmeldedialog bei Fehlern
+recovery_enabled-help =
+    Optionale E-Mail-Wiederherstellung ist standardmäßig AUS. Nach drei falschen
+    normalen Anmeldepasswörtern kann ein temporäres Passwort an die gespeicherte
+    E-Mail-Adresse gesendet werden. Aktivieren ändert Login-PPE/KBDSTUF-Dialoge.
+    Direkte PPEs bleiben unverändert. Erfordert Passwort-Hashes und ein aktuelles
+    Postfach. Gesperrte/gelöschte Benutzer und Sysops sind ausgeschlossen.
+    Keine Entsperrung, Webseite, Links oder Sicherheitsfragen. Das alte Passwort
+    gilt bis zum Speichern des neuen. Danach neu anmelden. Beim Speichern von
+    AUS werden offene Passwörter ungültig. Für die Anmeldung SSH oder TLS nutzen.
+recovery_smtp_host = SMTP-Server
+recovery_smtp_port = SMTP-Port
+recovery_implicit_tls = Implizites TLS (sonst STARTTLS)
+recovery_implicit_tls-status = Beide Modi erfordern geprüftes TLS
+recovery_implicit_tls-help =
+    Ja: implizites TLS, normalerweise Port 465. Nein: zwingend STARTTLS, Port 587.
+    Zertifikate werden geprüft. Kein Rückfall auf unverschlüsselte Verbindungen.
+recovery_sender = E-Mail-Absenderadresse
+recovery_smtp_username = SMTP-Benutzername
+recovery_smtp_password_env = Passwort-Umgebungsvariable
+recovery_smtp-help =
+    Natives TLS-SMTP sendet nur an die vorhandene E-Mail-Adresse des Benutzers.
+    Eine einzelne Absenderadresse, Server und Port angeben. Anmeldung optional.
+    Das Passwortfeld enthält den NAMEN EINER UMGEBUNGSVARIABLEN, kein Geheimnis.
+    Die Variable in der BBS-Dienstumgebung setzen. SMTP-Fehler verhindern keine
+    normale Anmeldung. Kein Wiederholungsversand. TLS ist keine Ende-zu-Ende-
+    Verschlüsselung der E-Mail.
+recovery_ttl = Gültigkeit (Minuten)
+recovery_cooldown = Kontosperrfrist (Minuten)
+recovery_account_limit = Versand je Konto/Stunde
+recovery_board_limit = Versand je BBS/Stunde
+recovery_attempts = Prüfversuche
+recovery_timeout = SMTP-Zeitlimit (Sekunden)
+recovery_limits-help =
+    Standard: 30 Minuten gültig, 10 Minuten Sperrfrist, 3 Sendungen/Konto/Stunde,
+    50 Sendungen/BBS/Stunde, 5 Prüfversuche, 15 Sekunden SMTP-Zeitlimit.
+    Höchstens zwei parallele Hash-/Versandvorgänge. Versuche und Kontolimits
+    bleiben gespeichert. Temporäre Passwörter werden nur als Argon2-Hash abgelegt.
+recovery_invalid = Erforderlich: Argon2/BCrypt, gültige SMTP-Absenderadresse/Server/Port, Umgebungsvariable für Zugangsdaten und Grenzwerte im angezeigten Bereich. Einstellungen korrigieren oder Wiederherstellung ausschalten.

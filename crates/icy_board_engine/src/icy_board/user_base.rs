@@ -597,6 +597,15 @@ pub struct User {
 
     pub password: PasswordInfo,
 
+    #[serde(default)]
+    pub credential_revision: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub security_stamp: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<super::password_recovery::RecoveryChallenge>,
+    #[serde(default)]
+    pub recovery_issues: Vec<DateTime<Utc>>,
+
     pub security_level: u8,
 
     #[serde(default)]
@@ -1013,6 +1022,10 @@ impl User {
 
         Self {
             path: None,
+            credential_revision: 0,
+            security_stamp: String::new(),
+            recovery: None,
+            recovery_issues: Vec::new(),
             name: u.user.name.clone(),
             alias,
             verify_answer: verify,

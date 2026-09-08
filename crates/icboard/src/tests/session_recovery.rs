@@ -43,6 +43,172 @@ const EVENT_DENIED: &str = "[test-event-denied]";
 const FIRST_NAME: &str = "[test-first-name]";
 const REGISTER: &str = "[test-register]";
 
+#[derive(Default)]
+struct RecoveryMail(std::sync::Mutex<Vec<String>>);
+
+#[async_trait::async_trait]
+impl icy_board_engine::icy_board::password_recovery::MailSender for RecoveryMail {
+    async fn send(&self, _: &icy_board_engine::icy_board::password_recovery::PasswordRecoveryConfig, to: &str, _: &str, body: String) -> Result<(), ()> {
+        assert_eq!(to, "caller@example.invalid");
+        self.0.lock().unwrap().push(body);
+        Ok(())
+    }
+}
+
+impl RecoveryMail {
+    fn password(&self) -> String {
+        self.0
+            .lock()
+            .unwrap()
+            .last()
+            .unwrap()
+            .lines()
+            .find_map(|line| line.strip_prefix("Your temporary password: "))
+            .unwrap()
+            .to_string()
+    }
+}
+
+fn password_recovery_board(root: &Path) -> (Arc<Mutex<IcyBoard>>, Arc<RecoveryMail>) {
+    use icy_board_engine::icy_board::{
+        icb_config::PasswordStorageMethod,
+        password_recovery::{PasswordRecoveryConfig, RecoveryService},
+        user_base::Password,
+    };
+    let mut board = board_at(root);
+    board.config.system_control.password_storage_method = PasswordStorageMethod::Argon2;
+    board.config.password_recovery = PasswordRecoveryConfig {
+        enabled: true,
+        smtp_host: "smtp.example.invalid".into(),
+        sender: "bbs@example.invalid".into(),
+        ..Default::default()
+    };
+    board.users[1].security_level = 10;
+    board.users[1].email = "caller@example.invalid".into();
+    board.users[1].password.password = Password::new_argon2("old-secret");
+    board
+        .default_display_text
+        .update_record_number(IceText::WrongPasswordEntered as usize, "[recovery-wrong]")
+        .unwrap();
+    let mail = Arc::new(RecoveryMail::default());
+    board.password_recovery_service = Arc::new(RecoveryService::new(mail.clone()));
+    board.save_userbase().unwrap();
+    (Arc::new(Mutex::new(board)), mail)
+}
+
+#[tokio::test]
+async fn password_recovery_failed_three_sends_only_registered_mail_and_disconnects() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    let bbs = Arc::new(Mutex::new(BBS::new(1)));
+    let mut session = Session::start_with_password(board.clone(), bbs, 1, "wrong").await;
+    session.send("wrong\rwrong\r").await;
+    session.expect("Send a temporary password").await;
+    assert!(mail.0.lock().unwrap().is_empty());
+    session.send("Y\r").await;
+    let output = session.finish().await;
+    assert_eq!(output.matches("[recovery-wrong]").count(), 3, "{output}");
+    assert_eq!(output.matches("Send a temporary password").count(), 1, "{output}");
+    assert!(output.contains("If eligible"), "{output}");
+    assert!(!output.contains(COMMAND));
+    assert_eq!(mail.0.lock().unwrap().len(), 1);
+    assert!(board.lock().await.users[1].password.password.is_valid("old-secret"));
+    assert!(board.lock().await.users[1].recovery.is_some());
+}
+
+#[tokio::test]
+async fn password_recovery_restricted_change_persists_then_requires_normal_relogin() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    let service = board.lock().await.password_recovery_service.clone();
+    assert!(service.issue(&board, 1, Utc::now()).await.unwrap());
+    let temporary = mail.password();
+    let bbs = Arc::new(Mutex::new(BBS::new(1)));
+    let mut session = Session::start_with_password(board.clone(), bbs.clone(), 1, &temporary).await;
+    session.expect("Temporary password verified").await;
+    session.send("brand-new\rbrand-new\r").await;
+    let output = session.finish().await;
+    assert!(output.contains("Password saved"), "{output}");
+    assert!(!output.contains(COMMAND));
+    let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+    assert!(users[1].password.password.is_valid("brand-new"));
+    assert!(users[1].recovery.is_none());
+    assert!(!std::fs::read_to_string(dir.path().join("users.toml")).unwrap().contains(&temporary));
+    let mut relogin = Session::start_with_password(board, bbs, 1, "brand-new").await;
+    relogin.expect(COMMAND).await;
+    let output = relogin.bye().await;
+    assert!(!output.contains("Temporary password verified"));
+    assert!(!output.contains("Send a temporary password"));
+}
+
+#[tokio::test]
+async fn password_recovery_cancellation_never_enters_menu_or_changes_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    let service = board.lock().await.password_recovery_service.clone();
+    service.issue(&board, 1, Utc::now()).await.unwrap();
+    let mut session = Session::start_with_password(board.clone(), Arc::new(Mutex::new(BBS::new(1))), 1, &mail.password()).await;
+    session.expect("Temporary password verified").await;
+    session.send("\r").await;
+    let output = session.finish().await;
+    assert!(!output.contains(COMMAND));
+    assert!(!output.contains("Password saved"));
+    assert!(board.lock().await.users[1].password.password.is_valid("old-secret"));
+}
+
+#[tokio::test]
+async fn password_recovery_no_keeps_the_existing_failure_comment_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    board.lock().await.config.system_control.allow_password_failure_comment = true;
+    let mut session = Session::start_with_password(board, Arc::new(Mutex::new(BBS::new(1))), 1, "wrong").await;
+    session.send("wrong\rwrong\r").await;
+    session.expect("Send a temporary password").await;
+    session.send("N\r").await;
+    session.expect("leave a comment to the sysop").await;
+    session.send("N\r").await;
+    let output = session.finish().await;
+    assert!(output.find("Send a temporary password").unwrap() < output.find("leave a comment to the sysop").unwrap());
+    assert!(mail.0.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn password_recovery_commit_failure_never_announces_success_or_enters_menu() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    let service = board.lock().await.password_recovery_service.clone();
+    service.issue(&board, 1, Utc::now()).await.unwrap();
+    let mut session = Session::start_with_password(board.clone(), Arc::new(Mutex::new(BBS::new(1))), 1, &mail.password()).await;
+    session.expect("Temporary password verified").await;
+    board.lock().await.config.paths.user_file = dir.path().to_path_buf();
+    session.send("brand-new\rbrand-new\r").await;
+    let output = session.finish().await;
+    assert!(!output.contains(COMMAND));
+    assert!(!output.contains("Password saved"));
+    assert!(board.lock().await.users[1].password.password.is_valid("old-secret"));
+}
+
+#[tokio::test]
+async fn password_recovery_revokes_another_live_node_without_restoring_old_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let (board, mail) = password_recovery_board(dir.path());
+    let bbs = Arc::new(Mutex::new(BBS::new(2)));
+    let mut old = Session::start_with_password(board.clone(), bbs.clone(), 1, "old-secret").await;
+    old.expect(COMMAND).await;
+    let service = board.lock().await.password_recovery_service.clone();
+    service.issue(&board, 1, Utc::now()).await.unwrap();
+    let mut recovery = Session::start_with_password(board.clone(), bbs, 1, &mail.password()).await;
+    recovery.expect("Temporary password verified").await;
+    recovery.send("brand-new\rbrand-new\r").await;
+    let recovered = recovery.finish().await;
+    assert!(recovered.contains("Password saved"), "{recovered}");
+    old.finish().await;
+    let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+    assert!(users[1].password.password.is_valid("brand-new"));
+    assert!(!users[1].password.password.is_valid("old-secret"));
+    assert!(users[1].recovery.is_none());
+}
+
 fn board_at(root: &Path) -> IcyBoard {
     let mut board = IcyBoard::new();
     board.root_path = root.to_path_buf();
@@ -116,6 +282,10 @@ struct Session {
 
 impl Session {
     async fn start(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, user: usize) -> Self {
+        Self::start_with_password(board, bbs, user, "").await
+    }
+
+    async fn start_with_password(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, user: usize, password: &str) -> Self {
         let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let nodes = bbs.lock().await.open_connections.clone();
         let (peer, connection) = ChannelConnection::create_pair();
@@ -156,7 +326,7 @@ impl Session {
         };
         // Real login using fixture accounts with empty passwords, then normal
         // PCBoard commands over the connection (no keyboard stuffing).
-        session.send(&format!("{username}\r\r")).await;
+        session.send(&format!("{username}\r{password}\r")).await;
         session
     }
 

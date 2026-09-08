@@ -54,6 +54,7 @@ pub mod macro_parser;
 pub mod menu;
 pub mod message_area;
 pub mod path_check;
+pub mod password_recovery;
 pub mod pcb;
 pub mod qwknet;
 pub mod sec_levels;
@@ -137,6 +138,7 @@ pub struct IcyBoard {
     pub zconnect: ZconnectConfig,
     pub events: EventList,
     pub ppl_http_service: std::sync::Arc<state::ppl_http::PplHttpService>,
+    pub password_recovery_service: std::sync::Arc<password_recovery::RecoveryService>,
 }
 
 impl IcyBoard {
@@ -161,6 +163,7 @@ impl IcyBoard {
             zconnect: ZconnectConfig::default(),
             events: EventList::default(),
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
+            password_recovery_service: std::sync::Arc::new(password_recovery::RecoveryService::default()),
         }
     }
 
@@ -475,6 +478,7 @@ impl IcyBoard {
             zconnect,
             events,
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
+            password_recovery_service: std::sync::Arc::new(password_recovery::RecoveryService::default()),
         };
 
         for conf in board.conferences.iter_mut() {
@@ -581,10 +585,38 @@ impl IcyBoard {
             }
         }
 
+        // A disabled service cannot leave challenges that revive on a later restart.
+        if !board.config.password_recovery.enabled && board.users.iter().any(|user| user.recovery.is_some()) {
+            for user in board.users.iter_mut() {
+                user.recovery = None;
+            }
+            board.save_userbase()?;
+        }
         Ok(board)
     }
 
     pub fn save(&self) -> Res<()> {
+        self.config.password_recovery.validate(self.config.system_control.password_storage_method)?;
+        if self.users.iter().any(|user| {
+            user.recovery
+                .as_ref()
+                .is_some_and(|c| !self.config.password_recovery.enabled || self.password_recovery_service.is_revoked(c))
+        }) {
+            let mut users = self.users.clone();
+            for user in users.iter_mut() {
+                if user
+                    .recovery
+                    .as_ref()
+                    .is_some_and(|c| !self.config.password_recovery.enabled || self.password_recovery_service.is_revoked(c))
+                {
+                    user.recovery = None;
+                }
+            }
+            users.save(&self.resolve_file(&self.config.paths.user_file))?;
+            if !self.config.password_recovery.enabled {
+                self.password_recovery_service.revoke_runtime_challenges();
+            }
+        }
         self.config.save(&self.file_name)?;
         self.conferences.save(&self.resolve_file(&self.config.paths.conferences))?;
         if !self.config.paths.ftn_file.as_os_str().is_empty() {
@@ -611,6 +643,12 @@ impl IcyBoard {
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {
+        for user in self.users.iter_mut() {
+            password_recovery::normalize_security(user);
+            if !self.config.password_recovery.enabled || user.recovery.as_ref().is_some_and(|c| self.password_recovery_service.is_revoked(c)) {
+                user.recovery = None;
+            }
+        }
         let users_file = self.resolve_file(&self.config.paths.user_file);
         if let Err(e) = self.users.save(&users_file) {
             log::error!("Error saving user base: {e}");

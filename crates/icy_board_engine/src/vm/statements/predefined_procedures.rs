@@ -318,8 +318,15 @@ pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
         let mut board = vm.icy_board_state.get_board().await;
         let index = board.users.iter().position(|stored| stored.get_name() == user.get_name());
         if let Some(index) = index {
-            board.users[index] = user.clone();
-            board.save_userbase()?;
+            let previous = board.users[index].clone();
+            let mut merged = user.clone();
+            crate::icy_board::password_recovery::merge_security(&user, &vm.user, &previous, &mut merged)?;
+            board.users[index] = merged;
+            if let Err(error) = board.save_userbase() {
+                board.users[index] = previous;
+                return Err(error);
+            }
+            user = board.users[index].clone();
             drop(board);
             vm.user = user;
         }

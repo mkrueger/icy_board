@@ -14,6 +14,10 @@ fn a_failed_password_can_offer_a_sysop_comment() {
         setup_login(board, true);
     });
     assert!(
+        !output.contains("Send a temporary password"),
+        "default-off recovery changed the login dialogue:\n{output}"
+    );
+    assert!(
         output.contains("leave a comment to the sysop"),
         "the password failure comment was not offered:\n{output}"
     );
@@ -24,6 +28,10 @@ fn a_failed_password_does_not_offer_a_comment_when_disabled() {
     let output = test_login_output("SYSOP\nWRONG\nWRONG\nWRONG\nWRONG\n".to_string(), |board| {
         setup_login(board, false);
     });
+    assert!(
+        !output.contains("Send a temporary password"),
+        "default-off recovery changed the login dialogue:\n{output}"
+    );
     assert!(
         !output.contains("leave a comment to the sysop"),
         "the password failure comment was offered:\n{output}"
@@ -38,6 +46,7 @@ fn a_direct_ppe_has_only_its_output_and_the_completion_prompt() {
         board.config.paths.welcome = fixture("main/blt2");
         board.config.switches.display_news_behavior = DisplayNewsBehavior::Always;
         board.config.switches.scan_new_blt = true;
+        board.config.password_recovery.enabled = true;
     });
 
     assert_eq!(output, format!("PPE ONLY\n{}\n", icy_board_tui::get_text("run_ppe_completed")));

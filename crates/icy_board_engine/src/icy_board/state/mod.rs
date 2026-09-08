@@ -248,6 +248,8 @@ pub struct Session {
     saved_session_minutes: i64,
 
     pub current_user: Option<User>,
+    pub security_baseline: Option<User>,
+    pub authenticated_security: Option<(u64, String)>,
     pub cur_user_id: i32,
     pub cur_security: u8,
     /// Session-only delta applied by the local SysOp function keys.
@@ -354,6 +356,8 @@ impl Session {
             login_date: Utc::now(),
             saved_session_minutes: 0,
             current_user: None,
+            security_baseline: None,
+            authenticated_security: None,
             cur_user_id: -1,
             cur_security: 0,
             temporary_security_adjustment: 0,
@@ -931,6 +935,9 @@ impl IcyBoardState {
     /// its keyboard loop, so the check sits in front of every prompt. It watches it for
     /// everyone, sysop included - an unlimited sysop holds a level that says so.
     async fn check_time_left(&mut self) {
+        if !self.credentials_still_current().await {
+            self.session.request_logoff = true;
+        }
         if self.session.request_logoff || self.session.accounting.checking {
             return;
         }
@@ -1779,6 +1786,8 @@ impl IcyBoardState {
         self.session.alias_name.clone_from(&user.alias);
         self.session.fse_mode = user.flags.fse_mode.clone();
 
+        self.session.security_baseline = Some(user.clone());
+        self.session.authenticated_security = None;
         self.session.current_user = Some(user);
         self.accounting_mark_saved();
         self.apply_security_level_limits().await;
@@ -1840,17 +1849,43 @@ impl IcyBoardState {
     /// Writes the current user straight to the user base without the logoff-time
     /// accounting, so a PPE's `Session.User` change lands on disk immediately.
     pub async fn persist_current_user(&mut self) -> Res<()> {
+        if !self.credentials_still_current().await {
+            self.session.request_logoff = true;
+            if let (Some(local), Some(baseline)) = (&self.session.current_user, &self.session.security_baseline) {
+                if super::password_recovery::security_fingerprint(local) != super::password_recovery::security_fingerprint(baseline) {
+                    return Err("Credentials changed on another node; relogin required".into());
+                }
+            }
+        }
         if let Some(user) = &self.session.current_user {
             let mut board = self.get_board().await;
             for u in 0..board.users.len() {
-                if board.users[u].get_name() == user.get_name() {
-                    let merged = self.accounting_merge_for_save(user, &board.users[u])?;
+                if board.users[u].get_name() == self.session.security_baseline.as_ref().unwrap_or(user).get_name() {
+                    let mut merged = self.accounting_merge_for_save(user, &board.users[u])?;
+                    if let Some(baseline) = &self.session.security_baseline {
+                        super::password_recovery::merge_security(user, baseline, &board.users[u], &mut merged)?;
+                    }
                     let previous = std::mem::replace(&mut board.users[u], merged);
                     if let Err(error) = board.save_userbase() {
                         board.users[u] = previous;
                         return Err(error);
                     }
+                    let saved = board.users[u].clone();
                     drop(board);
+                    if let Some(local) = &mut self.session.current_user {
+                        let baseline = local.clone();
+                        super::password_recovery::merge_security(&baseline, &baseline, &saved, local)?;
+                        self.session.security_baseline = Some(local.clone());
+                    }
+                    if self.session.authenticated_security.is_some() {
+                        // Only our own intentional change may refresh an authenticated revision.
+                        let was_current = self.session.authenticated_security.as_ref().is_some_and(|(revision, stamp)| {
+                            *revision == previous.credential_revision && *stamp == super::password_recovery::security_fingerprint(&previous)
+                        });
+                        if was_current {
+                            self.session.authenticated_security = Some((saved.credential_revision, super::password_recovery::security_fingerprint(&saved)));
+                        }
+                    }
                     // Keep this call's local snapshot (notably START_SESSION).
                     // Only its deltas were posted; the next save must compare
                     // against this snapshot, not adopt another node's deltas.
@@ -3348,6 +3383,10 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn get_char_with_timeout(&mut self, target: TerminalTarget, wait: Duration) -> Res<Option<KeyChar>> {
+        if !self.credentials_still_current().await {
+            self.session.request_logoff = true;
+            return Ok(None);
+        }
         // Check even with a continuously stuffed/typeahead buffer, not only when
         // the terminal is idle. Accounting display recursion is guarded inside.
         self.check_time_left().await;

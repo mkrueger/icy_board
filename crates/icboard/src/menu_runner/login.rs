@@ -707,6 +707,7 @@ impl PcbBoardCommand {
     }
 
     async fn login_user(&mut self) -> Res<bool> {
+        let recovery_enabled = self.state.get_board().await.config.password_recovery.enabled;
         let check_password = if let Some(user) = &self.state.session.current_user {
             if user.flags.delete_flag || user.flags.disabled_flag {
                 self.state.display_text(IceText::DeniedLockedOut, display_flags::NEWLINE).await?;
@@ -718,22 +719,63 @@ impl PcbBoardCommand {
 
             let mut emsi_pw = false;
             if let Some(emsi) = &self.state.session.emsi
-                && emsi.user.password.eq_ignore_ascii_case(pw.to_string().as_str())
+                && pw.is_valid(&emsi.user.password)
             {
                 emsi_pw = true;
             }
 
-            emsi_pw
-                || self
-                    .state
-                    .check_password(IceText::YourPassword, pwd_flags::SHOW_WRONG_PWD_MSG, |pwd| pw.is_valid(pwd))
-                    .await?
+            if recovery_enabled {
+                use icy_board_engine::icy_board::password_recovery::LoginPassword;
+                match self.recovery_login_password().await? {
+                    LoginPassword::Permanent => true,
+                    LoginPassword::Temporary(proof) => {
+                        self.finish_password_recovery(proof).await?;
+                        return Ok(false);
+                    }
+                    LoginPassword::Invalid => false,
+                }
+            } else {
+                emsi_pw
+                    || self
+                        .state
+                        .check_password(IceText::YourPassword, pwd_flags::SHOW_WRONG_PWD_MSG, |pwd| pw.is_valid(pwd))
+                        .await?
+            }
         } else {
             log::warn!("login_user: User missing (should never happen -> bug)");
             return Ok(false);
         };
 
         if !check_password {
+            if recovery_enabled && !self.state.session.request_logoff {
+                let answer = self
+                    .state
+                    .input_field(
+                        IceText::RecoverPasswordByEmail,
+                        1,
+                        "",
+                        "",
+                        Some("N".to_string()),
+                        display_flags::YESNO | display_flags::NEWLINE | display_flags::FIELDLEN,
+                    )
+                    .await?;
+                if answer == self.state.session.yes_char.to_uppercase().to_string() {
+                    let service = self.state.get_board().await.password_recovery_service.clone();
+                    // The response must not reveal eligibility, mailbox, throttling or delivery.
+                    if service
+                        .issue(&self.state.board, self.state.session.cur_user_id as usize, Utc::now())
+                        .await
+                        .is_err()
+                    {
+                        log::warn!("Password recovery request could not be completed");
+                    }
+                    self.state.display_text(IceText::RecoveryRequestAccepted, display_flags::NEWLINE).await?;
+                    self.state.session.last_password.clear();
+                    self.state.session.emsi = None;
+                    self.state.hangup().await?;
+                    return Ok(false);
+                }
+            }
             log::warn!("Login from {} at {} password failed", self.state.session.user_name, Local::now().to_rfc2822());
             if self.state.get_board().await.config.system_control.allow_password_failure_comment {
                 self.state.password_failure_comment().await?;
@@ -743,6 +785,10 @@ impl PcbBoardCommand {
             return Ok(false);
         }
 
+        if !self.state.authorize_normal_login().await? {
+            self.state.hangup().await?;
+            return Ok(false);
+        }
         if self.state.session.request_logoff || self.deny_login_for_event().await? {
             return Ok(false);
         }
@@ -811,6 +857,155 @@ impl PcbBoardCommand {
         self.state.join_conference(last_conference, false, false).await?;
 
         Ok(true)
+    }
+
+    async fn recovery_login_password(&mut self) -> Res<icy_board_engine::icy_board::password_recovery::LoginPassword> {
+        use icy_board_engine::icy_board::{password_recovery::LoginPassword, state::functions::MASK_PASSWORD};
+        let service = self.state.get_board().await.password_recovery_service.clone();
+        let index = self.state.session.cur_user_id as usize;
+        let cached = self
+            .state
+            .session
+            .emsi
+            .as_ref()
+            .map(|emsi| emsi.user.password.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| self.state.session.last_password.clone());
+        if !cached.is_empty() {
+            let result = service.verify(&self.state.board, index, cached, Utc::now()).await?;
+            if !matches!(result, LoginPassword::Invalid) {
+                return Ok(result);
+            }
+        }
+        for _ in 0..3 {
+            let pwd = self
+                .state
+                .input_field(
+                    IceText::YourPassword,
+                    13,
+                    MASK_PASSWORD,
+                    "",
+                    None,
+                    display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::NEWLINE,
+                )
+                .await?;
+            if self.state.session.request_logoff {
+                return Ok(LoginPassword::Invalid);
+            }
+            let result = service.verify(&self.state.board, index, pwd.clone(), Utc::now()).await?;
+            match result {
+                LoginPassword::Permanent => {
+                    self.state.session.last_password = pwd;
+                    return Ok(result);
+                }
+                LoginPassword::Temporary(_) => {
+                    self.state.session.last_password.clear();
+                    self.state.session.emsi = None;
+                    return Ok(result);
+                }
+                LoginPassword::Invalid => self.state.display_text(IceText::WrongPasswordEntered, display_flags::NEWLINE).await?,
+            }
+        }
+        if let Some(user) = &mut self.state.session.current_user {
+            user.stats.num_password_failures += 1;
+        }
+        self.state.session.op_text = self.state.session.get_username_or_alias();
+        self.state
+            .display_text(IceText::PasswordFailure, display_flags::NEWLINE | display_flags::LFAFTER)
+            .await?;
+        Ok(LoginPassword::Invalid)
+    }
+
+    async fn finish_password_recovery(&mut self, proof: icy_board_engine::icy_board::password_recovery::RecoveryProof) -> Res<()> {
+        use icy_board_engine::icy_board::{bbs::BBSMessage, state::functions::MASK_PASSWORD, user_base::PasswordVerdict};
+        self.state.session.last_password.clear();
+        self.state.session.emsi = None;
+        self.state.display_text(IceText::RecoveryChangeRequired, display_flags::NEWLINE).await?;
+        let service = self.state.get_board().await.password_recovery_service.clone();
+        for _ in 0..3 {
+            let first = self
+                .state
+                .input_field(
+                    IceText::NewPassword,
+                    12,
+                    MASK_PASSWORD,
+                    "",
+                    None,
+                    display_flags::ECHODOTS | display_flags::FIELDLEN | display_flags::NEWLINE,
+                )
+                .await?;
+            if first.is_empty() || self.state.session.request_logoff {
+                break;
+            }
+            let min_len = self.state.get_board().await.config.limits.min_pwd_length;
+            let user = self.state.session.current_user.as_ref().unwrap();
+            let verdict = user.password.check_new_password(&user.name, &first, min_len);
+            let error = match verdict {
+                PasswordVerdict::Ok => None,
+                PasswordVerdict::TooShort => {
+                    self.state.session.op_text = min_len.to_string();
+                    Some(IceText::PasswordTooShort)
+                }
+                PasswordVerdict::PartOfName => Some(IceText::NeedUniquePassword),
+                _ => Some(IceText::PreviouslyUsedPassword),
+            };
+            if let Some(error) = error {
+                self.state.display_text(error, display_flags::NEWLINE).await?;
+                continue;
+            }
+            let second = self
+                .state
+                .input_field(
+                    IceText::ReEnterPassword,
+                    12,
+                    MASK_PASSWORD,
+                    "",
+                    None,
+                    display_flags::ECHODOTS | display_flags::FIELDLEN | display_flags::NEWLINE,
+                )
+                .await?;
+            if second.is_empty() || self.state.session.request_logoff {
+                break;
+            }
+            if !first.eq_ignore_ascii_case(&second) {
+                self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
+                continue;
+            }
+            match service.complete(&self.state.board, &proof, first, Utc::now()).await {
+                Ok(true) => {
+                    let targets: Vec<usize> = self
+                        .state
+                        .node_state
+                        .lock()
+                        .await
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, node)| {
+                            (index != self.state.node && node.as_ref().is_some_and(|n| n.cur_user == self.state.session.cur_user_id)).then_some(index)
+                        })
+                        .collect();
+                    let bbs = self.state.bbs.lock().await;
+                    for index in targets {
+                        if let Some(Some(channel)) = bbs.bbs_channels.get(index) {
+                            let _ = channel.try_send(BBSMessage::Shutdown("Credentials changed; please log in again.".to_string()));
+                        }
+                    }
+                    drop(bbs);
+                    self.state.display_text(IceText::RecoveryPasswordChanged, display_flags::NEWLINE).await?;
+                    break;
+                }
+                Ok(false) => {
+                    self.state.display_text(IceText::NeedUniquePassword, display_flags::NEWLINE).await?;
+                }
+                Err(_) => {
+                    log::warn!("Password recovery commit failed");
+                    break;
+                }
+            }
+        }
+        // Recovery proof never reaches LOGON surveys, accounting, conferences or a menu.
+        self.state.hangup().await?;
+        Ok(())
     }
 
     /// NODE/LOGIN.C: after LOGON preprocessing, before ordinary conference
@@ -928,5 +1123,63 @@ mod option_tests {
         groups.add_group("trial", "Trial users");
         assign_new_user_groups(&mut groups, "new_users, trial; missing", "NEW USER");
         assert_eq!(groups.get_groups("NEW USER"), vec!["new_users", "trial"]);
+    }
+
+    #[tokio::test]
+    async fn password_recovery_off_preserves_stuffed_input_and_iemsi_checks_hashes() {
+        use crate::menu_runner::PcbBoardCommand;
+        use icy_board_engine::icy_board::{
+            IcyBoard,
+            bbs::BBS,
+            state::IcyBoardState,
+            user_base::{Password, User},
+        };
+        use icy_net::{
+            ConnectionType,
+            channel::ChannelConnection,
+            iemsi::ici::{EmsiICI, ICIUserSettings},
+        };
+        use std::sync::Arc;
+        for (cached, accepted) in [("old-secret", true), ("******", false)] {
+            let dir = tempfile::tempdir().unwrap();
+            let mut board = IcyBoard::new();
+            board.config.paths.user_file = dir.path().join("users.toml");
+            board.config.paths.statistics_file = dir.path().join("stats.toml");
+            let mut user = User {
+                name: "Test Caller".into(),
+                ..Default::default()
+            };
+            user.password.password = Password::new_argon2("old-secret");
+            board.users.new_user(user);
+            let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+            let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+            let nodes = bbs.lock().await.open_connections.clone();
+            let (_peer, connection) = ChannelConnection::create_pair();
+            let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+            state.set_current_user(0, false).await.unwrap();
+            state.session.is_local = true;
+            state.session.emsi = Some(EmsiICI {
+                user: ICIUserSettings {
+                    password: cached.into(),
+                    ..Default::default()
+                },
+                term: Default::default(),
+                requests: Default::default(),
+            });
+            state.stuff_keyboard_buffer("wrong\rwrong\rwrong\rZ", false).unwrap();
+            // Stop successful login before surveys; failed login still exercises all three reads.
+            if accepted {
+                state.session.request_logoff = true;
+            }
+            let mut command = PcbBoardCommand::new(state);
+            assert!(!command.login_user().await.unwrap());
+            assert_eq!(
+                command.state.session.current_user.as_ref().unwrap().stats.num_password_failures,
+                if accepted { 0 } else { 1 }
+            );
+            command.state.session.request_logoff = false;
+            let next = command.state.get_char(icy_board_engine::vm::TerminalTarget::Both).await.unwrap().unwrap();
+            assert_eq!(next.ch, if accepted { 'w' } else { 'Z' });
+        }
     }
 }

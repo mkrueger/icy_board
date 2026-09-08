@@ -122,6 +122,10 @@ impl ActivityUsage {
 impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn run_single_command(&mut self, via_cmd_list: bool) -> Res<bool> {
+        if !self.credentials_still_current().await {
+            self.session.request_logoff = true;
+            return Ok(false);
+        }
         if let Some(command) = self.session.tokens.pop_front() {
             if let Some(action) = self.try_find_command(&command, via_cmd_list).await {
                 return self.dispatch_command(&command, &action).await;

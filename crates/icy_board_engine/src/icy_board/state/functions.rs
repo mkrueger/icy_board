@@ -801,7 +801,7 @@ pub fn transfer_cps(bytes: u64, started: Instant) -> usize {
     if elapsed <= 0.0 { 0 } else { (bytes as f64 / elapsed) as usize }
 }
 
-const MASK_PASSWORD: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:'\",.<>/?\\|~`";
+pub const MASK_PASSWORD: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:'\",.<>/?\\|~`";
 
 pub mod pwd_flags {
     pub const SHOW_WRONG_PWD_MSG: u32 = 0x00001;

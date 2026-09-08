@@ -2987,3 +2987,19 @@ style = "Green"
 [ReadingBulletins]
 text = "Reading Bulletins"
 style = "Cyan"
+
+[RecoverPasswordByEmail]
+text = "Send a temporary password to your registered email address (Y/N)"
+style = "Yellow"
+
+[RecoveryRequestAccepted]
+text = "If eligible, a temporary password will be emailed. Please disconnect and check your mailbox."
+style = "Green"
+
+[RecoveryChangeRequired]
+text = "Temporary password verified. Choose a NEW password now, or press Enter to cancel."
+style = "Yellow"
+
+[RecoveryPasswordChanged]
+text = "Password saved. Please reconnect and log in with your new password."
+style = "Green"

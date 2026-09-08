@@ -21,7 +21,7 @@ import tools can subsequently replace it. New values are *not* generally
 loading defaults: deriving or implementing Rust ``Default`` does not make
 a field optional in Serde.
 
-Only ``upload_processing``, ``ppl_http``, and ``qwk_settings`` may be omitted
+Only ``upload_processing``, ``ppl_http``, ``password_recovery``, and ``qwk_settings`` may be omitted
 as whole top-level tables. Each then receives its complete New values.
 Every other top-level table below is required. An empty required table is
 valid only when all its fields have loading defaults. Unknown keys are
@@ -100,6 +100,9 @@ Top-level layout
    * - ``ppl_http``
      - table; New values if absent
      - HTTP boundary for PPE requests.
+   * - ``password_recovery``
+     - table; New values if absent
+     - Optional normal-login email temporary passwords, disabled by default.
    * - ``event``, ``accounting``
      - tables; required
      - Event scheduler and accounting configuration references.
@@ -117,6 +120,125 @@ Top-level layout
      - tables; required
      - Paths, board display colors, and subscriptions. The serialized names
        are not ``color_configuration`` or ``subscription_info``.
+
+Optional email password recovery
+--------------------------------
+
+ICBSetup → Configuration Options → Email password recovery configures the
+``[password_recovery]`` table. Every field defaults when omitted. Save and
+reload the board configuration to apply changes.
+
+.. list-table:: Password recovery settings
+   :header-rows: 1
+   :widths: 28 15 57
+
+   * - Field
+     - Default
+     - Enabled validation / meaning
+   * - ``enabled``
+     - false
+     - Explicit opt-in; no new prompt or input read when false.
+   * - ``smtp_host``
+     - ``""``
+     - Required hostname, at most 253 characters.
+   * - ``smtp_port``
+     - 587
+     - 1–65535.
+   * - ``implicit_tls``
+     - false
+     - False requires STARTTLS; true uses implicit TLS (usually 465).
+       Certificate verification is mandatory, with no plaintext fallback.
+   * - ``sender``
+     - ``""``
+     - Required single address, without display name or mailbox list.
+   * - ``smtp_username``
+     - ``""``
+     - Empty for unauthenticated relay; otherwise SMTP login name.
+   * - ``smtp_password_env``
+     - ``""``
+     - Environment variable NAME, not its value. Required with a username;
+       letters, digits and underscore only. Set the secret in the BBS service
+       environment, never TOML.
+   * - ``ttl_minutes``
+     - 30
+     - 1–60, finite lifetime.
+   * - ``cooldown_minutes``
+     - 10
+     - 1–60 between account requests.
+   * - ``account_per_hour``
+     - 3
+     - 1–10 issuance attempts/account/rolling hour.
+   * - ``board_per_hour``
+     - 50
+     - 1–500 issuance attempts/board/rolling hour.
+   * - ``max_attempts``
+     - 5
+     - 1–10 validations/challenge, shared across nodes.
+   * - ``timeout_seconds``
+     - 15
+     - 1–30, SMTP deadline.
+
+Requires Argon2 or BCrypt storage and an already hashed account password; no
+silent plaintext migration or Argon2-to-BCrypt downgrade. Account zero, sysops,
+disabled/deleted users, empty credentials and missing/invalid saved addresses
+are excluded. No account unlock or security-question fallback.
+
+After three failed normal BBS password attempts, appended ICBTEXT 781 offers
+delivery (default No). No keeps the original failure-comment/hangup order. Yes
+sends only to ``User.email``, gives a generic acknowledgement regardless of
+eligibility, limits or SMTP result, and disconnects. There is no destination
+question, browser, link, listener or PPL recovery API. Generic password checks
+and direct ``/PPE`` execution are unchanged. Enabling deliberately changes
+failed-login dialogue; review custom login PPEs and KBDSTUF scripts first.
+
+The random 12-character case-insensitive temporary password carries 60 bits.
+Only its salted Argon2 hash, expiry, attempt count, identity and security binding
+are persisted. English/German email templates follow the user language and
+never execute PPEs or macros. The old password stays valid until verification
+and the new permanent password are committed together by one atomic user-base
+replacement. The new password must satisfy length/name/history policy and
+differ from current and temporary passwords. The restricted change stage runs
+before LOGON surveys, accounting and menus. Cancel, disconnect or failed save
+grants no access. Success requires normal relogin. Normal-password login cancels
+pending recovery.
+
+Password/name/alias/email/security/disable/delete edits invalidate challenges.
+Credential revisions prevent stale W/PPE/ICBSM/profile saves restoring old
+passwords, while unrelated profile/accounting updates retain live security state.
+Other authenticated nodes receive disconnect signals and are checked at input
+and command boundaries, not instantaneously killed inside external doors.
+Disabling and saving, or loading a disabled board, durably revokes challenges.
+Re-enabling cannot revive them. Atomic rename does not promise power-loss-proof
+multi-file transactions or concurrent cross-process editing.
+
+At most two issuance hash/send operations run concurrently; overload is rejected,
+not queued. Login verification and password completion share two separate hash
+workers; callers wait for capacity rather than being rejected as invalid passwords.
+Account issuance histories and verification counts persist; board limits
+also consult persisted histories after restart. No per-IP throttle, retry spool,
+automatic resend or detached mail task. Definite SMTP failure revokes that
+challenge; ambiguous timeout leaves an expiring hash, never a changed old
+password. SMTP outages do not block ordinary login. Tests use injected mail,
+never arbitrary external recipients.
+
+Stored mailbox ownership is not verified. Enabling explicitly trusts current
+ownership; reassigned addresses can compromise accounts. SMTP TLS is not
+end-to-end email encryption. Use SSH or secure WebSocket for secret entry;
+Telnet exposes passwords. Protect user-base backups and the service environment.
+Live web-admin DTOs preserve this table but expose neither SMTP secrets nor
+a public reset route or recovery editor.
+
+ICBTEXT 781–784 are appended with fallback for older customized files. German
+replacements (keep the existing style) are:
+
+* ``RecoverPasswordByEmail`` (781): Temporäres Passwort an die gespeicherte
+  E-Mail-Adresse senden (J/N)
+* ``RecoveryRequestAccepted`` (782): Falls berechtigt, wird ein temporäres
+  Passwort gesendet. Bitte abmelden und das Postfach prüfen.
+* ``RecoveryChangeRequired`` (783): Temporäres Passwort geprüft. Neues Passwort
+  wählen oder mit Enter abbrechen.
+* ``RecoveryPasswordChanged`` (784): Passwort gespeichert. Bitte neu verbinden
+  und mit dem neuen Passwort anmelden.
 
 Board and operator
 ------------------

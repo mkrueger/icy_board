@@ -1167,6 +1167,8 @@ pub struct IcbConfig {
     #[serde(default)]
     pub upload_processing: UploadProcessingConfig,
     pub system_control: SystemControlOptions,
+    #[serde(default)]
+    pub password_recovery: super::password_recovery::PasswordRecoveryConfig,
     pub switches: ConfigSwitches,
     pub limits: LimitOptions,
     pub options: BoardOptions,
@@ -1203,6 +1205,7 @@ pub const DEFAULT_PCBOARD_DATE_FORMAT: &str = "%m/%d/%y";
 impl IcbConfig {
     pub fn new() -> Self {
         Self {
+            password_recovery: super::password_recovery::PasswordRecoveryConfig::default(),
             board: BoardInformation {
                 name: "IcyBoard".to_string(),
                 location: String::new(),

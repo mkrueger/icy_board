@@ -1609,9 +1609,13 @@ pub enum IceText {
 
     /// `Reading Bulletins`
     ReadingBulletins = 780,
+    RecoverPasswordByEmail = 781,
+    RecoveryRequestAccepted = 782,
+    RecoveryChangeRequired = 783,
+    RecoveryPasswordChanged = 784,
 }
 
-const LAST_ENTRY: usize = 780;
+const LAST_ENTRY: usize = 784;
 
 impl IceText {
     /// A number a file or a PPE names. Anything past the last message has no
@@ -1933,7 +1937,13 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
                     res[ice_text as usize] = Some(entry);
                 }
             }
-            Ok(res.into_iter().flatten().collect())
+            // Missing optional records must not shift later customized IDs.
+            // The embedded file is complete, so its initialization needs no fallback.
+            Ok(res
+                .into_iter()
+                .enumerate()
+                .map(|(index, entry)| entry.unwrap_or_else(|| DEFAULT_DISPLAY_TEXT.entries[index].clone()))
+                .collect())
         }
         Err(err) => {
             log::error!("Error parsing icb text file ({file}): {err} ");
@@ -2002,9 +2012,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn password_recovery_old_and_sparse_text_files_keep_numeric_fallbacks() {
+        let old = include_str!("../data/ICBTEXT.toml").split("[RecoverPasswordByEmail]").next().unwrap();
+        let loaded = IcbTextFile::deserialize(old.as_bytes(), "old".into()).unwrap();
+        assert_eq!(loaded.get_display_text(IceText::ReadingBulletins).unwrap().text, "Reading Bulletins");
+        assert!(
+            loaded
+                .get_display_text(IceText::RecoverPasswordByEmail)
+                .unwrap()
+                .text
+                .contains("temporary password")
+        );
+        let sparse = format!("{old}\n[RecoveryPasswordChanged]\ntext = \"relogin custom\"\n");
+        let loaded = IcbTextFile::deserialize(sparse.as_bytes(), "sparse".into()).unwrap();
+        assert_eq!(loaded.get_display_text(IceText::RecoveryPasswordChanged).unwrap().text, "relogin custom");
+        assert!(
+            loaded
+                .get_display_text(IceText::RecoveryRequestAccepted)
+                .unwrap()
+                .text
+                .starts_with("If eligible")
+        );
+    }
+
+    #[test]
     fn text_numbers_are_checked_before_they_become_an_enum() {
         assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
-        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::ReadingBulletins));
+        assert_eq!(IceText::try_from_number(780), Some(IceText::ReadingBulletins));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::RecoveryPasswordChanged));
         assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
         assert_eq!(IceText::try_from_number(usize::MAX), None);
     }

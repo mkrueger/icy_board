@@ -10,6 +10,16 @@ releases.
 
 ### Added
 
+- Optional, default-off email temporary-password recovery for normal BBS login.
+  After three failed passwords, callers can request mail to their saved address;
+  temporary verification requires a new password and normal relogin, without
+  admitting the caller to surveys, accounting or menus. Includes bounded TLS
+  SMTP, environment-referenced credentials, hash-only expiring challenges,
+  issuance/attempt limits, atomic credential replacement, stale-session write
+  protection, English/German setup help and appended ICBTEXT 781–784. Requires
+  hashed credentials; sysops and inactive accounts are excluded. See the
+  [configuration and security constraints](docs/configuration/board.md#optional-email-password-recovery).
+
 - `mkicbmnu --board/-b` accepts a BBS directory or configuration file;
   `--check` validates menus without opening the editor or writing files.
   The editor adds save-without-exit, undo/redo, isolated command/action drafts,

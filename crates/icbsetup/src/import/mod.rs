@@ -502,6 +502,7 @@ impl PCBoardImporter {
 
         let mailer_profile = self.load_mailer_profile();
         let mut icb_cfg = IcbConfig {
+            password_recovery: Default::default(),
             sysop: SysopInformation {
                 name: self.data.sysop_info.sysop.clone(),
                 password: Password::new_argon2(self.data.sysop_info.password.as_str()),

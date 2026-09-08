@@ -35,6 +35,7 @@ procedure and this page as its risk checklist.
 | DIR files | Binary, they carry the metadata the archives do not. |
 | Encoding | Structural text is UTF-8. Display files with a UTF-8 BOM are UTF-8; display files without it are read as CP437. See [differences.md](differences.md). |
 | Passwords | Hashed by default. The plain text fallback exists for PPEs that read the password and is a security risk. |
+| Email password recovery | Optional and off by default; requires hashed account credentials and an existing email address. Stored mailbox ownership is not verified, sysops/inactive accounts cannot recover, and there is no per-IP throttle or retry spool. SMTP TLS does not protect mailbox storage or cleartext Telnet entry. See [configuration](configuration/board.md#optional-email-password-recovery). |
 | Access | Security level, group and age instead of a single level. |
 | Events | Weekday schedules support positive start-anchored intervals, inclusive same-day latest starts, Maintenance/Online execution, stable IDs, durable history and confirmed manual runs. Monthly/date masks, overnight windows, PCBoard per-node scheduling/last-run dates and Fido/mail-hour modes are absent; `EVENT.DAT` is not imported. See [events.md](events.md). |
 

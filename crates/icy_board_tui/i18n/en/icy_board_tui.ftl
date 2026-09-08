@@ -5177,3 +5177,43 @@ mnu_app_help =
 mnu_app_confirm_title = Save menu
 mnu_app_external_change = The destination changed outside this editor. Save refused; changes remain open.
 mnu_app_exists = The destination already exists; --create will not overwrite it.
+
+recovery_title = Email password recovery
+recovery_enabled = Enable password recovery
+recovery_enabled-status = Default OFF; changes failed-login dialogue
+recovery_enabled-help =
+    Optional email recovery is OFF by default. After three failed normal login
+    passwords, offer a temporary password sent only to the saved email address.
+    Enabling changes login PPE/KBDSTUF dialogue. Direct PPEs are unchanged.
+    Requires hashed passwords and a current mailbox. Disabled/deleted users and
+    sysops cannot recover. No account unlock, browser, link or security question.
+    The old password stays valid until a new password is saved. Then relogin.
+    Disabling revokes pending passwords when settings are saved. Use SSH or TLS.
+recovery_smtp_host = SMTP host
+recovery_smtp_port = SMTP port
+recovery_implicit_tls = Implicit TLS (otherwise STARTTLS)
+recovery_implicit_tls-status = Both modes require verified TLS
+recovery_implicit_tls-help =
+    Yes: implicit TLS, normally port 465. No: mandatory STARTTLS, normally 587.
+    Certificate verification is required. Plaintext fallback is never allowed.
+recovery_sender = Sender email address
+recovery_smtp_username = SMTP username
+recovery_smtp_password_env = Password environment variable
+recovery_smtp-help =
+    Native TLS SMTP sends only to the existing user email address.
+    Enter a single sender address, server and port. Authentication is optional.
+    The password field contains an ENVIRONMENT VARIABLE NAME, never a secret.
+    Set that variable in the BBS service environment. SMTP failures do not stop
+    ordinary login. No retry spool. SMTP TLS is not end-to-end email encryption.
+recovery_ttl = Lifetime (minutes)
+recovery_cooldown = Account cooldown (minutes)
+recovery_account_limit = Account sends per hour
+recovery_board_limit = Board sends per hour
+recovery_attempts = Verification attempts
+recovery_timeout = SMTP timeout (seconds)
+recovery_limits-help =
+    Defaults: 30 minute lifetime, 10 minute cooldown, 3 sends/account/hour,
+    50 sends/board/hour, 5 verification attempts and 15 second SMTP deadline.
+    Two concurrent hash/send operations maximum. Attempts and account issuance
+    limits persist. Temporary passwords are stored only as Argon2 hashes.
+recovery_invalid = Recovery needs Argon2/BCrypt, valid SMTP sender/host/port, an environment variable for credentials, and limits within the displayed ranges. Correct the settings or turn recovery off.

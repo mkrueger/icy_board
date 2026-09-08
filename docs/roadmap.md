@@ -24,7 +24,6 @@ tracks the larger remaining directions; it is not a release-date promise.
 
 - Improve FTN operation where real networks need it, especially per-user
   netmail instead of routing all incoming netmail to one dump base.
-- Add a self-service password-reset flow without weakening password storage.
 - Provide a browser-based caller frontend; IcyTerm can run as WebAssembly, but
   the board still needs a suitable caller API.
 
