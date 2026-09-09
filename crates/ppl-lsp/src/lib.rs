@@ -32,6 +32,15 @@ pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
     loader
 });
 
+pub fn diagnostic_message(error: &(dyn std::error::Error + Send + Sync + 'static), loader: &FluentLanguageLoader) -> String {
+    match error.downcast_ref::<icy_board_ppl::compiler::CompilationErrorType>() {
+        Some(icy_board_ppl::compiler::CompilationErrorType::TypeNotComparable(type_name)) => {
+            i18n_embed_fl::fl!(loader, "diagnostic-type-not-comparable", type_name = type_name.as_str())
+        }
+        _ => error.to_string(),
+    }
+}
+
 pub fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     if offset > rope.len_chars() {
         return None;
@@ -76,6 +85,45 @@ pub fn line_before_cursor(rope: &Rope, position: Position) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use i18n_embed::LanguageLoader;
+    use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
+
+    #[test]
+    fn s1_type_not_comparable_is_localized_with_independent_loaders() {
+        for (locale, expected) in [
+            (
+                "en",
+                "Type Envelope does not support equality because it is or contains a non-comparable host object",
+            ),
+            (
+                "de",
+                "Typ Envelope unterstützt keinen Gleichheitsvergleich, da er ein nicht vergleichbares Hostobjekt ist oder enthält",
+            ),
+        ] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            loader.set_use_isolating(false);
+            assert!(loader.has("diagnostic-type-not-comparable"), "{locale}");
+            let error = CompilationErrorType::TypeNotComparable("Envelope".to_string());
+            assert_eq!(diagnostic_message(&error, &loader), expected, "{locale}");
+        }
+    }
+
+    #[test]
+    fn s1_untranslated_diagnostics_keep_their_display_text() {
+        for locale in ["en", "de"] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            for error in [
+                CompilationErrorType::RecordIoFieldNotSerializable("Child.Values".to_string(), VariableType::Integer),
+                CompilationErrorType::VariableNotFound("missing".to_string()),
+            ] {
+                assert_eq!(diagnostic_message(&error, &loader), error.to_string(), "{locale}");
+            }
+            let error = std::io::Error::other("unchanged non-compiler error");
+            assert_eq!(diagnostic_message(&error, &loader), error.to_string(), "{locale}");
+        }
+    }
 
     #[test]
     fn positions_use_utf16_columns() {

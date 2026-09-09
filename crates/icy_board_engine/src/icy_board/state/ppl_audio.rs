@@ -1,26 +1,44 @@
 //! The `AUDIO` object a PPE plays through.
 //!
-//! Like a surface, the value a PPE holds is only the channel the engine handed out.
-//! The file it was loaded from lives in the session, so the object stays immutable.
+//! Aliases retain one allocation identity; the session owns the file and channel.
 
 use async_trait::async_trait;
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
+    compiler::user_data::{ResourceIdentity, UserData, UserDataMemberRegistry, UserDataValue, resource_user_data_value},
     executable::{VariableData, VariableValue},
     parser::AUDIO_ID,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PplAudio {
     pub channel: i32,
+    identity: Option<ResourceIdentity>,
 }
 
 impl PplAudio {
+    /// A detached identity; allocation binds a value with `with_identity` instead.
     pub fn value(channel: i32) -> VariableValue {
-        let mut value = user_data_value(PplAudio { channel }, AUDIO_ID);
+        Self::with_identity(channel, (channel >= 0).then(ResourceIdentity::default))
+    }
+
+    pub(crate) fn with_identity(channel: i32, identity: Option<ResourceIdentity>) -> VariableValue {
+        let mut value = resource_user_data_value(
+            PplAudio {
+                channel,
+                identity: identity.clone(),
+            },
+            AUDIO_ID,
+            identity,
+        );
         value.data = VariableData::from_int(channel);
         value
+    }
+
+    pub(crate) fn is_live(&self, state: &super::IcyBoardState) -> bool {
+        self.identity
+            .as_ref()
+            .is_some_and(|identity| state.ppl_audio_identity(self.channel) == Some(identity))
     }
 
     /// An answer for audio that could not be loaded, so its members stay callable.
@@ -43,6 +61,7 @@ pub static STOP_ALL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::La
 
 impl UserData for PplAudio {
     const TYPE_NAME: &'static str = "Audio";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(PplAudio::invalid);
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplAudio::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -53,7 +72,7 @@ impl UserData for PplAudio {
 #[async_trait(?Send)]
 impl UserDataValue for PplAudio {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        let loaded = vm.icy_board_state.ppl_audio_file(self.channel).is_some();
+        let loaded = self.is_live(vm.icy_board_state);
         if *name == *VALID {
             return Ok(VariableValue::new_bool(loaded));
         }
@@ -89,6 +108,11 @@ impl UserDataValue for PplAudio {
         }
         if *name == *STOP_ALL {
             return Ok(VariableValue::new_bool(crate::vm::statements::predefined_procedures::sound_stop_all(vm).await?));
+        }
+        if !self.is_live(vm.icy_board_state) {
+            use super::ppl_error::{ERR_INVALID, ERR_KIND_SOUND, PplError};
+            vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound is loaded").on_channel(self.channel));
+            return Ok(VariableValue::new_bool(false));
         }
         let handled = crate::vm::statements::predefined_procedures::sound_member(vm, self.channel, name, arguments).await?;
         Ok(VariableValue::new_bool(handled))

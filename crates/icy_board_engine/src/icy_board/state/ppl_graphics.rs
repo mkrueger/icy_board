@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use icy_net::termcap_detect::GfxCapabilities;
 
+use crate::compiler::user_data::ResourceIdentity;
+
 pub const GFX_BACKEND_NONE: i32 = -1;
 pub const GFX_BACKEND_AUTO: i32 = 0;
 // 1 is reserved for a future character based backend.
@@ -226,6 +228,7 @@ pub struct PplGraphicsState {
     pub pinned: HashMap<i32, u8>,
     pub pacing: bool,
     pub sixel_presented: bool,
+    identities: HashMap<i32, ResourceIdentity>,
     resident_bytes: usize,
     next_handle: i32,
 }
@@ -241,15 +244,24 @@ impl PplGraphicsState {
             pinned: HashMap::new(),
             pacing: false,
             sixel_presented: false,
+            identities: HashMap::new(),
             resident_bytes: 0,
             next_handle: 0,
         })
     }
 
-    /// A name only the engine hands out, so two callers can never pick the same one.
-    pub fn allocate_handle(&mut self) -> i32 {
-        self.next_handle -= 1;
-        self.next_handle
+    /// Numeric compatibility handles may restart; allocation identities never do.
+    pub fn allocate_handle(&mut self) -> Option<i32> {
+        loop {
+            self.next_handle = self.next_handle.checked_sub(1)?;
+            if !self.surfaces.contains_key(&self.next_handle) {
+                return Some(self.next_handle);
+            }
+        }
+    }
+
+    pub(crate) fn identity(&self, handle: i32) -> Option<&ResourceIdentity> {
+        self.identities.get(&handle).filter(|_| self.surfaces.contains_key(&handle))
     }
 
     pub fn insert_surface(&mut self, slot: i32, surface: GfxSurface) -> bool {
@@ -263,12 +275,14 @@ impl PplGraphicsState {
         }
         self.pinned.remove(&slot);
         self.resident_bytes = resident_bytes;
+        self.identities.insert(slot, ResourceIdentity::default());
         self.surfaces.insert(slot, surface);
         true
     }
 
     pub fn remove_surface(&mut self, slot: i32) -> bool {
         self.pinned.remove(&slot);
+        self.identities.remove(&slot);
         let Some(surface) = self.surfaces.remove(&slot) else {
             return false;
         };

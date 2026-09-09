@@ -182,6 +182,39 @@ fn source_range(source: &str, byte: usize, token: &str) -> Value {
     json!({"start": position(source, byte), "end": position(source, byte + token.len())})
 }
 
+#[test]
+fn s1_type_not_comparable_publishes_localized_text_and_stable_code() {
+    for (locale, expected) in [
+        (
+            "en_US.UTF-8",
+            "Type Envelope does not support equality because it is or contains a non-comparable host object",
+        ),
+        (
+            "de_DE.UTF-8",
+            "Typ Envelope unterstützt keinen Gleichheitsvergleich, da er ein nicht vergleichbares Hostobjekt ist oder enthält",
+        ),
+    ] {
+        let mut server = Server::ready_in_locale(locale);
+        let uri = "file:///tmp/s1-not-comparable.pps";
+        let source = ";$LANGVERSION 400\nTYPE Payload\n USER Owner\nENDTYPE\nTYPE Envelope\n Payload Items[,]\nENDTYPE\nEnvelope left, right\nPRINTLN left = right\nPRINTLN left <> right\n";
+        server.open(uri, source);
+        let diagnostics = published(&mut server, uri, 1);
+        let errors = of_severity(&diagnostics, 1);
+        assert_eq!(errors.len(), 2, "{locale}: {diagnostics}");
+        for (diagnostic, operator) in errors.iter().zip(["=", "<>"]) {
+            assert_eq!(diagnostic["code"], "ppl.type-not-comparable", "{locale}: {diagnostics}");
+            assert_eq!(diagnostic["source"], "ppl", "{locale}: {diagnostics}");
+            let text = diagnostic["message"].as_str().unwrap().replace(['\u{2068}', '\u{2069}'], "");
+            assert_eq!(text, expected, "{locale}");
+            assert_eq!(
+                diagnostic["range"],
+                source_range(source, source.find(operator).unwrap(), operator),
+                "{diagnostics}"
+            );
+        }
+    }
+}
+
 fn assert_errors(diagnostics: &Value, source: &str, expected: &[(&str, &str)]) {
     let errors = of_severity(diagnostics, 1);
     assert_eq!(errors.len(), expected.len(), "{diagnostics}");

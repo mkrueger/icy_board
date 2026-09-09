@@ -1,28 +1,43 @@
 //! The `SURFACE` object a PPE draws on.
 //!
-//! The value a PPE holds is only the name the engine gave the surface; the pixels
-//! live in `PplGraphicsState`. That keeps the object itself immutable, so a member
-//! reaches the surface through the VM rather than through the handle.
+//! Aliases retain one allocation identity; `PplGraphicsState` owns the pixels.
 
 use async_trait::async_trait;
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableData, VariableType, VariableValue},
+    compiler::user_data::{ResourceIdentity, ResourceUserData, UserData, UserDataMemberRegistry, UserDataValue, resource_user_data_value},
+    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
     parser::SURFACE_ID,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PplSurface {
     pub handle: i32,
+    identity: Option<ResourceIdentity>,
 }
 
 impl PplSurface {
+    /// A detached identity; allocation binds a value with `with_identity` instead.
     pub fn value(handle: i32) -> VariableValue {
-        let mut value = user_data_value(PplSurface { handle }, SURFACE_ID);
+        Self::with_identity(handle, (handle != 0).then(ResourceIdentity::default))
+    }
+
+    pub(crate) fn with_identity(handle: i32, identity: Option<ResourceIdentity>) -> VariableValue {
+        let mut value = resource_user_data_value(
+            PplSurface {
+                handle,
+                identity: identity.clone(),
+            },
+            SURFACE_ID,
+            identity,
+        );
         // Surface arguments carry the handle in the data word as well.
         value.data = VariableData::from_int(handle);
         value
+    }
+
+    pub(crate) fn is_live(&self, graphics: &super::ppl_graphics::PplGraphicsState) -> bool {
+        self.identity.as_ref().is_some_and(|identity| graphics.identity(self.handle) == Some(identity))
     }
 
     /// An answer for a surface that could not be made, so its members stay callable.
@@ -31,12 +46,17 @@ impl PplSurface {
     }
 }
 
-/// The handle inside a `SURFACE` argument.
-pub fn surface_handle(value: &VariableValue) -> Option<i32> {
+/// Resolve a `SURFACE` argument only in the graphics allocation that issued it.
+pub fn surface_handle(value: &VariableValue, graphics: &super::ppl_graphics::PplGraphicsState) -> Option<i32> {
     if value.get_type() != VariableType::UserData(SURFACE_ID as u8) {
         return None;
     }
-    Some(unsafe { value.data.int_value })
+    let GenericVariableData::UserData(object) = &value.generic_data else {
+        return None;
+    };
+    let identity = object.downcast_ref::<ResourceUserData>()?.identity.as_ref()?;
+    let handle = unsafe { value.data.int_value };
+    (graphics.identity(handle) == Some(identity)).then_some(handle)
 }
 
 pub static WIDTH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Width".to_string()));
@@ -60,6 +80,7 @@ pub static LOAD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 
 impl UserData for PplSurface {
     const TYPE_NAME: &'static str = "Surface";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(PplSurface::invalid);
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplSurface::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -74,6 +95,7 @@ impl UserDataValue for PplSurface {
             .icy_board_state
             .ppl_graphics
             .as_ref()
+            .filter(|graphics| self.is_live(graphics))
             .and_then(|graphics| graphics.surfaces.get(&self.handle));
         if *name == *WIDTH {
             return Ok(VariableValue::new_int(surface.map_or(0, |surface| surface.width as i32)));
@@ -106,6 +128,19 @@ impl UserDataValue for PplSurface {
         if *name == *LOAD {
             let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             return crate::vm::statements::predefined_procedures::gfx_load_surface(vm, &file_name).await;
+        }
+        if !vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| self.is_live(graphics)) {
+            // Pin reports an unsupported backend before checking allocation validity.
+            vm.icy_board_state.gfx_error = match vm.icy_board_state.ppl_graphics.as_ref() {
+                None => 1,
+                Some(graphics) if *name == *PIN && graphics.backend != super::ppl_graphics::GFX_BACKEND_JXL => 6,
+                Some(_) => 2,
+            };
+            return Ok(if *name == *GET_PIXEL {
+                VariableValue::new_unsigned(0)
+            } else {
+                VariableValue::new_bool(false)
+            });
         }
         if *name == *GET_PIXEL {
             return crate::vm::statements::predefined_procedures::surface_get_pixel(vm, self.handle, arguments).await;

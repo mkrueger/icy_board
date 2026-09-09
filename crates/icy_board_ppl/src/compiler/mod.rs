@@ -6,6 +6,8 @@ mod hir_lowering;
 #[cfg(test)]
 mod hir_validation_tests;
 pub(crate) mod modules;
+#[cfg(test)]
+mod record_fields_tests;
 pub use modules::lower_modules;
 pub mod optimizer;
 pub mod user_data;
@@ -18,7 +20,7 @@ use thiserror::Error;
 
 use crate::{
     ast::{Ast, AstNode, Expression, OnErrorMode, Statement},
-    executable::{Executable, OpCode, PPECommand, PPEScript, RecordField, VariableType},
+    executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEScript, RecordField, VariableType},
     hir::{CallId, CodeOffset, HirCommand, HirErrorTarget, HirExpr, HirProgram, LabelId, RoutineId, VariableId},
     parser::{
         ErrorReporter, UserTypeRegistry,
@@ -161,6 +163,9 @@ pub enum CompilationErrorType {
 
     #[error("Whole arrays of custom types cannot be compared")]
     CustomTypeArrayComparisonNotSupported,
+
+    #[error("Type {0} does not support equality because it is or contains a non-comparable host object")]
+    TypeNotComparable(String),
 
     #[error("Record array field '{0}' has a fixed size and cannot be redimensioned")]
     FixedRecordArrayCannotBeRedimmed(String),
@@ -674,13 +679,22 @@ impl PPECompiler {
                     log::error!("Procedure not found: {}", call_stmt.get_identifier());
                     return None;
                 };
+                let decl = self.lookup_table.variable_table.get_var_entry(decl_idx).clone();
+                let pass_flags = if decl.header.variable_type == VariableType::Procedure {
+                    unsafe { decl.value.data.procedure_value.pass_flags }
+                } else {
+                    0
+                };
                 let mut arguments = Vec::new();
-                for arg in call_stmt.get_arguments() {
+                for (index, arg) in call_stmt.get_arguments().iter().enumerate() {
                     let expr_buffer = self.resolve_expr(arg);
-                    arguments.push(expr_buffer);
+                    arguments.push(if 1u16.checked_shl(index as u32).is_some_and(|mask| pass_flags & mask != 0) {
+                        Self::lower_variable_argument(expr_buffer)
+                    } else {
+                        expr_buffer
+                    });
                 }
 
-                let decl = self.lookup_table.variable_table.get_var_entry(decl_idx).clone();
                 if decl.header.variable_type == VariableType::Procedure {
                     let len = unsafe { decl.value.data.procedure_value.parameters as usize };
                     if !Self::check_arg_count(len, arguments.len(), call_stmt.get_identifier_token()) {
@@ -866,6 +880,28 @@ impl PPECompiler {
 
     fn resolve_expr(&mut self, expr: &Expression) -> HirExpr {
         expr.visit(&mut HirExpressionResolver { compiler: self })
+    }
+
+    fn lower_variable_argument(expr: HirExpr) -> HirExpr {
+        match expr {
+            HirExpr::Member(base, member) => HirExpr::Member(Box::new(Self::lower_variable_argument(*base)), member),
+            HirExpr::IndexedMember(base, member, indices) => HirExpr::IndexedMember(Box::new(Self::lower_variable_argument(*base)), member, indices),
+            HirExpr::PredefinedCall(opcode @ (FuncOpCode::ArrayValueAt | FuncOpCode::ArrayValueAt2 | FuncOpCode::ArrayValueAt3), mut arguments)
+                if !arguments.is_empty() =>
+            {
+                // Keep index expressions in the copy-back path; VAR reevaluates them as before.
+                let base = Self::lower_variable_argument(arguments.remove(0));
+                match base {
+                    HirExpr::Member(receiver, member) => HirExpr::IndexedMember(receiver, member, arguments),
+                    HirExpr::Variable(id) => HirExpr::Dim(id, arguments),
+                    other => {
+                        arguments.insert(0, other);
+                        HirExpr::PredefinedCall(opcode, arguments)
+                    }
+                }
+            }
+            other => other,
+        }
     }
 
     fn get_label_index(&mut self, label_token: &Spanned<Token>) -> usize {

@@ -3,6 +3,64 @@ use super::{run_ppl_with_files_and_input, run_ppl_with_input};
 const TONE: &[u8] = b"RIFFxxxxWAVEfmt ";
 
 #[test]
+fn resource_identity_audio_reuse_does_not_revive_aliases() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO original = Audio.Load("tone.wav")
+        AUDIO sharedTone = original
+        sharedTone.Play(TRUE)
+        PRINTLN "live:", original.Valid, original.Playing
+        original.Free()
+        AUDIO replacement = Audio.Load("tone.wav")
+        replacement.Play(TRUE)
+        PRINTLN "stale:", sharedTone.Valid, sharedTone.Playing
+        PRINTLN "ops:", sharedTone.Play(), sharedTone.Stop(), sharedTone.SetVolume(17), sharedTone.Fade(0, 250), sharedTone.Free()
+        PRINTLN "new:", replacement.Valid, replacement.Playing, ":", replacement.Channel
+        "#,
+        &[("tone.wav", TONE)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
+    );
+    assert!(output.contains("live:11\n"), "{output:?}");
+    assert!(output.contains("stale:00\n"), "{output:?}");
+    assert!(output.contains("ops:00000\n"), "{output:?}");
+    assert!(output.ends_with("new:11:0\n"), "{output:?}");
+    assert_eq!(output.matches("Queue;C=2;S=2").count(), 2, "{output:?}");
+    assert_eq!(output.matches("Flush;C=2;O=0").count(), 1, "{output:?}");
+    assert_eq!(output.matches("Volume;C=2;").count(), 2, "{output:?}");
+}
+
+#[test]
+fn resource_identity_audio_equality_and_empty_defaults() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO empty, otherEmpty
+        PRINTLN "empty:", empty = otherEmpty, empty.Valid, empty.Playing, ":", empty.Channel
+        PRINTLN "emptyops:", empty.Play(), empty.Stop(), empty.SetVolume(20), empty.Free()
+        AUDIO original = Audio.Load("tone.wav")
+        AUDIO sharedTone = original
+        PRINTLN "same:", original = sharedTone, original <> empty
+        original.Free()
+        AUDIO replacement = Audio.Load("tone.wav")
+        PRINTLN "identity:", original = sharedTone, original <> replacement, original <> empty
+        "#,
+        &[("tone.wav", TONE)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
+    );
+    assert!(output.starts_with("empty:100:-1\nemptyops:0000\n"), "{output:?}");
+    assert!(output.contains("same:11\n"), "{output:?}");
+    assert!(output.ends_with("identity:111\n"), "{output:?}");
+}
+
+#[test]
+fn resource_identity_audio_values_compare_by_identity() {
+    use crate::icy_board::state::ppl_audio::PplAudio;
+    let value = PplAudio::value(0);
+    assert_eq!(value, value.clone());
+    assert_ne!(value, PplAudio::value(0));
+    assert_eq!(PplAudio::invalid(), PplAudio::invalid());
+}
+
+#[test]
 fn sound_capabilities_are_queried_and_cached() {
     let output = run_ppl_with_files_and_input(
         r#"

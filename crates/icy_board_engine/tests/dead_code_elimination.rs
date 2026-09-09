@@ -371,6 +371,7 @@ target = source
             RecordField {
                 variable_type: VariableType::Integer,
                 dim: 0,
+                is_dynamic: false,
                 vector_size: 0,
                 matrix_size: 0,
                 cube_size: 0,
@@ -378,6 +379,7 @@ target = source
             RecordField {
                 variable_type: VariableType::UnboundedString,
                 dim: 1,
+                is_dynamic: false,
                 vector_size: 4,
                 matrix_size: 0,
                 cube_size: 0,
@@ -385,6 +387,7 @@ target = source
             RecordField {
                 variable_type: VariableType::Boolean,
                 dim: 2,
+                is_dynamic: false,
                 vector_size: 2,
                 matrix_size: 3,
                 cube_size: 0,

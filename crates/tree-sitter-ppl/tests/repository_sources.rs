@@ -62,3 +62,31 @@ fn every_source_in_the_repository_parses() {
         failures.join("\n")
     );
 }
+
+#[test]
+fn s1_host_and_dynamic_record_fields_parse_with_all_ranks() {
+    let source = r#";$LANGVERSION 400
+TYPE Entry
+    AREA Destination
+    SURFACE Image
+    AUDIO Sound
+    INTEGER Values[]
+    STRING Grid[,]
+    INTEGER Cube[,,]
+    INTEGER Fixed[0]
+ENDTYPE
+TYPE Menu
+    Entry Items[]
+ENDTYPE
+Menu menus[1]
+menus[0].Items.Redim(1)
+REDIM menus[0].Items[0].Grid, 2, 3
+menus[0].Items[0].Values.Redim(0)
+menus[0].Items[0].Values[0] = 42
+menus[0].Items[1] = Entry { Destination = menus[0].Items[0].Destination }
+"#;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_ppl::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(source, None).unwrap();
+    assert!(!tree.root_node().has_error(), "{}", tree.root_node().to_sexp());
+}

@@ -149,6 +149,16 @@ impl SemanticVisitor {
                     .lock()
                     .unwrap()
                     .report_error(binary.get_op_token().span.clone(), CompilationErrorType::ComparisonTypeMismatch(left, right));
+            } else if !self.type_registry.is_equality_comparable(left) {
+                let name = match left {
+                    VariableType::UserData(id) => self.type_registry.get_record_type_from_id(id).map(|record| record.name.to_string()),
+                    _ => None,
+                }
+                .unwrap_or_else(|| self.source_type_name(left));
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::TypeNotComparable(name));
             }
             VariableType::Boolean
         } else {
@@ -381,7 +391,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         expected_field.matrix_size as usize,
                         expected_field.cube_size as usize,
                     ],
-                    resizable: false,
+                    resizable: expected_field.is_dynamic,
                     field_name: Some(name.to_string()),
                 };
                 self.check_array_target_assignment(&target_shape, field.get_value(), &field.get_value().get_span());
@@ -874,7 +884,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if matches!(def.opcode, OpCode::FGetRec | OpCode::FPutRec | OpCode::FReadRec | OpCode::FWriteRec)
             && let Some(record) = call_stmt.get_arguments().get(1)
         {
-            let actual = self.resolved_record_io_type(record);
+            let actual = argument_types[1];
             let VariableType::UserData(type_id) = actual else {
                 self.errors.lock().unwrap().report_error(
                     record.get_span(),
@@ -882,7 +892,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 return VariableType::None;
             };
-            if !crate::parser::is_user_declared_type(type_id) {
+            if self.type_registry.get_user_type_from_id(type_id).is_none() {
                 self.errors.lock().unwrap().report_error(
                     record.get_span(),
                     CompilationErrorType::ArgumentTypeMismatch(2, "user-defined record".to_string(), self.source_type_name(actual)),
@@ -1789,7 +1799,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                     element_type: field.variable_type,
                                     rank: field.dim,
                                     bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
-                                    resizable: false,
+                                    resizable: field.is_dynamic,
                                     field_name: Some(member.to_string()),
                                 });
                             }
@@ -2254,7 +2264,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
                     for i in 0..arg_count.min(u16::BITS as usize) {
                         if 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0) {
-                            self.check_argument_is_variable(i, &call.get_arguments()[i]);
+                            self.check_var_argument(i, &call.get_arguments()[i]);
                         }
                     }
                 }

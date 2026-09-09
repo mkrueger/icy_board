@@ -38,6 +38,9 @@ pub fn type_name(registry: &UserTypeRegistry, var_type: VariableType) -> String 
 }
 
 pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_ppl::executable::RecordField) -> String {
+    if field.is_dynamic {
+        return ranked_type_name(registry, field.variable_type, field.dim);
+    }
     let mut name = type_name(registry, field.variable_type);
     if field.dim > 0 {
         let dimensions = [field.vector_size, field.matrix_size, field.cube_size]

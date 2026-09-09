@@ -9,6 +9,17 @@ pub fn user_data_value<T: UserDataValue + 'static>(value: T, type_id: usize) -> 
 }
 
 #[cfg(feature = "bbs")]
+pub fn resource_user_data_value<T: UserDataValue + 'static>(value: T, type_id: usize, identity: Option<ResourceIdentity>) -> crate::executable::VariableValue {
+    icy_board_ppl::compiler::user_data::user_data_value(
+        ResourceUserData {
+            identity,
+            object: std::sync::Arc::new(RuntimeUserData(std::sync::Arc::new(value))),
+        },
+        type_id,
+    )
+}
+
+#[cfg(feature = "bbs")]
 #[async_trait::async_trait(?Send)]
 pub trait UserDataValue: Send + Sync {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<crate::executable::VariableValue>;
@@ -34,6 +45,7 @@ pub trait UserDataValue: Send + Sync {
 
 #[cfg(feature = "bbs")]
 pub(crate) fn runtime_object(object: &(dyn std::any::Any + Send + Sync), type_id: u8) -> crate::Res<&dyn UserDataValue> {
+    let object = object.downcast_ref::<ResourceUserData>().map_or(object, |resource| resource.object.as_ref());
     object
         .downcast_ref::<RuntimeUserData>()
         .map(|value| value.0.as_ref())

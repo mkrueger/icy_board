@@ -490,6 +490,13 @@ impl PartialEq for VariableValue {
             return match (&self.generic_data, &other.generic_data) {
                 (GenericVariableData::Record(left), GenericVariableData::Record(right)) => left == right,
                 (GenericVariableData::Enum(_), GenericVariableData::Enum(_)) => self.as_int() == other.as_int(),
+                (GenericVariableData::UserData(left), GenericVariableData::UserData(right)) => {
+                    use crate::compiler::user_data::ResourceUserData;
+                    match (left.downcast_ref::<ResourceUserData>(), right.downcast_ref::<ResourceUserData>()) {
+                        (Some(left), Some(right)) => left.identity == right.identity,
+                        _ => false,
+                    }
+                }
                 _ => false,
             };
         }

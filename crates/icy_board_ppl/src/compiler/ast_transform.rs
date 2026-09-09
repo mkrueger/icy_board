@@ -54,6 +54,7 @@ pub struct AstTransformationVisitor {
     compound_receiver_types: HashMap<usize, u8>,
     compound_record_types: HashSet<u8>,
     compound_members: HashMap<(u8, unicase::Ascii<String>), (usize, VariableType)>,
+    record_fields: HashMap<(u8, unicase::Ascii<String>), crate::executable::RecordField>,
     function_type_lookup: HashMap<CallId, SemanticInfo>,
     enum_binary_types: HashMap<u64, u8>,
     compound_target_types: HashMap<usize, VariableType>,
@@ -79,6 +80,7 @@ impl AstTransformationVisitor {
             compound_receiver_types: HashMap::new(),
             compound_record_types: HashSet::new(),
             compound_members: HashMap::new(),
+            record_fields: HashMap::new(),
             function_type_lookup: HashMap::new(),
             enum_binary_types: HashMap::new(),
             compound_target_types: HashMap::new(),
@@ -94,6 +96,7 @@ impl AstTransformationVisitor {
     pub(crate) fn set_compound_receiver_types(&mut self, types: HashMap<usize, u8>, registry: &crate::parser::UserTypeRegistry) {
         self.compound_record_types = types.values().copied().filter(|id| registry.is_record_type(*id)).collect();
         self.compound_members.clear();
+        self.record_fields.clear();
         for id in types.values() {
             if let Some(members) = registry.get_type_from_id(*id) {
                 for (name, variable_type) in &members.fields {
@@ -104,6 +107,7 @@ impl AstTransformationVisitor {
             } else if let Some(record) = registry.get_record_type_from_id(*id) {
                 for (field, (name, definition)) in record.fields.iter().enumerate() {
                     self.compound_members.insert((*id, name.clone()), (field, definition.variable_type));
+                    self.record_fields.insert((*id, name.clone()), *definition);
                 }
             }
         }
@@ -240,6 +244,95 @@ impl AstTransformationVisitor {
             Token::AndAssign => Some(BinOp::And),
             Token::OrAssign => Some(BinOp::Or),
             _ => None,
+        }
+    }
+
+    fn lower_record_redim(&mut self, target: &Expression, bounds: &[Expression]) -> Option<Statement> {
+        let mut field_target = target;
+        while let Expression::Parens(parens) = field_target {
+            field_target = parens.get_expression();
+        }
+        let Expression::MemberReference(member) = field_target else { return None };
+        let receiver = self.compound_receiver_types.get(&member.get_identifier_token().span.start)?;
+        let field = *self.record_fields.get(&(*receiver, member.get_identifier().clone()))?;
+        if !field.is_dynamic {
+            return None;
+        }
+        // REDIM's existing instruction encodes a bare variable id, never a field path.
+        let mut statements = Vec::new();
+        let target = self.capture_compound_target(target.clone(), &mut statements);
+        let name = unicase::Ascii::new(format!("*(redim{})", self.temporaries));
+        self.temporaries += 1;
+        let variable = VariableSpecifier::new(
+            Spanned::create_empty(Token::Identifier(name.clone())),
+            None,
+            vec![DimensionSpecifier::dynamic(); field.dim as usize],
+            None,
+            None,
+            None,
+        );
+        self.register_temporary(field.variable_type, &variable);
+        statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::empty(
+            field.variable_type,
+            vec![variable],
+        )));
+        statements.push(LetStatement::create_empty_statement(name.clone(), Token::Eq, Vec::new(), target.clone()));
+        let temporary = IdentifierExpression::create_empty_expression(name.clone());
+        let mut arguments = vec![temporary.clone()];
+        arguments.extend_from_slice(bounds);
+        statements.push(crate::ast::PredefinedCallStatement::create_empty_statement(
+            crate::executable::OpCode::REDIM.get_definition(),
+            arguments,
+        ));
+        let target = self.record_redim_lvalue(target);
+        statements.push(Statement::Let(
+            LetStatement::empty(name, Token::Eq, Vec::new(), temporary).with_target_expression(target),
+        ));
+        Some(Statement::Block(BlockStatement::empty(statements)))
+    }
+
+    fn record_redim_lvalue(&mut self, target: Expression) -> Expression {
+        match target {
+            Expression::Parens(parens) => self.record_redim_lvalue(parens.get_expression().clone()),
+            Expression::MemberReference(member) => Expression::MemberReference(MemberReferenceExpression::new(
+                self.record_redim_lvalue(member.get_expression().clone()),
+                member.get_dot_token().clone(),
+                member.get_identifier_token().clone(),
+            )),
+            Expression::FunctionCall(call) => {
+                if matches!(self.function_type_lookup.get(&CallId(call.id)), Some(SemanticInfo::ArrayValueAt))
+                    && let Expression::MemberReference(indexer) = call.get_expression()
+                {
+                    let base = self.record_redim_lvalue(indexer.get_expression().clone());
+                    // Parenthesized variable roots use the same getter syntax as indexed fields.
+                    if let Expression::Identifier(identifier) = &base {
+                        return Expression::Indexer(crate::ast::IndexerExpression::new(
+                            identifier.get_identifier_token().clone(),
+                            indexer.get_dot_token().clone(),
+                            call.get_arguments().clone(),
+                            call.get_rpar_token().clone(),
+                        ));
+                    }
+                    if matches!(base, Expression::MemberReference(_))
+                        && let Some((field, _)) = self.compound_member(&base)
+                    {
+                        // A fresh call keeps the read copy's ArrayValueAt annotation intact.
+                        let indexed = crate::ast::FunctionCallExpression::new(
+                            base,
+                            call.get_lpar_token().clone(),
+                            call.get_arguments().clone(),
+                            call.get_rpar_token().clone(),
+                        );
+                        self.generated
+                            .function_type_lookup
+                            .insert(CallId(indexed.id), SemanticInfo::IndexedRecordField(field));
+                        return Expression::FunctionCall(indexed);
+                    }
+                }
+                let base = self.record_redim_lvalue(call.get_expression().clone());
+                Expression::FunctionCall(call.preserving_id(base, call.get_arguments().clone()))
+            }
+            target => target,
         }
     }
 
@@ -875,6 +968,16 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_member_call_statement(&mut self, statement: &crate::ast::MemberCallStatement) -> Statement {
         let expression = statement.get_expression().visit_mut(self);
         if let Expression::FunctionCall(call) = &expression
+            && matches!(
+                self.function_type_lookup.get(&CallId(call.id)),
+                Some(SemanticInfo::ArrayMemberProc(crate::executable::OpCode::REDIM))
+            )
+            && let Expression::MemberReference(member) = call.get_expression()
+            && let Some(lowered) = self.lower_record_redim(member.get_expression(), call.get_arguments())
+        {
+            return lowered;
+        }
+        if let Expression::FunctionCall(call) = &expression
             && let Some(op) = Self::compound_operator(&call.get_lpar_token().token)
             && let Expression::MemberReference(member) = call.get_expression()
             && !member.get_identifier().starts_with('<')
@@ -897,6 +1000,21 @@ impl AstVisitorMut for AstTransformationVisitor {
             return Statement::Block(BlockStatement::empty(statements));
         }
         Statement::MemberCall(crate::ast::MemberCallStatement::new(expression))
+    }
+
+    fn visit_predefined_call_statement(&mut self, statement: &crate::ast::PredefinedCallStatement) -> Statement {
+        let arguments: Vec<_> = statement.get_arguments().iter().map(|argument| argument.visit_mut(self)).collect();
+        if statement.get_func().opcode == crate::executable::OpCode::REDIM
+            && let Some(target) = arguments.first()
+            && let Some(lowered) = self.lower_record_redim(target, &arguments[1..])
+        {
+            return lowered;
+        }
+        Statement::PredifinedCall(crate::ast::PredefinedCallStatement::new(
+            statement.get_identifier_token().clone(),
+            statement.get_func(),
+            arguments,
+        ))
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {

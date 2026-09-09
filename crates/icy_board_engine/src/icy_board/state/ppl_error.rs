@@ -97,6 +97,7 @@ impl PplError {
 
 impl UserData for PplError {
     const TYPE_NAME: &'static str = "Error";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| Self::default().value());
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplError::static_receiver);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {

@@ -253,7 +253,7 @@ module.exports = grammar({
 
     field_declaration: $ => seq(
       field('type', $._type),
-      commaSep1(field('name', $.identifier)),
+      commaSep1(seq(field('name', $.identifier), optional($.dimensions))),
     ),
 
     function_declaration: $ => seq(

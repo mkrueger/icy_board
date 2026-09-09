@@ -114,6 +114,24 @@ pub fn user_data_value<T: Send + Sync + 'static>(value: T, type_id: usize) -> Va
     }
 }
 
+/// An allocation identity, independent of reusable numeric handles and sessions.
+#[derive(Clone, Debug, Default)]
+pub struct ResourceIdentity(std::sync::Arc<()>);
+
+impl PartialEq for ResourceIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ResourceIdentity {}
+
+/// Explicit opt-in to resource equality; ordinary host objects remain opaque.
+pub struct ResourceUserData {
+    pub identity: Option<ResourceIdentity>,
+    pub object: std::sync::Arc<dyn std::any::Any + Send + Sync>,
+}
+
 pub enum UserDataEntry {
     Field(unicase::Ascii<String>),
     Getter(unicase::Ascii<String>),

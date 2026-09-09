@@ -40,6 +40,9 @@ pub mod test_evaluation_visitor;
 #[cfg(test)]
 mod test_expression_output;
 
+#[cfg(test)]
+mod test_record_fields;
+
 pub struct DecompilerIssue {
     pub byte_offset: usize,
     pub bug: DeserializationErrorType,
@@ -327,10 +330,14 @@ impl Decompiler {
                         .take(field.dim as usize)
                         .map(usize::from)
                         .collect();
+                    let mut variable = VariableSpecifier::empty(user_field_name(j), dimensions);
+                    if field.is_dynamic {
+                        *variable.get_dimensions_mut() = vec![crate::ast::DimensionSpecifier::dynamic(); field.dim as usize];
+                    }
                     TypeFieldSpecifier::new(
                         self.type_token(self.source_type(field.variable_type)),
                         self.source_type(field.variable_type),
-                        VariableSpecifier::empty(user_field_name(j), dimensions),
+                        variable,
                     )
                 })
                 .collect();

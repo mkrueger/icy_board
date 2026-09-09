@@ -234,6 +234,32 @@ impl UserTypeRegistry {
         matches!(variable_type, VariableType::UserData(id) if self.get_enum_from_id(id).is_some())
     }
 
+    /// Array fields inherit their element type's equality contract, even when empty.
+    pub fn is_equality_comparable(&self, variable_type: VariableType) -> bool {
+        fn visit(registry: &UserTypeRegistry, variable_type: VariableType, visiting: &mut Vec<u8>) -> bool {
+            let VariableType::UserData(id) = variable_type else {
+                return !matches!(
+                    variable_type,
+                    VariableType::None | VariableType::Function | VariableType::Procedure | VariableType::Table
+                );
+            };
+            if registry.is_enum_type(variable_type) || matches!(id as usize, AUDIO_ID | SURFACE_ID) {
+                return true;
+            }
+            if visiting.contains(&id) {
+                return false;
+            }
+            let Some(record) = registry.get_record_type_from_id(id) else {
+                return false;
+            };
+            visiting.push(id);
+            let comparable = record.fields.iter().all(|(_, field)| visit(registry, field.variable_type, visiting));
+            visiting.pop();
+            comparable
+        }
+        visit(self, variable_type, &mut Vec::new())
+    }
+
     /// Records grow upward from 100, enums downward from 255; neither kind is
     /// serialized under the other's representation.
     pub fn declare_enum(&self, name: unicase::Ascii<String>, variants: Vec<(unicase::Ascii<String>, i32)>) -> Option<u8> {

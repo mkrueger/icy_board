@@ -64,9 +64,8 @@ fn runtime_factories_produce_dispatchable_objects() {
         assert!(metadata.types[&id].static_receiver.is_none());
         assert!(metadata.types[&id].empty_value.is_none());
         let has_static = [SURFACE_ID, AUDIO_ID, ERROR_ID, HTTP_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, REGEX_ID].contains(&(id as usize));
-        let has_empty = [CONFERENCE_ID, MESSAGE_AREA_ID, FILE_DIRECTORY_ID, DOOR_ID, USER_ID].contains(&(id as usize));
         assert_eq!(members.static_receiver.is_some(), has_static, "type {id}");
-        assert_eq!(members.empty_value.is_some(), has_empty, "type {id}");
+        assert!(members.empty_value.is_some(), "type {id}");
         for factory in [members.static_receiver, members.empty_value].into_iter().flatten() {
             let value = factory();
             assert_eq!(value.get_type(), VariableType::UserData(id));

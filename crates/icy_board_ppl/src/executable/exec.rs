@@ -81,6 +81,9 @@ pub enum ExecutableError {
 
     #[error("Invalid closed enum definition for type {0}")]
     InvalidEnumDefinition(u8),
+
+    #[error("Type {type_id} field {field_index} uses a dynamic array or host type; these record layouts have no executable encoding")]
+    UnsupportedRecordFieldEncoding { type_id: usize, field_index: usize },
 }
 
 #[derive(Clone)]
@@ -268,6 +271,7 @@ impl Executable {
                     fields.push(RecordField {
                         variable_type: VariableType::from(field[0]),
                         dim: field[1],
+                        is_dynamic: false,
                         vector_size: u16::from_le_bytes(field[2..4].try_into()?),
                         matrix_size: u16::from_le_bytes(field[4..6].try_into()?),
                         cube_size: u16::from_le_bytes(field[6..8].try_into()?),
@@ -370,6 +374,16 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn to_buffer(&self) -> Result<Vec<u8>, ExecutableError> {
+        for (index, fields) in self.user_types.iter().enumerate() {
+            for (field_index, field) in fields.iter().enumerate() {
+                if field.is_dynamic || matches!(field.variable_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
+                    return Err(ExecutableError::UnsupportedRecordFieldEncoding {
+                        type_id: FIRST_USER_TYPE_ID + index,
+                        field_index,
+                    });
+                }
+            }
+        }
         if self.runtime > LAST_PPE_RUNTIME {
             return Err(ExecutableError::UnsupporrtedVersion(self.runtime));
         }

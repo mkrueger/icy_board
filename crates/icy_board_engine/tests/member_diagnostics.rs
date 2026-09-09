@@ -163,9 +163,9 @@ fn records_of_different_types_cannot_be_compared() {
 }
 
 #[test]
-fn a_board_object_cannot_be_a_record_field() {
-    let errors = diagnostics("TYPE Holder\n  CONFERENCE Conf\nENDTYPE\nHolder item\n");
-    assert!(errors.iter().any(|e| e == "Board object UserData(30) cannot be a record field"), "{errors:?}");
+fn board_objects_and_dynamic_arrays_are_accepted_record_fields() {
+    let errors = diagnostics("TYPE Holder\n CONFERENCE Conf\n CONTACT Person\n INTEGER Values[]\n INTEGER Grid[,]\n INTEGER Cube[,,]\nENDTYPE\nHolder item\n");
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]

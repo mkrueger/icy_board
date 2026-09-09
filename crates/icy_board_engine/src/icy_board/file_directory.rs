@@ -265,11 +265,11 @@ impl UserDataValue for FileDirectory {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.list_security.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.list_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *CAN_DOWNLOAD {
-            let res = self.download_security.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.download_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on FileDirectory ({name})");

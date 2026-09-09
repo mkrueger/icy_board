@@ -65,7 +65,7 @@ impl VirtualMachine<'_> {
                 (1, Some(argument)) => Some(self.eval_call_argument(first, argument).await?),
                 _ => None,
             };
-            self.save_call_frame(locals, parameters, first);
+            self.save_call_frame(locals, parameters, first)?;
             if let Some(value) = value {
                 self.set_call_parameter(first, value)?;
                 if pass_flags & 1 != 0 {
@@ -79,7 +79,7 @@ impl VirtualMachine<'_> {
         for (i, argument) in arguments.iter().take(parameters).enumerate() {
             values.push(self.eval_call_argument(first + i, argument).await?);
         }
-        self.save_call_frame(locals, parameters, first);
+        self.save_call_frame(locals, parameters, first)?;
         for (i, value) in values.into_iter().enumerate() {
             let id = first + i;
             self.set_call_parameter(id, value)?;
@@ -93,15 +93,27 @@ impl VirtualMachine<'_> {
 
     /// The same, for a call the VM makes itself and so has the arguments of already.
     pub(super) fn prepare_call_with_values(&mut self, locals: usize, parameters: usize, first: usize, arguments: Vec<VariableValue>) -> Res<()> {
-        self.save_call_frame(locals, parameters, first);
+        self.save_call_frame(locals, parameters, first)?;
         for (i, value) in arguments.into_iter().take(parameters).enumerate() {
             self.set_call_parameter(first + i, value)?;
         }
         Ok(())
     }
 
-    fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
-        for i in 0..(locals + parameters) {
+    fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) -> Res<()> {
+        // Resolve fallible defaults before changing any of the caller's slots.
+        let defaults = (0..locals + parameters)
+            .map(|i| {
+                let id = first + i;
+                let entry = self.variable_table.get_var_entry(id);
+                if (i < parameters && self.is_legacy_array_parameter(id)) || entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC != 0 {
+                    Ok(None)
+                } else {
+                    self.local_default(entry).map(Some)
+                }
+            })
+            .collect::<Res<Vec<_>>>()?;
+        for (i, empty) in defaults.into_iter().enumerate() {
             let id = first + i;
             if i < parameters && self.is_legacy_array_parameter(id) {
                 // stkinit/stkclean save and restore only parameter element zero;
@@ -109,22 +121,12 @@ impl VirtualMachine<'_> {
                 self.call_local_value_stack.push(self.call_parameter_value(id));
                 continue;
             }
-            let entry = self.variable_table.get_var_entry(id);
-            if entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0 {
-                let empty =
-                    if self.variable_table.get_version() >= 400 && entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
-                        VariableValue {
-                            vtype: entry.value.vtype,
-                            data: entry.value.data,
-                            generic_data: entry.header.create_generic_data().unwrap_or_default(),
-                        }
-                    } else {
-                        entry.value.emptied()
-                    };
+            if let Some(empty) = empty {
                 let value = std::mem::replace(self.variable_table.get_value_mut(id), empty);
                 self.call_local_value_stack.push(value);
             }
         }
+        Ok(())
     }
 
     pub(super) fn goto(&mut self, label: usize) -> Result<(), VMError> {

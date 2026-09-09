@@ -725,6 +725,7 @@ impl UserDataValue for PplHttp {
 
 impl UserData for PplHttpRequest {
     const TYPE_NAME: &'static str = "HttpRequest";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(Self::invalid);
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttpRequest::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -886,6 +887,7 @@ impl UserDataValue for PplHttpRequest {
 
 impl UserData for PplHttpResponse {
     const TYPE_NAME: &'static str = "HttpResponse";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(Self::invalid);
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttpResponse::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {

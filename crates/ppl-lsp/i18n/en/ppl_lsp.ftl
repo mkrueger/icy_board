@@ -1,3 +1,5 @@
+diagnostic-type-not-comparable=Type { $type_name } does not support equality because it is or contains a non-comparable host object
+
 hint-preprocessor-langversion=Declares the PPL language version used by this source file. It must appear before code and takes precedence over workspace, command-line, and environment settings.
 hint-preprocessor-define=Defines a case-insensitive preprocessor variable. The optional value may be used in conditional expressions or inserted into source with `;#name`; a definition without a value is true.
 hint-preprocessor-if=Starts a conditional-compilation branch. The expression may use `VERSION`, `RUNTIME`, `LANGVERSION`, and variables introduced with `;$DEFINE`. Source in an inactive branch is not compiled.

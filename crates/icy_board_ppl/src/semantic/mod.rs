@@ -1159,6 +1159,56 @@ impl SemanticVisitor {
         }
     }
 
+    fn is_variable_argument(&mut self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Identifier(identifier) => {
+                self.function_return_value_spans.contains(&identifier.get_identifier_token().span.start)
+                    || (self.lookup_constant(identifier.get_identifier()).is_none()
+                        && self
+                            .lookup_variable(identifier.get_identifier())
+                            .is_some_and(|index| matches!(self.references[index].0, ReferenceType::Variable(_))))
+            }
+            Expression::Indexer(indexer) => self.lookup_variable(indexer.get_identifier()).is_some_and(|index| {
+                matches!(self.references[index].0, ReferenceType::Variable(_))
+                    && self.references[index]
+                        .1
+                        .header
+                        .as_ref()
+                        .is_some_and(|header| header.dim > 0 && header.dim as usize == indexer.get_arguments().len())
+            }),
+            Expression::Parens(parens) => self.is_variable_argument(parens.get_expression()),
+            Expression::MemberReference(member) => {
+                // Copy-back requires record storage at every step, not a host getter's snapshot.
+                self.user_type_lookup
+                    .get(&member.get_identifier_token().span.start)
+                    .and_then(|type_id| self.type_registry.record_field_index(*type_id, member.get_identifier()))
+                    .is_some()
+                    && self.is_variable_argument(member.get_expression())
+            }
+            Expression::FunctionCall(call) => match self.function_type_lookup.get(&CallId(call.id)) {
+                Some(SemanticInfo::VariableReference(_)) => true,
+                Some(SemanticInfo::IndexedRecordField(_)) => self.is_variable_argument(call.get_expression()),
+                Some(SemanticInfo::ArrayValueAt) => match call.get_expression() {
+                    Expression::MemberReference(member) => self.is_variable_argument(member.get_expression()),
+                    _ => false,
+                },
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn check_var_argument(&mut self, arg_num: usize, expr: &Expression) {
+        if self.is_variable_argument(expr) {
+            return;
+        }
+
+        self.errors
+            .lock()
+            .unwrap()
+            .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
+    }
+
     fn check_argument_is_variable(&mut self, arg_num: usize, expr: &Expression) {
         // that the identifier/dim is in the vtable is checked in argument evaluation
         if let Expression::Identifier(_) = expr {
@@ -1180,56 +1230,25 @@ impl SemanticVisitor {
             .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
     }
 
-    fn resolved_record_io_type(&mut self, expression: &Expression) -> VariableType {
-        match expression {
-            Expression::Identifier(identifier) => self
-                .lookup_variable(identifier.get_identifier())
-                .map_or(VariableType::None, |index| self.references[index].1.variable_type),
-            Expression::RecordLiteral(record) => record.get_variable_type(),
-            Expression::Parens(parens) => self.resolved_record_io_type(parens.get_expression()),
-            Expression::MemberReference(member) => {
-                let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
-                    return VariableType::None;
-                };
-                self.type_registry
-                    .get_record_type_from_id(type_id)
-                    .and_then(|definition| definition.field_index(member.get_identifier()).and_then(|index| definition.field_type(index)))
-                    .unwrap_or(VariableType::None)
-            }
-            _ => VariableType::None,
-        }
-    }
-
     fn first_unserializable_record_field(&self, type_id: u8, prefix: &str) -> Option<(String, VariableType)> {
         let definition = self.type_registry.get_user_type_from_id(type_id)?;
         for (name, field) in &definition.fields {
             let path = if prefix.is_empty() { name.to_string() } else { format!("{prefix}.{name}") };
+            if field.is_dynamic {
+                return Some((path, field.variable_type));
+            }
             match field.variable_type {
+                VariableType::UserData(_) if self.type_registry.is_enum_type(field.variable_type) => {}
                 VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => {
+                    // Source fields only refer to already declared records, including dynamic edges.
+                    if id >= type_id {
+                        return Some((path, field.variable_type));
+                    }
                     if let Some(invalid) = self.first_unserializable_record_field(id, &path) {
                         return Some(invalid);
                     }
                 }
-                VariableType::Boolean
-                | VariableType::Unsigned
-                | VariableType::Date
-                | VariableType::EDate
-                | VariableType::Integer
-                | VariableType::Money
-                | VariableType::Float
-                | VariableType::String
-                | VariableType::Time
-                | VariableType::Byte
-                | VariableType::Word
-                | VariableType::SByte
-                | VariableType::SWord
-                | VariableType::BigStr
-                | VariableType::UnboundedString
-                | VariableType::Double
-                | VariableType::DDate
-                | VariableType::MessageAreaID
-                | VariableType::Long
-                | VariableType::ULong => {}
+                _ if field.has_record_io_scalar_type() => {}
                 other => return Some((path, other)),
             }
         }

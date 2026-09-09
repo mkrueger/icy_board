@@ -52,8 +52,10 @@ mod record_io;
 mod record_literals;
 mod records;
 mod regex;
+mod resource_lifecycle;
 mod retired_terminal_api;
 mod routine_parameters;
+mod s1_record_fields;
 mod scalars;
 mod sound;
 mod static_members;
@@ -108,6 +110,29 @@ pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
 
 /// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
 pub(super) fn compile(source: &str) -> crate::executable::Executable {
+    let executable = compile_source(source);
+    // Keep the real PPE storage boundary for all existing callers.
+    let mut bytes = executable.to_buffer().expect("the snippet does not serialize");
+    crate::executable::Executable::from_buffer(&mut bytes, false).expect("the snippet does not load")
+}
+
+/// Compiles directly to an executable, including layouts with no on-disk encoding yet.
+pub(super) fn compile_in_memory(source: &str) -> crate::executable::Executable {
+    use crate::executable::VariableType;
+
+    let mut executable = compile_source(source);
+    for id in 1..=executable.variable_table.get_entries().len() {
+        let entry = executable.variable_table.get_var_entry_mut(id);
+        // Ordinary declaration arrays normally get their storage from the PPE loader.
+        if entry.header.dim > 0 && !matches!(entry.header.variable_type, VariableType::Function | VariableType::Procedure) && entry.value.get_dimensions() == 0
+        {
+            entry.value.generic_data = entry.header.create_generic_data().expect("the array declaration has invalid bounds");
+        }
+    }
+    executable
+}
+
+fn compile_source(source: &str) -> crate::executable::Executable {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let reg = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
@@ -126,17 +151,22 @@ pub(super) fn compile(source: &str) -> crate::executable::Executable {
     );
     drop(reporter);
 
-    // Round tripping through the on disk form is what fills in the variable table's
-    // array storage, so a snippet with an array behaves the way a real PPE would.
-    let executable = compiler.create_executable().expect("the snippet does not compile");
-    let mut bytes = executable.to_buffer().expect("the snippet does not serialize");
-    crate::executable::Executable::from_buffer(&mut bytes, false).expect("the snippet does not load")
+    compiler.create_executable().expect("the snippet does not compile")
 }
 
 /// Compiles and runs a PPL snippet against a scratch board, and returns
 /// everything it wrote to the terminal.
 pub fn run_ppl(source: &str) -> String {
     run_ppl_on(source, |_| {})
+}
+
+/// Runs compiler output directly; never serializes or reloads a PPE file.
+pub fn run_ppl_in_memory(source: &str) -> String {
+    run_ppl_in_memory_collecting(source, |_| {}, &[], &[]).1
+}
+
+pub(super) fn run_ppl_in_memory_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], input: &[u8]) -> (bool, String) {
+    run_executable_collecting(compile_in_memory(source), init_fn, files, None, input, false, false)
 }
 
 /// The same, with a chance to shape the board the snippet runs against.
@@ -240,6 +270,22 @@ pub fn run_ppl_at_boundary(source: &str) -> String {
     run_ppl_collecting(source, |_| {}, &[], None, &[], true, true).1
 }
 
+enum TestPpeBoundary {
+    Vm,
+    Executable,
+    File,
+}
+
+/// Runs serialized parent/child fixtures with production cleanup, without a second manual cleanup.
+fn run_ppl_at_boundary_with_files_and_input<T>(
+    source: &str,
+    files: &[(&str, &[u8])],
+    input: &[u8],
+    inspect: impl FnOnce(&mut IcyBoardState) -> T,
+) -> (bool, String, T) {
+    run_executable_collecting_inspected(compile(source), |_| {}, files, None, input, false, TestPpeBoundary::File, inspect)
+}
+
 fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
     source: &str,
     init_fn: P,
@@ -249,7 +295,37 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
     cleanup: bool,
     production_boundary: bool,
 ) -> (bool, String) {
-    let executable = compile(source);
+    run_executable_collecting(compile(source), init_fn, files, ppe_dir, input, cleanup, production_boundary)
+}
+
+fn run_executable_collecting<P: Fn(&mut IcyBoard)>(
+    executable: crate::executable::Executable,
+    init_fn: P,
+    files: &[(&str, &[u8])],
+    ppe_dir: Option<&str>,
+    input: &[u8],
+    cleanup: bool,
+    production_boundary: bool,
+) -> (bool, String) {
+    let boundary = if production_boundary {
+        TestPpeBoundary::Executable
+    } else {
+        TestPpeBoundary::Vm
+    };
+    let (kept_answers, output, ()) = run_executable_collecting_inspected(executable, init_fn, files, ppe_dir, input, cleanup, boundary, |_| ());
+    (kept_answers, output)
+}
+
+fn run_executable_collecting_inspected<P: Fn(&mut IcyBoard), T>(
+    executable: crate::executable::Executable,
+    init_fn: P,
+    files: &[(&str, &[u8])],
+    ppe_dir: Option<&str>,
+    input: &[u8],
+    cleanup: bool,
+    boundary: TestPpeBoundary,
+    inspect: impl FnOnce(&mut IcyBoardState) -> T,
+) -> (bool, String, T) {
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
         let path = work_dir.join(name);
@@ -316,20 +392,28 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
         });
 
         let mut io = DiskIO::new(work_dir.to_str().unwrap(), None);
-        let result = if production_boundary {
+        let result = if !matches!(boundary, TestPpeBoundary::Vm) {
             state
                 .set_color(crate::vm::TerminalTarget::Both, crate::icy_board::icb_config::IcbColor::Dos(0x1F))
                 .await
                 .unwrap();
             let ppe_file = work_dir.join("boundary-test.ppe");
             std::fs::write(&ppe_file, executable.to_buffer().unwrap()).unwrap();
-            state.run_executable_with_color_restore(&ppe_file, None, executable, true).await
+            if matches!(boundary, TestPpeBoundary::File) {
+                match tokio::time::timeout(std::time::Duration::from_secs(10), state.run_ppe(&ppe_file, None)).await {
+                    Ok(result) => result,
+                    Err(error) => Err(error.into()),
+                }
+            } else {
+                state.run_executable_with_color_restore(&ppe_file, None, executable, true).await
+            }
         } else {
             run(&ppe_file, &executable, &mut io, &mut state).await
         };
         if cleanup {
             state.cleanup_ppl_media().await;
         }
+        let inspected = inspect(&mut state);
 
         // Dropping the board end closes the channel, which is what lets the
         // reader finish instead of blocking on a connection nobody will write to.
@@ -338,14 +422,15 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
 
         let kept_answers = result.expect("the snippet failed to run");
         let bytes = collected.lock().unwrap().clone();
-        (kept_answers, bytes)
+        (kept_answers, bytes, inspected)
     });
 
     let _ = std::fs::remove_dir_all(&work_dir);
-    let (kept_answers, bytes) = output;
+    let (kept_answers, bytes, inspected) = output;
     (
         kept_answers,
         String::from_utf8(bytes).expect("PPE output is not valid UTF-8").replace("\r\n", "\n"),
+        inspected,
     )
 }
 

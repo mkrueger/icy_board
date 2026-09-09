@@ -77,7 +77,7 @@ impl SemanticVisitor {
                         element_type: field.variable_type,
                         rank: field.dim,
                         bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
-                        resizable: false,
+                        resizable: field.is_dynamic,
                         field_name: Some(member.get_identifier().to_string()),
                     });
                 }
@@ -119,7 +119,7 @@ impl SemanticVisitor {
         }
     }
 
-    /// REDIM writes a variable-table slot, not a computed array value or property.
+    /// REDIM writes array storage, not a computed array value or host property.
     /// Language 400 changes bounds only; legacy rank-changing REDIM remains valid.
     pub(super) fn check_redim_target(&mut self, target: &Expression, bounds: usize) {
         let shape = self.array_shape(target);
@@ -144,6 +144,13 @@ impl SemanticVisitor {
                 && self
                     .lookup_variable(identifier.get_identifier())
                     .is_some_and(|index| matches!(self.references[index].0, super::ReferenceType::Variable(_)))
+        } else if let Expression::MemberReference(member) = variable {
+            self.user_type_lookup
+                .get(&member.get_identifier_token().span.start)
+                .and_then(|id| self.type_registry.get_record_type_from_id(*id))
+                .and_then(|definition| definition.field_index(member.get_identifier()).and_then(|index| definition.field(index)))
+                .is_some_and(|field| field.is_dynamic)
+                && self.is_assignable_explicit_target(member.get_expression())
         } else {
             false
         };
@@ -187,12 +194,19 @@ impl SemanticVisitor {
     pub(super) fn is_assignable_explicit_target(&mut self, expression: &Expression) -> bool {
         match expression {
             Expression::Identifier(_) | Expression::Indexer(_) => true,
+            Expression::Parens(parens) => self.is_assignable_explicit_target(parens.get_expression()),
             Expression::MemberReference(member) => self.is_assignable_explicit_target(member.get_expression()),
             Expression::FunctionCall(call) => {
                 if matches!(
                     self.function_type_lookup.get(&CallId(call.id)),
-                    Some(SemanticInfo::IndexedRecordField(_) | SemanticInfo::VariableReference(_))
+                    Some(SemanticInfo::ArrayValueAt | SemanticInfo::IndexedRecordField(_))
                 ) {
+                    return match call.get_expression() {
+                        Expression::MemberReference(member) => self.is_assignable_explicit_target(member.get_expression()),
+                        _ => false,
+                    };
+                }
+                if matches!(self.function_type_lookup.get(&CallId(call.id)), Some(SemanticInfo::VariableReference(_))) {
                     return true;
                 }
                 match call.get_expression() {
@@ -200,7 +214,8 @@ impl SemanticVisitor {
                         let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
                             return false;
                         };
-                        self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
+                        matches!(self.references[index].0, super::ReferenceType::Variable(_))
+                            && self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
                     }
                     Expression::MemberReference(member) => {
                         let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {

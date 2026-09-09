@@ -5,6 +5,64 @@ use super::{compile_errors, run_ppl, run_ppl_with_input};
 const JXL_TERMINAL: &[u8] = b"\x1b[<1;4;7;8c\x1b[6;20;10t\x1b[4;600;800t\x1b[=1;1-n\x1b_SyncTERM:C;L\n\x1b\\";
 
 #[test]
+fn resource_identity_surface_restart_does_not_retarget() {
+    for shutdown in ["", "Terminal.Gfx.Shutdown()"] {
+        let output = run_ppl(&format!(
+            r#"
+            Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+            SURFACE original = Surface.New(2, 2)
+            SURFACE sharedSurface = original
+            sharedSurface.SetPixel(0, 0, Rgb(1, 2, 3))
+            PRINTLN "live:", original.GetPixel(0, 0) = Rgb(1, 2, 3)
+            {shutdown}
+            Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+            SURFACE replacement = Surface.New(3, 4)
+            replacement.Clear(Rgb(10, 20, 30))
+            PRINTLN "stale:", sharedSurface.Valid, ":", sharedSurface.Width, ":", sharedSurface.Height, ":", sharedSurface.GetPixel(0, 0)
+            PRINTLN "ops:", sharedSurface.Clear(0), sharedSurface.SetPixel(0, 0, 0), sharedSurface.FillRect(0, 0, 1, 1, 0), sharedSurface.DrawRect(0, 0, 1, 1, 0)
+            PRINTLN "blit:", replacement.Blit(sharedSurface, 0, 0), replacement.BlitRect(sharedSurface, 0, 0, 1, 1, 0, 0), sharedSurface.Blit(replacement, 0, 0), sharedSurface.BlitRect(replacement, 0, 0, 1, 1, 0, 0)
+            PRINTLN "present:", sharedSurface.Present(), sharedSurface.PresentAt(1, 1), sharedSurface.PresentRect(0, 0, 1, 1), sharedSurface.Pin(), sharedSurface.Unpin()
+            PRINTLN "free:", sharedSurface.Free(), original.Free()
+            PRINTLN "new:", replacement.Valid, replacement.GetPixel(0, 0) = Rgb(10, 20, 30)
+            "#
+        ));
+        assert!(output.contains("live:1\n"), "{output:?}");
+        assert!(output.contains("stale:0:0:0:0\n"), "{output:?}");
+        assert!(output.contains("ops:0000\nblit:0000\npresent:00000\nfree:00\nnew:11\n"), "{output:?}");
+        assert!(!output.contains("\x1bP"), "{output:?}");
+    }
+}
+
+#[test]
+fn resource_identity_surface_free_and_empty_defaults() {
+    let output = run_ppl(
+        r#"
+        SURFACE empty, otherEmpty
+        PRINTLN "empty:", empty = otherEmpty, empty.Valid, empty.Width, empty.Height
+        PRINTLN "emptyops:", empty.Clear(0), empty.Free(), empty.GetPixel(0, 0)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE original = Surface.New(2, 2)
+        SURFACE sharedSurface = original
+        PRINTLN "same:", original = sharedSurface, original <> empty
+        sharedSurface.Free()
+        SURFACE replacement = Surface.New(2, 2)
+        PRINTLN "stale:", original.Valid, original.Free(), replacement.Valid
+        PRINTLN "identity:", original = sharedSurface, original <> replacement, original <> empty
+        "#,
+    );
+    assert_eq!(output, "empty:1000\nemptyops:000\nsame:11\nstale:001\nidentity:111\n");
+}
+
+#[test]
+fn resource_identity_surface_values_compare_by_identity() {
+    use crate::icy_board::state::ppl_surface::PplSurface;
+    let value = PplSurface::value(-1);
+    assert_eq!(value, value.clone());
+    assert_ne!(value, PplSurface::value(-1));
+    assert_eq!(PplSurface::invalid(), PplSurface::invalid());
+}
+
+#[test]
 fn the_backend_reads_back_what_init_selected() {
     let output = run_ppl(
         r"

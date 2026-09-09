@@ -30,12 +30,15 @@ pub struct Server {
 
 impl Server {
     pub fn start() -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_ppl-lsp"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
+        Self::start_with_locale(None)
+    }
+
+    fn start_with_locale(locale: Option<&str>) -> Self {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_ppl-lsp"));
+        if let Some(locale) = locale {
+            command.env("LANG", locale).env("LC_ALL", locale).env("LANGUAGE", locale);
+        }
+        let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
         let input = child.stdin.take().unwrap();
         let mut output = BufReader::new(child.stdout.take().unwrap());
 
@@ -65,6 +68,13 @@ impl Server {
 
     pub fn ready_at(root_uri: &str) -> (Self, Value) {
         Self::ready_with_root(Some(root_uri))
+    }
+
+    pub fn ready_in_locale(locale: &str) -> Self {
+        let mut server = Self::start_with_locale(Some(locale));
+        server.request("initialize", json!({"processId": null, "rootUri": null, "capabilities": {}}));
+        server.send(json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}));
+        server
     }
 
     fn ready_with_root(root_uri: Option<&str>) -> (Self, Value) {

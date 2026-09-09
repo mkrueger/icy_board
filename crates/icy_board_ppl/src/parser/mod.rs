@@ -392,12 +392,6 @@ impl<'a> Parser<'a> {
                 self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
                 continue;
             };
-            if !self.types_predeclared && matches!(field_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
-                self.error_reporter
-                    .lock()
-                    .unwrap()
-                    .report_error(field_type_token.span.clone(), ParserErrorType::TypeFieldBoardObjectNotSupported(field_type));
-            }
             while let Some(specifier) = self.parse_var_info(false) {
                 let field_name = specifier.get_identifier().clone();
                 if specifier.get_dimensions().iter().any(|dimension| dimension.get_dimension() > u16::MAX as usize) {
@@ -450,14 +444,16 @@ impl<'a> Parser<'a> {
             .iter()
             .map(|field| {
                 let dimensions = field.get_specifier().get_dimensions();
+                let is_dynamic = dimensions.first().is_some_and(DimensionSpecifier::is_dynamic);
                 (
                     field.get_identifier().clone(),
                     crate::executable::RecordField {
                         variable_type: field.get_variable_type(),
                         dim: dimensions.len() as u8,
-                        vector_size: field.get_specifier().get_vector_size() as u16,
-                        matrix_size: field.get_specifier().get_matrix_size() as u16,
-                        cube_size: field.get_specifier().get_cube_size() as u16,
+                        is_dynamic,
+                        vector_size: if is_dynamic { 0 } else { field.get_specifier().get_vector_size() as u16 },
+                        matrix_size: if is_dynamic { 0 } else { field.get_specifier().get_matrix_size() as u16 },
+                        cube_size: if is_dynamic { 0 } else { field.get_specifier().get_cube_size() as u16 },
                     },
                 )
             })

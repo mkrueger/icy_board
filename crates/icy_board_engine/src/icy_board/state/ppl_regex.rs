@@ -168,6 +168,7 @@ impl PplRegex {
 
 impl UserData for PplRegex {
     const TYPE_NAME: &'static str = "Regex";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(Self::invalid);
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplRegex::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -381,6 +382,7 @@ impl UserDataValue for PplRegex {
 
 impl UserData for PplRegexMatch {
     const TYPE_NAME: &'static str = "RegexMatch";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| Self::default().value());
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         crate::parser::board_catalog::register_members(REGEX_MATCH_ID, registry);

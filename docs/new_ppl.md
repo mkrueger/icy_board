@@ -337,8 +337,8 @@ axis.Finish.Y = 10
 Records are nominal values. Fields can contain a previously declared record,
 record variables can be arrays, member chains can be read or assigned, and
 routine parameters and return values retain the exact record type. Equality is
-defined between individual records of the same type; arithmetic and ordering
-are not. Fields can also be one-, two- or three-dimensional arrays, including
+defined between individual records of the same type when every field supports
+equality; arithmetic and ordering are not. Fields can also be one-, two- or three-dimensional arrays, including
 arrays of a previously declared record:
 
 ```PPL
@@ -353,7 +353,7 @@ map.Positions(4).X = 12
 ```
 
 Array fields are part of a record value: assignment copies their contents and
-record equality compares them. Their bounds are fixed by the `TYPE` declaration;
+record equality compares them. Explicit bounds are fixed by the `TYPE` declaration;
 `REDIM map.Labels, ...` and `map.Labels.Redim(...)` are compile errors.
 They otherwise have the read-only array surface: `map.Labels.Len(1)` reports the
 number of elements in that dimension and `FOREACH label IN map.Labels` walks every element. A whole field may
@@ -362,6 +362,34 @@ use an index whenever a scalar value is required.
 
 The PPE must store each record layout, so any use of `TYPE` requires runtime
 4.00. Field and type names are not stored; a decompiler invents names for them.
+
+#### S1: dynamic and host-object fields (in-memory implementation)
+
+**File-format gate:** The compiler and VM implement the following additions,
+but the PPE writer deliberately rejects these new record layouts until the
+separate PPE-400 format decision is implemented. They cannot yet be deployed
+as PPE files. Existing fixed value-only layouts retain their encoding.
+
+- `INTEGER Values[]`, `STRING Grid[,]` and `Point Cells[,,]` declare empty
+	dynamic fields with a fixed element type and rank. Assignments may change
+	their bounds; `REDIM` and `.Redim(...)` allocate fresh default elements, as
+	for ordinary PPL arrays. They do not preserve the previous contents.
+- Existing host types can be fields and array elements. Record copies retain
+	the host object's existing snapshot, live-view or shared-resource behavior;
+	embedding an object grants no additional write access.
+- Ordinary record and array data has copy-on-write value semantics: changing
+	a nested field in a copy leaves the original data unchanged. Host state is
+	not deep-copied. Use `VAR` for checked copy-back through record field paths.
+- Fresh records, partial record literals and routine-local defaults contain
+	empty dynamic fields and typed empty host values. Empty resources have
+	`Valid = FALSE`; a blank controller does not silently attach to the live
+	session. Obtain live controllers through the documented providers.
+- `AUDIO` and `SURFACE` compare by allocation identity, including when held
+	inside a record. Two empty resources of the same type compare equal. Other
+	host types do not gain implicit equality: comparisons involving them or
+	containing records are compiler errors. `CONTACT` retains value equality.
+- Direct and indirect recursive record types remain forbidden, including
+	recursion through dynamic arrays. No pointers or recursive types are added.
 
 ### String members
 
@@ -576,7 +604,9 @@ carry no schema fingerprint, so they must be read with the matching record type.
 All record reads are transactional. A malformed or truncated input leaves the
 destination unchanged and reports through both `FERR(channel)` and
 `Error.Last()`. Record I/O supports nested records and fixed arrays, but not
-functions, procedures, tables or board resource objects.
+functions, procedures, tables, host objects or dynamic record fields. Unsupported
+layouts are rejected even if an offending array is empty, before any record
+bytes are read or written. Runtime usability does not imply serializability.
 
 ### Board objects
 
@@ -702,6 +732,12 @@ Surface members are:
 | `Pin()`, `Unpin()` | Load or release an immutable JXL client buffer |
 | `Free()` | Release the surface |
 
+Copies of a surface share its allocation. After `Free()`, graphics reinitialization
+or cleanup, old copies stay invalid: a new surface cannot revive them, even if
+its numeric handle is reused. Stale copies cannot draw, present, serve as blit
+sources or free a replacement. Comparing two stale copies still compares their
+original identity; it does not make either copy valid.
+
 `PresentRect` scaling and `GFX_FLIP_X`/`GFX_FLIP_Y` are JPEG XL features. Sixel
 reports `ErrCode.Unsupported` for them.
 
@@ -713,6 +749,10 @@ and sound together may add at most 256 MiB of persistent media per connection.
 
 `Audio.Load(file)` probes the format, uploads it to the caller's SyncTERM cache
 and takes an available channel. A cached file is not sent again.
+
+Audio copies share one allocation, not ownership of the channel number forever.
+After `Free()` or cleanup, they remain invalid when another sound reuses that
+channel and cannot play, stop, change volume or free the replacement.
 
 ```PPL
 AUDIO music = Audio.Load("music.opus")

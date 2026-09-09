@@ -795,32 +795,7 @@ fn string_split_values(vm: &mut VirtualMachine<'_>, text: String, separator: Str
 pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let array = vm.eval_array_operand(&args[0]).await?;
     let index = vm.eval_expr(&args[1]).await?.as_int();
-    if vm.variable_table.is_enum(array.vtype) {
-        return Ok(vm.variable_table.array_value(&array, index as usize, 0, 0));
-    }
-    let GenericVariableData::Dim1(values) = &array.generic_data else {
-        return Ok(array.vtype.create_empty_value());
-    };
-    if let Some(value) = usize::try_from(index).ok().and_then(|index| values.get(index).cloned()) {
-        return Ok(value);
-    }
-    if let VariableType::UserData(type_id) = array.vtype
-        && let Some(empty_value) = vm.type_registry.get_type_from_id(type_id).and_then(|registry| registry.empty_value)
-    {
-        return Ok(empty_value());
-    }
-    if let VariableType::UserData(type_id) = array.vtype
-        && let Some(definition) = vm.type_registry.get_record_type_from_id(type_id)
-    {
-        return Ok(VariableValue {
-            vtype: array.vtype,
-            data: crate::executable::VariableData::default(),
-            generic_data: GenericVariableData::Record(std::sync::Arc::new(
-                definition.fields.iter().map(|(_, field)| field.variable_type.create_empty_value()).collect(),
-            )),
-        });
-    }
-    Ok(array.vtype.create_empty_value())
+    vm.read_array_element(&array, index as usize, 0, 0)
 }
 
 pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

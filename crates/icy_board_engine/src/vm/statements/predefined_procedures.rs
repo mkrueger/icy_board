@@ -1788,7 +1788,7 @@ fn record_io_error(vm: &mut VirtualMachine<'_>, channel: i32, code: i32, message
 pub async fn fgetrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
     let template = vm.eval_expr(&args[1]).await?;
-    let count = match crate::vm::record_io::line_count(&template) {
+    let count = match crate::vm::record_io::line_count(&template, &vm.variable_table) {
         Ok(count) => count,
         Err(message) => {
             record_io_error(vm, channel, ERR_FORMAT, message);
@@ -1814,7 +1814,7 @@ pub async fn fgetrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 pub async fn fputrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
     let value = vm.eval_expr(&args[1]).await?;
-    match crate::vm::record_io::encode_lines(&value) {
+    match crate::vm::record_io::encode_lines(&value, &vm.variable_table) {
         Ok(lines) => {
             for line in lines {
                 vm.io.fput(channel, format!("{line}\n"))?;
@@ -1828,8 +1828,8 @@ pub async fn fputrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 pub async fn freadrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
     let template = vm.eval_expr(&args[1]).await?;
-    if !crate::vm::record_io::is_record(&template) {
-        record_io_error(vm, channel, ERR_FORMAT, "a user-defined record is required".to_string());
+    if let Err(message) = crate::vm::record_io::ensure_supported(&template, &vm.variable_table) {
+        record_io_error(vm, channel, ERR_FORMAT, message);
         return Ok(());
     }
     let header = vm.io.fread(channel, 4)?;
@@ -1857,7 +1857,7 @@ pub async fn freadrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 pub async fn fwriterec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
     let value = vm.eval_expr(&args[1]).await?;
-    match crate::vm::record_io::encode_binary(&value) {
+    match crate::vm::record_io::encode_binary(&value, &vm.variable_table) {
         Ok(frame) => vm.io.fwrite(channel, &frame)?,
         Err(message) => {
             let code = if message.contains("16 MiB") { ERR_LIMIT } else { ERR_FORMAT };
@@ -1969,12 +1969,9 @@ pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
     if let PPEExpr::Value(id) = args[0] {
         let vtype = vm.variable_table.get_value(id).vtype;
-        if let VariableType::UserData(type_id) = vtype
-            && let Some(empty) = crate::executable::create_record_value(type_id, &vm.user_types, &vm.variable_table.enums)
-        {
-            let generic_data =
-                GenericVariableData::create_array(empty, (args.len() - 1) as u8, dim1, dim2, dim3).ok_or(crate::executable::VMError::GenericDataNotSet)?;
-            vm.variable_table.get_value_mut(id).generic_data = generic_data;
+        if matches!(vtype, VariableType::UserData(_)) {
+            let value = vm.array_default(vtype, (args.len() - 1) as u8, [dim1, dim2, dim3])?;
+            vm.variable_table.set_value(id, value);
         } else {
             vm.variable_table.get_value_mut(id).redim((args.len() - 1) as u8, dim1, dim2, dim3);
         }
@@ -3400,7 +3397,7 @@ pub(crate) async fn audio_load(vm: &mut VirtualMachine<'_>, file_name: &str) -> 
         return Ok(failed(vm, PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound channel is free")));
     };
     vm.operation_succeeded();
-    Ok(PplAudio::value(channel))
+    Ok(PplAudio::with_identity(channel, vm.icy_board_state.ppl_audio_identity(channel).cloned()))
 }
 
 /// Runs one `AUDIO` member. Answers whether it could be carried out.
@@ -3523,12 +3520,12 @@ pub(crate) async fn surface_member(vm: &mut VirtualMachine<'_>, handle: i32, nam
     }
 
     if *name == *BLIT || *name == *BLIT_RECT {
-        let Some(source_handle) = arguments.first().and_then(surface_handle) else {
-            vm.icy_board_state.gfx_error = 2;
-            return Ok(false);
-        };
         let Some(graphics) = vm.icy_board_state.ppl_graphics.as_mut() else {
             vm.icy_board_state.gfx_error = 1;
+            return Ok(false);
+        };
+        let Some(source_handle) = arguments.first().and_then(|value| surface_handle(value, graphics)) else {
+            vm.icy_board_state.gfx_error = 2;
             return Ok(false);
         };
         let Some(source) = graphics.surfaces.get(&source_handle).cloned() else {
@@ -3765,13 +3762,16 @@ pub(crate) fn gfx_new_surface(vm: &mut VirtualMachine<'_>, width: i32, height: i
         vm.icy_board_state.gfx_error = 1;
         return Ok(PplSurface::invalid());
     };
-    let handle = graphics.allocate_handle();
+    let Some(handle) = graphics.allocate_handle() else {
+        vm.icy_board_state.gfx_error = 5;
+        return Ok(PplSurface::invalid());
+    };
     if !graphics.insert_surface(handle, surface) {
         vm.icy_board_state.gfx_error = 5;
         return Ok(PplSurface::invalid());
     }
     vm.icy_board_state.gfx_error = 0;
-    Ok(PplSurface::value(handle))
+    Ok(PplSurface::with_identity(handle, graphics.identity(handle).cloned()))
 }
 
 /// `LoadSurface(file)` - a surface holding what the image file decoded to.
@@ -3791,13 +3791,16 @@ pub(crate) async fn gfx_load_surface(vm: &mut VirtualMachine<'_>, file_name: &st
         vm.icy_board_state.gfx_error = 1;
         return Ok(PplSurface::invalid());
     };
-    let handle = graphics.allocate_handle();
+    let Some(handle) = graphics.allocate_handle() else {
+        vm.icy_board_state.gfx_error = 5;
+        return Ok(PplSurface::invalid());
+    };
     if !graphics.insert_surface(handle, surface) {
         vm.icy_board_state.gfx_error = 5;
         return Ok(PplSurface::invalid());
     }
     vm.icy_board_state.gfx_error = 0;
-    Ok(PplSurface::value(handle))
+    Ok(PplSurface::with_identity(handle, graphics.identity(handle).cloned()))
 }
 
 pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

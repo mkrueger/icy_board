@@ -724,7 +724,7 @@ pub struct IcyBoardState {
     pub sound_active: [bool; 14],
 
     /// The file each `AUDIO` channel was loaded from, indexed by logical channel.
-    ppl_audio: [Option<String>; 14],
+    ppl_audio: [Option<(String, crate::compiler::user_data::ResourceIdentity)>; 14],
 
     pub sound_formats: HashMap<i32, bool>,
 
@@ -3803,13 +3803,17 @@ impl IcyBoardState {
 
     /// The file an `AUDIO` channel was loaded from, if it still holds one.
     pub fn ppl_audio_file(&self, channel: i32) -> Option<&String> {
-        self.ppl_audio.get(usize::try_from(channel).ok()?)?.as_ref()
+        self.ppl_audio.get(usize::try_from(channel).ok()?)?.as_ref().map(|(file, _)| file)
+    }
+
+    pub(crate) fn ppl_audio_identity(&self, channel: i32) -> Option<&crate::compiler::user_data::ResourceIdentity> {
+        self.ppl_audio.get(usize::try_from(channel).ok()?)?.as_ref().map(|(_, identity)| identity)
     }
 
     /// Takes the next free `AUDIO` channel for `file`, or nothing when all are in use.
     pub fn take_ppl_audio(&mut self, file: String) -> Option<i32> {
         let channel = self.ppl_audio.iter().position(Option::is_none)?;
-        self.ppl_audio[channel] = Some(file);
+        self.ppl_audio[channel] = Some((file, crate::compiler::user_data::ResourceIdentity::default()));
         Some(channel as i32)
     }
 

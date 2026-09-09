@@ -38,6 +38,7 @@ pub use self::statements::*;
 
 mod call_stack;
 mod error_handling;
+mod host_defaults;
 pub mod io;
 mod record_io;
 mod resources;
@@ -502,6 +503,9 @@ impl VirtualMachine<'_> {
         match expr {
             PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => {
                 let value = self.variable_table.get_value(*id);
+                if self.variable_table.get_version() >= 400 && value.get_dimensions() > 0 && matches!(value.vtype, VariableType::UserData(_)) {
+                    return None;
+                }
                 Some(if value.get_dimensions() > 0 && self.variable_table.is_enum(value.vtype) {
                     self.variable_table.array_value(value, 0, 0, 0)
                 } else {
@@ -518,6 +522,9 @@ impl VirtualMachine<'_> {
                 Some(Self::apply_bin_op(*op, left_value, right_value))
             }
             PPEExpr::Dim(id, dims) => {
+                if self.variable_table.get_version() >= 400 && matches!(self.variable_table.get_value(*id).vtype, VariableType::UserData(_)) {
+                    return None;
+                }
                 let dim_1 = self.eval_expr_sync(&dims[0])?.as_int() as usize;
                 let dim_2 = if dims.len() >= 2 {
                     self.eval_expr_sync(&dims[1])?.as_int() as usize
@@ -574,10 +581,16 @@ impl VirtualMachine<'_> {
     async fn eval_expr_async(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
-            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.eval_expr_sync(&PPEExpr::Value(*id)).unwrap()),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => {
+                let value = self.variable_table.get_value(*id);
+                if self.variable_table.get_version() >= 400 && value.get_dimensions() > 0 && matches!(value.vtype, VariableType::UserData(_)) {
+                    self.read_array_element(value, 0, 0, 0)
+                } else {
+                    Ok(self.eval_expr_sync(&PPEExpr::Value(*id)).unwrap())
+                }
+            }
             PPEExpr::RecordLiteral(type_id, fields) => {
-                let mut value =
-                    crate::executable::create_record_value(*type_id, &self.user_types, &self.variable_table.enums).ok_or(VMError::InternalVMError)?;
+                let mut value = self.type_default(VariableType::UserData(*type_id))?;
                 let GenericVariableData::Record(values) = &mut value.generic_data else {
                     return Err(VMError::InternalVMError.into());
                 };
@@ -594,7 +607,7 @@ impl VirtualMachine<'_> {
                     } else {
                         self.eval_expr(expression).await?
                     };
-                    self.check_record_field_value(field, &field_value)?;
+                    self.check_record_field_value(*type_id, *field_id, &field_value)?;
                     values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type);
                 }
                 Ok(value)
@@ -647,7 +660,7 @@ impl VirtualMachine<'_> {
                 };
                 let field = fields.get(*id).ok_or(VMError::InternalVMError)?;
                 let (dim_1, dim_2, dim_3) = self.eval_array_indices(arguments).await?;
-                Ok(self.variable_table.array_value(field, dim_1, dim_2, dim_3))
+                self.read_array_element(field, dim_1, dim_2, dim_3)
             }
 
             PPEExpr::MemberFunctionCall(base_expr, arguments, id) => {
@@ -716,7 +729,7 @@ impl VirtualMachine<'_> {
                 } else {
                     0
                 };
-                Ok(self.variable_table.array_value(self.variable_table.get_value(*id), dim_1, dim_2, dim_3))
+                self.read_array_element(self.variable_table.get_value(*id), dim_1, dim_2, dim_3)
             }
 
             PPEExpr::PredefinedFunctionCall(func, arguments)
@@ -731,7 +744,7 @@ impl VirtualMachine<'_> {
                     return Err(VMError::InvalidArrayDimensionCount(indices.len()).into());
                 }
                 let (first, second, third) = self.eval_array_indices(indices).await?;
-                Ok(self.variable_table.array_value(&array, first, second, third))
+                self.read_array_element(&array, first, second, third)
             }
             PPEExpr::PredefinedFunctionCall(func, arguments) => match run_function(func.opcode, self, arguments).await {
                 Ok(val) => Ok(val),
@@ -830,6 +843,8 @@ impl VirtualMachine<'_> {
                 if matches!(target_type, VariableType::Function | VariableType::Procedure) && value.get_type() != target_type {
                     return Ok(());
                 }
+                self.check_nominal_assignment(target_type, value.vtype)?;
+                self.check_record_assignment(target_type, self.variable_table.get_var_entry(*id).header.dim, &value)?;
                 // Writing a bare array without subscripts reaches its first element,
                 // the way reading one does; replacing it would drop the other elements.
                 let target = self.variable_table.get_value(*id);
@@ -859,6 +874,8 @@ impl VirtualMachine<'_> {
                 };
                 let target_type = self.variable_table.get_var_entry(*id).header.variable_type;
                 let value = self.variable_table.checked_enum_value(target_type, value)?;
+                self.check_nominal_assignment(target_type, value.vtype)?;
+                self.check_record_assignment(target_type, 0, &value)?;
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
             PPEExpr::Member(_, _) | PPEExpr::IndexedMember(_, _, _) => {
@@ -917,22 +934,37 @@ impl VirtualMachine<'_> {
                 } else {
                     root
                 };
+                let mut field_layout = None;
                 for step in resolved_path {
+                    let VariableType::UserData(type_id) = target.vtype else {
+                        return Err(VMError::NoUserTypeBase.into());
+                    };
                     let GenericVariableData::Record(fields) = &mut target.generic_data else {
                         return Err(VMError::NoUserTypeBase.into());
                     };
                     let fields = Arc::make_mut(fields);
                     target = match step {
-                        ResolvedLValuePathStep::Member(member_id) => fields.get_mut(member_id).ok_or(VMError::InternalVMError)?,
-                        ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => fields
-                            .get_mut(member_id)
-                            .ok_or(VMError::InternalVMError)?
-                            .get_array_value_mut(first, second, third)
-                            .ok_or(VMError::InternalVMError)?,
+                        ResolvedLValuePathStep::Member(member_id) => {
+                            field_layout = Some(self.record_field_layout(type_id, member_id)?);
+                            fields.get_mut(member_id).ok_or(VMError::InternalVMError)?
+                        }
+                        ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => {
+                            let field = self.record_field_layout(type_id, member_id)?;
+                            if field.dim == 0 {
+                                return Err(VMError::RecordFieldShapeMismatch.into());
+                            }
+                            field_layout = Some(crate::executable::RecordField::scalar(field.variable_type));
+                            fields
+                                .get_mut(member_id)
+                                .ok_or(VMError::InternalVMError)?
+                                .get_array_value_mut(first, second, third)
+                                .ok_or(VMError::InternalVMError)?
+                        }
                     };
                 }
-                let field_type = target.vtype;
-                self.check_record_field_value(target, &value)?;
+                let field = field_layout.ok_or(VMError::InternalVMError)?;
+                let field_type = field.variable_type;
+                self.check_record_value(field, &value)?;
                 *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
                 self.variable_table.set_value(root_id, root_value);
             }
@@ -1178,61 +1210,137 @@ impl VirtualMachine<'_> {
         Ok(())
     }
 
-    /// Field templates are fixed values, unlike redimensionable variable slots.
-    /// Validate before publishing either a field replacement or a record literal.
-    fn check_record_field_value(&self, template: &VariableValue, value: &VariableValue) -> Res<()> {
-        // Enum constants lower to INTEGER operands. As at the normal enum write
-        // boundary, accept that representation only after checking its domain.
-        if self.variable_table.is_enum(template.vtype) {
-            if value.get_dimensions() == 0 {
-                self.variable_table.checked_enum_value(template.vtype, value.clone())?;
-            } else if value.vtype != VariableType::Integer {
-                self.check_nominal_assignment(template.vtype, value.vtype)?;
-            }
-        } else {
-            self.check_nominal_assignment(template.vtype, value.vtype)?;
+    fn record_field_layout(&self, type_id: u8, field_id: usize) -> Res<crate::executable::RecordField> {
+        if type_id as usize == crate::parser::CONTACT_ID && field_id < 2 {
+            return Ok(crate::executable::RecordField::scalar(VariableType::UnboundedString));
         }
-        match (&template.generic_data, &value.generic_data) {
-            (GenericVariableData::Dim1(left), GenericVariableData::Dim1(right)) if left.len() == right.len() => {
-                for (left, right) in left.iter().zip(right.iter()) {
-                    self.check_record_field_value(left, right)?;
+        (type_id as usize)
+            .checked_sub(crate::parser::FIRST_USER_TYPE_ID)
+            .and_then(|index| self.user_types.get(index))
+            .and_then(|fields| fields.get(field_id))
+            .copied()
+            .ok_or_else(|| VMError::InvalidMemberId(type_id, field_id).into())
+    }
+
+    fn check_record_field_value(&self, type_id: u8, field_id: usize, value: &VariableValue) -> Res<()> {
+        self.check_record_value(self.record_field_layout(type_id, field_id)?, value)
+    }
+
+    fn check_record_assignment(&self, expected: VariableType, rank: u8, value: &VariableValue) -> Res<()> {
+        if matches!(expected, VariableType::UserData(id) if crate::parser::is_user_declared_type(id)) && !self.variable_table.is_enum(expected) {
+            let mut field = crate::executable::RecordField::scalar(expected);
+            // Bare scalar writes to array variables still address element zero.
+            field.dim = if value.get_dimensions() == 0 { 0 } else { rank };
+            field.is_dynamic = field.dim > 0;
+            self.check_record_value(field, value)?;
+        }
+        Ok(())
+    }
+
+    /// Validate against declarations, not current storage: only dynamic fields may change bounds.
+    fn check_record_value(&self, field: crate::executable::RecordField, value: &VariableValue) -> Res<()> {
+        let expected = field.variable_type;
+        let is_enum = self.variable_table.is_enum(expected);
+        if is_enum {
+            self.variable_table.checked_enum_value(expected, value.clone())?;
+        } else {
+            self.check_nominal_assignment(expected, value.vtype)?;
+        }
+        if field.element_count().is_none() || value.get_dimensions() != field.dim {
+            return Err(VMError::RecordFieldShapeMismatch.into());
+        }
+        let compatible_element_type = |actual| {
+            actual == expected
+                || (is_enum && actual == VariableType::Integer)
+                || (matches!(expected, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+                    && matches!(actual, VariableType::String | VariableType::BigStr | VariableType::UnboundedString))
+        };
+        let check_element = |element: &VariableValue| -> Res<()> {
+            if !compatible_element_type(element.vtype) {
+                return Err(VMError::AssignmentTypeMismatch(expected, element.vtype).into());
+            }
+            self.check_record_value(crate::executable::RecordField::scalar(expected), element)
+        };
+        if field.dim > 0 && !compatible_element_type(value.vtype) {
+            return Err(VMError::AssignmentTypeMismatch(expected, value.vtype).into());
+        }
+        let bounds = [field.vector_size as usize + 1, field.matrix_size as usize + 1, field.cube_size as usize + 1];
+        match &value.generic_data {
+            GenericVariableData::Dim1(values) => {
+                if !field.is_dynamic && values.len() != bounds[0] {
+                    return Err(VMError::RecordFieldShapeMismatch.into());
+                }
+                for element in values.iter() {
+                    check_element(element)?;
                 }
             }
-            (GenericVariableData::Dim2(left), GenericVariableData::Dim2(right)) if left.len() == right.len() => {
-                for (left, right) in left.iter().zip(right.iter()) {
-                    if left.len() != right.len() {
+            GenericVariableData::Dim2(values) => {
+                let columns = if field.is_dynamic { values.first().map_or(0, Vec::len) } else { bounds[1] };
+                if !field.is_dynamic && values.len() != bounds[0] {
+                    return Err(VMError::RecordFieldShapeMismatch.into());
+                }
+                for row in values.iter() {
+                    if row.len() != columns {
                         return Err(VMError::RecordFieldShapeMismatch.into());
                     }
-                    for (left, right) in left.iter().zip(right.iter()) {
-                        self.check_record_field_value(left, right)?;
+                    for element in row {
+                        check_element(element)?;
                     }
                 }
             }
-            (GenericVariableData::Dim3(left), GenericVariableData::Dim3(right)) if left.len() == right.len() => {
-                for (left, right) in left.iter().zip(right.iter()) {
-                    if left.len() != right.len() {
+            GenericVariableData::Dim3(values) => {
+                let rows = if field.is_dynamic { values.first().map_or(0, Vec::len) } else { bounds[1] };
+                let columns = if field.is_dynamic {
+                    values.first().and_then(|plane| plane.first()).map_or(0, Vec::len)
+                } else {
+                    bounds[2]
+                };
+                if !field.is_dynamic && values.len() != bounds[0] {
+                    return Err(VMError::RecordFieldShapeMismatch.into());
+                }
+                for plane in values.iter() {
+                    if plane.len() != rows {
                         return Err(VMError::RecordFieldShapeMismatch.into());
                     }
-                    for (left, right) in left.iter().zip(right.iter()) {
-                        if left.len() != right.len() {
+                    for row in plane {
+                        if row.len() != columns {
                             return Err(VMError::RecordFieldShapeMismatch.into());
                         }
-                        for (left, right) in left.iter().zip(right.iter()) {
-                            self.check_record_field_value(left, right)?;
+                        for element in row {
+                            check_element(element)?;
                         }
                     }
                 }
             }
-            (GenericVariableData::Record(left), GenericVariableData::Record(right)) if left.len() == right.len() => {
-                for (left, right) in left.iter().zip(right.iter()) {
-                    self.check_record_field_value(left, right)?;
+            _ => {
+                let record_type = match expected {
+                    VariableType::UserData(id) if !is_enum && (crate::parser::is_user_declared_type(id) || id as usize == crate::parser::CONTACT_ID) => {
+                        Some(id)
+                    }
+                    _ => None,
+                };
+                if let Some(type_id) = record_type {
+                    let field_count = if type_id as usize == crate::parser::CONTACT_ID {
+                        2
+                    } else {
+                        self.user_types
+                            .get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)
+                            .ok_or(VMError::TypeNotFoundInRegistry(type_id))?
+                            .len()
+                    };
+                    let GenericVariableData::Record(values) = &value.generic_data else {
+                        return Err(VMError::RecordFieldShapeMismatch.into());
+                    };
+                    if values.len() != field_count {
+                        return Err(VMError::RecordFieldShapeMismatch.into());
+                    }
+                    for (field_id, value) in values.iter().enumerate() {
+                        self.check_record_field_value(type_id, field_id, value)?;
+                    }
+                } else if matches!(value.generic_data, GenericVariableData::Record(_)) {
+                    return Err(VMError::RecordFieldShapeMismatch.into());
                 }
             }
-            (GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_) | GenericVariableData::Record(_), _)
-            | (_, GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_) | GenericVariableData::Record(_)) => {
-                return Err(VMError::RecordFieldShapeMismatch.into());
-            }
-            _ => {}
         }
         Ok(())
     }
@@ -1305,6 +1413,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             vm.variable_table = prg.variable_table.clone();
             vm.label_table = label_table;
             vm.user_types = prg.user_types.clone();
+            vm.initialize_host_defaults()?;
             vm.select_user(user);
             vm.snapshot_user_variables();
 
@@ -1321,6 +1430,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
 #[cfg(test)]
 mod followup_invariants {
     use super::*;
+    use crate::executable::{RecordField, TableEntry, VariableData, create_record_value};
     use icy_net::{ConnectionType, channel::ChannelConnection};
 
     async fn state() -> IcyBoardState {
@@ -1336,6 +1446,379 @@ mod followup_invariants {
             Box::new(connection),
         )
         .await
+    }
+
+    fn s1_record(type_id: u8, fields: Vec<VariableValue>) -> VariableValue {
+        VariableValue {
+            vtype: VariableType::UserData(type_id),
+            data: VariableData::default(),
+            generic_data: GenericVariableData::Record(Arc::new(fields)),
+        }
+    }
+
+    fn s1_array(element: VariableValue, rank: u8, bound: usize) -> VariableValue {
+        VariableValue {
+            vtype: element.vtype,
+            data: VariableData::default(),
+            generic_data: GenericVariableData::create_array(element, rank, bound, bound, bound).unwrap(),
+        }
+    }
+
+    fn s1_push(vm: &mut VirtualMachine<'_>, value: VariableValue) -> PPEExpr {
+        let mut entry = TableEntry::default();
+        entry.header.id = vm.variable_table.get_entries().len() + 1;
+        entry.header.variable_type = value.vtype;
+        entry.header.dim = value.get_dimensions();
+        entry.value = value;
+        let expression = PPEExpr::Value(entry.header.id);
+        vm.variable_table.push(entry);
+        expression
+    }
+
+    fn s1_layouts(vm: &mut VirtualMachine<'_>, rank: u8) {
+        vm.variable_table.set_version(400);
+        vm.variable_table.enums.insert(102, vec![7, 9]);
+        vm.user_types = vec![
+            vec![
+                RecordField {
+                    dim: 1,
+                    vector_size: 1,
+                    ..RecordField::scalar(VariableType::Integer)
+                },
+                RecordField {
+                    dim: rank,
+                    is_dynamic: true,
+                    ..RecordField::scalar(VariableType::Integer)
+                },
+                RecordField::scalar(VariableType::UserData(102)),
+            ],
+            vec![
+                RecordField::scalar(VariableType::UserData(100)),
+                RecordField {
+                    dim: 1,
+                    ..RecordField::scalar(VariableType::UserData(100))
+                },
+            ],
+            vec![],
+        ];
+        vm.variable_table.fill_in_records(&vm.user_types);
+    }
+
+    #[tokio::test]
+    async fn s1_dynamic_field_bytecode_accepts_resizing_through_nested_and_whole_record_writes() {
+        let mut state = state().await;
+        let registry = crate::parser::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        for rank in 1..=3 {
+            for path in ["field", "indexed field", "array root field", "child", "literal", "record", "array", "element"] {
+                let mut vm = VirtualMachine::new("s1-shapes.ppe".into(), &registry, &mut io, &mut state);
+                s1_layouts(&mut vm, rank);
+                let initial = create_record_value(101, &vm.user_types, &vm.variable_table.enums).unwrap();
+                let root = s1_push(&mut vm, initial.clone());
+                let roots = s1_push(&mut vm, s1_array(initial.clone(), 1, 0));
+                let alias = s1_push(&mut vm, initial.clone());
+                let zero = s1_push(&mut vm, VariableValue::new_int(0));
+                let items = s1_array(VariableValue::new_int(42), rank, 2);
+                let child = s1_record(
+                    100,
+                    vec![
+                        s1_array(VariableValue::new_int(0), 1, 1),
+                        items.clone(),
+                        VariableValue::new_enum(VariableType::UserData(102), 7, 7),
+                    ],
+                );
+                let outer = s1_record(101, vec![child.clone(), s1_array(child.clone(), 1, 0)]);
+                let PPEExpr::Value(roots_id) = roots else { unreachable!() };
+                let element = PPEExpr::Dim(roots_id, vec![zero.clone()]);
+                let (target, expected) = match path {
+                    "field" | "literal" => (PPEExpr::Member(Box::new(PPEExpr::Member(Box::new(root.clone()), 0)), 1), items),
+                    "indexed field" => (
+                        PPEExpr::Member(Box::new(PPEExpr::IndexedMember(Box::new(root.clone()), 1, vec![zero.clone()])), 1),
+                        items,
+                    ),
+                    "array root field" => (PPEExpr::Member(Box::new(PPEExpr::Member(Box::new(element), 0)), 1), items),
+                    "child" => (PPEExpr::Member(Box::new(root.clone()), 0), child),
+                    "record" => (root.clone(), outer),
+                    "array" => (PPEExpr::Value(roots_id), s1_array(outer, 1, 2)),
+                    "element" => (element, outer),
+                    _ => unreachable!(),
+                };
+                let source = s1_push(&mut vm, expected.clone());
+                let command = if path == "literal" {
+                    PPECommand::Let(
+                        Box::new(PPEExpr::Member(Box::new(root.clone()), 0)),
+                        Box::new(PPEExpr::RecordLiteral(100, vec![(1, source)])),
+                    )
+                } else {
+                    PPECommand::Let(Box::new(target.clone()), Box::new(source))
+                };
+                vm.execute_statement(&command).await.unwrap();
+                assert_eq!(expected, vm.eval_array_operand(&target).await.unwrap(), "rank={rank}, {path}");
+                assert_eq!(initial, vm.eval_expr(&alias).await.unwrap(), "shared copy changed: rank={rank}, {path}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn s1_review_string_field_writes_convert_each_element_without_accepting_other_types() {
+        let mut state = state().await;
+        let registry = crate::parser::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        let string_types = [VariableType::String, VariableType::BigStr, VariableType::UnboundedString];
+        for rank in 1..=3 {
+            for target_type in string_types {
+                for source_type in string_types {
+                    let mut vm = VirtualMachine::new("string-fields.ppe".into(), &registry, &mut io, &mut state);
+                    vm.variable_table.set_version(400);
+                    vm.user_types = vec![vec![RecordField {
+                        dim: rank,
+                        ..RecordField::scalar(target_type)
+                    }]];
+                    let initial = create_record_value(100, &vm.user_types, &vm.variable_table.enums).unwrap();
+                    let root = s1_push(&mut vm, initial);
+                    let target = PPEExpr::Member(Box::new(root.clone()), 0);
+                    let element = VariableValue::new_unbounded_string("é".repeat(3000)).convert_to(source_type);
+                    let expected = element.clone().convert_to(target_type);
+                    let source_array = s1_array(element, rank, 0);
+                    let source = s1_push(&mut vm, source_array.clone());
+                    vm.execute_statement(&PPECommand::Let(Box::new(target.clone()), Box::new(source)))
+                        .await
+                        .unwrap();
+                    let actual = vm.eval_array_operand(&target).await.unwrap();
+                    assert_eq!(actual.vtype, target_type);
+                    let actual_element = actual.get_array_value(0, 0, 0);
+                    assert_eq!(actual_element.vtype, target_type);
+                    assert_eq!(actual_element.as_string(), expected.as_string());
+                    let before = vm.eval_expr(&root).await.unwrap();
+                    for invalid in ["array", "element"] {
+                        let mut array = source_array.clone();
+                        if invalid == "array" {
+                            array.vtype = VariableType::Integer;
+                        } else {
+                            *array.get_array_value_mut(0, 0, 0).unwrap() = VariableValue::new_int(42);
+                        }
+                        let source = s1_push(&mut vm, array);
+                        assert!(
+                            vm.execute_statement(&PPECommand::Let(Box::new(target.clone()), Box::new(source)))
+                                .await
+                                .is_err()
+                        );
+                        assert_eq!(vm.eval_expr(&root).await.unwrap(), before, "{invalid}, rank {rank}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn s1_invalid_record_bytecode_is_transactional_for_all_assignment_paths() {
+        let mut state = state().await;
+        let registry = crate::parser::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        for rank in 1..=3 {
+            for invalid in [
+                "rank",
+                "array type",
+                "element type",
+                "nested fixed shape",
+                "enum",
+                "nominal",
+                "field count",
+                "ragged",
+            ] {
+                if invalid == "ragged" && rank == 1 {
+                    continue;
+                }
+                for path in ["child", "indexed child", "record", "array", "element", "array root child", "literal"] {
+                    let mut vm = VirtualMachine::new("s1-atomic.ppe".into(), &registry, &mut io, &mut state);
+                    s1_layouts(&mut vm, rank);
+                    let initial = create_record_value(101, &vm.user_types, &vm.variable_table.enums).unwrap();
+                    let root = s1_push(&mut vm, initial.clone());
+                    let roots = s1_push(&mut vm, s1_array(initial.clone(), 1, 0));
+                    s1_push(&mut vm, initial);
+                    let zero = s1_push(&mut vm, VariableValue::new_int(0));
+                    let mut child = s1_record(
+                        100,
+                        vec![
+                            s1_array(VariableValue::new_int(0), 1, 1),
+                            s1_array(VariableValue::new_int(42), rank, 2),
+                            VariableValue::new_enum(VariableType::UserData(102), 7, 7),
+                        ],
+                    );
+                    let GenericVariableData::Record(fields) = &mut child.generic_data else {
+                        unreachable!()
+                    };
+                    let fields = Arc::make_mut(fields);
+                    match invalid {
+                        "rank" => fields[1] = s1_array(VariableValue::new_int(0), rank % 3 + 1, 0),
+                        "array type" => fields[1] = s1_array(VariableValue::new_bool(false), rank, 0),
+                        "element type" => *fields[1].get_array_value_mut(2, 2, 2).unwrap() = VariableValue::new_bool(false),
+                        "nested fixed shape" => fields[0] = s1_array(VariableValue::new_int(0), 1, 2),
+                        "enum" => fields[2] = VariableValue::new_enum(VariableType::UserData(102), 99, 7),
+                        "nominal" => child.vtype = VariableType::UserData(101),
+                        "field count" => {
+                            fields.pop();
+                        }
+                        "ragged" => match &mut fields[1].generic_data {
+                            GenericVariableData::Dim2(rows) => {
+                                Arc::make_mut(rows)[1].pop();
+                            }
+                            GenericVariableData::Dim3(planes) => {
+                                Arc::make_mut(planes)[1][1].pop();
+                            }
+                            _ => unreachable!(),
+                        },
+                        _ => unreachable!(),
+                    }
+                    let outer = s1_record(101, vec![child.clone(), s1_array(child.clone(), 1, 0)]);
+                    let PPEExpr::Value(roots_id) = roots else { unreachable!() };
+                    let element = PPEExpr::Dim(roots_id, vec![zero.clone()]);
+                    let (target, value) = match path {
+                        "child" | "literal" => (PPEExpr::Member(Box::new(root.clone()), 0), child),
+                        "indexed child" => (PPEExpr::IndexedMember(Box::new(root.clone()), 1, vec![zero]), child),
+                        "record" => (root, outer),
+                        "array" => (PPEExpr::Value(roots_id), s1_array(outer, 1, 1)),
+                        "element" => (element, outer),
+                        "array root child" => (PPEExpr::Member(Box::new(element), 0), child),
+                        _ => unreachable!(),
+                    };
+                    let source = s1_push(&mut vm, value);
+                    let before: Vec<_> = vm.variable_table.get_entries().iter().map(|entry| entry.value.clone()).collect();
+                    let command = if path == "literal" {
+                        PPECommand::Let(Box::new(PPEExpr::Value(1)), Box::new(PPEExpr::RecordLiteral(101, vec![(0, source)])))
+                    } else {
+                        PPECommand::Let(Box::new(target), Box::new(source))
+                    };
+                    assert!(vm.execute_statement(&command).await.is_err(), "rank={rank}, {invalid}, {path}");
+                    let after: Vec<_> = vm.variable_table.get_entries().iter().map(|entry| entry.value.clone()).collect();
+                    assert_eq!(before, after, "rank={rank}, {invalid}, {path}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn s1_dynamic_record_and_enum_arrays_check_empty_types_and_every_element() {
+        let mut state = state().await;
+        let registry = crate::parser::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        for rank in 1..=3 {
+            for field_id in 0..2 {
+                let mut vm = VirtualMachine::new("s1-elements.ppe".into(), &registry, &mut io, &mut state);
+                s1_layouts(&mut vm, rank);
+                vm.user_types.push(
+                    [100, 102]
+                        .map(|type_id| RecordField {
+                            dim: rank,
+                            is_dynamic: true,
+                            ..RecordField::scalar(VariableType::UserData(type_id))
+                        })
+                        .to_vec(),
+                );
+                vm.variable_table.fill_in_records(&vm.user_types);
+                let initial = create_record_value(103, &vm.user_types, &vm.variable_table.enums).unwrap();
+                let root = s1_push(&mut vm, initial);
+                let target = PPEExpr::Member(Box::new(root.clone()), field_id);
+                let empty = vm.eval_array_operand(&target).await.unwrap();
+                let element_type = if field_id == 0 { 100 } else { 102 };
+                let element = create_record_value(element_type, &vm.user_types, &vm.variable_table.enums).unwrap();
+                let valid = s1_array(element.clone(), rank, 1);
+                for value in [valid.clone(), empty.clone(), valid.clone()] {
+                    let source = s1_push(&mut vm, value.clone());
+                    vm.execute_statement(&PPECommand::Let(Box::new(target.clone()), Box::new(source)))
+                        .await
+                        .unwrap();
+                    assert_eq!(value, vm.eval_array_operand(&target).await.unwrap());
+                }
+                let mut invalid = valid;
+                let leaf = invalid.get_array_value_mut(1, 1, 1).unwrap();
+                if let GenericVariableData::Record(fields) = &mut leaf.generic_data {
+                    Arc::make_mut(fields)[0] = s1_array(VariableValue::new_int(0), 1, 2);
+                } else {
+                    *leaf = VariableValue::new_enum(VariableType::UserData(102), 99, 7);
+                }
+                let wrong_empty = VariableValue {
+                    vtype: VariableType::Boolean,
+                    ..empty
+                };
+                for value in [invalid, wrong_empty] {
+                    let before = vm.eval_expr(&root).await.unwrap();
+                    let source = s1_push(&mut vm, value);
+                    assert!(
+                        vm.execute_statement(&PPECommand::Let(Box::new(target.clone()), Box::new(source)))
+                            .await
+                            .is_err()
+                    );
+                    assert_eq!(before, vm.eval_expr(&root).await.unwrap(), "rank={rank}, field={field_id}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn s1_record_io_bytecode_rejects_layouts_before_reading_or_writing() {
+        use crate::icy_board::state::ppl_error::ERR_FORMAT;
+
+        let mut state = state().await;
+        let registry = crate::parser::icy_board_registry();
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("record.dat");
+        let bytes = b"1234\n5678\n";
+        for field in [
+            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u8)),
+            RecordField::scalar(VariableType::UserData(30)),
+            RecordField {
+                dim: 1,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+            RecordField {
+                dim: 2,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+            RecordField {
+                dim: 3,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+        ] {
+            for type_id in [100, 101] {
+                for operation in ["FGETREC", "FPUTREC", "FREADREC", "FWRITEREC"] {
+                    std::fs::write(&file, bytes).unwrap();
+                    let mut io = DiskIO::new(".", None);
+                    io.fopen(1, file.to_str().unwrap(), 2, 0).unwrap();
+                    assert!(!io.ferr(1));
+                    let mut vm = VirtualMachine::new("s1-io.ppe".into(), &registry, &mut io, &mut state);
+                    vm.user_types = vec![vec![field], vec![RecordField::scalar(VariableType::UserData(100))]];
+                    vm.variable_table.fill_in_records(&vm.user_types);
+                    let value = create_record_value(type_id, &vm.user_types, &vm.variable_table.enums).unwrap();
+                    let target = s1_push(&mut vm, value.clone());
+                    let channel = s1_push(&mut vm, VariableValue::new_int(1));
+                    let args = [channel, target.clone()];
+                    match operation {
+                        "FGETREC" => statements::predefined_procedures::fgetrec(&mut vm, &args).await.unwrap(),
+                        "FPUTREC" => statements::predefined_procedures::fputrec(&mut vm, &args).await.unwrap(),
+                        "FREADREC" => statements::predefined_procedures::freadrec(&mut vm, &args).await.unwrap(),
+                        "FWRITEREC" => statements::predefined_procedures::fwriterec(&mut vm, &args).await.unwrap(),
+                        _ => unreachable!(),
+                    }
+                    assert_eq!(ERR_FORMAT, vm.last_error.code, "{operation}, {field:?}");
+                    assert!(vm.last_error.message.contains("cannot be stored"), "{operation}");
+                    assert!(vm.io.ferr(1), "{operation}");
+                    assert_eq!(0, vm.io.ftell(1).unwrap(), "{operation}");
+                    let after = vm.eval_expr(&target).await.unwrap();
+                    assert_eq!(value.vtype, after.vtype, "{operation}");
+                    let (GenericVariableData::Record(before), GenericVariableData::Record(after)) = (&value.generic_data, &after.generic_data) else {
+                        panic!("record expected")
+                    };
+                    // Host values are not structurally comparable; rejected I/O must retain the original storage.
+                    assert!(Arc::ptr_eq(before, after), "{operation}");
+                    assert_eq!(bytes.as_slice(), std::fs::read(&file).unwrap(), "{operation}");
+                    vm.io.fclose(1).unwrap();
+                }
+            }
+        }
     }
 
     #[tokio::test]

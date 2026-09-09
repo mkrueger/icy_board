@@ -98,6 +98,7 @@ impl PplTerminalInfo {
 
 impl UserData for PplTerminalInfo {
     const TYPE_NAME: &'static str = "TermInfo";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| Self::default().value());
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         crate::parser::board_catalog::register_members(TERM_INFO_ID, registry);
     }

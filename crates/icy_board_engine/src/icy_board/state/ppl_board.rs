@@ -55,6 +55,14 @@ impl PplBoard {
 
 impl UserData for PplBoard {
     const TYPE_NAME: &'static str = "Board";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| {
+        Self {
+            conferences: VariableValue::new_vector(crate::executable::VariableType::UserData(crate::parser::CONFERENCE_ID as u8), Vec::new()),
+            users: VariableValue::new_vector(crate::executable::VariableType::UserData(crate::parser::USER_ID as u8), Vec::new()),
+            ..Self::default()
+        }
+        .value()
+    });
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Board);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {

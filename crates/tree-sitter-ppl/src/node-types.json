@@ -827,6 +827,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "dimensions",
+          "named": true
+        }
+      ]
     }
   },
   {

@@ -1311,7 +1311,10 @@ impl Backend {
 
                     let start_position = offset_to_position(err.span.start, rope).unwrap_or(Position::new(0, 0));
                     let end_position = offset_to_position(err.span.end, rope).unwrap_or(Position::new(0, 0));
-                    let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
+                    let mut diag = Diagnostic::new_simple(
+                        Range::new(start_position, end_position),
+                        ppl_lsp::diagnostic_message(&*err.error, &ppl_lsp::LANGUAGE_LOADER),
+                    );
                     diag.severity = Some(severity);
                     diag.source = Some("ppl".to_string());
                     let (code, data) = diagnostic_details(&*err.error, rope, &err.file_name, err.span.start, semantic_visitor);
@@ -1394,6 +1397,7 @@ fn diagnostic_details(
         match error {
             CompilationErrorType::UnusedVariable(_) => "ppl.unused-variable",
             CompilationErrorType::UnusedFunction(_) => "ppl.unused-routine",
+            CompilationErrorType::TypeNotComparable(_) => "ppl.type-not-comparable",
             CompilationErrorType::MissingImplementation(_) => "ppl.missing-implementation",
             CompilationErrorType::VariableNotFound(unknown) => {
                 let Some(replacement) = closest_name(unknown, visible_names(semantic_visitor, file, start).into_iter()) else {

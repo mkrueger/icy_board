@@ -80,6 +80,7 @@ fn array_field_dimensions_survive_the_ppe_round_trip() {
             RecordField {
                 variable_type: VariableType::Integer,
                 dim: 1,
+                is_dynamic: false,
                 vector_size: 10,
                 matrix_size: 0,
                 cube_size: 0,
@@ -87,6 +88,7 @@ fn array_field_dimensions_survive_the_ppe_round_trip() {
             RecordField {
                 variable_type: VariableType::UnboundedString,
                 dim: 2,
+                is_dynamic: false,
                 vector_size: 2,
                 matrix_size: 3,
                 cube_size: 0,
@@ -94,6 +96,7 @@ fn array_field_dimensions_survive_the_ppe_round_trip() {
             RecordField {
                 variable_type: VariableType::Boolean,
                 dim: 3,
+                is_dynamic: false,
                 vector_size: 1,
                 matrix_size: 2,
                 cube_size: 3,
@@ -261,12 +264,36 @@ fn the_serializer_rejects_recursive_or_forward_type_references() {
 }
 
 #[test]
-fn the_serializer_rejects_a_board_object_field() {
+fn accepted_host_and_dynamic_fields_have_no_ppe_encoding() {
+    for declaration in [
+        "CONFERENCE Conf",
+        "CONTACT Person",
+        "INTEGER Values[]",
+        "INTEGER Values[,]",
+        "INTEGER Values[,,]",
+    ] {
+        let executable = compile(&format!("TYPE Holder\n {declaration}\nENDTYPE\nHolder item\nHolder target\ntarget = item\n"));
+        assert_eq!(1, executable.user_types.len(), "{declaration}");
+        assert_eq!(
+            ExecutableError::UnsupportedRecordFieldEncoding { type_id: 100, field_index: 0 },
+            executable.to_buffer().unwrap_err(),
+            "{declaration}"
+        );
+    }
+}
+
+#[test]
+fn the_loader_still_rejects_a_board_object_field() {
     let executable = Executable {
-        user_types: vec![vec![field(VariableType::UserData(30))]],
+        user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
-    assert_eq!(ExecutableError::BoardObjectTypeField(100, 30), executable.to_buffer().unwrap_err());
+    let mut bytes = executable.to_buffer().unwrap();
+    bytes[53] = 30;
+    assert!(matches!(
+        Executable::from_buffer(&mut bytes, false),
+        Err(error) if error.to_string() == ExecutableError::BoardObjectTypeField(100, 30).to_string()
+    ));
 }
 
 #[test]

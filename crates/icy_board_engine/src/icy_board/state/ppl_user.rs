@@ -276,7 +276,7 @@ impl UserDataValue for PplUser {
             date(&user.date_last_dir_read)
         } else if *name == *NOTES {
             VariableValue::new_vector(
-                VariableType::String,
+                VariableType::UnboundedString,
                 [
                     &user.custom_comment1,
                     &user.custom_comment2,

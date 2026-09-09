@@ -1,3 +1,5 @@
+diagnostic-type-not-comparable=Typ { $type_name } unterstützt keinen Gleichheitsvergleich, da er ein nicht vergleichbares Hostobjekt ist oder enthält
+
 hint-preprocessor-langversion=Legt die von dieser Quelldatei verwendete PPL-Sprachversion fest. Die Direktive muss vor Programmcode stehen und hat Vorrang vor Workspace-, Kommandozeilen- und Umgebungseinstellungen.
 hint-preprocessor-define=Definiert eine von Groß-/Kleinschreibung unabhängige Präprozessorvariable. Der optionale Wert kann in bedingten Ausdrücken verwendet oder mit `;#name` in den Quelltext eingefügt werden; eine Definition ohne Wert ist wahr.
 hint-preprocessor-if=Beginnt einen Zweig der bedingten Übersetzung. Der Ausdruck kann `VERSION`, `RUNTIME`, `LANGVERSION` und mit `;$DEFINE` eingeführte Variablen verwenden. Quelltext in einem inaktiven Zweig wird nicht übersetzt.

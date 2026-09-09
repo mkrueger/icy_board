@@ -27,6 +27,8 @@ pub(crate) const MAX_DESERIALIZED_ARRAY_ELEMENTS: usize = 1_000_000;
 pub struct RecordField {
     pub variable_type: VariableType,
     pub dim: u8,
+    /// In-memory only; dynamic fields have rank 1..=3 and zero stored bounds.
+    pub is_dynamic: bool,
     pub vector_size: u16,
     pub matrix_size: u16,
     pub cube_size: u16,
@@ -37,6 +39,7 @@ impl RecordField {
         Self {
             variable_type,
             dim: 0,
+            is_dynamic: false,
             vector_size: 0,
             matrix_size: 0,
             cube_size: 0,
@@ -44,6 +47,9 @@ impl RecordField {
     }
 
     pub fn element_count(self) -> Option<usize> {
+        if self.is_dynamic {
+            return ((1..=3).contains(&self.dim) && self.vector_size == 0 && self.matrix_size == 0 && self.cube_size == 0).then_some(0);
+        }
         if self.dim > 3 || (self.dim < 3 && self.cube_size != 0) || (self.dim < 2 && self.matrix_size != 0) || (self.dim == 0 && self.vector_size != 0) {
             return None;
         }
@@ -52,6 +58,32 @@ impl RecordField {
             .iter()
             .try_fold(1usize, |count, bound| count.checked_mul(*bound as usize + 1))
             .filter(|count| *count <= super::variable_value::MAX_ARRAY_SIZE)
+    }
+
+    pub(crate) fn has_record_io_scalar_type(self) -> bool {
+        matches!(
+            self.variable_type,
+            VariableType::Boolean
+                | VariableType::Unsigned
+                | VariableType::Date
+                | VariableType::EDate
+                | VariableType::Integer
+                | VariableType::Money
+                | VariableType::Float
+                | VariableType::String
+                | VariableType::Time
+                | VariableType::Byte
+                | VariableType::Word
+                | VariableType::SByte
+                | VariableType::SWord
+                | VariableType::BigStr
+                | VariableType::UnboundedString
+                | VariableType::Double
+                | VariableType::DDate
+                | VariableType::MessageAreaID
+                | VariableType::Long
+                | VariableType::ULong
+        )
     }
 }
 
@@ -164,13 +196,28 @@ impl VarHeader {
     }
 }
 
-/// A record value with every field set up, so a field that is itself a record gets
-/// its own fields too. A type can only name types declared before it, so this ends.
+/// Initializes value fields recursively; the engine replaces host placeholders.
 pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Option<VariableValue> {
+    create_record_value_inner(type_id, user_types, enums, &mut Vec::new())
+}
+
+fn create_record_value_inner(
+    type_id: u8,
+    user_types: &[Vec<RecordField>],
+    enums: &std::collections::BTreeMap<u8, Vec<i32>>,
+    visiting: &mut Vec<u8>,
+) -> Option<VariableValue> {
     if let Some(values) = enums.get(&type_id) {
         let default = *values.first()?;
         return Some(VariableValue::new_enum(VariableType::UserData(type_id), default, default));
     }
+    if type_id as usize != crate::parser::CONTACT_ID && crate::parser::board_catalog::TYPES.iter().any(|&(id, _, _)| id == type_id as usize) {
+        return Some(VariableType::UserData(type_id).create_empty_value());
+    }
+    if visiting.contains(&type_id) {
+        return None;
+    }
+    visiting.push(type_id);
     let built_in_fields = match type_id as usize {
         crate::parser::CONTACT_ID => Some(vec![
             RecordField::scalar(VariableType::UnboundedString),
@@ -185,20 +232,30 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>], enums: 
     };
     let mut values = Vec::with_capacity(fields.len());
     for field in fields {
+        field.element_count()?;
         let value = match field.variable_type {
-            VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => create_record_value(id, user_types, enums)?,
+            VariableType::UserData(id) => create_record_value_inner(id, user_types, enums, visiting)?,
             _ => field.variable_type.create_empty_value(),
         };
         let value = if field.dim == 0 {
             value
         } else {
-            let generic_data = GenericVariableData::create_array(
-                value,
-                field.dim,
-                field.vector_size as usize,
-                field.matrix_size as usize,
-                field.cube_size as usize,
-            )?;
+            let generic_data = if field.is_dynamic {
+                VarHeader {
+                    dim: field.dim,
+                    flags: VARIABLE_FLAG_DYNAMIC_ARRAY,
+                    ..Default::default()
+                }
+                .create_generic_data()?
+            } else {
+                GenericVariableData::create_array(
+                    value,
+                    field.dim,
+                    field.vector_size as usize,
+                    field.matrix_size as usize,
+                    field.cube_size as usize,
+                )?
+            };
             VariableValue {
                 vtype: field.variable_type,
                 data: enums
@@ -210,6 +267,7 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>], enums: 
         };
         values.push(value);
     }
+    visiting.pop();
     Some(VariableValue {
         vtype: VariableType::UserData(type_id),
         data: crate::executable::VariableData::default(),
@@ -438,6 +496,8 @@ pub struct VariableTable {
     has_user_vars: bool,
     /// Closed integer domains, in declaration order (the first value is the default).
     pub enums: std::collections::BTreeMap<u8, Vec<i32>>,
+    /// Rebuilt from layouts by `fill_in_records`; never serialized. Check before record I/O.
+    pub record_io_unsupported_types: std::collections::BTreeSet<u8>,
 }
 
 impl VariableTable {
@@ -571,6 +631,7 @@ impl VariableTable {
                     entries: result,
                     has_user_vars: false,
                     enums: Default::default(),
+                    record_io_unsupported_types: Default::default(),
                 },
             ));
         }
@@ -828,6 +889,7 @@ impl VariableTable {
             entries: result,
             has_user_vars: false,
             enums: Default::default(),
+            record_io_unsupported_types: Default::default(),
         };
         table.analyze_locals();
         table.generate_names();
@@ -1181,6 +1243,23 @@ impl VariableTable {
     /// The layout is not part of a variable's own entry, so it is filled in once the
     /// type table has been read.
     pub fn fill_in_records(&mut self, user_types: &[Vec<RecordField>]) {
+        self.record_io_unsupported_types.clear();
+        for (index, fields) in user_types.iter().enumerate() {
+            let type_id = (crate::parser::FIRST_USER_TYPE_ID + index) as u8;
+            let unsupported = fields.iter().any(|field| {
+                if field.is_dynamic || field.element_count().is_none() {
+                    return true;
+                }
+                match field.variable_type {
+                    VariableType::UserData(id) if self.enums.contains_key(&id) => false,
+                    VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => id >= type_id || self.record_io_unsupported_types.contains(&id),
+                    _ => !field.has_record_io_scalar_type(),
+                }
+            });
+            if unsupported {
+                self.record_io_unsupported_types.insert(type_id);
+            }
+        }
         for entry in &mut self.entries {
             let VariableType::UserData(type_id) = entry.header.variable_type else {
                 continue;

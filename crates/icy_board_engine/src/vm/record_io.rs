@@ -9,19 +9,27 @@ pub fn is_record(value: &VariableValue) -> bool {
         && matches!(value.generic_data, GenericVariableData::Record(_))
 }
 
-pub fn encode_lines(value: &VariableValue) -> Result<Vec<String>, String> {
+pub fn ensure_supported(value: &VariableValue, table: &VariableTable) -> Result<(), String> {
     if !is_record(value) {
         return Err("a user-defined record is required".to_string());
     }
+    if let VariableType::UserData(id) = value.vtype
+        && table.record_io_unsupported_types.contains(&id)
+    {
+        return Err(format!("{} contains fields that cannot be stored in a record file", value.vtype));
+    }
+    Ok(())
+}
+
+pub fn encode_lines(value: &VariableValue, table: &VariableTable) -> Result<Vec<String>, String> {
+    ensure_supported(value, table)?;
     let mut lines = Vec::new();
     walk_encode(value, &mut |leaf| lines.push(encode_text_scalar(leaf)))?;
     Ok(lines)
 }
 
 pub fn decode_lines(template: &VariableValue, lines: &[String], table: &VariableTable) -> Result<VariableValue, String> {
-    if !is_record(template) {
-        return Err("a user-defined record is required".to_string());
-    }
+    ensure_supported(template, table)?;
     let mut lines = lines.iter();
     let value = decode_text_value(template, &mut lines, table)?;
     if lines.next().is_some() {
@@ -30,19 +38,15 @@ pub fn decode_lines(template: &VariableValue, lines: &[String], table: &Variable
     Ok(value)
 }
 
-pub fn line_count(value: &VariableValue) -> Result<usize, String> {
-    if !is_record(value) {
-        return Err("a user-defined record is required".to_string());
-    }
+pub fn line_count(value: &VariableValue, table: &VariableTable) -> Result<usize, String> {
+    ensure_supported(value, table)?;
     let mut count = 0usize;
     walk_encode(value, &mut |_| count += 1)?;
     Ok(count)
 }
 
-pub fn encode_binary(value: &VariableValue) -> Result<Vec<u8>, String> {
-    if !is_record(value) {
-        return Err("a user-defined record is required".to_string());
-    }
+pub fn encode_binary(value: &VariableValue, table: &VariableTable) -> Result<Vec<u8>, String> {
+    ensure_supported(value, table)?;
     let mut payload = Vec::new();
     walk_encode(value, &mut |leaf| encode_binary_scalar(leaf, &mut payload))?;
     if payload.len() > MAX_RECORD_FRAME {
@@ -55,9 +59,7 @@ pub fn encode_binary(value: &VariableValue) -> Result<Vec<u8>, String> {
 }
 
 pub fn decode_binary(template: &VariableValue, payload: &[u8], table: &VariableTable) -> Result<VariableValue, String> {
-    if !is_record(template) {
-        return Err("a user-defined record is required".to_string());
-    }
+    ensure_supported(template, table)?;
     let mut cursor = Cursor::new(payload);
     let value = decode_binary_value(template, &mut cursor, table)?;
     if cursor.position() as usize != payload.len() {
@@ -424,9 +426,9 @@ mod tests {
     #[test]
     fn enum_record_wire_format_is_signed_i32_and_decoding_restores_the_default() {
         let (table, value) = enum_record();
-        assert_eq!(1, line_count(&value).unwrap());
-        assert_eq!(vec!["-3"], encode_lines(&value).unwrap());
-        assert_eq!(vec![4, 0, 0, 0, 253, 255, 255, 255], encode_binary(&value).unwrap());
+        assert_eq!(1, line_count(&value, &table).unwrap());
+        assert_eq!(vec!["-3"], encode_lines(&value, &table).unwrap());
+        assert_eq!(vec![4, 0, 0, 0, 253, 255, 255, 255], encode_binary(&value, &table).unwrap());
         for decoded in [
             decode_lines(&value, &["-3".to_string()], &table).unwrap(),
             decode_binary(&value, &[253, 255, 255, 255], &table).unwrap(),
@@ -474,9 +476,9 @@ mod tests {
 
         let source = record(value);
         let empty = record(template);
-        let lines = encode_lines(&source).unwrap();
+        let lines = encode_lines(&source, &VariableTable::default()).unwrap();
         let from_text = decode_lines(&empty, &lines, &VariableTable::default()).unwrap();
-        let binary = encode_binary(&source).unwrap();
+        let binary = encode_binary(&source, &VariableTable::default()).unwrap();
         let from_binary = decode_binary(&empty, &binary[4..], &VariableTable::default()).unwrap();
 
         let GenericVariableData::Record(text_fields) = from_text.generic_data else {
@@ -487,6 +489,52 @@ mod tests {
         };
         assert_eq!(text_fields[0].as_msg_id(), (2, 3));
         assert_eq!(binary_fields[0].as_msg_id(), (2, 3));
+    }
+
+    #[test]
+    fn s1_layout_guards_reject_host_and_dynamic_fields_even_without_leaves() {
+        use crate::executable::{RecordField, create_record_value};
+
+        for field in [
+            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u8)),
+            RecordField::scalar(VariableType::UserData(30)),
+            RecordField {
+                dim: 1,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+            RecordField {
+                dim: 2,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+            RecordField {
+                dim: 3,
+                is_dynamic: true,
+                ..RecordField::scalar(VariableType::Integer)
+            },
+        ] {
+            let layouts = vec![vec![field], vec![RecordField::scalar(VariableType::UserData(100))]];
+            let mut table = VariableTable::default();
+            table.fill_in_records(&layouts);
+            for type_id in [100, 101] {
+                assert!(table.record_io_unsupported_types.contains(&type_id));
+                let value = create_record_value(type_id, &layouts, &table.enums).unwrap();
+                // A malformed empty record must not hide its declared layout either.
+                let empty = VariableValue {
+                    generic_data: GenericVariableData::Record(std::sync::Arc::new(Vec::new())),
+                    ..value.clone()
+                };
+                for value in [value, empty] {
+                    assert!(ensure_supported(&value, &table).unwrap_err().contains("cannot be stored"));
+                    assert!(line_count(&value, &table).is_err());
+                    assert!(encode_lines(&value, &table).is_err());
+                    assert!(encode_binary(&value, &table).is_err());
+                    assert!(decode_lines(&value, &[], &table).is_err());
+                    assert!(decode_binary(&value, &[], &table).is_err());
+                }
+            }
+        }
     }
 
     #[test]

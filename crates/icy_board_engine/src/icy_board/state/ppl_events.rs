@@ -132,6 +132,7 @@ impl PplEvent {
 
 impl UserData for PplEvent {
     const TYPE_NAME: &'static str = "Event";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| Self::default().value());
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         crate::parser::board_catalog::register_members(crate::parser::EVENT_ID, registry);

@@ -284,16 +284,24 @@ impl UserDataValue for MessageArea {
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.req_level_to_list.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.req_level_to_list.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *CAN_ENTER {
-            let res = self.req_level_to_enter.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.req_level_to_enter.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *CAN_ATTACH {
-            let res = self.req_level_to_save_attach.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.req_level_to_save_attach.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
+        }
+        if !self.valid && (*name == *HIGH_MSG || *name == *LOW_MSG || *name == *READ || *name == *FIND) {
+            vm.set_error(PplError::new(ERR_KIND_MSG, ERR_INVALID, "invalid message area"));
+            return Ok(if *name == *HIGH_MSG || *name == *LOW_MSG {
+                VariableValue::new_long(0)
+            } else {
+                PplMessage::missing()
+            });
         }
         if *name == *HIGH_MSG {
             return Ok(VariableValue::new_long(self.message_bounds(vm).map_or(0, |(_, high)| i64::from(high))));

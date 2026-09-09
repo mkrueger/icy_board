@@ -231,6 +231,7 @@ impl Door {
 
 impl UserData for Door {
     const TYPE_NAME: &'static str = "Door";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| crate::compiler::user_data::user_data_value(Self::default(), crate::parser::DOOR_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         crate::parser::board_catalog::register_members(crate::parser::DOOR_ID, registry);
@@ -275,7 +276,7 @@ impl UserDataValue for Door {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
-            let res = self.securiy_level.session_can_access(&vm.icy_board_state.session);
+            let res = self.valid && self.securiy_level.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on Door ({name})");
