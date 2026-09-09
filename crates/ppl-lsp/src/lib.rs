@@ -92,6 +92,35 @@ mod tests {
     use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
 
     #[test]
+    fn s5_text_help_is_localized_with_independent_loaders() {
+        for (locale, codepoint, cells) in [("en", "Unicode code point", "terminal cells"), ("de", "Unicode-Codepoint", "Terminalzellen")] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            for key in [
+                "hint-type-string-unbounded",
+                "hint-string-len",
+                "hint-function-len",
+                "hint-param-start",
+                "hint-string-find",
+                "hint-string-find-last",
+                "hint-regex-is-match",
+                "hint-regex-find",
+                "hint-regex-match-start",
+                "hint-regex-match-length",
+                "hint-regex-match-group-start",
+                "hint-regex-match-group-length",
+            ] {
+                assert!(loader.has(key), "{locale}: {key}");
+                assert!(loader.get(key).contains(codepoint), "{locale}: {key}");
+            }
+            assert!(loader.get("hint-string-len").contains(cells));
+            assert!(loader.get("hint-function-tobytes").contains("UTF-8"));
+            assert!(loader.get("hint-bytes-to-string").contains("ErrCode.Format"));
+            assert!(loader.get("hint-bytes-len").contains("bytes") || loader.get("hint-bytes-len").contains("Bytes"));
+        }
+    }
+
+    #[test]
     fn s4_open_enum_help_is_localized_with_independent_loaders() {
         for (locale, enum_text, regex_text) in [
             ("en", "An open nominal enum value.", "Open nominal regex options:"),

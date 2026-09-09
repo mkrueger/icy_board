@@ -449,11 +449,15 @@ impl TableEntry {
                     return Err(ExecutableError::StringTypeInvalid(self.value.vtype));
                 };
                 let mut string_buffer: Vec<u8> = Vec::new();
-                for c in s.chars() {
-                    if let Some(b) = UNICODE_TO_CP437.get(&c) {
-                        string_buffer.push(*b);
-                    } else {
-                        string_buffer.push(c as u8);
+                if version >= 400 {
+                    string_buffer.extend_from_slice(s.as_bytes());
+                } else {
+                    for c in s.chars() {
+                        if let Some(b) = UNICODE_TO_CP437.get(&c) {
+                            string_buffer.push(*b);
+                        } else {
+                            string_buffer.push(c as u8);
+                        }
                     }
                 }
                 string_buffer.push(0);
@@ -691,10 +695,19 @@ impl VariableTable {
                     } else {
                         // The stored length counts the terminating NUL, an empty constant has none.
                         let text_end = if string_length > 0 { string_end - 1 } else { i };
-                        let mut str = String::new();
-                        for c in &buf[i..text_end] {
-                            str.push(CP437_TO_UNICODE[*c as usize]);
-                        }
+                        let str = if version >= 400 {
+                            if string_length > 0 && buf[text_end] != 0 {
+                                return Err(Box::new(ExecutableError::InvalidStringTerminator(header.id)));
+                            }
+                            std::str::from_utf8(&buf[i..text_end])
+                                .map_err(|error| ExecutableError::InvalidStringEncoding {
+                                    variable_id: header.id,
+                                    valid_up_to: error.valid_up_to(),
+                                })?
+                                .to_string()
+                        } else {
+                            buf[i..text_end].iter().map(|byte| CP437_TO_UNICODE[*byte as usize]).collect()
+                        };
                         Some(GenericVariableData::String(std::sync::Arc::new(str)))
                     };
                     variable = VariableValue {
@@ -1363,6 +1376,85 @@ mod tests {
             string_constant(u16::MAX as usize).to_buffer(400),
             Err(ExecutableError::StringConstantTooLong(length)) if length == u16::MAX as usize
         ));
+    }
+
+    fn encoded_string(text: &str, version: u16) -> Vec<u8> {
+        let mut entry = string_constant(0);
+        entry.value = VariableValue::new_string(text.to_string());
+        let mut buffer = 1u16.to_le_bytes().to_vec();
+        buffer.extend(entry.to_buffer(version).unwrap());
+        buffer
+    }
+
+    #[test]
+    fn s5_literal_encoding_is_selected_by_runtime() {
+        for version in [100, 300, 340, 400] {
+            let text = if version >= 400 {
+                "\u{20ac}\u{754c}e\u{301}\u{1f600}\0end"
+            } else {
+                "\u{e9}\u{2591}\u{2502}"
+            };
+            let mut buffer = encoded_string(text, version);
+            let mut payload = buffer[15..].to_vec();
+            decrypt_chunks(&mut payload, version, false);
+            let expected = if version >= 400 { text.as_bytes().to_vec() } else { vec![0x82, 0xb0, 0xb3] };
+            assert_eq!(&payload[..payload.len() - 1], expected, "runtime {version}");
+            assert_eq!(payload.last(), Some(&0));
+            let (consumed, table) = VariableTable::deserialize(version, &mut buffer).unwrap();
+            assert_eq!(consumed, buffer.len());
+            assert_eq!(table.get_value(1).as_string(), text);
+        }
+    }
+
+    #[test]
+    fn s5_literal_utf8_byte_limits() {
+        for byte_length in [65533, 65534, 65535] {
+            let mut entry = string_constant(0);
+            entry.value = VariableValue::new_string(format!("{}{}", "\u{1f600}".repeat(byte_length / 4), "x".repeat(byte_length % 4)));
+            let result = entry.to_buffer(400);
+            if byte_length < 65535 {
+                let mut buffer = 1u16.to_le_bytes().to_vec();
+                buffer.extend(result.unwrap());
+                let (_, table) = VariableTable::deserialize(400, &mut buffer).unwrap();
+                assert_eq!(table.get_value(1).as_string(), entry.value.as_string());
+            } else {
+                assert_eq!(result.unwrap_err(), ExecutableError::StringConstantTooLong(byte_length));
+            }
+        }
+    }
+
+    #[test]
+    fn s5_literal_loader_rejects_malformed_utf8_and_frames() {
+        for payload in [
+            vec![0xff],
+            vec![0xc0, 0x80],
+            vec![0xed, 0xa0, 0x80],
+            vec![0xf4, 0x90, 0x80, 0x80],
+            vec![0xe2, 0x82],
+        ] {
+            let mut buffer = encoded_string(&"x".repeat(payload.len()), 400);
+            buffer[15..15 + payload.len()].copy_from_slice(&payload);
+            let error = VariableTable::deserialize(400, &mut buffer).err().unwrap();
+            assert_eq!(
+                error.downcast_ref::<ExecutableError>(),
+                Some(&ExecutableError::InvalidStringEncoding {
+                    variable_id: 1,
+                    valid_up_to: 0
+                })
+            );
+        }
+        let mut buffer = encoded_string("valid", 400);
+        *buffer.last_mut().unwrap() = b'x';
+        let error = VariableTable::deserialize(400, &mut buffer).err().unwrap();
+        assert_eq!(error.downcast_ref::<ExecutableError>(), Some(&ExecutableError::InvalidStringTerminator(1)));
+        let buffer = encoded_string("\u{20ac}", 400);
+        for end in 0..buffer.len() {
+            assert!(VariableTable::deserialize(400, &mut buffer[..end].to_vec()).is_err(), "truncated at {end}");
+        }
+        for text in ["", "ASCII", "\0"] {
+            let (_, table) = VariableTable::deserialize(400, &mut encoded_string(text, 400)).unwrap();
+            assert_eq!(table.get_value(1).as_string(), text);
+        }
     }
 }
 

@@ -3,12 +3,14 @@
 A PPE is a compiled PPL program. This describes the container as IcyBoard reads
 and writes it, from the first byte to the last.
 
-All multi byte numbers are little endian. Strings are CP437, not UTF-8.
+All multi byte numbers are little endian. String literals use CP437 below
+runtime 400 and strict UTF-8 from runtime 400. The target PPE version selects
+the encoding, independently of the source language version.
 
 The authority for everything here is the code, not this page:
-[exec.rs](../crates/icy_board_engine/src/executable/exec.rs) for the container,
-[variable_table.rs](../crates/icy_board_engine/src/executable/variable_table.rs)
-for the variable table and [crypt.rs](../crates/icy_board_engine/src/crypt.rs)
+[exec.rs](../crates/icy_board_ppl/src/executable/exec.rs) for the container,
+[variable_table.rs](../crates/icy_board_ppl/src/executable/variable_table.rs)
+for the variable table and [crypt.rs](../crates/icy_board_ppl/src/crypt.rs)
 for encryption and packing.
 
 ## Layout
@@ -174,9 +176,22 @@ body inline instead of following it.
 **String, no dimensions**
 
 ```text
-u16                 length of the text including its terminator
-bytes               CP437 text, zero terminated, encrypted
+u16                 byte length of the text including its terminator
+bytes               text payload followed by NUL; encryption follows runtime
 ```
+
+Below runtime 400 the payload remains CP437. From runtime 400 it is UTF-8
+without a BOM. The maximum text payload is 65,534 bytes, regardless of code
+point count. The final NUL is excluded from the decoded text; embedded NULs
+are preserved. The loader also accepts a zero-length payload as an empty value.
+For runtime 400, invalid UTF-8 and a missing terminator in a nonempty payload
+are errors, as are truncated declared payloads.
+
+This UTF-8 change was explicitly pulled forward from the container work on
+2026-09-09. Old 400-beta PPEs with non-ASCII literals must be recompiled, and
+new PPEs need the updated loader. Both use version 400, so the loader does not
+attempt to identify old CP437 payloads heuristically. ASCII payloads are
+unchanged. No legacy PPE encoding, length-field width or opcode changes here.
 
 **String, with dimensions**
 

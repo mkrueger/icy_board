@@ -34,6 +34,12 @@ pub enum ExecutableError {
     #[error("String type invalid: {0}")]
     StringTypeInvalid(VariableType),
 
+    #[error("Invalid UTF-8 in string constant {variable_id} at byte {valid_up_to}")]
+    InvalidStringEncoding { variable_id: usize, valid_up_to: usize },
+
+    #[error("String constant {0} is missing its terminating NUL")]
+    InvalidStringTerminator(usize),
+
     #[error("Invalid index in variable table: {0} > max:{1}")]
     InvalidVariableIndexInTable(usize, usize),
 

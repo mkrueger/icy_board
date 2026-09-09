@@ -149,6 +149,10 @@ name = "closed_enum_roundtrip"
 required-features = ["bbs"]
 
 [[test]]
+name = "s5_text_contract"
+required-features = ["bbs"]
+
+[[test]]
 name = "enum_has"
 required-features = ["bbs"]
 

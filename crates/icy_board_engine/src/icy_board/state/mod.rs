@@ -2769,23 +2769,20 @@ impl IcyBoardState {
 
         for c in data {
             if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
-                let _ = self.user_screen.print_char(*c);
                 if user_is_utf8 {
+                    let _ = self.user_screen.print_char(*c);
                     let encoded = c.encode_utf8(&mut buf);
                     user_bytes.extend_from_slice(encoded.as_bytes());
-                } else if let Some(&cp437) = UNICODE_TO_CP437.get(c) {
-                    user_bytes.push(cp437);
                 } else {
-                    user_bytes.push(b'.');
+                    let cp437 = UNICODE_TO_CP437.get(c).copied().unwrap_or(b'.');
+                    let _ = self.user_screen.print_char(CP437_TO_UNICODE[cp437 as usize]);
+                    user_bytes.push(cp437);
                 }
             }
             if target != TerminalTarget::User {
-                let _ = self.sysop_screen.print_char(*c);
-                if let Some(&cp437) = UNICODE_TO_CP437.get(c) {
-                    sysop_bytes.push(cp437);
-                } else {
-                    sysop_bytes.push(b'.');
-                }
+                let cp437 = UNICODE_TO_CP437.get(c).copied().unwrap_or(b'.');
+                let _ = self.sysop_screen.print_char(CP437_TO_UNICODE[cp437 as usize]);
+                sysop_bytes.push(cp437);
             }
             if *c == '\n' {
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
@@ -4679,6 +4676,86 @@ mod screen_tests {
 
     fn attribute_of(screen: &VirtualScreen) -> u8 {
         screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink)
+    }
+
+    #[test]
+    fn s5_ppe_output_matches_rendered_utf8_and_cp437_screens() {
+        use crate::{
+            compiler::{PPECompiler, workspace::Workspace},
+            parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+        };
+
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            for (width, height) in [(80, 25), (132, 43)] {
+                for utf8 in [false, true] {
+                    let prefix = "x".repeat(width as usize - 3);
+                    let text = format!("{prefix}\u{20ac}\u{754c}e\u{301}\u{1f600}\u{e9}Z\r");
+                    let cp437_text = format!("{prefix}..e..\u{e9}Z\r");
+                    let source = format!("PRINT \"{}\", CHR(13)", text.trim_end_matches('\r'));
+                    let registry = UserTypeRegistry::icy_board_registry();
+                    let errors = Arc::new(std::sync::Mutex::new(ErrorReporter::default()));
+                    let mut workspace = Workspace::default();
+                    workspace.package.runtime = Some(400);
+                    workspace.set_default_language_version(Some(400));
+                    let ast = parse_ast(PathBuf::from("screen.pps"), errors.clone(), &source, &registry, Encoding::Utf8, &workspace);
+                    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+                    compiler.compile(&[&ast]);
+                    assert!(errors.lock().unwrap().errors.is_empty());
+                    let directory = tempfile::tempdir().unwrap();
+                    let path = directory.path().join("screen.ppe");
+                    std::fs::write(&path, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
+                    let executable = crate::executable::Executable::read_file(&path, false).unwrap();
+                    let (mut state, mut peer) = graphics_state().await;
+                    state.session.term_caps.is_utf8 = utf8;
+                    state.set_terminal_size(width, height);
+                    let expected: Vec<u8> = if utf8 {
+                        text.as_bytes().to_vec()
+                    } else {
+                        cp437_text.chars().map(|ch| UNICODE_TO_CP437[&ch]).collect()
+                    };
+                    let mut io = crate::vm::DiskIO::new(directory.path().to_str().unwrap(), None);
+                    let execute = crate::vm::run(&path, &executable, &mut io, &mut state);
+                    let read = async {
+                        let mut output = Vec::new();
+                        while output.len() < expected.len() {
+                            let mut buffer = [0; 1024];
+                            let size = peer.read(&mut buffer).await.unwrap();
+                            assert_ne!(size, 0);
+                            output.extend_from_slice(&buffer[..size]);
+                        }
+                        output
+                    };
+                    let (result, output) = tokio::time::timeout(Duration::from_secs(5), async { tokio::join!(execute, read) })
+                        .await
+                        .unwrap();
+                    result.unwrap();
+                    assert_eq!(output, expected, "{width}x{height}, utf8={utf8}");
+                    let rendered_text = if utf8 {
+                        String::from_utf8(output).unwrap()
+                    } else {
+                        output.iter().map(|byte| CP437_TO_UNICODE[*byte as usize]).collect()
+                    };
+                    for (virtual_screen, rendered_text) in [(&state.user_screen, rendered_text.as_str()), (&state.sysop_screen, cp437_text.as_str())] {
+                        let mut rendered = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+                        rendered.write_bytes(format!("\x1b[8;{height};{width}t").as_bytes());
+                        rendered.write_bytes(rendered_text.as_bytes());
+                        assert_eq!(virtual_screen.buffer.caret.position(), rendered.buffer.caret.position());
+                        for row in 0..height as i32 {
+                            for column in 0..width as i32 {
+                                let position = icy_engine::Position::new(column, row);
+                                assert_eq!(
+                                    virtual_screen.buffer.char_at(position).ch,
+                                    rendered.buffer.char_at(position).ch,
+                                    "{width}x{height}, utf8={utf8}, {position:?}"
+                                );
+                            }
+                        }
+                        assert_eq!(virtual_screen.buffer.caret.y, 1, "output should wrap once");
+                        assert_eq!(virtual_screen.buffer.caret.x, 0);
+                    }
+                }
+            }
+        });
     }
 
     /// The escape sequence is a delta, so the screen it was computed against is the only

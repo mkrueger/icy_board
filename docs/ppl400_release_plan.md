@@ -46,7 +46,7 @@ offene Reproduktionen stehen im [P0-Protokoll](#p0--2026-09-09).
 
 | ID | Befund / Risiko | Verbindliches Ergebnis | Einordnung |
 | --- | --- | --- | --- |
-| F1 | Unicode-Literale werden über den klassischen CP437-Konstantenpfad gespeichert; nicht darstellbare Zeichen können verändert werden. | Nicht-CP437-Text über Quelle, Compiler, PPE-Datei, Loader und Ausführung verlustfrei erhalten; Legacy-Kodierung bewahren. | Sprachvertrag in S5, Formatlösung nach C1, Umsetzung C2. |
+| F1 | Unicode-Literale wurden über den klassischen CP437-Konstantenpfad gespeichert; nicht darstellbare Zeichen konnten verändert werden. | Nicht-CP437-Text über Quelle, Compiler, PPE-Datei, Loader und Ausführung verlustfrei erhalten; Legacy-Kodierung bewahren. | UTF-8-Literalteil aus C2 ausdrücklich nach S5 vorgezogen; Datei- und Terminal-Roundtrips bestanden. |
 | F2 | Aktuell knapp 32 KiB erzeugter Code sowie kleine IDs, Offsets und Routinedeskriptoren. | Alle relevanten Grenzen inventarisieren, Zielgrößen beschließen und das freigegebene Größenkonzept einschließlich Prüfungen umsetzen. | Erst nach den Sprachschritten: C1/C2. |
 | F3 | Gespeicherte geschlossene Enum-Domains und kompakte Host-Typ-IDs erschweren API-Erweiterungen. | Vertrag für eigene und Host-Enums sowie dauerhafte Host-Typidentität festlegen; alte PPEs gegen neue API-Werte testen. | Sprachentscheidung S4; eventuelle Formatanteile C1/C2; API-Vertrag A1. |
 | F4 | Alte Audio- und Surface-Handles können nach Slot-Wiederverwendung beziehungsweise Grafik-Neustart neue Ressourcen adressieren. | Freigegebene Handles bleiben ungültig; Aliase lebender Ressourcen bleiben kontrolliert nutzbar. | Ressourcenvertrag S1, Korrektur R1. |
@@ -272,23 +272,65 @@ nicht die aktuelle Werteliste oder eine kompakte dateilokale Typnummer. Die
 bisherige Decompiler-Erkennung über ID und Metadatenliste ist noch keine dauerhafte
 Zuordnung. Diese Repräsentation und Tests mit tatsächlich unterschiedlichen
 Katalog-/Typ-ID-Belegungen bleiben C1/C2; F3 ist damit noch nicht vollständig
-geschlossen. S5 wird erst separat besprochen und freigegeben.
+geschlossen. S5 wurde anschließend separat besprochen und freigegeben.
 
 ### S5 — Text-, Binär- und Positionsverträge (F1)
 
-Status: offen; erst nach S4 einzeln besprechen.
+Status: am 2026-09-09 ausdrücklich freigegeben und implementiert, einschließlich
+des vorgezogenen UTF-8-Literalteils aus C2. Fokussierte Abnahmen und vollständige
+EN/DE-Gesamtläufe bestanden.
 
-**Besprechen:**
+**Beschlossener Vertrag:**
 
-- Unicode-Text und Binärdaten, Literaltypen und Konvertierungsgrenzen.
-- Bedeutung von Zeichenposition, Byteposition, Graphem und Terminalzelle.
-- Nullbasierte moderne Member versus klassische einbasierte Funktionen.
-- Umgang mit nicht darstellbaren Zeichen bei tatsächlicher CP437-Ausgabe.
+- Textliterale und Strings sind Unicode-Text; `BYTES` enthält Rohbytes.
+  `TOBYTES(text)` kodiert UTF-8, `bytes.ToString()` dekodiert strikt und meldet
+  ungültige Daten mit `String/Format`. Keine neue Literalart.
+- Stringlängen und -positionen zählen Unicode-Codepoints (Skalarwerte), nicht
+  Bytes, Grapheme oder Terminalzellen. Keine automatische Normalisierung.
+  `Reverse` kehrt Codepoints um; Padding zählt Codepoints, keine Bildschirmbreite.
+- Moderne Member bleiben nullbasiert, klassische Funktionen einbasiert.
+  Suchfehlschläge bleiben `-1` beziehungsweise `0`; bestehende Rand-, Padding-
+  und historische Kapazitätsregeln bleiben erhalten.
+- UTF-8-Ausgabe bleibt Unicode. Erst an tatsächlichen CP437-Ausgabegrenzen wird
+  jeder nicht darstellbare Codepoint durch `.` ersetzt. Der gespeicherte Text
+  bleibt unverändert; virtuelle CP437-Bildschirme spiegeln die Ersatzzeichen.
 
-**Abnahme:** Ein eindeutiger Sprachvertrag und Regressionen mit `€`, CJK,
-kombinierenden Zeichen und Nicht-BMP-Zeichen. `é` allein ist kein geeigneter
-Nicht-CP437-Test. Die noch offene Datei-Roundtrip-Korrektur wird als F1 nach C2
-übernommen, nicht als bereits erledigt markiert.
+**Ausdrücklich vorgezogener C2-Teil:** Ab PPE-/Zielruntime 400 werden Literale als
+UTF-8 ohne BOM gespeichert und strikt geladen, auch bei Quellsprache 350.
+Unter 400 bleibt CP437 unverändert. `u16`-Bytelänge und abschließendes NUL bleiben
+erhalten: maximal 65.534 Nutzbytes; eingebettete NULs bleiben erhalten. Ungültiges
+UTF-8, abgeschnittene Nutzdaten und fehlende Terminatoren werden zurückgewiesen.
+Alte 400-Beta-PPEs mit Nicht-ASCII-Literalen müssen neu kompiliert werden; neue
+PPEs benötigen den aktualisierten Loader. Kein heuristischer CP437-Fallback.
+Diese Beta-Inkompatibilität wurde ausdrücklich mit freigegeben.
+
+**Verifiziert:**
+
+- Direkte Literaltests: exakte CP437-Bytes für Runtime 100/300/340, UTF-8 ab 400,
+  NULs und Leertext, ungültige UTF-8-Sequenzen, abgeschnittene Rahmen sowie
+  65.533/65.534/65.535 UTF-8-Nutzbytes.
+- Quelle → Compiler → echte PPE-Datei → Loader → VM sowie Roh- und
+  rekonstruierter Decompiler → Compiler → Datei → VM erhalten `€`, CJK,
+  kombinierende Zeichen und Nicht-BMP-Zeichen. Sprachversion 350/400 gegen
+  Runtime 400 sowie ein Legacy-340-Roundtrip sind abgedeckt.
+- Codepoint-/Bytezahlen, moderne/klassische Suche, Indizierung, Teilstrings,
+  Padding, Reverse, Split, Regex-Capture-Positionen, fehlende Normalisierung,
+  striktes UTF-8-Decoding und unveränderte Kapazitätsgrenzen sind getestet.
+- Tatsächliche PPE-Ausgabebytes und gerenderte Terminalzeichen samt Cursor und
+  Umbruch bei 80×25 und 132×43 bestehen für UTF-8 und CP437. Dies ist eine
+  automatisierte Renderer-Abnahme, noch keine interaktive Client-Matrix.
+- Englische/deutsche LSP-Hilfe mit unabhängigen Locale-Loadern geprüft.
+
+**Gesamtvalidierung:** `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine
+-p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet` in getrennten
+EN- und DE-Prozessen: jeweils **2.878 bestanden, 0 fehlgeschlagen, 6 ignoriert**.
+All-Target-Checks der fünf Pakete und Engine-All-Targets ohne Default-Features
+bestanden. Der neue Integrationstest ist wie die übrigen BBS-Tests an `bbs`
+gebunden. Formatierung, Diff-Check und Editor-Diagnostik ohne neue Fehler.
+
+**Abgrenzung:** F1s Unicode-Dateipfad ist damit nachgewiesen. Größere Literale,
+Binärkonstanten, S1/S2-Kodierungen und F2/F3 bleiben C1/C2 vorbehalten. Die
+übrige Containerentscheidung bleibt nach S7 separat freigabepflichtig.
 
 ### S6 — Fehlerfluss und strukturiertes Cleanup
 
@@ -321,6 +363,8 @@ aufgelistet. Erst danach C1 beginnen.
 ### C1 — PPE-400-Formatentscheidung (F1/F2/F3)
 
 Status: offen; **keine Umsetzung ohne eigene Besprechung und Freigabe**.
+Einzige bereits freigegebene Ausnahme ist die UTF-8-Literalkodierung ab Runtime
+400 aus S5; die bestehende Bytelänge bleibt dabei unverändert.
 
 **Zentrale Frage:** Welche Änderungen sind für die beschlossene Sprache und
 langfristige PPE-Nutzung wirklich erforderlich, und welche wären unnötiger Umbau?
@@ -356,7 +400,8 @@ eine provisorische Binärschnittstelle als langfristig stabil veröffentlichen.
 
 ### C2 — Freigegebenes Format implementieren und absichern
 
-Status: offen; eigener Freigabepunkt nach C1.
+Status: übriger Umfang offen; eigener Freigabepunkt nach C1. Die ausdrücklich
+vorgezogene UTF-8-Literalkodierung ist mit S5 implementiert und in EN/DE abgenommen.
 
 **Arbeit:** Ausschließlich die in C1 beschlossene Lösung implementieren;
 Compiler, Serializer, Loader und Decompiler gemeinsam aktualisieren.
@@ -376,6 +421,7 @@ Compiler, Serializer, Loader und Decompiler gemeinsam aktualisieren.
 
 Auch die folgenden Schritte werden jeweils einzeln besprochen und freigegeben.
 Eine Reihenfolgeänderung ist möglich, aber nur ausdrücklich; C1 bleibt nach S7.
+Die UTF-8-Literalkodierung wurde als begrenzte Ausnahme mit S5 freigegeben.
 
 ### R1 — Ressourcenidentität korrigieren (F4)
 
@@ -553,7 +599,7 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 - [x] P0 abgeschlossen; stabiler Build und reproduzierbare Baseline.
 - [ ] S1–S6 jeweils einzeln besprochen; freigegebene Änderungen umgesetzt.
 - [ ] S7 abgeschlossen; Container erst danach separat entschieden.
-- [ ] F1: Unicode-Datei-Roundtrip nachgewiesen.
+- [x] F1: Unicode-Datei-Roundtrip nachgewiesen (S5, vorgezogener UTF-8-Literalteil).
 - [ ] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
 - [ ] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.
 - [x] F4: Stale Handles bleiben auch nach Wiederverwendung ungültig.

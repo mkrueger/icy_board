@@ -442,12 +442,57 @@ as PPE files. Existing fixed value-only layouts retain their encoding.
 - Direct and indirect recursive record types remain forbidden, including
 	recursion through dynamic arrays. No pointers or recursive types are added.
 
+### Text, bytes and literal encoding
+
+Ordinary `"..."` literals are Unicode text, not binary data. `STRING` and
+`BIGSTR` hold Unicode scalar values (code points); no automatic Unicode
+normalization is performed. Text operations count these values, not UTF-8
+bytes, grapheme clusters (user-perceived characters), or terminal cells.
+
+| Text | Code points | UTF-8 bytes |
+| :--- | ---: | ---: |
+| `€` | 1 | 3 |
+| `界` | 1 | 3 |
+| `e` followed by U+0301 (combining acute accent) | 2 | 3 |
+| U+1F600 (a non-BMP character) | 1 | 4 |
+
+The decomposed `e` plus U+0301 and the single code point `é` are different
+strings under ordinal equality. `Reverse()` reverses code points, so it can
+separate a combining mark from its base. `PadLeft()` and `PadRight()` pad to a
+code point count, not a terminal width. Display width depends on terminal
+handling of wide, combining and other Unicode sequences; `.Len()` is not a
+layout measurement.
+
+`BYTES` holds raw bytes. `TOBYTES(text)` encodes UTF-8; `bytes.ToString()` decodes
+strict UTF-8, returning an empty string and `ErrKind.String` / `ErrCode.Format`
+on invalid input. It does not guess CP437 or substitute replacement characters.
+Numeric `TOBYTES` conversions retain their fixed-width little-endian format.
+
+**Stored literal encoding follows the PPE target runtime, not the source
+language version.** Below runtime 400 the existing CP437 format is unchanged.
+From runtime 400 literals are stored as UTF-8 without a BOM and loaded strictly
+as UTF-8. The existing `u16` byte length includes the final NUL: a literal can
+contain at most 65,534 encoded bytes. Embedded NULs are preserved by the
+length-delimited payload. This file limit does not limit language-400 `STRING`
+values constructed at runtime. Larger literal lengths and the remaining
+container changes are separate work.
+
+**Recompile old 400-beta PPEs containing non-ASCII literals.** Their CP437 bytes
+cannot reliably be distinguished from UTF-8 under the same version number.
+New files require the updated loader; there is no heuristic CP437 fallback.
+Malformed UTF-8, truncated literal payloads and missing final NULs are rejected.
+
+Stored text encoding is independent of terminal encoding. UTF-8 caller
+connections receive UTF-8. At an actual CP437 output boundary, including the
+sysop monitor, each unrepresentable code point becomes `.`; the stored string
+is unchanged. Virtual CP437 screens track the same substituted output.
+
 ### String members
 
 At language 400 `STRING` is the string type and is not length-limited, so it is
 used throughout. It has its own PPE type ID, separate from classic `STRING` and
 `BIGSTR`. `BIGSTR` remains a deprecated legacy type limited to 2048 Unicode
-characters; the compiler warns when it is written at 400.
+code points; the compiler warns when it is written at 400.
 
 `STRING` values expose their common operations as members. This is the same
 operation as the classic global function where one exists, written with the
@@ -467,7 +512,7 @@ PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 
 | Member | Returns | Meaning |
 | :--- | :--- | :--- |
-| `Len()` | `INTEGER` | Number of Unicode characters |
+| `Len()` | `INTEGER` | Number of Unicode code points (scalar values) |
 | `Find(search [, start [, comparison]])` | `INTEGER` | First match at or after `start` |
 | `FindLast(search [, start [, comparison]])` | `INTEGER` | Last match at or before `start` |
 | `Contains(search [, comparison])` | `BOOLEAN` | Whether a non-empty search string occurs |
@@ -488,7 +533,7 @@ PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 | `ToMixedCase()` | `STRING` | Title-case each word |
 | `StripATX()` | `STRING` | Remove `@X` color codes |
 
-Positions in the PPL 400 member API are zero-based Unicode character positions;
+Positions in the PPL 400 member API are zero-based Unicode code point positions;
 `-1` means no match. Searches are case-sensitive. An empty search string is not
 considered a match and has a count of zero. `Find` and `FindLast` are the
 zero-based member forms of the classic `INSTR` and `INSTRR`, which remain 1-based
@@ -497,6 +542,13 @@ alternative to the 1-based classic `MID`; `Left` and `Right` are count-based and
 exactly like the classic functions. `Remove` and `Insert` use the same
 zero-based positions. `ToInt` is the member form of the classic `S2I`. A single
 character is also reachable through zero-based indexing (`text[0]`).
+
+`Substring` retains `MID`'s padding rule: it returns the requested positive
+number of code points, using spaces for positions outside the text. A
+non-positive length returns an empty string. Indexing outside the text returns
+an empty string; `Insert` clamps its index to the text bounds. `Remove` leaves
+the text unchanged for a negative or out-of-range start or non-positive length,
+and otherwise removes up to the requested number of code points.
 
 `StringComparison.Ordinal` is the default. Pass
 `StringComparison.OrdinalIgnoreCase` as the last argument for Unicode-aware,
@@ -514,7 +566,7 @@ exceeds the regex engine's size limit reports `ErrKind.String` /
 `ErrCode.Limit` instead of aborting execution. Its fallback is `-1` for
 `Find`/`FindLast`, `0` for `Count`, and `FALSE` for the boolean comparisons.
 
-Scalar strings support zero-based Unicode character indexing in language 400.
+Scalar strings support zero-based Unicode code point indexing in language 400.
 `text[0]` returns the first character as a `STRING`; a negative or out-of-range
 index returns an empty string. String arrays keep their normal array semantics,
 and indexing can be chained: `words[0][0]` reads the first character of the
@@ -604,7 +656,7 @@ or unmatched capture has start position `-1`. Group zero is the complete match.
 `matches[index]`; `matches.Len()` reports the number of matches.
 
 `Find`, `IsMatch` and `FindAll` search at or after the zero-based Unicode
-character position `start`, even if it lies inside a match that would have
+code point position `start`, even if it lies inside a match that would have
 started earlier. The whole text still supplies the context for anchors and
 word boundaries: `start` is not a new beginning for `^`. `FindAll` returns
 non-overlapping matches and suppresses an empty match immediately following
