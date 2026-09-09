@@ -25,6 +25,7 @@ use super::{
     IcyBoardSerializer, PcbUser,
     icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
     is_false, is_null_16, is_null_64, is_null_i64,
+    snapshot::Snapshot,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
 };
 
@@ -1331,7 +1332,7 @@ impl User {
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UserBase {
-    users: Vec<User>,
+    users: Snapshot<Vec<User>>,
 }
 
 impl UserBase {
@@ -1357,7 +1358,7 @@ impl UserBase {
         for u in pcb_user {
             users.push(User::import_pcb(u));
         }
-        Self { users }
+        Self { users: users.into() }
     }
 
     pub fn new_user(&mut self, new_user: User) -> usize {
@@ -1439,6 +1440,103 @@ impl Deref for UserBase {
 impl DerefMut for UserBase {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.users
+    }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+
+    fn user() -> User {
+        User {
+            name: "Original user".into(),
+            contacts: vec![UserContact {
+                service: "test".into(),
+                account: "original".into(),
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn user_base_clones_share_storage_and_isolate_nested_edits() {
+        let mut users = UserBase::default();
+        assert!(users.is_empty());
+        assert_eq!(users.new_user(user()), 0);
+        let original = users.clone();
+        assert!(original.users.ptr_eq(&users.users));
+
+        users[0].name = "Edited user".into();
+        users[0].contacts[0].account.push_str(" edited");
+        users[0].stats.messages_read = 42;
+        assert!(!original.users.ptr_eq(&users.users));
+        assert_eq!(original[0].name, "Original user");
+        assert_eq!(original[0].contacts[0].account, "original");
+        assert_eq!(original[0].stats.messages_read, 0);
+        assert_eq!(users[0].contacts[0].account, "original edited");
+        assert_eq!(users[0].stats.messages_read, 42);
+
+        let before_insert = users.clone();
+        assert_eq!(users.new_user(User::default()), 1);
+        assert_eq!(before_insert.len(), 1);
+        assert_eq!(users.len(), 2);
+
+        let mut independent = original.clone();
+        independent.get_mut(0).unwrap().contacts.clear();
+        assert_eq!(original[0].contacts.len(), 1);
+        assert!(independent[0].contacts.is_empty());
+        assert_eq!(original.find_by_name("Original user"), Some(0));
+    }
+
+    #[test]
+    fn mutable_vec_api_preserves_old_snapshots() {
+        let mut users = UserBase::default();
+        users.new_user(user());
+        let original = users.clone();
+        for user in users.iter_mut() {
+            user.name = "Renamed".into();
+        }
+        assert_eq!(original[0].name, "Original user");
+        assert_eq!(users[0].name, "Renamed");
+
+        let renamed = users.clone();
+        users.push(User::default());
+        assert_eq!(renamed.len(), 1);
+        assert_eq!(users.len(), 2);
+        let before_replace = users.clone();
+        *users = Vec::new();
+        assert!(users.is_empty());
+        assert_eq!(before_replace.len(), 2);
+    }
+
+    #[test]
+    fn user_base_toml_schema_is_unchanged() {
+        #[derive(Serialize, Deserialize)]
+        struct LegacyUserBase {
+            users: Vec<User>,
+        }
+
+        for legacy in [LegacyUserBase { users: Vec::new() }, LegacyUserBase { users: vec![user()] }] {
+            let encoded = toml::to_string(&legacy).unwrap();
+            let users: UserBase = toml::from_str(&encoded).unwrap();
+            assert_eq!(users.len(), legacy.users.len());
+            let snapshot = users.clone();
+            assert!(snapshot.users.ptr_eq(&users.users));
+            let serialized = toml::to_string(&snapshot).unwrap();
+            assert_eq!(serialized, encoded);
+            let decoded: LegacyUserBase = toml::from_str(&serialized).unwrap();
+            assert_eq!(toml::to_string(&decoded).unwrap(), encoded);
+        }
+    }
+
+    #[test]
+    fn imported_user_base_uses_snapshot_storage() {
+        let users = UserBase::import_pcboard(&[user().to_pcboard()]);
+        let mut edited = users.clone();
+        assert!(users.users.ptr_eq(&edited.users));
+        edited[0].name = "Edited import".into();
+        assert_eq!(users[0].name, "Original user");
+        assert_eq!(edited[0].name, "Edited import");
     }
 }
 

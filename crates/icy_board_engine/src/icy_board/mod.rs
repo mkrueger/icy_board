@@ -59,6 +59,7 @@ pub mod pcb;
 pub mod qwknet;
 pub mod sec_levels;
 pub mod security_expr;
+pub mod snapshot;
 pub mod state;
 pub mod statistics;
 pub mod subscription;
@@ -124,7 +125,7 @@ pub struct IcyBoard {
     pub file_name: PathBuf,
     pub root_path: PathBuf,
     pub users: UserBase,
-    pub config: IcbConfig,
+    pub config: snapshot::Snapshot<IcbConfig>,
     pub conferences: ConferenceBase,
     pub default_display_text: IcbTextFile,
 
@@ -153,7 +154,7 @@ impl IcyBoard {
             file_name: PathBuf::new(),
             root_path: PathBuf::new(),
             users: UserBase::default(),
-            config: IcbConfig::new(),
+            config: IcbConfig::new().into(),
             conferences: ConferenceBase::default(),
             languages: SupportedLanguages::default(),
             protocols: SupportedProtocols::default(),
@@ -169,6 +170,10 @@ impl IcyBoard {
             password_recovery_service: std::sync::Arc::new(password_recovery::RecoveryService::default()),
             user_revision: 0,
         }
+    }
+
+    pub fn configuration_snapshot(&self) -> snapshot::Snapshot<IcbConfig> {
+        self.config.clone()
     }
 
     pub fn resolve_paths(&mut self) {
@@ -468,7 +473,7 @@ impl IcyBoard {
             file_name: path.as_ref().to_path_buf(),
             root_path: parent_path.to_path_buf(),
             users,
-            config,
+            config: config.into(),
             conferences,
             default_display_text,
             languages,

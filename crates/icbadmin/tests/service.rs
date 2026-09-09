@@ -32,7 +32,7 @@ fn fixture() -> Fixture {
     let mut board = IcyBoard::new();
     board.root_path = dir.path().to_path_buf();
     board.file_name = file.clone();
-    board.config = IcbConfig::load(&file).unwrap();
+    board.config = IcbConfig::load(&file).unwrap().into();
     board.resolve_paths();
 
     let board = Arc::new(Mutex::new(board));
@@ -344,7 +344,7 @@ async fn paths_settings_can_update_help_path() {
 async fn live_backend_updates_disk_and_running_board() {
     let f = fixture();
     let mut running_board = IcyBoard::new();
-    running_board.config = IcbConfig::load(&f.file).unwrap();
+    running_board.config = IcbConfig::load(&f.file).unwrap().into();
     let running_board = Arc::new(Mutex::new(running_board));
     let backend = LiveAdminBackend::new(&f.file, running_board.clone()).unwrap();
 
@@ -388,7 +388,7 @@ async fn conference_fixture() -> (Fixture, PathBuf) {
 /// Mirrors what the running board holds after an external change to the files.
 async fn reload_board(f: &Fixture) {
     let mut board = f.board.lock().await;
-    board.config = IcbConfig::load(&f.file).unwrap();
+    board.config = IcbConfig::load(&f.file).unwrap().into();
     let conferences = board.resolve_file(&board.config.paths.conferences.clone());
     if conferences.is_file() {
         board.conferences = ConferenceBase::load(&conferences).unwrap();
@@ -515,7 +515,7 @@ async fn conference_index_out_of_range_is_reported_as_missing() {
 async fn live_backend_updates_conferences_in_memory_and_on_disk() {
     let (f, path) = conference_fixture().await;
     let mut running_board = IcyBoard::new();
-    running_board.config = IcbConfig::load(&f.file).unwrap();
+    running_board.config = IcbConfig::load(&f.file).unwrap().into();
     running_board.conferences = ConferenceBase::load(&path).unwrap();
     let running_board = Arc::new(Mutex::new(running_board));
     let backend = LiveAdminBackend::new(&f.file, running_board.clone()).unwrap();
@@ -536,7 +536,7 @@ async fn live_backend_keeps_paths_relative_in_the_configuration_file() {
     let root = f.backend.root_path().to_path_buf();
     let mut running_board = IcyBoard::new();
     running_board.root_path = root.clone();
-    running_board.config = IcbConfig::load(&f.file).unwrap();
+    running_board.config = IcbConfig::load(&f.file).unwrap().into();
     running_board.conferences = ConferenceBase::load(&conf_path).unwrap();
     // The running board resolves every path against the board directory.
     running_board.resolve_paths();
@@ -575,7 +575,7 @@ async fn live_conference_paths_are_relative() {
     let root = f.backend.root_path().to_path_buf();
     let mut running_board = IcyBoard::new();
     running_board.root_path = root.clone();
-    running_board.config = IcbConfig::load(&f.file).unwrap();
+    running_board.config = IcbConfig::load(&f.file).unwrap().into();
     running_board.conferences = ConferenceBase::load(&conf_path).unwrap();
     running_board.resolve_paths();
     let running_board = Arc::new(Mutex::new(running_board));

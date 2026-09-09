@@ -169,7 +169,7 @@ impl LiveAdminBackend {
                 fingerprint: backup::fingerprint(&self.board_file)?,
             });
         }
-        board.config = edited;
+        board.config = edited.into();
         board.resolve_paths();
 
         let mut disk_config = IcbConfig::load(&self.board_file).map_err(|e| AdminError::Load(e.to_string()))?;

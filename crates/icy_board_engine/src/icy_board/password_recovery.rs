@@ -704,7 +704,7 @@ impl RecoveryService {
             if !proof_valid(&b, proof, now) {
                 return Ok(false);
             }
-            (b.users[proof.index].clone(), b.config.clone())
+            (b.users[proof.index].clone(), (*b.config).clone())
         };
         if candidate.is_empty() || candidate.len() > 12 {
             return Ok(false);
