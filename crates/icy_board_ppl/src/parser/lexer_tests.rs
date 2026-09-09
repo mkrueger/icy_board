@@ -94,10 +94,14 @@ fn test_string() {
 fn test_op() {
     assert_eq!(Token::Eq, get_token("=="));
     assert_eq!(Token::Eq, get_token("="));
-    assert_eq!(Token::And, get_token("&&"));
+    assert_eq!(Token::ShortAnd, get_token("&&"));
     assert_eq!(Token::And, get_token("&"));
-    assert_eq!(Token::Or, get_token("||"));
+    assert_eq!(Token::ShortOr, get_token("||"));
     assert_eq!(Token::Or, get_token("|"));
+    for version in SUPPORTED_PPL_LANGUAGE_VERSIONS.iter().copied().filter(|version| *version < 400) {
+        assert_eq!(Token::And, get_token_ver("&&", version));
+        assert_eq!(Token::Or, get_token_ver("||", version));
+    }
     assert_eq!(Token::Not, get_token("!"));
     //assert_eq!(Token::PoW, get_token("**"));
     assert_eq!(Token::PoW, get_token("^"));
@@ -567,6 +571,20 @@ fn test_preproc_branch_selection() {
     // Only the first true branch runs.
     assert_active(";$IF 1 == 1\nA\n;$ELSEIF 1 == 1\nB\n;$ELSE\nC\n;$ENDIF", &["A"]);
     assert_active(";$IF 1 == 2\nA\n;$ELSEIF 1 == 1\nB\n;$ELSEIF 1 == 1\nC\n;$ENDIF", &["B"]);
+}
+
+#[test]
+fn s2_preprocessor_short_circuit_and_original_precedence() {
+    assert_active(";$LANGVERSION 400\n;$IF 0 && (1 / 0)\nWrong\n;$ELSE\nRight\n;$ENDIF", &["Right"]);
+    assert_active(";$LANGVERSION 400\n;$IF 1 || (1 / 0)\nRight\n;$ELSE\nWrong\n;$ENDIF", &["Right"]);
+    for language in [340, 400] {
+        assert_active(&format!(";$LANGVERSION {language}\n;$IF 1 | 0 & 0\nRight\n;$ENDIF"), &["Right"]);
+        assert_active(&format!(";$LANGVERSION {language}\n;$IF !1 = 2\nRight\n;$ENDIF"), &["Right"]);
+        let (_, errors) = lex_all(&format!(";$LANGVERSION {language}\n;$IF 0 & (1 / 0)\nWrong\n;$ENDIF"));
+        assert!(!errors.is_empty());
+    }
+    let (_, errors) = lex_all(";$LANGVERSION 340\n;$IF 0 && (1 / 0)\nWrong\n;$ENDIF");
+    assert!(!errors.is_empty());
 }
 
 #[test]

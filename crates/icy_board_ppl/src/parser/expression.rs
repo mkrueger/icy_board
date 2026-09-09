@@ -39,15 +39,15 @@ impl Parser<'_> {
     }
 
     fn parse_bool(&mut self) -> Option<Expression> {
-        let mut expr = self.parse_comparison()?;
+        let mut expr = self.parse_and()?;
         let mut links = 0;
-        while self.get_cur_token() == Some(Token::Or) || self.get_cur_token() == Some(Token::And) {
+        while matches!(self.get_cur_token(), Some(Token::Or | Token::ShortOr)) {
             if !self.take_operator_link(&mut links) {
                 return None;
             }
             let op_token = self.save_spanned_token();
             self.next_token();
-            let right = self.parse_comparison();
+            let right = self.parse_and();
             if let Some(e) = right {
                 expr = Expression::Binary(BinaryExpression::new(expr, op_token, e));
             } else {
@@ -55,6 +55,31 @@ impl Parser<'_> {
             }
         }
         Some(expr)
+    }
+
+    fn parse_and(&mut self) -> Option<Expression> {
+        let mut expr = self.parse_not()?;
+        let mut links = 0;
+        while matches!(self.get_cur_token(), Some(Token::And | Token::ShortAnd)) {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
+            let token = self.save_spanned_token();
+            self.next_token();
+            let right = self.parse_not()?;
+            expr = Expression::Binary(BinaryExpression::new(expr, token, right));
+        }
+        Some(expr)
+    }
+
+    fn parse_not(&mut self) -> Option<Expression> {
+        if self.get_cur_token() == Some(Token::Not) {
+            let token = self.save_spanned_token();
+            self.next_token();
+            let expr = self.parse_nested(Self::parse_not)?;
+            return Some(Expression::Unary(UnaryExpression::new(token, expr)));
+        }
+        self.parse_comparison()
     }
 
     fn parse_comparison(&mut self) -> Option<Expression> {
@@ -159,12 +184,7 @@ impl Parser<'_> {
             }
         }
         if self.get_cur_token() == Some(Token::Not) {
-            let token = self.save_spanned_token();
-            self.next_token();
-            let expr = self.parse_nested(Self::parse_unary);
-            if let Some(e) = expr {
-                return Some(Expression::Unary(UnaryExpression::new(token, e)));
-            }
+            return self.parse_nested(Self::parse_not);
         }
         self.parse_function_call_expression()
     }

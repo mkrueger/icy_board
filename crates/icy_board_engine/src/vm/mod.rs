@@ -518,6 +518,9 @@ impl VirtualMachine<'_> {
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr_sync(left)?;
+                if let Some(result) = op.short_circuit_result(left_value.as_bool()) {
+                    return Some(VariableValue::new_bool(result));
+                }
                 let right_value = self.eval_expr_sync(right)?;
                 Some(Self::apply_bin_op(*op, left_value, right_value))
             }
@@ -560,9 +563,8 @@ impl VirtualMachine<'_> {
             BinOp::PoW => left.pow(right),
             BinOp::Eq => VariableValue::new_bool(left == right),
             BinOp::NotEq => VariableValue::new_bool(left != right),
-            // Both sides are evaluated before this runs, so these do not short-circuit.
-            BinOp::Or => VariableValue::new_bool(left.as_bool() || right.as_bool()),
-            BinOp::And => VariableValue::new_bool(left.as_bool() && right.as_bool()),
+            BinOp::Or | BinOp::ShortOr => VariableValue::new_bool(left.as_bool() || right.as_bool()),
+            BinOp::And | BinOp::ShortAnd => VariableValue::new_bool(left.as_bool() && right.as_bool()),
             BinOp::Lower => VariableValue::new_bool(left < right),
             BinOp::LowerEq => VariableValue::new_bool(left <= right),
             BinOp::Greater => VariableValue::new_bool(left > right),
@@ -714,6 +716,9 @@ impl VirtualMachine<'_> {
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr(left).await?;
+                if let Some(result) = op.short_circuit_result(left_value.as_bool()) {
+                    return Ok(VariableValue::new_bool(result));
+                }
                 let right_value = self.eval_expr(right).await?;
                 Ok(Self::apply_bin_op(*op, left_value, right_value))
             }

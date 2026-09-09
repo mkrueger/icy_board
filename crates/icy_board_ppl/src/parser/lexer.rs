@@ -163,6 +163,8 @@ pub enum Token {
 
     And,
     Or,
+    ShortAnd,
+    ShortOr,
     Not,
 
     If,
@@ -295,6 +297,8 @@ impl fmt::Display for Token {
             Token::GreaterEq => write!(f, ">="),
             Token::And => write!(f, "&"),
             Token::Or => write!(f, "|"),
+            Token::ShortAnd => write!(f, "&&"),
+            Token::ShortOr => write!(f, "||"),
             Token::Not => write!(f, "!"),
             Token::Dot => write!(f, "."),
             Token::DotDot => write!(f, ".."),
@@ -933,7 +937,7 @@ impl Lexer {
             '&'  => {
                 let next = self.next_ch();
                  if let Some('&') = next {
-                    Some(Token::And)
+                          Some(Token::And)
                 } else {
                     if self.lang_version >= 350 {
                         if next == Some('=') {
@@ -948,7 +952,7 @@ impl Lexer {
             '|' => {
                 let next = self.next_ch();
                  if let Some('|') = next {
-                    Some(Token::Or)
+                          Some(Token::Or)
                 } else {
                     if self.lang_version >= 350 {
                         if next == Some('=') {
@@ -1506,7 +1510,9 @@ impl Lexer {
         }
         let reg = UserTypeRegistry::default();
         let parse_errors = Arc::new(Mutex::new(ErrorReporter::default()));
-        let mut parser = Parser::new(PathBuf::from("."), parse_errors.clone(), &reg, expr, Encoding::Utf8, &Workspace::default());
+        let mut workspace = Workspace::default();
+        workspace.set_default_language_version(Some(self.lang_version));
+        let mut parser = Parser::new(PathBuf::from("."), parse_errors.clone(), &reg, expr, Encoding::Utf8, &workspace);
         parser.next_token();
         let Some(expression) = parser.parse_expression() else {
             return Err(());
@@ -1860,7 +1866,7 @@ impl Lexer {
             '&' => {
                 let next = self.next_ch();
                 if let Some('&') = next {
-                    Some(Token::And)
+                    Some(if self.lang_version >= 400 { Token::ShortAnd } else { Token::And })
                 } else {
                     if self.lang_version >= 350 && next == Some('=') {
                         return Some(Token::AndAssign);
@@ -1872,7 +1878,7 @@ impl Lexer {
             '|' => {
                 let next = self.next_ch();
                 if let Some('|') = next {
-                    Some(Token::Or)
+                    Some(if self.lang_version >= 400 { Token::ShortOr } else { Token::Or })
                 } else {
                     if self.lang_version >= 350 && next == Some('=') {
                         return Some(Token::OrAssign);

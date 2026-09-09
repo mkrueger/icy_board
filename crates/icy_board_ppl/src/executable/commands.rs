@@ -25,12 +25,13 @@ impl Display for DeserializationError {
     }
 }
 
+#[derive(Clone)]
 pub struct PPEStatement {
     pub span: Range<usize>,
     pub command: PPECommand,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PPEScript {
     pub bugged_offsets: HashMap<usize, Vec<DeserializationErrorType>>,
     pub statements: Vec<PPEStatement>,
@@ -56,6 +57,9 @@ impl PPEScript {
     ///
     /// This function will return an error if .
     pub fn from_ppe_file(exe: &Executable) -> Result<Self, DeserializationError> {
+        if let Some(script) = &exe.in_memory_script {
+            return Ok(script.clone());
+        }
         let mut deserializer: super::PPEDeserializer = super::PPEDeserializer::default();
         let mut result = PPEScript::default();
         loop {
@@ -78,6 +82,9 @@ impl PPEScript {
     }
 
     pub fn step_through(exe: &Executable) -> Vec<CommandOrError> {
+        if let Some(script) = &exe.in_memory_script {
+            return script.statements.iter().cloned().map(CommandOrError::Command).collect();
+        }
         let mut deserializer = super::PPEDeserializer::default();
         let mut result = Vec::new();
         loop {
@@ -179,6 +186,15 @@ impl OnErrorTarget {
 }
 
 impl PPECommand {
+    pub(crate) fn contains_short_circuit(&self) -> bool {
+        match self {
+            Self::IfNot(expression, _) | Self::MemberCall(expression) | Self::ForEach(_, expression, _) => expression.contains_short_circuit(),
+            Self::ProcedureCall(_, arguments) | Self::PredefinedCall(_, arguments) => arguments.iter().any(PPEExpr::contains_short_circuit),
+            Self::Let(target, value) => target.contains_short_circuit() || value.contains_short_circuit(),
+            _ => false,
+        }
+    }
+
     pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
         match self {
             PPECommand::IfNot(expression, _) | PPECommand::MemberCall(expression) | PPECommand::ForEach(_, expression, _) => {
@@ -456,6 +472,21 @@ impl fmt::Display for PPEExpr {
 }
 
 impl PPEExpr {
+    pub(crate) fn contains_short_circuit(&self) -> bool {
+        match self {
+            Self::BinaryExpression(op, left, right) => op.is_short_circuit() || left.contains_short_circuit() || right.contains_short_circuit(),
+            Self::RecordLiteral(_, fields) => fields.iter().any(|(_, value)| value.contains_short_circuit()),
+            Self::Member(expression, _) | Self::UnaryExpression(_, expression) => expression.contains_short_circuit(),
+            Self::IndexedMember(expression, _, arguments) | Self::MemberFunctionCall(expression, arguments, _) => {
+                expression.contains_short_circuit() || arguments.iter().any(Self::contains_short_circuit)
+            }
+            Self::Dim(_, arguments) | Self::PredefinedFunctionCall(_, arguments) | Self::FunctionCall(_, arguments) => {
+                arguments.iter().any(Self::contains_short_circuit)
+            }
+            Self::Invalid | Self::Value(_) | Self::RoutineReference(_) => false,
+        }
+    }
+
     pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
         match self {
             PPEExpr::RecordLiteral(type_id, fields) => {
@@ -596,6 +627,7 @@ impl PPEExpr {
                 vec.push(*op as i16);
             }
             PPEExpr::BinaryExpression(op, left_expr, right_expr) => {
+                assert!(!op.is_short_circuit(), "Short-circuit expressions have no executable encoding");
                 left_expr.serialize(vec);
                 right_expr.serialize(vec);
                 vec.push(*op as i16);
@@ -808,6 +840,9 @@ impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_>
 
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> Result<VariableValue, PPEError> {
         let left_val = left.visit(self)?;
+        if let Some(result) = op.short_circuit_result(left_val.as_bool()) {
+            return Ok(VariableValue::new_bool(result));
+        }
         let right_val = right.visit(self)?;
         let val = match op {
             BinOp::Add => left_val + right_val,
@@ -816,8 +851,8 @@ impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_>
             BinOp::Div => left_val / right_val,
             BinOp::Mod => left_val % right_val,
             BinOp::PoW => left_val.pow(right_val),
-            BinOp::And => VariableValue::new_bool(left_val.as_bool() && right_val.as_bool()),
-            BinOp::Or => VariableValue::new_bool(left_val.as_bool() || right_val.as_bool()),
+            BinOp::And | BinOp::ShortAnd => VariableValue::new_bool(left_val.as_bool() && right_val.as_bool()),
+            BinOp::Or | BinOp::ShortOr => VariableValue::new_bool(left_val.as_bool() || right_val.as_bool()),
             BinOp::Eq => VariableValue::new_bool(left_val.as_bool() == right_val.as_bool()),
             BinOp::NotEq => VariableValue::new_bool(left_val.as_bool() != right_val.as_bool()),
             BinOp::Lower => VariableValue::new_bool(left_val < right_val),
@@ -961,7 +996,7 @@ impl PPEVisitorMut for ExpressionNegator {
 
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> PPEExpr {
         match op {
-            BinOp::PoW | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::Add | BinOp::Sub => PPEExpr::UnaryExpression(
+            BinOp::PoW | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::Add | BinOp::Sub | BinOp::ShortAnd | BinOp::ShortOr => PPEExpr::UnaryExpression(
                 UnaryOp::Not,
                 Box::new(PPEExpr::BinaryExpression(op, Box::new(left.clone()), Box::new(right.clone()))),
             ),

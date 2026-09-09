@@ -90,3 +90,43 @@ menus[0].Items[1] = Entry { Destination = menus[0].Items[0].Destination }
     let tree = parser.parse(source, None).unwrap();
     assert!(!tree.root_node().has_error(), "{}", tree.root_node().to_sexp());
 }
+
+#[test]
+fn s2_operator_precedence_matches_original_ppl() {
+    fn expression_shape(node: tree_sitter::Node<'_>, source: &[u8]) -> Option<String> {
+        if let Some(operator) = node.child_by_field_name("operator") {
+            let operator = operator.utf8_text(source).unwrap();
+            if let Some(operand) = node.child_by_field_name("operand") {
+                return Some(format!("({operator} {})", expression_shape(operand, source).unwrap()));
+            }
+            if let (Some(left), Some(right)) = (node.child_by_field_name("left"), node.child_by_field_name("right")) {
+                return Some(format!(
+                    "({operator} {} {})",
+                    expression_shape(left, source).unwrap(),
+                    expression_shape(right, source).unwrap()
+                ));
+            }
+        }
+        let text = node.utf8_text(source).unwrap();
+        if node.named_child_count() == 0 && (text.parse::<i32>().is_ok() || matches!(text, "TRUE" | "FALSE")) {
+            return Some(text.to_string());
+        }
+        let mut cursor = node.walk();
+        let result = node.named_children(&mut cursor).find_map(|child| expression_shape(child, source));
+        result
+    }
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_ppl::LANGUAGE.into()).unwrap();
+    for (expression, expected) in [
+        ("TRUE | FALSE & FALSE", "(| TRUE (& FALSE FALSE))"),
+        ("TRUE || FALSE && FALSE", "(|| TRUE (&& FALSE FALSE))"),
+        ("!1 = 2 & TRUE", "(& (! (= 1 2)) TRUE)"),
+        ("2^3^2", "(^ (^ 2 3) 2)"),
+        ("-2^2", "(^ (- 2) 2)"),
+    ] {
+        let source = format!("PRINTLN {expression}\n");
+        let tree = parser.parse(&source, None).unwrap();
+        assert!(!tree.root_node().has_error(), "{source}: {}", tree.root_node().to_sexp());
+        assert_eq!(expression_shape(tree.root_node(), source.as_bytes()).unwrap(), expected, "{source}");
+    }
+}

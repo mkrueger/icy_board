@@ -69,6 +69,12 @@ impl SemanticVisitor {
 
     /// Checks already-visited operands, preserving source call IDs and references.
     fn check_binary_operands(&mut self, binary: &crate::ast::BinaryExpression, left: VariableType, right: VariableType, source_binary: bool) -> VariableType {
+        if binary.get_op().is_short_circuit() && self.runtime < 400 {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::BuiltinNeedsRuntime(binary.get_op().to_string(), 400),
+            );
+        }
         let left_array = self.array_shape(binary.get_left_expression());
         let right_array = self.array_shape(binary.get_right_expression());
         if left_array.is_some() || right_array.is_some() {
@@ -172,7 +178,16 @@ impl SemanticVisitor {
 
         if matches!(
             op,
-            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq | BinOp::And | BinOp::Or
+            BinOp::Eq
+                | BinOp::NotEq
+                | BinOp::Lower
+                | BinOp::LowerEq
+                | BinOp::Greater
+                | BinOp::GreaterEq
+                | BinOp::And
+                | BinOp::Or
+                | BinOp::ShortAnd
+                | BinOp::ShortOr
         ) {
             return Boolean;
         }
@@ -2066,15 +2081,22 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> VariableType {
-        // The value is never read at runtime, so walking it with the semantic visitor
-        // would put literals nobody uses into the variable table. Collect only names
-        // here so references to earlier constants still support navigation and hover.
+        // Short-circuit constants also need type checking of their unevaluated operands.
         #[derive(Default)]
-        struct ConstantReferences(Vec<Spanned<Token>>);
+        struct ConstantReferences {
+            identifiers: Vec<Spanned<Token>>,
+            has_short_circuit: bool,
+        }
 
         impl AstVisitor<()> for ConstantReferences {
             fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) {
-                self.0.push(identifier.get_identifier_token().clone());
+                self.identifiers.push(identifier.get_identifier_token().clone());
+            }
+
+            fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) {
+                self.has_short_circuit |= binary.get_op().is_short_circuit();
+                binary.get_left_expression().visit(self);
+                binary.get_right_expression().visit(self);
             }
         }
 
@@ -2086,6 +2108,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
 
+        let mut constant_references = ConstantReferences::default();
+        const_decl.get_value().visit(&mut constant_references);
+        if constant_references.has_short_circuit {
+            const_decl.get_value().visit(self);
+        }
         self.check_constant_enum_operations(const_decl.get_value());
         let value = self.enum_constant_value(const_decl.get_value());
         let Some(value) = value else {
@@ -2096,9 +2123,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         };
 
-        let mut constant_references = ConstantReferences::default();
-        const_decl.get_value().visit(&mut constant_references);
-        for identifier in constant_references.0 {
+        for identifier in constant_references.identifiers {
             if let Token::Identifier(name) = &identifier.token
                 && let Some(reference_index) = self.lookup_constant(name).map(|(_, _, reference_index)| *reference_index)
             {

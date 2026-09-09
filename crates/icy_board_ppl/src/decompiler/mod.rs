@@ -1321,19 +1321,12 @@ fn add_parens_if_required(op: BinOp, expr: Expression, right_operand: bool) -> E
     // bind more tightly than AND/OR, and every binary level (even POW) is
     // left-associative. Preserve right-nested trees also for ADD/MUL: numeric
     // overflow, rounding and string coercion make reassociation unsafe.
-    fn source_priority(op: BinOp) -> u8 {
-        match op {
-            BinOp::Or | BinOp::And => 0,
-            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq => 1,
-            BinOp::Add | BinOp::Sub => 2,
-            BinOp::Mul | BinOp::Div | BinOp::Mod => 3,
-            BinOp::PoW => 4,
-        }
-    }
     let add_parens = if let Expression::Binary(bin_op) = &expr {
-        let child = source_priority(bin_op.get_op());
-        let parent = source_priority(op);
+        let child = bin_op.get_op().get_priority();
+        let parent = op.get_priority();
         child < parent || (right_operand && child == parent)
+    } else if let Expression::Unary(unary) = &expr {
+        unary.get_op() == UnaryOp::Not && op.get_priority() > 3
     } else {
         false
     };

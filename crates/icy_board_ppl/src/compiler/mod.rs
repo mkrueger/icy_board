@@ -859,7 +859,30 @@ impl PPECompiler {
                 .collect();
         }
         variable_table.fill_in_records(&user_types);
-        let script_buffer = if remap.iter().all(|(old_id, new_id)| old_id == new_id) {
+        let in_memory_script = if self.commands.statements.iter().any(|statement| statement.command.contains_short_circuit()) {
+            let mut script = self.commands.clone();
+            for statement in &mut script.statements {
+                statement.command.remap_user_types(&remap);
+            }
+            Some(script)
+        } else {
+            None
+        };
+        let script_buffer = if in_memory_script.is_some() {
+            for id in 1..=variable_table.len() {
+                let entry = variable_table.get_var_entry_mut(id);
+                if entry.header.dim > 0
+                    && !matches!(entry.header.variable_type, VariableType::Function | VariableType::Procedure)
+                    && entry.value.get_dimensions() == 0
+                {
+                    entry.value.generic_data = entry.header.create_generic_data().ok_or_else(|| CompilationErrorType::InvalidLoweredProgram {
+                        command_index: 0,
+                        reason: format!("cannot initialize array storage for variable {id}"),
+                    })?;
+                }
+            }
+            Vec::new()
+        } else if remap.iter().all(|(old_id, new_id)| old_id == new_id) {
             self.commands.serialize()
         } else {
             let mut script_buffer = Vec::new();
@@ -875,6 +898,7 @@ impl PPECompiler {
             variable_table,
             user_types,
             script_buffer,
+            in_memory_script,
         })
     }
 

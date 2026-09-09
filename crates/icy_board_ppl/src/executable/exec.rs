@@ -84,6 +84,9 @@ pub enum ExecutableError {
 
     #[error("Type {type_id} field {field_index} uses a dynamic array or host type; these record layouts have no executable encoding")]
     UnsupportedRecordFieldEncoding { type_id: usize, field_index: usize },
+
+    #[error("Short-circuit expressions have no executable encoding yet")]
+    UnsupportedShortCircuitEncoding,
 }
 
 #[derive(Clone)]
@@ -94,6 +97,7 @@ pub struct Executable {
     /// `FIRST_USER_TYPE_ID`. Only written for runtime 400 and above.
     pub user_types: Vec<Vec<RecordField>>,
     pub script_buffer: Vec<i16>,
+    pub in_memory_script: Option<super::PPEScript>,
 }
 
 static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
@@ -365,6 +369,7 @@ impl Executable {
             variable_table,
             user_types,
             script_buffer,
+            in_memory_script: None,
         })
     }
 
@@ -374,6 +379,9 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn to_buffer(&self) -> Result<Vec<u8>, ExecutableError> {
+        if self.in_memory_script.is_some() {
+            return Err(ExecutableError::UnsupportedShortCircuitEncoding);
+        }
         for (index, fields) in self.user_types.iter().enumerate() {
             for (field_index, field) in fields.iter().enumerate() {
                 if field.is_dynamic || matches!(field.variable_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
@@ -469,6 +477,7 @@ impl Default for Executable {
             variable_table: VariableTable::default(),
             user_types: Vec::new(),
             script_buffer: Vec::new(),
+            in_memory_script: None,
         }
     }
 }

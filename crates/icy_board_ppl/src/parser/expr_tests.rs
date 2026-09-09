@@ -9,9 +9,15 @@ use std::{
 };
 
 fn parse_expression(input: &str) -> Expression {
+    parse_expression_version(input, 400)
+}
+
+fn parse_expression_version(input: &str, language: u16) -> Expression {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
+    let mut workspace = Workspace::default();
+    workspace.set_default_language_version(Some(language));
+    let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &workspace);
     parser.next_token();
     let res = parser.parse_expression().unwrap();
     assert_eq!(parser.get_cur_token(), None);
@@ -38,6 +44,44 @@ fn test_parse_parens() {
         "(5)",
         &ParensExpression::create_empty_expression(ConstantExpression::create_empty_expression(Constant::Integer(5, NumberFormat::Default))),
     );
+}
+
+#[test]
+fn s2_original_logical_precedence() {
+    for (source, or_op, and_op) in [
+        ("TRUE | FALSE & FALSE", BinOp::Or, BinOp::And),
+        ("TRUE || FALSE && FALSE", BinOp::ShortOr, BinOp::ShortAnd),
+    ] {
+        let Expression::Binary(outer) = parse_expression(source) else {
+            panic!("expected OR")
+        };
+        assert_eq!(outer.get_op(), or_op);
+        let Expression::Binary(inner) = outer.get_right_expression() else {
+            panic!("expected AND")
+        };
+        assert_eq!(inner.get_op(), and_op);
+    }
+    let Expression::Unary(outer) = parse_expression("!1 = 2") else {
+        panic!("expected NOT")
+    };
+    assert_eq!(outer.get_op(), UnaryOp::Not);
+    let Expression::Binary(inner) = outer.get_expression() else {
+        panic!("expected comparison")
+    };
+    assert_eq!(inner.get_op(), BinOp::Eq);
+    let Expression::Binary(outer) = parse_expression("!1 = 2 & TRUE") else {
+        panic!("expected AND")
+    };
+    assert_eq!(outer.get_op(), BinOp::And);
+    assert!(matches!(outer.get_left_expression(), Expression::Unary(_)));
+    let Expression::Binary(outer) = parse_expression_version("TRUE || FALSE && FALSE", 340) else {
+        panic!("expected OR")
+    };
+    assert_eq!(outer.get_op(), BinOp::Or);
+    let Expression::Binary(inner) = outer.get_right_expression() else {
+        panic!("expected AND")
+    };
+    assert_eq!(inner.get_op(), BinOp::And);
 }
 
 #[test]

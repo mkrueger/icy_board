@@ -42,9 +42,14 @@ impl AstVisitorMut for NegateExpressionVisitor {
 
     fn visit_binary_expression(&mut self, expr: &super::BinaryExpression) -> Expression {
         match expr.get_op() {
-            super::BinOp::PoW | super::BinOp::Mul | super::BinOp::Div | super::BinOp::Mod | super::BinOp::Add | super::BinOp::Sub => {
-                UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Binary(expr.clone()))
-            }
+            super::BinOp::PoW
+            | super::BinOp::Mul
+            | super::BinOp::Div
+            | super::BinOp::Mod
+            | super::BinOp::Add
+            | super::BinOp::Sub
+            | super::BinOp::ShortAnd
+            | super::BinOp::ShortOr => UnaryExpression::create_empty_expression(UnaryOp::Not, Expression::Binary(expr.clone())),
 
             super::BinOp::Eq => {
                 BinaryExpression::create_empty_expression(super::BinOp::NotEq, expr.get_left_expression().clone(), expr.get_right_expression().clone())

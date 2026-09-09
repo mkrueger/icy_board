@@ -22,6 +22,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Compile-time modules | 350 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
 | Routine parameters | 400 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
+| Short-circuit logic | 400 | 400, in-memory only until the new encoding is decided | `&&` and `\|\|` skip the right operand when the left determines the result |
 | Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `Board`, `Session` |
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
@@ -40,6 +41,54 @@ when compiling classic source. In both cases the generated PPE uses ordinary
 old instructions. Whether an authored declaration must match its implementation
 depends on the source language, as described below.
 Routine documentation is not in the table either, for the same reason.
+
+## Logical evaluation and operator precedence
+
+From **language 400**, `&&` and `||` short-circuit: `left && right` evaluates
+`right` only when `left` is true; `left || right` evaluates it only when `left`
+is false. Evaluation proceeds left to right, once per required operand. These
+operators work in every expression context, including arguments and loop
+conditions. Both operands are still checked for valid names and types, even
+when execution skips the right operand.
+
+`&` and `|` continue to evaluate both operands. Logical operations produce
+`BOOLEAN` and retain the existing scalar truth-value conversions; numeric
+operands do not turn these into bitwise operations. Enum bit operations remain
+available through `&` and `|` on matching enum types, not through `&&` or `||`.
+Integer bit operations remain the separate `AND()` and `OR()` functions.
+
+In **languages below 400**, `&&` is an alias of `&`, and `||` is an alias of `|`:
+all four evaluate both operands. This also holds when compiling legacy source
+for runtime 400. Existing PPE files retain their original evaluation behavior.
+Recompiling source as language 400 can therefore remove right-hand side effects;
+use `&` or `|` where complete evaluation is intentional. No new keyword is added.
+
+All language versions use original PPLC precedence, strongest first:
+
+| Level | Operators |
+| :--- | :--- |
+| Unary sign | unary `+`, unary `-` |
+| Power | `^` |
+| Multiplication | `*`, `/`, `%` |
+| Addition | `+`, `-` |
+| Comparison | `=`, `<>`, `<`, `<=`, `>`, `>=` and their aliases |
+| Logical negation | `!` |
+| Logical AND | `&`, `&&` |
+| Logical OR | `\|`, `\|\|` |
+
+Binary operators at the same level associate left to right, including power.
+Parentheses override these rules. Thus `TRUE | FALSE & FALSE` is true,
+`!1 = 2` means `!(1 = 2)`, `-2^2` is 4, and `2^3^2` is 64. Correcting the
+previous equal precedence of AND/OR and the overly strong NOT is a compiler
+compatibility fix, not a language-400-only rule. Existing compiled PPE trees
+are not regrouped; decompilation inserts parentheses where required.
+
+**Temporary release boundary:** new short-circuit expressions currently run
+only from the compiler's in-memory script. Writing such an executable is
+explicitly rejected with `UnsupportedShortCircuitEncoding`. No provisional
+opcode or file representation is emitted; file encoding and its roundtrip
+acceptance belong to C1/C2 of the PPL 400 release plan. Programs without these
+expressions continue to use the existing PPE path.
 
 ## DECLARE contracts and language versions
 

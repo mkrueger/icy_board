@@ -119,13 +119,15 @@ const BUILTIN_CONSTANTS = [
 
 const PREC = {
   OR: 1,
-  COMPARE: 2,
-  ADD: 3,
-  MUL: 4,
-  POW: 5,
-  UNARY: 6,
-  CALL: 7,
-  MEMBER: 8,
+  AND: 2,
+  NOT: 3,
+  COMPARE: 4,
+  ADD: 5,
+  MUL: 6,
+  POW: 7,
+  UNARY: 8,
+  CALL: 9,
+  MEMBER: 10,
 };
 
 module.exports = grammar({
@@ -589,14 +591,21 @@ module.exports = grammar({
 
     parenthesized_expression: $ => seq('(', $._expression, ')'),
 
-    unary_expression: $ => prec.right(PREC.UNARY, seq(
-      field('operator', choice('-', '+', '!')),
-      field('operand', $._expression),
-    )),
+    unary_expression: $ => choice(
+      prec.right(PREC.UNARY, seq(
+        field('operator', choice('-', '+')),
+        field('operand', $._expression),
+      )),
+      prec.right(PREC.NOT, seq(
+        field('operator', '!'),
+        field('operand', $._expression),
+      )),
+    ),
 
     binary_expression: $ => {
       const table = [
-        [PREC.OR, choice('&&', '&', '||', '|')],
+        [PREC.OR, choice('||', '|')],
+        [PREC.AND, choice('&&', '&')],
         [PREC.COMPARE, choice('==', '=', '!=', '<>', '><', '<=', '=<', '>=', '=>', '<', '>')],
         [PREC.ADD, choice('+', '-')],
         [PREC.MUL, choice('*', '/', '%')],
@@ -607,7 +616,7 @@ module.exports = grammar({
           field('operator', operator),
           field('right', $._expression),
         ))),
-        prec.right(PREC.POW, seq(
+        prec.left(PREC.POW, seq(
           field('left', $._expression),
           field('operator', '^'),
           field('right', $._expression),

@@ -53,6 +53,9 @@ impl AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'_> {
 
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Option<VariableValue> {
         let left = binary.get_left_expression().visit(self);
+        if let Some(result) = left.as_ref().and_then(|value| binary.get_op().short_circuit_result(value.as_bool())) {
+            return Some(VariableValue::new_bool(result));
+        }
         let right = binary.get_right_expression().visit(self);
 
         if left.is_none() || right.is_none() {
@@ -83,8 +86,8 @@ impl AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'_> {
                 BinOp::PoW => Some(left_value.pow(right_value)),
                 BinOp::Eq => Some(VariableValue::new_bool(left_value == right_value)),
                 BinOp::NotEq => Some(VariableValue::new_bool(left_value != right_value)),
-                BinOp::Or => Some(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool())),
-                BinOp::And => Some(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool())),
+                BinOp::Or | BinOp::ShortOr => Some(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool())),
+                BinOp::And | BinOp::ShortAnd => Some(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool())),
                 BinOp::Lower => Some(VariableValue::new_bool(left_value < right_value)),
                 BinOp::LowerEq => Some(VariableValue::new_bool(left_value <= right_value)),
                 BinOp::Greater => Some(VariableValue::new_bool(left_value > right_value)),

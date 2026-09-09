@@ -46,6 +46,8 @@ fn every_binary_operator_pair_preserves_its_tree_on_both_sides() {
         BinOp::GreaterEq,
         BinOp::And,
         BinOp::Or,
+        BinOp::ShortAnd,
+        BinOp::ShortOr,
     ];
     for parent in operators {
         for child in operators {
@@ -61,7 +63,8 @@ fn every_binary_operator_pair_preserves_its_tree_on_both_sides() {
                 expression.visit(&mut output);
                 let registry = UserTypeRegistry::default();
                 let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-                let workspace = Workspace::default();
+                let mut workspace = Workspace::default();
+                workspace.set_default_language_version(Some(400));
                 let mut parser = Parser::new(
                     PathBuf::from("expression.pps"),
                     errors.clone(),

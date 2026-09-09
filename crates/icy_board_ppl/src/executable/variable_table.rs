@@ -1306,6 +1306,9 @@ impl VariableTable {
                     if t.value.data.function_value.start_offset == 0 {
                         continue;
                     }
+                    if let Some(result) = self.try_get_entry_mut(t.value.data.function_value.return_var as usize) {
+                        result.set_type(EntryType::FunctionResult);
+                    }
                     let start = t.value.data.function_value.first_var_id as usize + t.value.data.function_value.parameters as usize + 1;
                     for i in 0..t.value.data.function_value.local_variables {
                         let idx = start + i as usize;

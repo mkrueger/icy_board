@@ -56,6 +56,7 @@ mod resource_lifecycle;
 mod retired_terminal_api;
 mod routine_parameters;
 mod s1_record_fields;
+mod s2_logical_operators;
 mod scalars;
 mod sound;
 mod static_members;

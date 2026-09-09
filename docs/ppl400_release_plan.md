@@ -105,14 +105,57 @@ On-Disk-Kodierung bleibt bis C1 offen; keine provisorische Kodierung veröffentl
 
 ### S2 — Kurzschließende logische Auswertung
 
-Status: offen; erst nach S1 einzeln besprechen.
+Status: Sprach-/Runtime-Umsetzung am 2026-09-09 einzeln freigegeben,
+implementiert und in EN/DE abgenommen. Die neue Dateikodierung bleibt C1/C2
+vorbehalten; S3 ist noch nicht freigegeben.
 
-**Besprechen:** Explizite kurzschließende Operatoren, etwa `ANDALSO`/`ORELSE`,
-gegen eine versionsgebundene Änderung bestehender Operatoren abwägen. Namen,
-Präzedenz und Typregeln festlegen. Legacy-Auswertung nicht still ändern.
+**Entscheidung:** Keine neuen Schlüsselwörter `ANDALSO`/`ORELSE`. Ab Sprache
+400 schließen `&&`/`||` kurz; `&`/`|` werten weiterhin beide Seiten aus. Vor
+400 bleiben die doppelten Zeichen Aliase der einfachen, auch bei Zielruntime
+400. Neue Kurzschlussausdrücke benötigen mindestens Runtime 400, liefern
+BOOLEAN und behalten skalare Wahrheitswertkonvertierungen. Enum-Bitoperationen
+bleiben bei `&`/`|`. Übersprungene Operanden werden weiterhin semantisch geprüft.
+
+**Historischer Befund:** 20 Proben wurden mit originalem PPLC 3.40 kompiliert
+und auf einer isolierten PCBoard-15.4/M-Kopie ausgeführt. Alle vier Zeichenformen
+werteten beide Seiten aus, auch bei konstantem linken Operanden; Funktionsspuren
+waren links vor rechts. Originalquellen und Laufzeit bestätigen Vergleich vor
+`!`, UND vor ODER. Die Originalquellen bestätigen zudem unäre Vorzeichen vor
+Potenz und linksassoziative binäre Operatoren. Temporäre Originalausgaben:
+`target/s2-legacy-oracle/run-204z3_m3/logic.out`; Live-Installation unverändert.
+
+**Präzedenzkorrektur:** Für alle Sprachversionen gilt Original-PPLC-Präzedenz:
+unäres Vorzeichen, Potenz, Multiplikation, Addition, Vergleich, NOT, AND, OR.
+Binäre Operatoren gleicher Stufe sind linksassoziativ. Die bisher gleichrangigen
+AND/OR und das zu stark bindende NOT waren Fehler, keine beizubehaltende Variante.
+Parser, Decompiler-Klammerung und Tree-sitter verwenden nun diesen Vertrag.
+
+**Formatgrenze:** Kurzschlussprogramme behalten intern den Scriptbaum. Die
+PPE-Dateiausgabe wird eindeutig abgelehnt; alte Opcodes und Loadersemantik bleiben
+unverändert. Datei- und Containerabnahme dieser Ausdrücke folgt erst nach C1.
 
 **Abnahme:** Seiteneffekte beweisen, wann der rechte Operand ausgeführt wird und
 wann nicht. Compileroptimierung, VM, Decompiler, Formatter und LSP stimmen überein.
+
+**Nachweise 2026-09-09:**
+
+- Sechs Engine-S2-Tests bestehen: 96 Kombinationen aus Operator, Wahrheitswerten,
+  Sprach-/Runtime-Ziel und Optimierung; Originalpräzedenz, Argumente, Schleifen,
+  Indizes, Negation, Fehlerzustand und semantische Prüfung übersprungener Operanden.
+- Decompile/Recompile im rohen und rekonstruierten Modus erhält Seiteneffekte;
+  binäre Operatorpaare behalten ihre Bäume. Compiler- und LSP-Formatter erhalten
+  Schreibweisen und Klammern. Präprozessor berücksichtigt die tatsächliche
+  Sprachversion. Neue CONST-Ausdrücke prüfen auch übersprungene Operanden.
+- `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine -p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet`:
+  EN und DE jeweils **2853 bestanden, 0 fehlgeschlagen, 6 ignoriert**;
+  getrennte Locale-Prozesse, gefilterte Kindprozess-Tests nicht doppelt gezählt.
+- Tree-sitter: `cargo test-low --test repository_sources` jeweils **3/3** in
+  EN und DE, `tree-sitter test` **34/34** auf dem endgültig generierten Parser.
+- All-Targets-Check der fünf Rust-Crates sowie Engine ohne Default-Features
+  bestehen mit `-j4`; Formatierungsprüfung der berührten Rust-Dateien besteht.
+- Neue Kurzschlussprogramme werden an der PPE-Dateigrenze ausdrücklich
+  zurückgewiesen. Legacy-Programme werden in den S2-Tests gespeichert, geladen
+  und ausgeführt. Die neue Kurzschluss-Dateikodierung ist noch nicht abgenommen.
 
 ### S3 — Array- und `VAR`-Verträge schärfen
 

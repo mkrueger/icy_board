@@ -100,3 +100,15 @@ fn the_editor_formats_like_the_compiler() {
     }
     assert!(different.is_empty(), "the two answers differ for:\n{}", different.join("\n"));
 }
+
+#[test]
+fn s2_formatting_preserves_short_circuit_spelling_and_parentheses() {
+    for language in [340, 400] {
+        let path = Path::new("s2.pps");
+        let source = format!(";$LANGVERSION {language}\nBOOLEAN answer\nanswer=(TRUE||FALSE)&&!1=2|TRUE&FALSE\n");
+        let expected = format!(";$LANGVERSION {language}\nBOOLEAN answer\nanswer = (TRUE || FALSE) && !1 = 2 | TRUE & FALSE\n");
+        assert_eq!(format_as_compiler(path, &source), expected);
+        assert_eq!(format_as_editor(path, &source), expected);
+        assert_eq!(format_as_editor(path, &expected), expected);
+    }
+}

@@ -24,6 +24,8 @@ pub enum BinOp {
     GreaterEq = FuncOpCode::GE as i16,
     And = FuncOpCode::AND as i16,
     Or = FuncOpCode::OR as i16,
+    ShortAnd = 1,
+    ShortOr = 2,
 }
 impl BinOp {
     /// .
@@ -53,13 +55,24 @@ impl BinOp {
 
     pub fn get_priority(&self) -> u8 {
         match self {
-            BinOp::PoW => 3,
+            BinOp::PoW => 7,
+            BinOp::Mul | BinOp::Div | BinOp::Mod => 6,
+            BinOp::Add | BinOp::Sub => 5,
+            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq => 4,
+            BinOp::And | BinOp::ShortAnd => 2,
+            BinOp::Or | BinOp::ShortOr => 1,
+        }
+    }
 
-            BinOp::Mul | BinOp::Div | BinOp::Mod => 2,
+    pub fn is_short_circuit(self) -> bool {
+        matches!(self, Self::ShortAnd | Self::ShortOr)
+    }
 
-            BinOp::Add | BinOp::Sub => 1,
-
-            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq | BinOp::And | BinOp::Or => 0,
+    pub fn short_circuit_result(self, left: bool) -> Option<bool> {
+        match self {
+            Self::ShortAnd if !left => Some(false),
+            Self::ShortOr if left => Some(true),
+            _ => None,
         }
     }
 }
@@ -81,6 +94,8 @@ impl fmt::Display for BinOp {
             BinOp::GreaterEq => write!(f, ">="),
             BinOp::And => write!(f, "&"),
             BinOp::Or => write!(f, "|"),
+            BinOp::ShortAnd => write!(f, "&&"),
+            BinOp::ShortOr => write!(f, "||"),
         }
     }
 }
@@ -793,6 +808,8 @@ impl BinaryExpression {
                 BinOp::GreaterEq => Token::GreaterEq,
                 BinOp::And => Token::And,
                 BinOp::Or => Token::Or,
+                BinOp::ShortAnd => Token::ShortAnd,
+                BinOp::ShortOr => Token::ShortOr,
             }),
             right_expression: Box::new(right_expression),
         }
@@ -819,6 +836,8 @@ impl BinaryExpression {
             Token::GreaterEq => BinOp::GreaterEq,
             Token::And => BinOp::And,
             Token::Or => BinOp::Or,
+            Token::ShortAnd => BinOp::ShortAnd,
+            Token::ShortOr => BinOp::ShortOr,
             _ => panic!("Expected binary operator got {:?}", self.op_token.token),
         }
     }

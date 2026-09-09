@@ -245,6 +245,11 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
 
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Option<VariableValue> {
         let left = binary.get_left_expression().visit(self)?;
+        if !matches!(left.get_type(), VariableType::UserData(_))
+            && let Some(result) = binary.get_op().short_circuit_result(left.as_bool())
+        {
+            return Some(VariableValue::new_bool(result));
+        }
         let right = binary.get_right_expression().visit(self)?;
         if matches!(left.get_type(), VariableType::UserData(_)) || matches!(right.get_type(), VariableType::UserData(_)) {
             if left.get_type() != right.get_type() {
@@ -274,8 +279,8 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             BinOp::PoW => left.pow(right),
             BinOp::Eq => VariableValue::new_bool(left == right),
             BinOp::NotEq => VariableValue::new_bool(left != right),
-            BinOp::Or => VariableValue::new_bool(left.as_bool() || right.as_bool()),
-            BinOp::And => VariableValue::new_bool(left.as_bool() && right.as_bool()),
+            BinOp::Or | BinOp::ShortOr => VariableValue::new_bool(left.as_bool() || right.as_bool()),
+            BinOp::And | BinOp::ShortAnd => VariableValue::new_bool(left.as_bool() && right.as_bool()),
             BinOp::Lower => VariableValue::new_bool(left < right),
             BinOp::LowerEq => VariableValue::new_bool(left <= right),
             BinOp::Greater => VariableValue::new_bool(left > right),
