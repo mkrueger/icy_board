@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::MACROS_ID,
 };
 
@@ -27,13 +27,7 @@ impl UserData for PplMacros {
     const TYPE_NAME: &'static str = "Macros";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(RECORDING.clone(), VariableType::Boolean, false);
-
-        registry.add_named_function(RECORD.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
-        registry.add_function(END.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_named_function(PLAY.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
-        registry.add_named_function(DELETE.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
-        registry.add_function(CLEAR.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(crate::parser::MACROS_ID, registry);
     }
 }
 

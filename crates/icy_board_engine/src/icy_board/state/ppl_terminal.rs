@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
-    parser::{GFX_ID, MACROS_ID, MARGINS_ID, PALETTE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
+    executable::VariableValue,
+    parser::TERMINAL_ID,
 };
 
 pub static INFO: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Info".to_string()));
@@ -32,28 +32,7 @@ impl UserData for PplTerminal {
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Terminal);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(INFO.clone(), VariableType::UserData(TERM_INFO_ID as u8), false);
-        registry.add_property(GFX.clone(), VariableType::UserData(GFX_ID as u8), false);
-        registry.add_property(INPUT.clone(), VariableType::UserData(TERM_INPUT_ID as u8), false);
-        registry.add_property(MARGINS.clone(), VariableType::UserData(MARGINS_ID as u8), false);
-        registry.add_property(PALETTE.clone(), VariableType::UserData(PALETTE_ID as u8), false);
-        registry.add_property(MACROS.clone(), VariableType::UserData(MACROS_ID as u8), false);
-
-        registry.add_function(BEGIN_UPDATE.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(END_UPDATE.clone(), Vec::new(), VariableType::Boolean);
-        // Leaving the slot out means every attribute class, which is what changing
-        // *the* font means.
-        registry.add_named_function_with(
-            SET_FONT.clone(),
-            vec![("font", VariableType::Integer), ("slot", VariableType::Integer)],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            LOAD_FONT.clone(),
-            vec![("font", VariableType::Integer), ("file", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
+        crate::parser::board_catalog::register_members(crate::parser::TERMINAL_ID, registry);
     }
 }
 

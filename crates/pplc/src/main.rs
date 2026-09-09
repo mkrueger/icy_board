@@ -1,7 +1,7 @@
 use ariadne::{Label, Report, ReportKind};
 
 use codepages::tables::UNICODE_TO_CP437;
-use icy_board_engine::{
+use icy_board_ppl::{
     Res,
     ast::Ast,
     compiler::{
@@ -10,7 +10,7 @@ use icy_board_engine::{
     },
     executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS, language_version_from_env},
     formatting::{FormattingVisitor, StringFormattingBackend},
-    icy_board::{read_with_encoding_detection, write_atomic},
+    io::{read_with_encoding_detection, write_atomic},
     parser::{
         Encoding, ErrorReporter, UserTypeRegistry, lexer::scan_language_version, load_with_encoding, parse_ast_with_predeclared_types,
         preparse_type_declarations,
@@ -22,8 +22,11 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 
-use icy_engine::SaveOptions;
-use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions};
+#[cfg(feature = "artwork")]
+use icy_engine::{
+    SaveOptions,
+    formats::{CharacterFormatOptions, FileFormat, FormatOptions},
+};
 use semver::Version;
 use serde::Serialize;
 use std::{
@@ -406,7 +409,7 @@ struct CompilerConfigReport {
 }
 
 fn environment_candidate() -> Option<String> {
-    std::env::var(icy_board_engine::executable::PPL_LANG_VERSION_ENV).ok()
+    std::env::var(icy_board_ppl::executable::PPL_LANG_VERSION_ENV).ok()
 }
 
 fn resolve_config(workspace: &Workspace, arguments: &Cli, encoding: Encoding, project: Option<&Path>, output: PathBuf) -> Res<CompilerConfigReport> {
@@ -415,7 +418,7 @@ fn resolve_config(workspace: &Workspace, arguments: &Cli, encoding: Encoding, pr
     let directive = declared_language_version(workspace, encoding)?;
     let environment = environment_candidate();
 
-    let runtime = arguments.runtime.or(manifest_runtime).unwrap_or(icy_board_engine::executable::LAST_PPE_RUNTIME);
+    let runtime = arguments.runtime.or(manifest_runtime).unwrap_or(icy_board_ppl::executable::LAST_PPE_RUNTIME);
     let runtime_source = if arguments.runtime.is_some() {
         "commandLine"
     } else if manifest_runtime.is_some() {
@@ -560,7 +563,7 @@ fn print_config(file_name: &Path, arguments: &Cli, encoding: Encoding) -> Res<()
     let runtime = arguments
         .runtime
         .or(workspace.package.runtime)
-        .unwrap_or(icy_board_engine::executable::LAST_PPE_RUNTIME);
+        .unwrap_or(icy_board_ppl::executable::LAST_PPE_RUNTIME);
     let output = workspace.target_path(runtime).join(workspace.package.name()).with_extension("ppe");
     let report = resolve_config(&workspace, arguments, encoding, Some(file_name), output)?;
     print_report(&report, arguments.print_config_json)
@@ -568,6 +571,17 @@ fn print_config(file_name: &Path, arguments: &Cli, encoding: Encoding) -> Res<()
 
 fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     let mut workspace = Workspace::load(file_name)?;
+    #[cfg(not(feature = "artwork"))]
+    if let Some(file) = workspace.data.as_ref().and_then(|data| data.art_files.as_ref()).and_then(|files| {
+        files
+            .iter()
+            .find(|file| Path::new(file).extension().is_some_and(|extension| extension == "icy"))
+    }) {
+        return Err(format!(
+            "art_files entry '{file}' requires ICY artwork conversion, but pplc was built without artwork support; rebuild pplc with --features artwork"
+        )
+        .into());
+    }
     apply_arguments(&mut workspace, arguments);
 
     let base_path = file_name.parent().unwrap_or_else(|| Path::new("."));
@@ -586,6 +600,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
                 let out_file = target_path.join(file);
                 fs::create_dir_all(out_file.parent().unwrap())?;
 
+                #[cfg(feature = "artwork")]
                 if src_file.extension().is_some_and(|extension| extension == "icy") {
                     let data = fs::read(&src_file)?;
                     let format = FileFormat::from_extension("icy").ok_or("ICY format is unavailable")?;
@@ -777,7 +792,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                 println!();
                 executable.print_variable_table();
                 println!();
-                let mut visitor = icy_board_engine::executable::disassembler::DisassembleVisitor::new(&executable);
+                let mut visitor = icy_board_ppl::executable::disassembler::DisassembleVisitor::new(&executable);
                 visitor.generate_statement_data = true;
                 compiler.get_script().visit(&mut visitor);
                 println!();
@@ -822,7 +837,7 @@ fn encode_cp437(text: &str) -> Vec<u8> {
     data
 }
 
-fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorReporter>>, arguments: &Cli, src: &[(Ast, String)]) -> bool {
+fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_ppl::parser::ErrorReporter>>, arguments: &Cli, src: &[(Ast, String)]) -> bool {
     if errors.lock().unwrap().has_errors() || (errors.lock().unwrap().has_warnings() && !arguments.nowarnings) {
         let mut error_count = 0;
         let mut warning_count = 0;

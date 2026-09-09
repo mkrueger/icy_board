@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
-    parser::{BOARD_ID, CONFERENCE_ID, USER_ID},
+    executable::VariableValue,
+    parser::BOARD_ID,
 };
 
 macro_rules! member_name {
@@ -58,12 +58,7 @@ impl UserData for PplBoard {
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Board);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        for name in [&*NAME, &*LOCATION, &*OPERATOR, &*SYSOP_NAME] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, false);
-        }
-        registry.add_property(NODES.clone(), VariableType::Integer, false);
-        registry.add_array_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCE_ID as u8), 1);
-        registry.add_array_property(USERS.clone(), VariableType::UserData(USER_ID as u8), 1);
+        crate::parser::board_catalog::register_members(BOARD_ID, registry);
     }
 }
 

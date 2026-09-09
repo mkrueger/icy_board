@@ -8,7 +8,7 @@ use std::{
 use crate::{
     Res,
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     tables::export_cp437_string,
 };
 use async_trait::async_trait;
@@ -212,16 +212,7 @@ impl UserData for FileDirectory {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(FileDirectory::default(), crate::parser::FILE_DIRECTORY_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
-        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(PATH.clone(), VariableType::UnboundedString, false);
-        registry.add_property(IS_FREE.clone(), VariableType::Boolean, false);
-        registry.add_property(HAS_NEW_FILES.clone(), VariableType::Boolean, false);
-        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
-
-        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(CAN_DOWNLOAD.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(crate::parser::FILE_DIRECTORY_ID, registry);
     }
 }
 

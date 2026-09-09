@@ -62,7 +62,6 @@ async fn closed_enums_invalid_dynamic_cast_does_not_publish_a_value() {
     use crate::{
         executable::{FuncOpCode, PPEExpr},
         icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
-        parser::UserTypeRegistry,
         vm::{VirtualMachine, io::DiskIO},
     };
     use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -74,7 +73,7 @@ async fn closed_enums_invalid_dynamic_cast_does_not_publish_a_value() {
     let (_peer, connection) = ChannelConnection::create_pair();
     let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
     let directory = tempfile::tempdir().unwrap();
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
     let mut vm = VirtualMachine::new(PathBuf::from("enum.ppe"), &registry, &mut io, &mut state);
     vm.variable_table = executable.variable_table;

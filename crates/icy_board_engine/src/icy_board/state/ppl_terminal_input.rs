@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
-    parser::{EVENT_ID, TERM_INPUT_ID},
+    executable::VariableValue,
+    parser::TERM_INPUT_ID,
 };
 
 /// The caller's keyboard and mouse. Turning reporting on is what takes them over from
@@ -29,23 +29,7 @@ impl UserData for PplTerminalInput {
     const TYPE_NAME: &'static str = "TermInput";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        use crate::parser::{MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID};
-
-        registry.add_function(POLL.clone(), Vec::new(), VariableType::UserData(EVENT_ID as u8));
-        registry.add_named_function(WAIT.clone(), vec![("timeoutMs", VariableType::Integer)], VariableType::UserData(EVENT_ID as u8));
-        registry.add_named_function_with(
-            MOUSE_ON.clone(),
-            vec![
-                ("mode", VariableType::UserData(MOUSE_MODE_ENUM_ID)),
-                ("tracking", VariableType::UserData(MOUSE_TRACKING_ENUM_ID)),
-            ],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_function(MOUSE_OFF.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_named_function_with(KEYBOARD_ON.clone(), vec![("echo", VariableType::Boolean)], 0, VariableType::Boolean);
-        registry.add_function(KEYBOARD_OFF.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(RELEASE.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(crate::parser::TERM_INPUT_ID, registry);
     }
 }
 

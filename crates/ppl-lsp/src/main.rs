@@ -6,20 +6,20 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dashmap::DashMap;
-use icy_board_engine::ast::{
+use icy_board_ppl::ast::{
     Ast, AstVisitor, BreakStatement, Constant, ConstantExpression, ContinueStatement, Expression, FunctionCallExpression, ParameterSpecifier,
     PredefinedCallStatement, ProcedureCallStatement, RecordLiteralExpression, walk_function_call_expression, walk_function_declaration,
     walk_function_implementation, walk_predefined_call_statement, walk_procedure_call_statement, walk_variable_declaration_statement,
 };
-use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, workspace::CompilerData, workspace::Workspace};
-use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
-use icy_board_engine::formatting::FormattingVisitor;
-use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::lexer::{KEYWORDS, LexingErrorType, Spanned, Token};
-use icy_board_engine::parser::{
+use icy_board_ppl::compiler::{CompilationErrorType, CompilationWarningType, workspace::CompilerData, workspace::Workspace};
+use icy_board_ppl::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
+use icy_board_ppl::formatting::FormattingVisitor;
+use icy_board_ppl::io::read_data_with_encoding_detection;
+use icy_board_ppl::parser::lexer::{KEYWORDS, LexingErrorType, Spanned, Token};
+use icy_board_ppl::parser::{
     Encoding, ErrorReporter, ParserErrorType, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations,
 };
-use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
+use icy_board_ppl::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
 use ppl_lsp::code_lens::get_code_lenses;
 use ppl_lsp::completion::get_completion;
 use ppl_lsp::document_symbol::get_document_symbols;
@@ -79,7 +79,7 @@ struct State {
 /// ppld read it. A language server is started once, so this is read once too.
 fn env_language_version() -> Option<u16> {
     static VERSION: std::sync::OnceLock<Option<u16>> = std::sync::OnceLock::new();
-    *VERSION.get_or_init(|| match icy_board_engine::executable::language_version_from_env() {
+    *VERSION.get_or_init(|| match icy_board_ppl::executable::language_version_from_env() {
         Ok(version) => version,
         Err(err) => {
             log::error!("{err}");
@@ -577,7 +577,7 @@ impl LanguageServer for Backend {
 
         self.get_ast(&uri, |ast, visitor| {
             let mut workspace = Workspace::default();
-            workspace.compiler = Some(icy_board_engine::compiler::workspace::CompilerData {
+            workspace.compiler = Some(icy_board_ppl::compiler::workspace::CompilerData {
                 language_version: Some(ast.language_version),
                 defines: None,
             });
@@ -1442,27 +1442,27 @@ fn diagnostic_details(
             CompilationErrorType::FunctionUsedAsVariable(name) if takes_no_arguments(name, semantic_visitor) => "ppl.routine-needs-call",
             _ => return (None, None),
         }
-    } else if let Some(error) = error.downcast_ref::<icy_board_engine::parser::ParserErrorType>() {
+    } else if let Some(error) = error.downcast_ref::<icy_board_ppl::parser::ParserErrorType>() {
         match error {
-            icy_board_engine::parser::ParserErrorType::TooManyArguments(_, _, expected) if *expected >= 0 => {
+            icy_board_ppl::parser::ParserErrorType::TooManyArguments(_, _, expected) if *expected >= 0 => {
                 data = Some(serde_json::json!({"expected": expected}));
                 "ppl.too-many-arguments"
             }
-            icy_board_engine::parser::ParserErrorType::TypeNeedsNewerRuntime(required) => {
+            icy_board_ppl::parser::ParserErrorType::TypeNeedsNewerRuntime(required) => {
                 data = Some(serde_json::json!({"required": required}));
                 "ppl.runtime-too-old"
             }
-            icy_board_engine::parser::ParserErrorType::StatementVersionNotSupported(_, required, _)
-            | icy_board_engine::parser::ParserErrorType::FunctionVersionNotSupported(_, required, _) => {
+            icy_board_ppl::parser::ParserErrorType::StatementVersionNotSupported(_, required, _)
+            | icy_board_ppl::parser::ParserErrorType::FunctionVersionNotSupported(_, required, _) => {
                 data = Some(serde_json::json!({"required": required}));
                 "ppl.language-version-too-old"
             }
-            icy_board_engine::parser::ParserErrorType::EndIsNotAStatement => {
+            icy_board_ppl::parser::ParserErrorType::EndIsNotAStatement => {
                 data = Some(serde_json::json!({"legacy": LAST_LEGACY_LANGUAGE_VERSION}));
                 "ppl.end-is-not-a-statement"
             }
-            icy_board_engine::parser::ParserErrorType::VarNotAllowedInFunctions => "ppl.var-not-allowed",
-            icy_board_engine::parser::ParserErrorType::NoStatementsAfterFunctions => "ppl.statement-after-routines",
+            icy_board_ppl::parser::ParserErrorType::VarNotAllowedInFunctions => "ppl.var-not-allowed",
+            icy_board_ppl::parser::ParserErrorType::NoStatementsAfterFunctions => "ppl.statement-after-routines",
             _ => return (None, None),
         }
     } else {
@@ -1964,14 +1964,14 @@ impl AstVisitor<()> for TooltipVisitor {
         }
     }
 
-    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_board_engine::ast::VariableDeclarationStatement) {
+    fn visit_variable_declaration_statement(&mut self, var_decl: &icy_board_ppl::ast::VariableDeclarationStatement) {
         if var_decl.get_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover_for_version(var_decl.get_variable_type(), self.language_version);
         }
         walk_variable_declaration_statement(self, var_decl);
     }
 
-    fn visit_parameter_specifier(&mut self, param: &icy_board_engine::ast::ParameterSpecifier) {
+    fn visit_parameter_specifier(&mut self, param: &icy_board_ppl::ast::ParameterSpecifier) {
         match param {
             ParameterSpecifier::Variable(param) => {
                 if param.get_type_token().span.contains(&self.offset) {
@@ -1994,29 +1994,29 @@ impl AstVisitor<()> for TooltipVisitor {
         }
     }
 
-    fn visit_function_declaration(&mut self, func_decl: &icy_board_engine::ast::FunctionDeclarationAstNode) {
+    fn visit_function_declaration(&mut self, func_decl: &icy_board_ppl::ast::FunctionDeclarationAstNode) {
         if func_decl.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover_for_version(func_decl.get_return_type(), self.language_version);
         }
         walk_function_declaration(self, func_decl);
     }
 
-    fn visit_function_implementation(&mut self, function: &icy_board_engine::ast::FunctionImplementation) {
+    fn visit_function_implementation(&mut self, function: &icy_board_ppl::ast::FunctionImplementation) {
         if function.get_return_type_token().span.contains(&self.offset) {
             self.tooltip = get_type_hover_for_version(function.get_return_type(), self.language_version);
         }
         walk_function_implementation(self, function);
     }
 
-    fn visit_predefined_call_statement(&mut self, call: &icy_board_engine::ast::PredefinedCallStatement) {
+    fn visit_predefined_call_statement(&mut self, call: &icy_board_ppl::ast::PredefinedCallStatement) {
         if call.get_identifier_token().span.contains(&self.offset) {
             self.tooltip = get_statement_hover(call.get_func());
         }
         walk_predefined_call_statement(self, call);
     }
 
-    fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) {
-        icy_board_engine::ast::walk_function_call_expression(self, call);
+    fn visit_function_call_expression(&mut self, call: &icy_board_ppl::ast::FunctionCallExpression) {
+        icy_board_ppl::ast::walk_function_call_expression(self, call);
         if let Expression::Identifier(identifier) = call.get_expression()
             && identifier.get_identifier_token().span.contains(&self.offset)
         {

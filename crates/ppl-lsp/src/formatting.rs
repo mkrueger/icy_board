@@ -1,4 +1,4 @@
-use icy_board_engine::formatting::{FormattingBackend, blank_line_edit, space_around};
+use icy_board_ppl::formatting::{FormattingBackend, blank_line_edit, space_around};
 use ropey::Rope;
 use tower_lsp::lsp_types::{Range, TextEdit};
 

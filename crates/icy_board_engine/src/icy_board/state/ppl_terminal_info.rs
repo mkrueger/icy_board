@@ -3,7 +3,7 @@ use icy_net::termcap_detect::{TerminalCaps, TerminalProgram};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::TERM_INFO_ID,
 };
 
@@ -99,26 +99,7 @@ impl PplTerminalInfo {
 impl UserData for PplTerminalInfo {
     const TYPE_NAME: &'static str = "TermInfo";
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        for name in [&*PROGRAM, &*DEVICE_ATTRS, &*RIP_VERSION] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, false);
-        }
-        for name in [&*COLUMNS, &*ROWS, &*CTERM_LEVEL, &*CELL_WIDTH, &*CELL_HEIGHT, &*SCREEN_WIDTH, &*SCREEN_HEIGHT] {
-            registry.add_property(name.clone(), VariableType::Integer, false);
-        }
-        for name in [
-            &*UTF8,
-            &*SIXEL,
-            &*JXL,
-            &*INLINE_GRAPHICS,
-            &*AUDIO,
-            &*PHYSICAL_KEYS,
-            &*PIXEL_MOUSE,
-            &*CLIENT_BLIT,
-            &*SYNCHRONIZED_OUTPUT,
-            &*TERMINAL_MACROS,
-        ] {
-            registry.add_property(name.clone(), VariableType::Boolean, false);
-        }
+        crate::parser::board_catalog::register_members(TERM_INFO_ID, registry);
     }
 }
 

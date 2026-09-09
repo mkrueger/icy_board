@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_TERM, PplError},
     parser::MARGINS_ID,
 };
@@ -39,25 +39,7 @@ impl UserData for PplMargins {
     const TYPE_NAME: &'static str = "Margins";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        for name in [&*TOP, &*BOTTOM, &*LEFT, &*RIGHT] {
-            registry.add_property(name.clone(), VariableType::Integer, false);
-        }
-        registry.add_property(HAS_VERTICAL.clone(), VariableType::Boolean, false);
-        registry.add_property(HAS_HORIZONTAL.clone(), VariableType::Boolean, false);
-
-        registry.add_named_function(
-            SET_VERTICAL.clone(),
-            vec![("top", VariableType::Integer), ("bottom", VariableType::Integer)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            SET_HORIZONTAL.clone(),
-            vec![("left", VariableType::Integer), ("right", VariableType::Integer)],
-            VariableType::Boolean,
-        );
-        registry.add_function(RESET_VERTICAL.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(RESET_HORIZONTAL.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(RESET.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(MARGINS_ID, registry);
     }
 }
 

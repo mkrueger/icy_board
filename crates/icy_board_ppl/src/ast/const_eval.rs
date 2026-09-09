@@ -329,7 +329,7 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             "RGB" if arguments.len() == 4 => arguments[3].as_int(),
             _ => return None,
         };
-        Some(VariableValue::new_unsigned(u64::from(crate::icy_board::state::ppl_graphics::rgba_value(
+        Some(VariableValue::new_unsigned(u64::from(crate::color::rgba_value(
             arguments[0].as_int(),
             arguments[1].as_int(),
             arguments[2].as_int(),

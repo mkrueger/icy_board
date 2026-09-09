@@ -1,6 +1,6 @@
 //! Informational code lenses for user-defined routines.
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{Ast, AstNode},
     semantic::SemanticVisitor,
 };

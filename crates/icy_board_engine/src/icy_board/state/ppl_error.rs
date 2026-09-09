@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::ERROR_ID,
 };
 
@@ -100,16 +100,7 @@ impl UserData for PplError {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplError::static_receiver);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        use crate::parser::{ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID};
-
-        registry.add_property(OK.clone(), VariableType::Boolean, false);
-        registry.add_property(KIND.clone(), VariableType::UserData(ERR_KIND_ENUM_ID), false);
-        registry.add_property(CODE.clone(), VariableType::UserData(ERR_CODE_ENUM_ID), false);
-        registry.add_property(MESSAGE.clone(), VariableType::UnboundedString, false);
-        registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
-
-        registry.add_static_function(LAST.clone(), Vec::new(), VariableType::UserData(ERROR_ID as u8));
-        registry.add_static_function(CLEAR.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(ERROR_ID, registry);
     }
 }
 

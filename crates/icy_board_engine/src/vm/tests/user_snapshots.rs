@@ -163,7 +163,7 @@ async fn compiled_stale_password_and_dates_are_not_implicit_credential_edits() {
                 Ok(())
             })
             .unwrap();
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         let commands = load(&mut vm, "GETALTUSER 2\nU_CITY = \"Hamburg\"\nPUTUSER\nU_PWD = \"draft-password\"\nPUTUSER\n");
@@ -201,7 +201,7 @@ async fn compiled_removed_alternate_never_writes_a_reused_record_or_alias() {
     for replacement in [false, true] {
         let directory = tempfile::tempdir().unwrap();
         let mut state = state(directory.path()).await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         let commands = load(&mut vm, "GETALTUSER 2\nU_CITY = \"draft\"\nPUTUSER\n");
@@ -243,7 +243,7 @@ async fn compiled_alternate_put_keeps_the_selected_daily_bucket_and_cumulative_d
             Ok(())
         })
         .unwrap();
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     let commands = load(&mut vm, "GETALTUSER 2\nU_CMNT1 = \"draft\"\nPUTUSER\nPUTUSER\n");
@@ -272,7 +272,7 @@ async fn compiled_alternate_put_keeps_the_selected_daily_bucket_and_cumulative_d
 async fn compiled_alternate_put_merges_live_changes_and_account_deltas_once() {
     let directory = tempfile::tempdir().unwrap();
     let mut state = state(directory.path()).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     let commands = load(
@@ -313,7 +313,7 @@ async fn compiled_caller_account_refresh_never_advances_profile_baseline_or_repl
         let directory = tempfile::tempdir().unwrap();
         let mut state = state(directory.path()).await;
         let persisted = std::fs::read(directory.path().join("users.toml")).unwrap();
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         let commands = load(
@@ -350,7 +350,7 @@ async fn compiled_put_conflicts_preserve_draft_baseline_and_live_record() {
     for alternate in [false, true] {
         let directory = tempfile::tempdir().unwrap();
         let mut state = state(directory.path()).await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         let selection = if alternate { "GETALTUSER 2" } else { "GETUSER" };
@@ -394,7 +394,7 @@ async fn compiled_put_conflicts_preserve_draft_baseline_and_live_record() {
 async fn compiled_alternate_failed_persistence_does_not_publish_or_acknowledge_edits() {
     let directory = tempfile::tempdir().unwrap();
     let mut state = state(directory.path()).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     let commands = load(&mut vm, "GETALTUSER 2\nU_CITY = \"Munich\"\nACCOUNT 13, 2\nPUTUSER\nPUTUSER\n");
@@ -419,7 +419,7 @@ async fn compiled_alternate_failed_persistence_does_not_publish_or_acknowledge_e
 async fn compiled_selection_changes_and_invalid_getaltuser_preserve_the_right_baseline() {
     let directory = tempfile::tempdir().unwrap();
     let mut state = state(directory.path()).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     let commands = load(

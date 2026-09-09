@@ -372,7 +372,6 @@ async fn classic_static_flags_and_bare_array_decay_survive_dynamic_storage_chang
     use crate::{
         executable::{EntryType, GenericVariableData, PPECommand, PPEExpr, ProcedureValue, TableEntry, VarHeader, VariableTable, VariableType, VariableValue},
         icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
-        parser::UserTypeRegistry,
         vm::{ReturnAddress, VirtualMachine, io::DiskIO},
     };
     use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -384,7 +383,7 @@ async fn classic_static_flags_and_bare_array_decay_survive_dynamic_storage_chang
     let nodes = bbs.lock().await.open_connections.clone();
     let (_peer, connection) = ChannelConnection::create_pair();
     let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
     let array = |first, second| VariableValue {
         vtype: VariableType::Integer,

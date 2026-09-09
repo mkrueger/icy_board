@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::{
+use icy_board_ppl::{
     compiler::workspace::Workspace,
     formatting::{FormattingOptions, FormattingVisitor, StringFormattingBackend},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
@@ -15,7 +15,7 @@ use icy_board_engine::{
 use ppl_lsp::formatting::VSCodeFormattingBackend;
 use ropey::Rope;
 
-fn parse(path: &Path, source: &str) -> icy_board_engine::ast::Ast {
+fn parse(path: &Path, source: &str) -> icy_board_ppl::ast::Ast {
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     parse_ast(path.to_path_buf(), errors, source, &registry, Encoding::Utf8, &Workspace::default())

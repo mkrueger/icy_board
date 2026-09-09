@@ -5,7 +5,7 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_REGEX, PplError},
-    parser::{REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID},
+    parser::{REGEX_ID, REGEX_MATCH_ID},
 };
 
 const MAX_REGEX_RESULTS: usize = 100_000;
@@ -171,67 +171,7 @@ impl UserData for PplRegex {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplRegex::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(PATTERN.clone(), VariableType::UnboundedString, false);
-        registry.add_named_static_function_with(
-            COMPILE.clone(),
-            vec![
-                ("pattern", VariableType::UnboundedString),
-                ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID)),
-            ],
-            1,
-            VariableType::UserData(REGEX_ID as u8),
-        );
-        registry.add_named_static_function(ESCAPE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
-        registry.add_named_static_function_with(
-            IS_VALID.clone(),
-            vec![
-                ("pattern", VariableType::UnboundedString),
-                ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID)),
-            ],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_named_function_with(
-            IS_MATCH.clone(),
-            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer)],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_named_function_with(
-            FIND.clone(),
-            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer)],
-            1,
-            VariableType::UserData(REGEX_MATCH_ID as u8),
-        );
-        registry.add_named_array_function_with(
-            FIND_ALL.clone(),
-            vec![
-                ("text", VariableType::UnboundedString),
-                ("start", VariableType::Integer),
-                ("limit", VariableType::Integer),
-            ],
-            1,
-            VariableType::UserData(REGEX_MATCH_ID as u8),
-            1,
-        );
-        registry.add_named_function_with(
-            REPLACE.clone(),
-            vec![
-                ("text", VariableType::UnboundedString),
-                ("replacement", VariableType::UnboundedString),
-                ("limit", VariableType::Integer),
-            ],
-            2,
-            VariableType::UnboundedString,
-        );
-        registry.add_named_array_function_with(
-            SPLIT.clone(),
-            vec![("text", VariableType::UnboundedString), ("limit", VariableType::Integer)],
-            1,
-            VariableType::UnboundedString,
-            1,
-        );
+        crate::parser::board_catalog::register_members(REGEX_ID, registry);
     }
 }
 
@@ -443,27 +383,7 @@ impl UserData for PplRegexMatch {
     const TYPE_NAME: &'static str = "RegexMatch";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(SUCCESS.clone(), VariableType::Boolean, false);
-        registry.add_property(VALUE.clone(), VariableType::UnboundedString, false);
-        registry.add_property(START.clone(), VariableType::Integer, false);
-        registry.add_property(LENGTH.clone(), VariableType::Integer, false);
-        registry.add_property(GROUP_COUNT.clone(), VariableType::Integer, false);
-        registry.add_named_function(GROUP.clone(), vec![("index", VariableType::Integer)], VariableType::UnboundedString);
-        registry.add_named_function(
-            NAMED_GROUP.clone(),
-            vec![("name", VariableType::UnboundedString)],
-            VariableType::UnboundedString,
-        );
-        registry.add_named_function(GROUP_MATCHED.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
-        registry.add_named_function(
-            NAMED_GROUP_MATCHED.clone(),
-            vec![("name", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(GROUP_START.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
-        registry.add_named_function(NAMED_GROUP_START.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Integer);
-        registry.add_named_function(GROUP_LENGTH.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
-        registry.add_named_function(NAMED_GROUP_LENGTH.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Integer);
+        crate::parser::board_catalog::register_members(REGEX_MATCH_ID, registry);
     }
 }
 

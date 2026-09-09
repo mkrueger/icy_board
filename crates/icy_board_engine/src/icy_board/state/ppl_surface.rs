@@ -7,8 +7,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
+    executable::{VariableData, VariableType, VariableValue},
     parser::SURFACE_ID,
 };
 
@@ -19,13 +19,10 @@ pub struct PplSurface {
 
 impl PplSurface {
     pub fn value(handle: i32) -> VariableValue {
-        VariableValue {
-            vtype: VariableType::UserData(SURFACE_ID as u8),
-            // The handle rides in the data word as well, so a surface passed to
-            // another surface's member can be named without downcasting the object.
-            data: VariableData::from_int(handle),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplSurface { handle })),
-        }
+        let mut value = user_data_value(PplSurface { handle }, SURFACE_ID);
+        // Surface arguments carry the handle in the data word as well.
+        value.data = VariableData::from_int(handle);
+        value
     }
 
     /// An answer for a surface that could not be made, so its members stay callable.
@@ -66,96 +63,7 @@ impl UserData for PplSurface {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplSurface::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        let surface = VariableType::UserData(SURFACE_ID as u8);
-
-        registry.add_property(WIDTH.clone(), VariableType::Integer, false);
-        registry.add_property(HEIGHT.clone(), VariableType::Integer, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-
-        registry.add_named_function(CLEAR.clone(), vec![("rgba", VariableType::Unsigned)], VariableType::Boolean);
-        registry.add_named_function(
-            SET_PIXEL.clone(),
-            vec![("x", VariableType::Integer), ("y", VariableType::Integer), ("rgba", VariableType::Unsigned)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            GET_PIXEL.clone(),
-            vec![("x", VariableType::Integer), ("y", VariableType::Integer)],
-            VariableType::Unsigned,
-        );
-        registry.add_named_function(
-            FILL_RECT.clone(),
-            vec![
-                ("x", VariableType::Integer),
-                ("y", VariableType::Integer),
-                ("width", VariableType::Integer),
-                ("height", VariableType::Integer),
-                ("rgba", VariableType::Unsigned),
-            ],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            RECT.clone(),
-            vec![
-                ("x", VariableType::Integer),
-                ("y", VariableType::Integer),
-                ("width", VariableType::Integer),
-                ("height", VariableType::Integer),
-                ("rgba", VariableType::Unsigned),
-            ],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            BLIT.clone(),
-            vec![
-                ("source", surface),
-                ("destinationX", VariableType::Integer),
-                ("destinationY", VariableType::Integer),
-            ],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            BLIT_RECT.clone(),
-            vec![
-                ("source", surface),
-                ("sourceX", VariableType::Integer),
-                ("sourceY", VariableType::Integer),
-                ("width", VariableType::Integer),
-                ("height", VariableType::Integer),
-                ("destinationX", VariableType::Integer),
-                ("destinationY", VariableType::Integer),
-            ],
-            VariableType::Boolean,
-        );
-        registry.add_function(PRESENT.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_named_function(
-            PRESENT_AT.clone(),
-            vec![("column", VariableType::Integer), ("row", VariableType::Integer)],
-            VariableType::Boolean,
-        );
-        // Source rectangle is required; destination, size and flip are not.
-        registry.add_named_function_with(
-            PRESENT_RECT.clone(),
-            vec![
-                ("sourceX", VariableType::Integer),
-                ("sourceY", VariableType::Integer),
-                ("sourceWidth", VariableType::Integer),
-                ("sourceHeight", VariableType::Integer),
-                ("column", VariableType::Integer),
-                ("row", VariableType::Integer),
-                ("destinationWidth", VariableType::Integer),
-                ("destinationHeight", VariableType::Integer),
-                ("flip", VariableType::Integer),
-            ],
-            4,
-            VariableType::Boolean,
-        );
-        registry.add_function(PIN.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(UNPIN.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
-
-        registry.add_named_static_function(NEW.clone(), vec![("width", VariableType::Integer), ("height", VariableType::Integer)], surface);
-        registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::UnboundedString)], surface);
+        crate::parser::board_catalog::register_members(SURFACE_ID, registry);
     }
 }
 

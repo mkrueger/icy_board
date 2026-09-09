@@ -14,7 +14,6 @@ use crate::{
         state::IcyBoardState,
         user_base::{User, UserBase},
     },
-    parser::UserTypeRegistry,
     vm::{DiskIO, VirtualMachine, expressions},
 };
 use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -153,7 +152,7 @@ async fn account_is_additive_and_independent_of_mode_and_rates() {
     let mut state = state().await;
     state.session.accounting.mode = AccountingMode::Disabled;
     state.get_board().await.config.accounting.accounting_config = None;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     vm.user = vm.icy_board_state.session.current_user.clone().unwrap();
@@ -176,7 +175,7 @@ async fn account_is_additive_and_independent_of_mode_and_rates() {
 #[tokio::test]
 async fn live_runtime_charges_survive_account_read_write_and_putuser() {
     let mut state = state().await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     prepare_user_variables(&mut vm);
@@ -201,7 +200,7 @@ async fn alternate_user_charges_persist_only_to_the_selected_user() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("users.toml");
     state.get_board().await.config.paths.user_file = path.clone();
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     prepare_user_variables(&mut vm);
@@ -230,7 +229,7 @@ async fn recordusage_obeys_session_mode_and_zero_tracking_policy() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("usage.log");
         let mut state = state_with_tracking(Some(&path)).await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         vm.user = vm.icy_board_state.get_board().await.users[usize::from(alternate)].clone();
@@ -255,7 +254,7 @@ async fn recordusage_obeys_session_mode_and_zero_tracking_policy() {
 async fn invalid_amounts_and_overflow_leave_accounts_unchanged() {
     for alternate in [false, true] {
         let mut state = state().await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         vm.user = vm.icy_board_state.get_board().await.users[usize::from(alternate)].clone();
@@ -290,7 +289,7 @@ async fn recordusage_covers_all_debit_credit_fields_and_shared_dbf_output() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("usage.DBF");
         let mut state = state_with_tracking(Some(&path)).await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         vm.user = vm.icy_board_state.get_board().await.users[usize::from(alternate)].clone();
@@ -312,7 +311,7 @@ async fn recordusage_covers_all_debit_credit_fields_and_shared_dbf_output() {
 #[tokio::test]
 async fn pcbaccstat_balance_uses_live_session_not_selected_snapshot() {
     let mut state = state().await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(".", None);
     let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
     vm.user = vm.icy_board_state.get_board().await.users[1].clone();
@@ -329,7 +328,7 @@ async fn tracking_failure_does_not_retry_or_lose_a_posted_charge() {
     for alternate in [false, true] {
         let directory = tempfile::tempdir().unwrap();
         let mut state = state_with_tracking(Some(&directory.path().join("missing/usage.log"))).await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
         vm.user = vm.icy_board_state.get_board().await.users[usize::from(alternate)].clone();

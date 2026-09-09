@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{
         Ast, AstVisitor, ConstDeclarationStatement, Constant, EnumDeclarationAstNode, Expression, FunctionDeclarationAstNode, FunctionImplementation,
         MemberReferenceExpression, ParameterSpecifier, TypeDeclarationAstNode, VariableDeclarationStatement, walk_function_declaration,
@@ -327,7 +327,7 @@ impl AstVisitor<()> for AstTokens<'_> {
 
     fn visit_variable_declaration_statement(&mut self, declaration: &VariableDeclarationStatement) {
         insert(self.tokens, &declaration.get_type_token().span, TYPE, 0);
-        icy_board_engine::ast::walk_variable_declaration_statement(self, declaration);
+        icy_board_ppl::ast::walk_variable_declaration_statement(self, declaration);
     }
 
     fn visit_function_declaration(&mut self, declaration: &FunctionDeclarationAstNode) {

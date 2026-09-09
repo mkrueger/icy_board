@@ -627,7 +627,7 @@ impl VirtualMachine<'_> {
 
                 match member {
                     crate::compiler::user_data::UserDataEntry::Field(name) | crate::compiler::user_data::UserDataEntry::Getter(name) => {
-                        let val = object.get_property_value(self, name);
+                        let val = crate::compiler::user_data::runtime_object(object.as_ref(), type_id)?.get_property_value(self, name);
                         return val;
                     }
                     crate::compiler::user_data::UserDataEntry::Procedure(_) | crate::compiler::user_data::UserDataEntry::Function(_) => {
@@ -668,6 +668,7 @@ impl VirtualMachine<'_> {
                 let Some(member) = registry.id_table.get(*id) else {
                     return Err(VMError::InvalidMemberId(type_id, *id).into());
                 };
+                let object = crate::compiler::user_data::runtime_object(object.as_ref(), type_id)?;
                 if let crate::compiler::user_data::UserDataEntry::Field(name) = member {
                     if arguments.len() != 1 {
                         return Err(VMError::InvalidMemberArgumentCount(type_id, *id, 1, arguments.len()).into());
@@ -870,7 +871,9 @@ impl VirtualMachine<'_> {
                         let Some(crate::compiler::user_data::UserDataEntry::Field(name)) = registry.id_table.get(*member_id) else {
                             return Err(VMError::InvalidMemberId(type_id, *member_id).into());
                         };
-                        return object.set_property_value(self, name, value).await;
+                        return crate::compiler::user_data::runtime_object(object.as_ref(), type_id)?
+                            .set_property_value(self, name, value)
+                            .await;
                     }
                 }
 
@@ -1293,7 +1296,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 User::default()
             };
             let file_name = file_name.as_ref().to_path_buf();
-            let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
+            let reg = crate::parser::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
 
             let mut vm = VirtualMachine::new(file_name, &reg, io, icy_board_state);
@@ -1338,7 +1341,7 @@ mod followup_invariants {
     #[tokio::test]
     async fn foreach_bytecode_checks_rank_nominal_type_and_enum_domain() {
         let mut state = state().await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         for invalid in ["scalar source", "array target", "nominal target", "invalid enum"] {
             let executable = tests::compile("ENUM Bits\n One=1\nENDENUM\nBits values[0]\nBits item\nFOREACH item IN values\nPRINT item\nNEXT\n");
@@ -1383,7 +1386,7 @@ mod followup_invariants {
     #[tokio::test]
     async fn nested_fixed_field_failures_leave_root_and_shared_copies_unchanged() {
         let mut state = state().await;
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
         for (rank, bounds) in [(1, "1"), (2, "1,1"), (3, "1,1,1")] {
             for assignment in [

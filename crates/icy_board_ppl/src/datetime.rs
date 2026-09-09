@@ -388,7 +388,7 @@ impl IcbTime {
         }
     }
 
-    pub(crate) fn to_pcb_str(&self) -> String {
+    pub fn to_pcb_str(&self) -> String {
         // PCBoard uses HH:MM format (5 characters) for time fields
         format!("{:02}:{:02}", self.hour, self.minute)
     }
@@ -407,7 +407,7 @@ impl IcbTime {
         self.hour as i32 * 60 * 60 + self.minute as i32 * 60 + self.second as i32
     }
 
-    pub(crate) fn from_naive(date_time: NaiveDateTime) -> IcbTime {
+    pub fn from_naive(date_time: NaiveDateTime) -> IcbTime {
         IcbTime {
             hour: date_time.hour() as u8,
             minute: date_time.minute() as u8,

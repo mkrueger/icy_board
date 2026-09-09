@@ -4,7 +4,7 @@ use crossterm::{
     execute,
     style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
 };
-use icy_board_engine::executable::{Executable, ImplStatus, PPECommand, PPEExpr, PPEScript, function_status, statement_status};
+use icy_board_ppl::executable::{Executable, ImplStatus, PPECommand, PPEExpr, PPEScript, function_status, statement_status};
 
 struct UsageHit {
     span_start: usize,
@@ -36,7 +36,7 @@ pub struct CompatibilityReport {
     hits: Vec<UsageHit>,
 }
 
-// The compatibility tables live in `icy_board_engine::executable::compat` and are
+// The compatibility tables live in `icy_board_ppl::executable::compat` and are
 // kept in sync with the VM by the `opcode_coverage` test in that crate.
 
 fn classify_statement(name: &str) -> Option<ImplStatus> {
@@ -107,7 +107,7 @@ fn collect_expr_hits(expr: &PPEExpr, hits: &mut Vec<UsageHit>, span_start: usize
 }
 
 /// Walk a statement + its expressions.
-fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hits: &mut Vec<UsageHit>) {
+fn collect_statement_hits(stmt: &icy_board_ppl::executable::PPEStatement, hits: &mut Vec<UsageHit>) {
     let span_start = stmt.span.start;
     match &stmt.command {
         PPECommand::PredefinedCall(def, args) => {

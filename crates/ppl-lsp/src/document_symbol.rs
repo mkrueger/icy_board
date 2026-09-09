@@ -1,6 +1,6 @@
 //! The outline of a file: its types, routines and top level variables.
 
-use icy_board_engine::ast::{Ast, AstNode, Statement};
+use icy_board_ppl::ast::{Ast, AstNode, Statement};
 use ropey::Rope;
 use tower_lsp::lsp_types::{DocumentSymbol, Range, SymbolKind};
 

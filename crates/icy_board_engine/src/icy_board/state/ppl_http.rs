@@ -16,9 +16,9 @@ use reqwest::{
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     icy_board::icb_config::{PplHttpDestinationPolicy, PplHttpOptions, normalize_ppl_http_origin},
-    parser::{HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID},
+    parser::{HTTP_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID},
 };
 
 use super::ppl_error::{ERR_DENIED, ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_NET, ERR_LIMIT, ERR_TIMEOUT, ERR_UNAVAILABLE, ERR_UNSUPPORTED, PplError};
@@ -660,33 +660,7 @@ impl UserData for PplHttp {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttp::value);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_named_static_function(
-            GET.clone(),
-            vec![("url", VariableType::UnboundedString)],
-            VariableType::UserData(HTTP_RESPONSE_ID as u8),
-        );
-        registry.add_named_static_function(
-            NEW.clone(),
-            vec![("method", VariableType::UserData(HTTP_METHOD_ENUM_ID)), ("url", VariableType::UnboundedString)],
-            VariableType::UserData(HTTP_REQUEST_ID as u8),
-        );
-        registry.add_named_static_function(
-            DOWNLOAD.clone(),
-            vec![("url", VariableType::UnboundedString), ("file", VariableType::UnboundedString)],
-            VariableType::UserData(HTTP_RESPONSE_ID as u8),
-        );
-        registry.add_named_static_function(URL_ENCODE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
-        registry.add_named_static_function(URL_DECODE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
-        registry.add_named_static_function(
-            FORM_ENCODE.clone(),
-            vec![("text", VariableType::UnboundedString)],
-            VariableType::UnboundedString,
-        );
-        registry.add_named_static_function(
-            FORM_DECODE.clone(),
-            vec![("text", VariableType::UnboundedString)],
-            VariableType::UnboundedString,
-        );
+        crate::parser::board_catalog::register_members(HTTP_ID, registry);
     }
 }
 
@@ -754,36 +728,7 @@ impl UserData for PplHttpRequest {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttpRequest::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(URL.clone(), VariableType::UnboundedString, false);
-        registry.add_property(METHOD.clone(), VariableType::UserData(HTTP_METHOD_ENUM_ID), false);
-        registry.add_named_function(
-            SET_QUERY.clone(),
-            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            SET_HEADER.clone(),
-            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function_with(
-            SET_TEXT.clone(),
-            vec![("text", VariableType::UnboundedString), ("contentType", VariableType::UnboundedString)],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_named_function_with(
-            SET_BYTES.clone(),
-            vec![("data", VariableType::Bytes), ("contentType", VariableType::UnboundedString)],
-            1,
-            VariableType::Boolean,
-        );
-        registry.add_named_function(
-            SET_FORM.clone(),
-            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
-        registry.add_function(SEND.clone(), Vec::new(), VariableType::UserData(HTTP_RESPONSE_ID as u8));
+        crate::parser::board_catalog::register_members(HTTP_REQUEST_ID, registry);
     }
 }
 
@@ -944,16 +889,7 @@ impl UserData for PplHttpResponse {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttpResponse::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(OK.clone(), VariableType::Boolean, false);
-        registry.add_property(STATUS.clone(), VariableType::Integer, false);
-        registry.add_property(FINAL_URL.clone(), VariableType::UnboundedString, false);
-        registry.add_property(SIZE.clone(), VariableType::Long, false);
-        registry.add_property(CONTENT_TYPE.clone(), VariableType::UnboundedString, false);
-        registry.add_function(TEXT.clone(), Vec::new(), VariableType::UnboundedString);
-        registry.add_function(BYTES.clone(), Vec::new(), VariableType::Bytes);
-        registry.add_named_function(HEADER.clone(), vec![("name", VariableType::UnboundedString)], VariableType::UnboundedString);
-        registry.add_named_function(SAVE.clone(), vec![("file", VariableType::UnboundedString)], VariableType::Boolean);
+        crate::parser::board_catalog::register_members(HTTP_RESPONSE_ID, registry);
     }
 }
 

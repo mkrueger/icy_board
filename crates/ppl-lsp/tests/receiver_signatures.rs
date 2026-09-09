@@ -2,7 +2,7 @@
 //! source 350/400 gates, and EN/DE unbounded STRING prose (legacy BIGSTR retained).
 //! Direct public LSP handlers are exercised; no core or root documentation edits.
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::Ast,
     compiler::workspace::Workspace,
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},

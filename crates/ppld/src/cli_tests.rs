@@ -83,7 +83,7 @@ fn cli_strict_requires_check_and_allows_repeated_switches() {
 #[test]
 fn cli_compatibility_summary_distinguishes_findings_from_errors() {
     use crate::compat_check::{CompatibilitySummary, check_compatibility};
-    use icy_board_engine::executable::{Executable, OpCode};
+    use icy_board_ppl::executable::{Executable, OpCode};
 
     for (fixture, expected) in [
         ("beep", CompatibilitySummary::default()),
@@ -126,7 +126,7 @@ fn cli_compatibility_summary_distinguishes_findings_from_errors() {
 #[test]
 fn cli_compatibility_report_is_deterministic_and_propagates_writer_errors() {
     use crate::compat_check::{CompatibilitySummary, check_compatibility};
-    use icy_board_engine::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEExpr, PPEScript};
+    use icy_board_ppl::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEExpr, PPEScript};
     use std::io::{self, Write};
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/dointr.ppe");

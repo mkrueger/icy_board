@@ -10,7 +10,7 @@ use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     icy_board::{
         is_null_16,
         state::{
@@ -18,7 +18,6 @@ use crate::{
             ppl_message::{PplMessage, message_error, message_is_missing},
         },
     },
-    parser::MSG_ID,
 };
 
 /// The `HDR_*` field numbers a `MsgField` names, so `Find` and `SCANMSGHDR` agree.
@@ -223,30 +222,7 @@ impl UserData for MessageArea {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(MessageArea::default(), crate::parser::MESSAGE_AREA_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
-        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(IS_READ_ONLY.clone(), VariableType::Boolean, false);
-        registry.add_property(ALLOW_ALIASES.clone(), VariableType::Boolean, false);
-        registry.add_property(QWK_NAME.clone(), VariableType::UnboundedString, false);
-        registry.add_property(ECHO_TAG.clone(), VariableType::UnboundedString, false);
-        registry.add_property(ECHO_ORIGIN.clone(), VariableType::UnboundedString, false);
-        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(CAN_ENTER.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(HIGH_MSG.clone(), Vec::new(), VariableType::Long);
-        registry.add_function(LOW_MSG.clone(), Vec::new(), VariableType::Long);
-        registry.add_named_function(READ.clone(), vec![("messageNumber", VariableType::Long)], VariableType::UserData(MSG_ID as u8));
-        registry.add_named_function_with(
-            FIND.clone(),
-            vec![
-                ("field", VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID)),
-                ("text", VariableType::UnboundedString),
-                ("startMessage", VariableType::Long),
-            ],
-            2,
-            VariableType::UserData(MSG_ID as u8),
-        );
+        crate::parser::board_catalog::register_members(crate::parser::MESSAGE_AREA_ID, registry);
     }
 }
 

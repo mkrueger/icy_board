@@ -1,6 +1,6 @@
 use i18n_embed_fl::fl;
-use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
-use icy_board_engine::parser::{
+use icy_board_ppl::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
+use icy_board_ppl::parser::{
     AUDIO_ID, BOARD_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
     EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID,
     MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID,
@@ -12,7 +12,7 @@ use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::LANGUAGE_LOADER;
 
-pub fn get_const_hover(c: &icy_board_engine::ast::constant::BuiltinConst) -> Option<Hover> {
+pub fn get_const_hover(c: &icy_board_ppl::ast::constant::BuiltinConst) -> Option<Hover> {
     match c.name {
         "TRUE" => get_sig_hint(c.get_signature(), fl!(crate::LANGUAGE_LOADER, "hint-const-true")),
         "FALSE" => get_sig_hint(c.get_signature(), fl!(crate::LANGUAGE_LOADER, "hint-const-false")),
@@ -559,7 +559,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         };
     }
     if id == REGEX_OPTIONS_ENUM_ID {
-        return icy_board_engine::parser::UserTypeRegistry::icy_board_registry()
+        return icy_board_ppl::parser::UserTypeRegistry::icy_board_registry()
             .get_enum_from_id(id)
             .and_then(|definition| definition.value(&unicase::Ascii::new(member.to_string())))
             .map(|_| fl!(LANGUAGE_LOADER, "hint-enum-regex-options"));
@@ -1427,7 +1427,7 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
 
 #[cfg(test)]
 mod test {
-    use icy_board_engine::{
+    use icy_board_ppl::{
         executable::{FUNCTION_DEFINITIONS, FunctionSignature, STATEMENT_DEFINITIONS, VariableType},
         parser::{
             BOARD_ID, CHECKSUM_ENUM_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, EVENT_KIND_ENUM_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID,
@@ -1465,13 +1465,13 @@ mod test {
 
     #[test]
     fn built_in_constants_show_kind_type_name_and_value() {
-        let hover = super::get_const_hover(&icy_board_engine::ast::constant::BuiltinConst::TRUE).unwrap();
+        let hover = super::get_const_hover(&icy_board_ppl::ast::constant::BuiltinConst::TRUE).unwrap();
         let tower_lsp::lsp_types::HoverContents::Markup(content) = hover.contents else {
             panic!("expected markdown hover");
         };
         assert!(content.value.starts_with("```PPL\nCONSTANT BOOLEAN TRUE = 1h\n```"), "{}", content.value);
 
-        let key = icy_board_engine::ast::constant::BUILTIN_CONSTS
+        let key = icy_board_ppl::ast::constant::BUILTIN_CONSTS
             .iter()
             .find(|constant| constant.name == "KEY_ESCAPE")
             .unwrap();
@@ -1507,7 +1507,7 @@ mod test {
 
     #[test]
     fn every_reserved_keyword_has_hover_documentation() {
-        for keyword in icy_board_engine::parser::lexer::KEYWORDS {
+        for keyword in icy_board_ppl::parser::lexer::KEYWORDS {
             let hover = super::get_keyword_hover(keyword.name).unwrap_or_else(|| panic!("missing documentation for {}", keyword.name));
             let tower_lsp::lsp_types::HoverContents::Markup(content) = hover.contents else {
                 panic!("expected markdown hover for {}", keyword.name);

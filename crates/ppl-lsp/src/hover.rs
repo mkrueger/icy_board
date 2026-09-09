@@ -1,7 +1,7 @@
 //! Hover for the names a program declares itself - variables, routines, labels,
 //! record types and their fields. The built-ins are answered by `documentation`.
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{Ast, AstVisitor, ConstDeclarationStatement, MemberReferenceExpression, VariableDeclarationStatement, walk_variable_declaration_statement},
     executable::VariableType,
     semantic::{ReferenceType, SemanticVisitor},
@@ -59,8 +59,8 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
                     .iter()
                     .find(|container| container.name.eq_ignore_ascii_case(&name))
                     .and_then(|container| match &container.functions {
-                        icy_board_engine::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
-                        icy_board_engine::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
+                        icy_board_ppl::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
+                        icy_board_ppl::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
                     })
                     .map(str::to_owned);
                 Some(documented_hover(routine_signature(visitor, &name)?, documentation))
@@ -149,7 +149,7 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
             return;
         }
         let receiver_type = self.visitor.member_receiver_type_lookup.get(&token.span.start).copied().or_else(|| {
-            let icy_board_engine::ast::Expression::Identifier(identifier) = member.get_expression() else {
+            let icy_board_ppl::ast::Expression::Identifier(identifier) = member.get_expression() else {
                 return None;
             };
             let receiver_type = static_type_of_name(self.visitor, identifier.get_identifier().as_ref())?;

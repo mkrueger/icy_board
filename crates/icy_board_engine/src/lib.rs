@@ -36,27 +36,21 @@
 
 use std::{env, error::Error, path::PathBuf};
 
+#[cfg(feature = "bbs")]
 use semver::Version;
 
+#[cfg(feature = "bbs")]
 pub mod icy_board;
+#[cfg(feature = "bbs")]
 pub mod vm;
 
-pub mod ast;
+pub use icy_board_ppl::{ast, crypt, datetime, decompiler, executable, formatting, hir, io, password, search_patterns, semantic, tables, tokens};
 pub mod compiler;
-pub mod crypt;
-pub mod datetime;
-pub mod decompiler;
-pub mod executable;
-pub mod formatting;
-pub mod hir;
 pub mod parser;
-pub mod search_patterns;
-pub mod semantic;
-pub mod tables;
-pub mod tokens;
 
 pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
+#[cfg(feature = "bbs")]
 static VERSION: std::sync::LazyLock<Version> = std::sync::LazyLock::new(|| Version::parse(env!("CARGO_PKG_VERSION")).unwrap());
 
 pub const DEFAULT_ICYBOARD_FILE: &str = "icboard.toml";

@@ -8,7 +8,7 @@ edition.workspace = true
 icy_board_buildinfo = { workspace = true }
 
 [dependencies]
-icy_board_engine = { workspace = true }
+icy_board_ppl = { workspace = true }
 codepages = { workspace = true }
 lazy_static = { workspace = true }
 semver = { workspace = true }

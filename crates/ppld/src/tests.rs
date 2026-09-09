@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{Ast, OutputFunc, output_visitor},
     compiler::{PPECompiler, workspace::Workspace},
     executable::{Executable, LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION},

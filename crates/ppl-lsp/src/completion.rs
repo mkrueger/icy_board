@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
     parser::{FIRST_BOARD_OBJECT_LANGUAGE_VERSION, built_in_type_names, lexer::KEYWORDS},
@@ -276,8 +276,8 @@ fn routine_documentation(visitor: &SemanticVisitor, name: &str) -> Option<Docume
         .iter()
         .find(|container| container.name.eq_ignore_ascii_case(name))
         .and_then(|container| match &container.functions {
-            icy_board_engine::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
-            icy_board_engine::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
+            icy_board_ppl::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
+            icy_board_ppl::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
         })?;
     Some(Documentation::MarkupContent(MarkupContent {
         kind: MarkupKind::Markdown,
@@ -304,7 +304,7 @@ fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str, lan
         return Vec::new();
     }
     let parameter_type = callable_member(&visitor.type_registry, receiver, &call.name).and_then(|method| method.parameters.get(call.argument).copied());
-    let Some(icy_board_engine::executable::VariableType::UserData(parameter_id)) = parameter_type else {
+    let Some(icy_board_ppl::executable::VariableType::UserData(parameter_id)) = parameter_type else {
         return Vec::new();
     };
     let Some(definition) = visitor.type_registry.get_enum_from_id(parameter_id) else {
@@ -321,7 +321,7 @@ fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str, lan
                 insert_text: Some(qualified),
                 kind: Some(CompletionItemKind::ENUM_MEMBER),
                 detail: Some(definition.name.to_string()),
-                documentation: get_member_documentation(icy_board_engine::executable::VariableType::UserData(parameter_id), name.as_ref()).map(|value| {
+                documentation: get_member_documentation(icy_board_ppl::executable::VariableType::UserData(parameter_id), name.as_ref()).map(|value| {
                     Documentation::MarkupContent(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value,
@@ -369,7 +369,7 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
                     kind: MemberKind::Field,
                 })
                 .collect(),
-            Some(icy_board_engine::executable::VariableType::UserData(definition.id)),
+            Some(icy_board_ppl::executable::VariableType::UserData(definition.id)),
             &visitor.type_registry,
         );
     }
@@ -382,8 +382,8 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
 
 fn completion_items(
     members: Vec<crate::type_lookup::Member>,
-    receiver_type: Option<icy_board_engine::executable::VariableType>,
-    registry: &icy_board_engine::parser::UserTypeRegistry,
+    receiver_type: Option<icy_board_ppl::executable::VariableType>,
+    registry: &icy_board_ppl::parser::UserTypeRegistry,
 ) -> Vec<CompletionItem> {
     members
         .into_iter()

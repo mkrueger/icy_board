@@ -18,6 +18,17 @@ jobs:
       run: cargo fmt --all -- --check
     - name: Run Clippy
       run: cargo clippy --workspace --all-targets --all-features --locked --no-deps
+    - name: Check standalone language tools
+      run: |
+        cargo check -p icy_board_engine --no-default-features --all-targets --locked
+        cargo test -p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-default-features --locked
+        for package in icy_board_ppl pplc ppld ppl-lsp; do
+          dependencies=$(cargo tree -p "$package" --no-default-features --edges normal,build --prefix none --format '{p}' --locked)
+          if echo "$dependencies" | grep -E '^(icy_board_engine|icy_net|icy_engine|dizbase|jamjam|lettre|reqwest|fatfs|x86-native) '; then
+            echo "Unexpected BBS or graphics dependency in $package"
+            exit 1
+          fi
+        done
     - name: Run tests
       run: |
         cargo test --all-features --locked

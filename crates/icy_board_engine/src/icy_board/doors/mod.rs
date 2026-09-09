@@ -7,7 +7,7 @@ use std::{
 use crate::{
     Res,
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::load_with_encoding,
 };
 
@@ -233,13 +233,7 @@ impl UserData for Door {
     const TYPE_NAME: &'static str = "Door";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
-        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(DESCRIPTION.clone(), VariableType::UnboundedString, false);
-        registry.add_property(PATH.clone(), VariableType::UnboundedString, false);
-        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
-        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(crate::parser::DOOR_ID, registry);
     }
 }
 

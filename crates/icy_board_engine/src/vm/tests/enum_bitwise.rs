@@ -176,7 +176,7 @@ fn checked_run_inspecting(source: &str, inspect: impl FnOnce(&crate::executable:
         };
         let execute = async {
             let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
-            let registry = crate::parser::UserTypeRegistry::icy_board_registry();
+            let registry = crate::parser::icy_board_registry();
             let script = crate::executable::PPEScript::from_ppe_file(&executable).unwrap();
             let mut machine = vm::VirtualMachine::new(PathBuf::from("bits.ppe"), &registry, &mut io, &mut state);
             machine.commands = script.statements.iter().map(|statement| statement.command.clone()).collect::<Vec<_>>().into();

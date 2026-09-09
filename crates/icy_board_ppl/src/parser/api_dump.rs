@@ -1,6 +1,6 @@
 //! Dumps the whole 4.00 object surface, so a review reads what the registry has
 //! rather than what the source looks like.
-//! `cargo test -p icy_board_engine --lib dump_api -- --ignored --nocapture`
+//! `cargo test -p icy_board_ppl --lib dump_api -- --ignored --nocapture`
 
 use std::fmt::Write;
 

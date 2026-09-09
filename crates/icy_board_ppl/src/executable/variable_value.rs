@@ -9,7 +9,7 @@ use crate::{
     Res,
     datetime::{IcbDate, IcbTime},
     executable::{FunctionValue, ProcedureValue, VMError},
-    icy_board::user_base::Password,
+    password::Password,
 };
 
 use super::{MsgAreaIdValue, Signature};
@@ -331,7 +331,7 @@ pub enum GenericVariableData {
 
     Table(PPLTable),
 
-    Password(crate::icy_board::user_base::Password),
+    Password(crate::password::Password),
 
     /// The fields of a value whose type the program declared with TYPE/ENDTYPE.
     Record(std::sync::Arc<Vec<VariableValue>>),
@@ -340,7 +340,7 @@ pub enum GenericVariableData {
     Enum(i32),
 
     /// The object a member expression reads, kept alive by the values that name it.
-    UserData(std::sync::Arc<dyn crate::compiler::user_data::UserDataValue>),
+    UserData(std::sync::Arc<dyn std::any::Any + Send + Sync>),
 }
 
 impl fmt::Debug for GenericVariableData {
@@ -366,7 +366,7 @@ unsafe impl Sync for GenericVariableData {}
 pub(crate) const MAX_ARRAY_SIZE: usize = 100_000_000;
 
 impl GenericVariableData {
-    pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> Option<GenericVariableData> {
+    pub fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> Option<GenericVariableData> {
         match dim {
             1 => {
                 if vector_size > MAX_ARRAY_SIZE {
@@ -2189,7 +2189,7 @@ impl VariableValue {
         VariableValue::new(convert_to_type, data)
     }
 
-    pub(crate) fn new_password(password: crate::icy_board::user_base::Password) -> VariableValue {
+    pub fn new_password(password: crate::password::Password) -> VariableValue {
         VariableValue {
             vtype: VariableType::Password,
             data: VariableData::default(),

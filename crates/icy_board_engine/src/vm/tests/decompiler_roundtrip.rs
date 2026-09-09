@@ -146,7 +146,7 @@ fn execute(executable: &Executable, limit: usize) -> (Outcome, usize) {
         // Compare program output, not locale-dependent interactive MORE prompts.
         state.session.disp_options.force_non_stop();
         let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
-        let mut registry = UserTypeRegistry::icy_board_registry();
+        let mut registry = crate::parser::icy_board_registry();
         registry.register::<InstructionMeter>(METER_TYPE);
         let mut vm = VirtualMachine::new(PathBuf::from("roundtrip.ppe"), &registry, &mut io, &mut state);
         vm.variable_table = executable.variable_table;

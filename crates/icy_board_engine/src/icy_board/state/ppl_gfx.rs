@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::GFX_ID,
 };
 
@@ -31,17 +31,7 @@ impl UserData for PplGfx {
     const TYPE_NAME: &'static str = "Gfx";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        let backend = VariableType::UserData(crate::parser::GFX_BACKEND_ENUM_ID);
-        registry.add_property(BACKEND.clone(), backend, false);
-
-        registry.add_named_function_with(
-            INIT.clone(),
-            vec![("backend", backend), ("fullscreen", VariableType::Boolean)],
-            0,
-            VariableType::Boolean,
-        );
-        registry.add_named_function(SET_PACING.clone(), vec![("enabled", VariableType::Boolean)], VariableType::Boolean);
-        registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(GFX_ID, registry);
     }
 }
 

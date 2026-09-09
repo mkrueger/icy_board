@@ -2,9 +2,9 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     icy_board::{file_directory::FileDirectory, message_area::MessageArea},
-    parser::{CONFERENCE_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SESSION_ID, USER_ID},
+    parser::{CONFERENCE_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SESSION_ID},
 };
 
 macro_rules! member_name {
@@ -44,24 +44,7 @@ impl UserData for PplSession {
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Session);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(CONFERENCE.clone(), VariableType::UserData(CONFERENCE_ID as u8), false);
-        registry.add_property(USER.clone(), VariableType::UserData(USER_ID as u8), false);
-        registry.add_property(AREA.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), false);
-        registry.add_property(DIRECTORY.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), false);
-        for name in [&*USER_NAME, &*ALIAS_NAME, &*LANGUAGE] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, false);
-        }
-        for name in [&*SECURITY_LEVEL, &*NODE, &*MINUTES_LEFT, &*PAGE_LENGTH] {
-            registry.add_property(name.clone(), VariableType::Integer, false);
-        }
-        for name in [&*IS_LOCAL, &*IS_SYSOP] {
-            registry.add_property(name.clone(), VariableType::Boolean, false);
-        }
-        registry.add_named_function(
-            REQUEST_PASSWORD_RECOVERY.clone(),
-            vec![("userName", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
+        crate::parser::board_catalog::register_members(SESSION_ID, registry);
     }
 }
 

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::Ast,
     compiler::workspace::Workspace,
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
@@ -167,7 +167,7 @@ PRINTLN raw.GetChecksum(Checksum.SHA256)
 PRINTLN Bytes.FromBase64("YWJj").ToString()
 "#;
 
-    let HoverContents::Markup(bytes_type) = get_type_hover(icy_board_engine::executable::VariableType::Bytes).unwrap().contents else {
+    let HoverContents::Markup(bytes_type) = get_type_hover(icy_board_ppl::executable::VariableType::Bytes).unwrap().contents else {
         panic!("expected markup");
     };
     let bytes_type = bytes_type.value;

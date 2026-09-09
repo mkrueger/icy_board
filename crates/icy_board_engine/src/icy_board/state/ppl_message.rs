@@ -110,19 +110,7 @@ impl UserData for PplMessage {
     const TYPE_NAME: &'static str = "Msg";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NUMBER.clone(), VariableType::Long, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        for name in [&*FROM, &*TO, &*SUBJECT, &*STATUS] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, false);
-        }
-        registry.add_property(DATE.clone(), VariableType::Date, false);
-        registry.add_property(TIME.clone(), VariableType::Time, false);
-        registry.add_property(REPLY_TO.clone(), VariableType::Long, false);
-        registry.add_property(SIZE.clone(), VariableType::Long, false);
-        for name in [&*IS_PRIVATE, &*IS_READ, &*IS_DELETED, &*IS_ECHO, &*NEEDS_PASSWORD] {
-            registry.add_property(name.clone(), VariableType::Boolean, false);
-        }
-        registry.add_function(TEXT.clone(), Vec::new(), VariableType::UnboundedString);
+        crate::parser::board_catalog::register_members(crate::parser::MSG_ID, registry);
     }
 }
 

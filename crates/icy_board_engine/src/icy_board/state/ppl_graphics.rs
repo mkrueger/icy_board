@@ -12,13 +12,7 @@ const MAX_DIMENSION: usize = 2048;
 const MAX_RESIDENT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SURFACES: usize = 256;
 
-fn color_component(value: i32) -> u32 {
-    value.clamp(0, 255) as u32
-}
-
-pub fn rgba_value(red: i32, green: i32, blue: i32, alpha: i32) -> u32 {
-    (color_component(red) << 24) | (color_component(green) << 16) | (color_component(blue) << 8) | color_component(alpha)
-}
+pub use icy_board_ppl::color::rgba_value;
 
 /// Everything below this directory in the caller's per board cache belongs to PPL graphics.
 pub const CACHE_PREFIX: &str = "gfx/";

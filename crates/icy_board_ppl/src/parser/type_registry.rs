@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::RwLock};
 use crate::{
     compiler::user_data::{UserData, UserDataRegistry},
     executable::{RecordField, VariableType},
-    icy_board::{conferences::Conference, doors::Door, file_directory::FileDirectory, message_area::MessageArea},
 };
 
 /// A record a program declared with `TYPE ... ENDTYPE`.
@@ -140,12 +139,18 @@ impl UserTypeRegistry {
     pub fn icy_board_registry() -> Self {
         let mut registry = UserTypeRegistry::default();
         registry.register_builtin_enums();
-        registry.register::<Conference>(CONFERENCE_ID);
-        registry.register::<MessageArea>(MESSAGE_AREA_ID);
-        registry.register::<FileDirectory>(FILE_DIRECTORY_ID);
-        registry.register::<Door>(DOOR_ID);
-        registry.types.get_mut(&(DOOR_ID as u8)).unwrap().empty_value =
-            Some(|| crate::compiler::user_data::user_data_value(crate::icy_board::doors::Door::default(), DOOR_ID));
+        for &(id, name, instance_provider) in super::board_catalog::TYPES {
+            registry.claim_id(id, name);
+            let mut members = UserDataRegistry {
+                instance_provider,
+                ..Default::default()
+            };
+            super::board_catalog::register_members(id, &mut members);
+            registry
+                .registered_types
+                .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u8));
+            registry.types.insert(id as u8, members);
+        }
         registry.register_record(
             CONTACT_ID,
             "CONTACT",
@@ -154,27 +159,6 @@ impl UserTypeRegistry {
                 (unicase::Ascii::new("Account".to_string()), VariableType::UnboundedString),
             ],
         );
-        registry.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
-        registry.register::<crate::icy_board::state::ppl_events::PplEvent>(EVENT_ID);
-        registry.register::<crate::icy_board::state::ppl_audio::PplAudio>(AUDIO_ID);
-        registry.register::<crate::icy_board::state::ppl_error::PplError>(ERROR_ID);
-        registry.register::<crate::icy_board::state::ppl_terminal_info::PplTerminalInfo>(TERM_INFO_ID);
-        registry.register::<crate::icy_board::state::ppl_terminal_input::PplTerminalInput>(TERM_INPUT_ID);
-        registry.register::<crate::icy_board::state::ppl_terminal::PplTerminal>(TERMINAL_ID);
-        registry.register::<crate::icy_board::state::ppl_gfx::PplGfx>(GFX_ID);
-        registry.register::<crate::icy_board::state::ppl_margins::PplMargins>(MARGINS_ID);
-        registry.register::<crate::icy_board::state::ppl_palette::PplPalette>(PALETTE_ID);
-        registry.register::<crate::icy_board::state::ppl_macros::PplMacros>(MACROS_ID);
-        registry.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
-        registry.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);
-        registry.register::<crate::icy_board::state::ppl_user::PplUser>(USER_ID);
-        registry.register::<crate::icy_board::state::ppl_message::PplMessage>(MSG_ID);
-        registry.register::<crate::icy_board::state::ppl_http::PplHttp>(HTTP_ID);
-        registry.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);
-        registry.register::<crate::icy_board::state::ppl_http::PplHttpResponse>(HTTP_RESPONSE_ID);
-        registry.register::<crate::icy_board::state::ppl_regex::PplRegex>(REGEX_ID);
-        registry.register::<crate::icy_board::state::ppl_regex::PplRegexMatch>(REGEX_MATCH_ID);
-
         registry
     }
 

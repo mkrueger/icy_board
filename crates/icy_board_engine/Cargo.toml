@@ -6,83 +6,195 @@ edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["bbs"]
+bbs = [
+	"dep:icy_engine",
+	"dep:icy_engine_scripting",
+	"dep:icy_net",
+	"dep:icy_parser_core",
+	"dep:icy_sixel",
+	"dep:image",
+	"dep:jxl-oxide",
+	"dep:zune-jpegxl",
+	"dep:zune-core",
+	"dep:codepages",
+	"dep:thiserror",
+	"dep:log",
+	"dep:dizbase",
+	"dep:chrono",
+	"dep:serde",
+	"dep:serde_with",
+	"dep:tokio",
+	"dep:regex",
+	"dep:walkdir",
+	"dep:bitflag",
+	"dep:tempfile",
+	"dep:unicase",
+	"dep:fastrand",
+	"dep:jamjam",
+	"dep:bstr",
+	"dep:strum",
+	"dep:strum_macros",
+	"dep:async-recursion",
+	"dep:radix_fmt",
+	"dep:byteorder",
+	"dep:toml",
+	"dep:async-trait",
+	"dep:logos",
+	"dep:humanize-bytes",
+	"dep:reqwest",
+	"dep:percent-encoding",
+	"dep:form_urlencoded",
+	"dep:md5",
+	"dep:crc32fast",
+	"dep:temp-file",
+	"dep:glob",
+	"dep:creditcard",
+	"dep:zip",
+	"dep:rand_core",
+	"dep:lettre",
+	"dep:fs4",
+	"dep:base64",
+	"dep:sha2",
+	"dep:fatfs",
+	"dep:x86-native",
+	"dep:windows-sys",
+]
+termion = ["bbs", "dep:termion"]
+
 [dependencies]
-icy_engine = { workspace = true }
-icy_engine_scripting = { workspace = true }
-icy_net = { workspace = true }
-icy_parser_core =  { workspace = true }
-icy_sixel = { workspace = true }
-image = { workspace = true }
-jxl-oxide = { workspace = true }
-zune-jpegxl = { workspace = true }
-zune-core = { workspace = true }
-codepages = { workspace = true }
-
-lazy_static = { workspace = true }
-thiserror = { workspace = true }
-log = { workspace = true }
-dizbase = { workspace = true}
-crossterm = { workspace = true }
-chrono = { workspace = true }
-serde = { workspace = true }
-serde_with = "3.8.1"
-tokio = { workspace = true }
+icy_board_ppl = { workspace = true }
 semver = { workspace = true }
-regex = { workspace = true }
-walkdir = { workspace = true }
-bitflag = { workspace = true }
-tempfile = { workspace = true }
 
-unicase = { workspace = true }
-fastrand = { workspace = true }
-jamjam = { workspace = true }
-bstr = { workspace = true }
+icy_engine = { workspace = true, optional = true }
+icy_engine_scripting = { workspace = true, optional = true }
+icy_net = { workspace = true, optional = true }
+icy_parser_core = { workspace = true, optional = true }
+icy_sixel = { workspace = true, optional = true }
+image = { workspace = true, optional = true }
+jxl-oxide = { workspace = true, optional = true }
+zune-jpegxl = { workspace = true, optional = true }
+zune-core = { workspace = true, optional = true }
+codepages = { workspace = true, optional = true }
 
-strum = { workspace = true }
-strum_macros = { workspace = true }
-serde-inline-default = "1.0.0"
+thiserror = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
+dizbase = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_with = { version = "3.8.1", optional = true }
+tokio = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
+walkdir = { workspace = true, optional = true }
+bitflag = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
 
-async-recursion =  { workspace = true }
-radix_fmt = "1"
-byteorder = "1.5.0"
-toml = { workspace = true }
-async-trait =  { workspace = true }
-logos = "0.16.1"
-humanize-bytes = "1.0.5"
-reqwest = { version = "0.13", features = ["json", "blocking"] }
-percent-encoding = "2.3"
-form_urlencoded = "1.2"
-md5 = "0.8.0"
-crc32fast = "1.5.1"
-temp-file = "0.2.0"
-glob = "0.3.2"
-chumsky = "0.13.0"
-creditcard = "0.1.0"
-zip = { workspace = true }
-argon2 = "0.5.3"
-# argon2 re-exports OsRng, but only if someone asks rand_core for it.
-rand_core = { version = "0.6", features = ["getrandom"] }
-lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "ring", "webpki-roots"] }
-bcrypt = "0.19.3"
-fs4 = "1"
-base64 = "0.22.1"
-sha2 = { workspace = true }
-fatfs = { workspace = true }
-x86-native = { workspace = true }
+unicase = { workspace = true, optional = true }
+fastrand = { workspace = true, optional = true }
+jamjam = { workspace = true, optional = true }
+bstr = { workspace = true, optional = true }
 
-# interpreter deps
+strum = { workspace = true, optional = true }
+strum_macros = { workspace = true, optional = true }
+
+async-recursion = { workspace = true, optional = true }
+radix_fmt = { version = "1", optional = true }
+byteorder = { version = "1.5.0", optional = true }
+toml = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+logos = { version = "0.16.1", optional = true }
+humanize-bytes = { version = "1.0.5", optional = true }
+reqwest = { version = "0.13", features = ["json", "blocking"], optional = true }
+percent-encoding = { version = "2.3", optional = true }
+form_urlencoded = { version = "1.2", optional = true }
+md5 = { version = "0.8.0", optional = true }
+crc32fast = { version = "1.5.1", optional = true }
+temp-file = { version = "0.2.0", optional = true }
+glob = { version = "0.3.2", optional = true }
+creditcard = { version = "0.1.0", optional = true }
+zip = { workspace = true, optional = true }
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "ring", "webpki-roots"], optional = true }
+fs4 = { version = "1", optional = true }
+base64 = { version = "0.22.1", optional = true }
+sha2 = { workspace = true, optional = true }
+fatfs = { workspace = true, optional = true }
+x86-native = { workspace = true, optional = true }
+
 [dev-dependencies]
 criterion = "0.8.2"
-pretty_assertions = "1"
-stopwatch = "0.0.7"
+tempfile = { workspace = true }
+unicase = { workspace = true }
 
 [[bench]]
 name = "ppl_engine"
 harness = false
+required-features = ["bbs"]
+
+[[example]]
+name = "upload_corpus"
+required-features = ["bbs"]
+
+[[test]]
+name = "board_lock"
+required-features = ["bbs"]
+
+[[test]]
+name = "closed_enum_modules"
+required-features = ["bbs"]
+
+[[test]]
+name = "closed_enum_roundtrip"
+required-features = ["bbs"]
+
+[[test]]
+name = "enum_has"
+required-features = ["bbs"]
+
+[[test]]
+name = "legacy_routine_kind"
+required-features = ["bbs"]
+
+[[test]]
+name = "mod"
+required-features = ["bbs"]
+
+[[test]]
+name = "pcb_user"
+required-features = ["bbs"]
+
+[[test]]
+name = "ppl400_followup_api"
+required-features = ["bbs"]
+
+[[test]]
+name = "ppl400_followup_constants"
+required-features = ["bbs"]
+
+[[test]]
+name = "ppl400_followup_language"
+required-features = ["bbs"]
+
+[[test]]
+name = "predefined_functions"
+required-features = ["bbs"]
+
+[[test]]
+name = "search_highlight"
+required-features = ["bbs"]
+
+[[test]]
+name = "test_ppe_roundtrip"
+required-features = ["bbs"]
+
+[[test]]
+name = "test_run"
+required-features = ["bbs"]
 
 [target.'cfg(not(windows))'.dependencies]
 # termion is not supported on Windows
 termion = { version = "4.0.0", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem"], optional = true }

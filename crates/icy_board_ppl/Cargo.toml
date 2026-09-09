@@ -1,0 +1,29 @@
+[package]
+name = "icy_board_ppl"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+codepages = { workspace = true }
+chrono = { workspace = true }
+crossterm = { workspace = true }
+fastrand = { workspace = true }
+log = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+unicase = { workspace = true }
+walkdir = { workspace = true }
+logos = "0.16.1"
+chumsky = "0.13.0"
+serde-inline-default = "1.0.0"
+argon2 = "0.5.3"
+rand_core = { version = "0.6", features = ["getrandom"] }
+bcrypt = "0.19.3"
+
+[dev-dependencies]
+pretty_assertions = "1"

@@ -6,8 +6,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
+    executable::{VariableData, VariableValue},
     parser::AUDIO_ID,
 };
 
@@ -18,21 +18,15 @@ pub struct PplAudio {
 
 impl PplAudio {
     pub fn value(channel: i32) -> VariableValue {
-        VariableValue {
-            vtype: VariableType::UserData(AUDIO_ID as u8),
-            data: VariableData::from_int(channel),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel })),
-        }
+        let mut value = user_data_value(PplAudio { channel }, AUDIO_ID);
+        value.data = VariableData::from_int(channel);
+        value
     }
 
     /// An answer for audio that could not be loaded, so its members stay callable.
     /// Why it failed is `Error.Last()`'s to tell.
     pub fn invalid() -> VariableValue {
-        VariableValue {
-            vtype: VariableType::UserData(AUDIO_ID as u8),
-            data: VariableData::from_int(-1),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel: -1 })),
-        }
+        Self::value(-1)
     }
 }
 
@@ -52,27 +46,7 @@ impl UserData for PplAudio {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplAudio::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(PLAYING.clone(), VariableType::Boolean, false);
-        registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
-
-        registry.add_named_function(SET_VOLUME.clone(), vec![("volume", VariableType::Integer)], VariableType::Boolean);
-        // Looping is the only thing a play has to be told, and it may be left out.
-        registry.add_named_function_with(PLAY.clone(), vec![("looping", VariableType::Boolean)], 0, VariableType::Boolean);
-        registry.add_function(STOP.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_named_function(
-            FADE.clone(),
-            vec![("durationMs", VariableType::Integer), ("targetVolume", VariableType::Integer)],
-            VariableType::Boolean,
-        );
-        registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
-
-        registry.add_named_static_function(
-            LOAD.clone(),
-            vec![("file", VariableType::UnboundedString)],
-            VariableType::UserData(AUDIO_ID as u8),
-        );
-        registry.add_static_function(STOP_ALL.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(AUDIO_ID, registry);
     }
 }
 

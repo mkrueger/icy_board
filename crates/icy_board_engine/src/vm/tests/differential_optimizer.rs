@@ -74,7 +74,7 @@ fn execute(source: &str, optimize: bool) -> ExecutionSnapshot {
         });
 
         let mut io = DiskIO::new(root.to_str().unwrap(), None);
-        let registry = UserTypeRegistry::icy_board_registry();
+        let registry = crate::parser::icy_board_registry();
         let script = PPEScript::from_ppe_file(&executable).unwrap();
         let commands = script.statements.iter().map(|statement| statement.command.clone()).collect::<Vec<_>>().into();
         let mut vm = VirtualMachine::new(PathBuf::from("differential.ppe"), &registry, &mut io, &mut state);

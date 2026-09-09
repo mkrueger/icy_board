@@ -134,7 +134,6 @@ async fn result_sizing_is_gated_by_ppe_runtime_version() {
     use crate::{
         executable::{EntryType, GenericVariableData, PPEExpr, TableEntry, VarHeader, VariableTable, VariableType, VariableValue},
         icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
-        parser::UserTypeRegistry,
         vm::{VirtualMachine, io::DiskIO, statements::predefined_procedures::sort},
     };
     use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -146,7 +145,7 @@ async fn result_sizing_is_gated_by_ppe_runtime_version() {
     let nodes = bbs.lock().await.open_connections.clone();
     let (_peer, connection) = ChannelConnection::create_pair();
     let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
 
     // This pins the existing pre-400 behavior, not a newly oracle-verified contract.

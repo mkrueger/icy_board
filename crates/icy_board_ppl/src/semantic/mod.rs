@@ -138,7 +138,6 @@ impl SemanticVisitor {
         self.errors.lock().unwrap().set_file_name(file_name);
     }
 
-    #[cfg(test)]
     pub(crate) fn set_control_flow_liveness(&mut self, enabled: bool) {
         self.control_flow_liveness = enabled;
     }

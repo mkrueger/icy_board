@@ -1058,27 +1058,11 @@ pub fn is_null_f64(b: impl std::borrow::Borrow<f64>) -> bool {
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
-pub fn read_with_encoding_detection<P: AsRef<Path>>(path: &P) -> Res<String> {
-    match fs::read(path) {
-        Ok(data) => {
-            let import = if data.starts_with(&UTF8_BOM) {
-                String::from_utf8_lossy(&data[UTF8_BOM.len()..]).to_string()
-            } else {
-                crate::tables::import_cp437_string(&data, false)
-            };
-            Ok(import)
-        }
-        Err(e) => Err(IcyBoardError::FileError(path.as_ref().to_path_buf(), e.to_string()).into()),
-    }
-}
+pub use icy_board_ppl::io::read_data_with_encoding_detection;
 
-pub fn read_data_with_encoding_detection(data: &[u8]) -> Res<String> {
-    let import = if data.starts_with(&UTF8_BOM) {
-        String::from_utf8_lossy(&data[UTF8_BOM.len()..]).to_string()
-    } else {
-        crate::tables::import_cp437_string(data, false)
-    };
-    Ok(import)
+pub fn read_with_encoding_detection<P: AsRef<Path>>(path: &P) -> Res<String> {
+    let data = fs::read(path).map_err(|error| IcyBoardError::FileError(path.as_ref().to_path_buf(), error.to_string()))?;
+    read_data_with_encoding_detection(&data)
 }
 
 pub fn convert_to_utf8<P: AsRef<Path>, Q: AsRef<Path>>(from: &P, to: &Q) -> Res<()> {
@@ -1112,34 +1096,18 @@ thread_local! {
     pub(crate) static BEFORE_FILE_SYNC: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
 }
 
-/// Writes through a temporary file in the target directory and renames it into
-/// place, so a crash or a full disk can never leave a half-written file behind.
+#[cfg(not(test))]
+pub use icy_board_ppl::io::write_atomic;
+
+#[cfg(test)]
 pub fn write_atomic<P: AsRef<Path>>(path: P, contents: &[u8]) -> std::io::Result<()> {
-    use std::io::Write as _;
-
-    let path = path.as_ref();
-    let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-
-    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
-    tmp.write_all(contents)?;
-    #[cfg(test)]
-    BEFORE_FILE_SYNC.with(|hook| {
-        if let Some(wait) = hook.borrow_mut().take() {
-            wait();
-        }
-    });
-    tmp.as_file().sync_all()?;
-
-    if let Ok(meta) = fs::metadata(path) {
-        let _ = tmp.as_file().set_permissions(meta.permissions());
-    }
-    tmp.persist(path).map_err(|e| e.error)?;
-
-    // The rename becomes durable only once the directory entry itself is flushed.
-    if let Ok(handle) = fs::File::open(dir) {
-        let _ = handle.sync_all();
-    }
-    Ok(())
+    icy_board_ppl::io::write_atomic_with_before_sync(path, contents, || {
+        BEFORE_FILE_SYNC.with(|hook| {
+            if let Some(wait) = hook.borrow_mut().take() {
+                wait();
+            }
+        });
+    })
 }
 
 pub(crate) fn save_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: &P) -> Res<()> {

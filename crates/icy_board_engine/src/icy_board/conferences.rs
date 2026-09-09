@@ -10,9 +10,8 @@ use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     icy_board::state::ppl_array::{area_array_value, directory_array_value, door_array_value},
-    parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
 use super::{
@@ -393,23 +392,7 @@ impl UserData for Conference {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(Conference::default(), crate::parser::CONFERENCE_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
-        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
-        registry.add_property(IS_READ_ONLY.clone(), VariableType::Boolean, false);
-        registry.add_property(ALLOW_ALIASES.clone(), VariableType::Boolean, false);
-        registry.add_property(ECHO_MAIL.clone(), VariableType::Boolean, false);
-        registry.add_property(AUTO_REJOIN.clone(), VariableType::Boolean, false);
-        registry.add_property(PRIVATE_UPLOADS.clone(), VariableType::Boolean, false);
-        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
-        registry.add_array_property(FILE_AREAS.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), 1);
-        registry.add_array_property(MESSAGE_AREAS.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), 1);
-        registry.add_array_property(DOORS.clone(), VariableType::UserData(DOOR_ID as u8), 1);
-
-        registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(CAN_POST.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
+        crate::parser::board_catalog::register_members(crate::parser::CONFERENCE_ID, registry);
     }
 }
 

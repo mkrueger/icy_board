@@ -7,7 +7,7 @@ use std::{
 use super::{KeyChar, ppl_keys::PplKeyEvent, ppl_mouse::PplMouseEvent};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    executable::{VariableType, VariableValue},
+    executable::VariableValue,
     parser::EVENT_ID,
 };
 
@@ -134,33 +134,7 @@ impl UserData for PplEvent {
     const TYPE_NAME: &'static str = "Event";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        use crate::parser::{EVENT_KIND_ENUM_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID};
-
-        registry.add_property(KIND.clone(), VariableType::UserData(EVENT_KIND_ENUM_ID), false);
-        registry.add_property(CODE.clone(), VariableType::Integer, false);
-        registry.add_property(SCAN_CODE.clone(), VariableType::Integer, false);
-        registry.add_property(TEXT.clone(), VariableType::UnboundedString, false);
-        registry.add_property(PRESSED.clone(), VariableType::Boolean, false);
-        registry.add_property(X.clone(), VariableType::Integer, false);
-        registry.add_property(Y.clone(), VariableType::Integer, false);
-        registry.add_property(BUTTON.clone(), VariableType::UserData(MOUSE_BUTTON_ENUM_ID), false);
-        registry.add_property(PIXELS.clone(), VariableType::Boolean, false);
-        registry.add_property(REPEATED.clone(), VariableType::Boolean, false);
-        registry.add_property(WHEEL_X.clone(), VariableType::Integer, false);
-        registry.add_property(WHEEL_Y.clone(), VariableType::Integer, false);
-        registry.add_property(TIME.clone(), VariableType::Unsigned, false);
-
-        // What Code used to stand for depends on the kind, so each meaning says its own name.
-        registry.add_property(ACTION.clone(), VariableType::UserData(MOUSE_ACTION_ENUM_ID), false);
-        registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
-        registry.add_property(DROPPED.clone(), VariableType::Integer, false);
-        registry.add_property(LEFT_DOWN.clone(), VariableType::Boolean, false);
-        registry.add_property(MIDDLE_DOWN.clone(), VariableType::Boolean, false);
-        registry.add_property(RIGHT_DOWN.clone(), VariableType::Boolean, false);
-        registry.add_property(SHIFT.clone(), VariableType::Boolean, false);
-        registry.add_property(ALT.clone(), VariableType::Boolean, false);
-        registry.add_property(CTRL.clone(), VariableType::Boolean, false);
-        registry.add_property(META.clone(), VariableType::Boolean, false);
+        crate::parser::board_catalog::register_members(crate::parser::EVENT_ID, registry);
     }
 }
 

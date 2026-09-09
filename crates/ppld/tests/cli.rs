@@ -6,7 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use icy_board_engine::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEScript};
+use icy_board_ppl::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEScript};
 
 fn ppld() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_ppld"));

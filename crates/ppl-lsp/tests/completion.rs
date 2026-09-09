@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::{
+use icy_board_ppl::{
     compiler::workspace::{CompilerData, Workspace},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
@@ -12,7 +12,7 @@ use ppl_lsp::{completion::get_completion, signature_help::get_signature_help};
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemTag, Documentation, ParameterLabel};
 
 /// Parses a source the way the server does and hands back its semantic model.
-fn analyze(source: &str) -> (icy_board_engine::ast::Ast, SemanticVisitor) {
+fn analyze(source: &str) -> (icy_board_ppl::ast::Ast, SemanticVisitor) {
     let workspace = Workspace::default();
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));

@@ -4,13 +4,17 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
+[features]
+default = ["artwork"]
+artwork = ["dep:icy_engine"]
+
 [build-dependencies]
 icy_board_buildinfo = { workspace = true }
 
 [dependencies]
 codepages = { workspace = true }
-icy_engine = { workspace = true }
-icy_board_engine = { workspace = true }
+icy_engine = { workspace = true, optional = true }
+icy_board_ppl = { workspace = true }
 
 lazy_static = { workspace = true }
 semver = { workspace = true }

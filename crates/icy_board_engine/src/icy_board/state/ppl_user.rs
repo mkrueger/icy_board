@@ -8,7 +8,7 @@ use crate::{
         state::ppl_error::{ERR_INVALID, ERR_IO, ERR_KIND_USER, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
         user_base::{FSEMode, MAX_CONTACTS, User, UserContact},
     },
-    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
+    parser::{CONTACT_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -197,81 +197,7 @@ impl UserData for PplUser {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false, 0), USER_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        // What `PUTUSER` used to write is writable here, so the object replaces the
-        // GETUSER/PUTUSER round trip rather than sitting beside it. The caller's name
-        // and the board's own accounting stay read-only.
-        for name in [
-            &*ALIAS,
-            &*VERIFY_ANSWER,
-            &*STREET1,
-            &*STREET2,
-            &*CITY,
-            &*STATE,
-            &*ZIP,
-            &*COUNTRY,
-            &*BUSINESS_PHONE,
-            &*HOME_PHONE,
-            &*EMAIL,
-            &*WEB,
-            &*GENDER,
-            &*COMMENT,
-            &*SYSOP_COMMENT,
-            &*PROTOCOL,
-        ] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, true);
-        }
-        for name in [&*NAME, &*LANGUAGE, &*DATE_FORMAT] {
-            registry.add_property(name.clone(), VariableType::UnboundedString, false);
-        }
-        registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(RECORD_NUMBER.clone(), VariableType::Integer, false);
-        for name in [&*BIRTH_DATE, &*EXPIRATION_DATE, &*PASSWORD_EXPIRES] {
-            registry.add_property(name.clone(), VariableType::Date, true);
-        }
-        for name in [&*FIRST_DATE_ON, &*LAST_DATE_ON, &*LAST_DIR_READ] {
-            registry.add_property(name.clone(), VariableType::Date, false);
-        }
-        for name in [&*PAGE_LENGTH, &*SECURITY_LEVEL, &*EXPIRED_SECURITY_LEVEL] {
-            registry.add_property(name.clone(), VariableType::Integer, true);
-        }
-        for name in [&*MINUTES_TODAY] {
-            registry.add_property(name.clone(), VariableType::Integer, false);
-        }
-        for name in [&*TIMES_ON, &*MESSAGES_READ, &*MESSAGES_LEFT, &*UPLOADS, &*DOWNLOADS] {
-            registry.add_property(name.clone(), VariableType::ULong, false);
-        }
-        for name in [&*UPLOAD_BYTES, &*DOWNLOAD_BYTES, &*DOWNLOAD_BYTES_TODAY] {
-            registry.add_property(name.clone(), VariableType::ULong, false);
-        }
-        for name in [
-            &*EXPERT_MODE,
-            &*CLEAR_SCREEN,
-            &*SCROLL_MESSAGE_BODY,
-            &*SHORT_DESCRIPTIONS,
-            &*LONG_HEADER,
-            &*WIDE_EDITOR,
-        ] {
-            registry.add_property(name.clone(), VariableType::Boolean, true);
-        }
-        for name in [&*USE_GRAPHICS, &*USE_ALIAS] {
-            registry.add_property(name.clone(), VariableType::Boolean, false);
-        }
-        registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
-
-        registry.add_array_property(NOTES.clone(), VariableType::UnboundedString, 1);
-        registry.add_array_property(CONTACTS.clone(), VariableType::UserData(CONTACT_ID as u8), 1);
-        registry.add_named_function(SET_PASSWORD.clone(), vec![("password", VariableType::UnboundedString)], VariableType::Boolean);
-        registry.add_named_function(
-            ADD_CONTACT.clone(),
-            vec![("service", VariableType::UnboundedString), ("account", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
-        registry.add_named_function(REMOVE_CONTACT.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
-        registry.add_named_function(
-            SET_NOTE.clone(),
-            vec![("index", VariableType::Integer), ("text", VariableType::UnboundedString)],
-            VariableType::Boolean,
-        );
+        crate::parser::board_catalog::register_members(USER_ID, registry);
     }
 }
 

@@ -1,7 +1,7 @@
 //! Turning a name or a member chain into the type it has, so that completion
 //! and hover can say what a record or a board object holds.
 
-use icy_board_engine::{
+use icy_board_ppl::{
     executable::{FUNCTION_DEFINITIONS, VariableType},
     parser::UserTypeRegistry,
     semantic::{ARRAY_MEMBERS, ARRAY_PROCEDURES, BYTES_MEMBERS, FunctionDeclaration, ReferenceType, STRING_MEMBERS, SemanticVisitor},
@@ -37,7 +37,7 @@ pub fn type_name(registry: &UserTypeRegistry, var_type: VariableType) -> String 
     var_type.to_string().to_ascii_uppercase()
 }
 
-pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_engine::executable::RecordField) -> String {
+pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_ppl::executable::RecordField) -> String {
     let mut name = type_name(registry, field.variable_type);
     if field.dim > 0 {
         let dimensions = [field.vector_size, field.matrix_size, field.cube_size]
@@ -76,7 +76,7 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
                     .iter()
                     .find(|container| container.name.eq_ignore_ascii_case(name.as_ref()))
                     .and_then(|container| match &container.functions {
-                        icy_board_engine::semantic::FunctionDeclaration::Function(function) => Some(function.get_return_type()),
+                        icy_board_ppl::semantic::FunctionDeclaration::Function(function) => Some(function.get_return_type()),
                         _ => None,
                     });
             }
@@ -366,7 +366,7 @@ pub fn callable_member(registry: &UserTypeRegistry, receiver: ReceiverType, memb
         // No opcode argument metadata exists for the new scalar opcodes. Keep
         // this single adapter until the compiler exports typed scalar parameters.
         use VariableType::{Integer as I, UnboundedString as S, UserData};
-        let comparison = UserData(icy_board_engine::parser::STRING_COMPARISON_ENUM_ID);
+        let comparison = UserData(icy_board_ppl::parser::STRING_COMPARISON_ENUM_ID);
         let parameters: Vec<(&str, VariableType)> = match definition.name {
             "Find" | "FindLast" => vec![("value", S), ("start", I), ("comparison", comparison)],
             "Contains" | "StartsWith" | "EndsWith" | "Count" | "Equals" => vec![("value", S), ("comparison", comparison)],
@@ -390,7 +390,7 @@ pub fn callable_member(registry: &UserTypeRegistry, receiver: ReceiverType, memb
             "PadLeft" | "PadRight" => vec![("width", I), ("character", S)],
             "Insert" => vec![("start", I), ("value", S)],
             "ToInt" => vec![("base", I)],
-            "GetChecksum" => vec![("algorithm", UserData(icy_board_engine::parser::CHECKSUM_ENUM_ID))],
+            "GetChecksum" => vec![("algorithm", UserData(icy_board_ppl::parser::CHECKSUM_ENUM_ID))],
             "FromBase64" => vec![("text", S)],
             _ if *definition.arguments.end() == 0 => Vec::new(),
             _ => return None,
@@ -513,7 +513,7 @@ pub fn static_members_of(registry: &UserTypeRegistry, var_type: VariableType) ->
     user_data_members(registry, object, object.instance_provider.is_none())
 }
 
-fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::compiler::user_data::UserDataRegistry, statik: bool) -> Vec<Member> {
+fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_ppl::compiler::user_data::UserDataRegistry, statik: bool) -> Vec<Member> {
     let mut members = Vec::new();
     for (name, field_type) in object.fields.iter().filter(|_| !statik) {
         members.push(Member {

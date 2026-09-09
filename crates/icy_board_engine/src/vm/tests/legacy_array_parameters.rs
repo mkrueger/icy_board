@@ -4,7 +4,7 @@ use crate::{
     compiler::{PPECompiler, workspace::Workspace},
     executable::{EntryType, Executable, PPECommand, PPEExpr, ProcedureValue, TableEntry, VarHeader, VariableTable, VariableType, VariableValue},
     icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState, user_base::User},
-    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+    parser::{Encoding, ErrorReporter, parse_ast},
     vm::{ReturnAddress, VirtualMachine, io::DiskIO},
 };
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
@@ -13,7 +13,7 @@ const LEGACY_TARGETS: [(u16, u16); 4] = [(340, 340), (340, 400), (350, 350), (35
 
 fn compile_legacy(source: &str, language: u16, runtime: u16) -> Executable {
     let errors = Arc::new(std::sync::Mutex::new(ErrorReporter::default()));
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("legacy.pps")]);
     workspace.package.runtime = Some(runtime);
@@ -244,7 +244,7 @@ async fn legacy_bytecode_and_vm_supplied_values_save_only_zero_even_with_static_
     let nodes = bbs.lock().await.open_connections.clone();
     let (_peer, connection) = ChannelConnection::create_pair();
     let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
-    let registry = UserTypeRegistry::icy_board_registry();
+    let registry = crate::parser::icy_board_registry();
     let mut io = DiskIO::new(directory.path().to_str().unwrap(), None);
 
     // Original PPEs need no new marker. Unknown bit 0x04 must not activate the

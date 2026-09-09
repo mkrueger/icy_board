@@ -147,6 +147,33 @@ fn explicit_versions_ignore_an_invalid_environment() {
     assert!(declared.status.success(), "{}", String::from_utf8_lossy(&declared.stderr));
 }
 
+#[cfg(not(feature = "artwork"))]
+#[test]
+fn icy_artwork_requires_the_feature_before_creating_output() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join("src")).unwrap();
+    let source = dir.path().join("src/main.pps");
+    fs::write(&source, "PRINTLN \"hello\"\n").unwrap();
+    fs::write(dir.path().join("plain.txt"), "plain artwork\n").unwrap();
+    fs::write(dir.path().join("screen.icy"), b"not a text artwork file").unwrap();
+    fs::write(
+        dir.path().join("ppl.toml"),
+        "[package]\nname = \"artwork_test\"\nversion = \"0.1.0\"\n\n[data]\nart_files = [\"plain.txt\", \"screen.icy\"]\n",
+    )
+    .unwrap();
+
+    let output = pplc().current_dir(dir.path()).output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(1), "{stdout}\n{stderr}");
+    assert!(stderr.contains("art_files entry 'screen.icy'"), "{stderr}");
+    assert!(stderr.contains("without artwork support"), "{stderr}");
+    assert!(stderr.contains("rebuild pplc with --features artwork"), "{stderr}");
+    assert!(!stdout.contains("Parsing..."), "{stdout}");
+    assert!(!dir.path().join("target").exists(), "artwork preflight created output directories");
+    assert_eq!(fs::read_to_string(source).unwrap(), "PRINTLN \"hello\"\n");
+}
+
 #[test]
 fn an_invalid_environment_language_version_fails() {
     let dir = tempfile::tempdir().unwrap();

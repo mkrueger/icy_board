@@ -1,6 +1,6 @@
 //! Optional parameter-name inlay hints for PPL 400 object API calls.
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::{Ast, AstVisitor, Expression, FunctionCallExpression, walk_function_call_expression},
     executable::VariableType,
     semantic::SemanticVisitor,
@@ -18,7 +18,7 @@ struct HintVisitor<'a> {
 }
 
 impl HintVisitor<'_> {
-    fn receiver_type(&self, member: &icy_board_engine::ast::MemberReferenceExpression) -> Option<VariableType> {
+    fn receiver_type(&self, member: &icy_board_ppl::ast::MemberReferenceExpression) -> Option<VariableType> {
         self.semantic
             .member_receiver_type_lookup
             .get(&member.get_identifier_token().span.start)

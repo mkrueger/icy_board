@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use icy_board_engine::{
+use icy_board_ppl::{
     ast::Ast,
     compiler::workspace::Workspace,
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
