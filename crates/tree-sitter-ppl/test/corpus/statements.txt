@@ -223,3 +223,36 @@ CONST INTEGER Doubled = MaxTries * 2
       left: (identifier)
       right: (constant
         (number_literal)))))
+
+================================================================================
+Array bounds in brackets, which 4.00 prefers over parentheses
+================================================================================
+
+STRING lines[199]
+STRING parts[]
+INTEGER grid[4, 4]
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      (dimensions
+        (constant
+          (number_literal)))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      (dimensions)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      (dimensions
+        (constant
+          (number_literal))
+        (constant
+          (number_literal))))))

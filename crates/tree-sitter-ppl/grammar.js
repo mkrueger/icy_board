@@ -136,13 +136,11 @@ module.exports = grammar({
   word: $ => $.identifier,
 
   conflicts: $ => [
-    [$._assignment_target, $._expression],
-    [$._assignment_target, $._name_from_keyword],
     [$.predefined_call, $._name_from_keyword],
     [$.predefined_call],
     [$.return_statement],
-    [$.procedure_call, $._expression],
-    [$.member_call, $._expression],
+    [$.procedure_call, $._primary_expression],
+    [$.member_call, $._primary_expression],
   ],
 
   supertypes: $ => [$._statement, $._expression],
@@ -369,7 +367,13 @@ module.exports = grammar({
       optional(seq('=', field('value', choice($._expression, $.array_initializer)))),
     )),
 
-    dimensions: $ => seq('(', commaSep1($._expression), ')'),
+    // 4.00 wants brackets and only warns about parentheses, which older sources still use.
+    dimensions: $ => choice(
+      seq('(', commaSep1($._expression), ')'),
+      seq('[', commaSep1($._expression), ']'),
+      // A dynamic array leaves its bounds to the runtime, which only brackets can say.
+      seq('[', repeat(','), ']'),
+    ),
 
     array_initializer: $ => seq('{', commaSep($._expression), '}'),
 
@@ -553,14 +557,22 @@ module.exports = grammar({
 
     // ---------- Expressions ----------
     _expression: $ => choice(
+      $._primary_expression,
+      $.unary_expression,
+      $.binary_expression,
+    ),
+
+    // What a call, an index or a member reads from: always a value, never `-x`, which
+    // the member and call precedences already imply. Saying it here keeps `+` and `-`
+    // out of the tokens a statement can start with, so the condition of an unseparated
+    // `IF a + b stmt` cannot end at `a`.
+    _primary_expression: $ => choice(
       $.identifier,
       $.builtin_constant,
       $._name_from_keyword,
       $.constant,
       $.substitution,
       $.parenthesized_expression,
-      $.unary_expression,
-      $.binary_expression,
       $.call_expression,
       $.index_expression,
       $.member_access,
@@ -604,14 +616,14 @@ module.exports = grammar({
     },
 
     call_expression: $ => prec(PREC.CALL, seq(
-      field('function', $._expression),
+      field('function', $._primary_expression),
       '(',
       commaSep(field('argument', $._expression)),
       ')',
     )),
 
     index_expression: $ => prec(PREC.CALL, seq(
-      field('array', $._expression),
+      field('array', $._primary_expression),
       '[',
       commaSep1(field('index', $._expression)),
       ']',
@@ -620,7 +632,7 @@ module.exports = grammar({
     // A type name may stand in expression position, naming an enum member or the one
     // value a board object has, so it is an object here as well as a declaration type.
     member_access: $ => prec(PREC.MEMBER, seq(
-      field('object', choice($._expression, $.builtin_type)),
+      field('object', choice($._primary_expression, $.builtin_type)),
       '.',
       field('member', choice($.identifier, $.builtin_constant)),
     )),

@@ -312,3 +312,37 @@ END
         (constant
           (number_literal)))
       consequence: (exit_statement))))
+
+================================================================================
+A one-line IF keeps its condition across + and -
+================================================================================
+
+INTEGER a
+IF a + 1 > 5 RETURN
+IF a - 1 > 5 RETURN
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (constant
+          (number_literal)))
+      right: (constant
+        (number_literal)))
+    consequence: (return_statement))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (constant
+          (number_literal)))
+      right: (constant
+        (number_literal)))
+    consequence: (return_statement)))
