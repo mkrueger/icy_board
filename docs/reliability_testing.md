@@ -107,8 +107,9 @@ and advance saved baselines before retrying or switching users. This prevents
 reposting already committed accounting deltas after cancellation; it does not
 add process-crash recovery.
 
-`flush_persistence` waits for prior requests; it is not an aggregate success report
-for their individual writes. Synchronous `IcyBoard::edit_users`
+Normal shutdown/reload stops producers and waits without a timeout for `flush_persistence`
+before exit or loading files again. The barrier waits for prior requests; it is
+not an aggregate success report for their individual writes. Synchronous `IcyBoard::edit_users`
 and `update_user` remain available to offline tools and share the merge code;
 they return `WriterBusy` while the runtime writer holds its transaction gate.
 Both synchronous and queued operations fail closed with `WriterPoisoned` if the

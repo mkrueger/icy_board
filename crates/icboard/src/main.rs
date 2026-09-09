@@ -2,14 +2,14 @@ use std::{
     fmt::Display,
     io::{stderr, stdout},
     path::PathBuf,
-    process::{self, Command, exit},
+    process::{Command, exit},
     sync::Arc,
 };
 
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::Parser;
-use connections::{restart_connections, start_connections, stop_connections};
+use connections::{finish_sessions_and_flush, restart_connections, start_connections, stop_connections_and_flush};
 use crossterm::{
     ExecutableCommand, execute,
     style::{Attribute, Print, SetAttribute, SetForegroundColor},
@@ -195,9 +195,11 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 } else {
                     CallWaitMessage::User
                 };
-                run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
-                restore_terminal()?;
-                return Ok(());
+                let result = run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await;
+                bbs.lock().await.operator_maintenance = true;
+                return finish_operation(result, finish_sessions_and_flush(&board, &bbs), restore_terminal)
+                    .await
+                    .map(|_| ());
             }
 
             // Handle /runppe parameter
@@ -205,15 +207,16 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 match handle_runppe(runppe_params).await {
                     Ok(cmd) => {
                         let mut terminal = init_terminal()?;
-                        run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
-                        restore_terminal()?;
+                        let result = run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await;
+                        bbs.lock().await.operator_maintenance = true;
+                        finish_operation(result, finish_sessions_and_flush(&board, &bbs), restore_terminal).await?;
                     }
                     Err(err) => {
                         print_error(err.to_string());
                         exit(99);
                     }
                 }
-                exit(0);
+                return Ok(());
             }
 
             let mut connection_token = CancellationToken::new();
@@ -221,11 +224,17 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             // Keep the scheduler (and its occurrence watermark) alive across every
             // listener restart. Dropping this set on exit cancels it explicitly.
             let mut scheduler = JoinSet::new();
+            let scheduler_token = CancellationToken::new();
             // Every fallible foreground UI/tool path passes this boundary before
             // dropping the runtime. An error must not abandon a live shell.
             let result: Res<()> = async {
                 let mut web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await?;
-                scheduler.spawn(supervise_event_scheduler(board.clone(), bbs.clone(), board_lock.clone()));
+                scheduler.spawn(supervise_event_scheduler(
+                    board.clone(),
+                    bbs.clone(),
+                    board_lock.clone(),
+                    scheduler_token.clone(),
+                ));
                 let mut app = CallWaitScreen::new(&board).await?;
                 let mut terminal = init_terminal()?;
                 loop {
@@ -242,7 +251,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                                         }
                                         log::info!("Event maintenance: stopping listeners and draining admin requests");
-                                        stop_connections(&connection_token, &mut services).await;
+                                        stop_connections_and_flush(&board, &bbs, &connection_token, &mut services).await?;
                                         // Maintenance utilities launched by the command need
                                         // the cross-process board lock after all writers drain.
                                         drop(board_lock.lock().await.take());
@@ -284,10 +293,11 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                     app.show_error(icy_board_tui::get_text("event_runtime_tools_blocked"));
                                     continue;
                                 }
-                                stop_connections(&connection_token, &mut services).await;
+                                stop_connections_and_flush(&board, &bbs, &connection_token, &mut services).await?;
                                 drop(board_lock.lock().await.take());
                             }
 
+                            let exiting = matches!(&msg, CallWaitMessage::Exit);
                             let result = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen, String::new(), web_admin.clone()).await;
 
                             if launches_board_tool {
@@ -304,6 +314,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
 
                             match result {
                                 Ok(reload) => {
+                                    if exiting {
+                                        return Ok(());
+                                    }
                                     if reload {
                                         let mut loaded = IcyBoard::load(&config_file)?;
                                         loaded.resolve_paths();
@@ -342,7 +355,6 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                             }
                         }
                         Err(err) => {
-                            restore_terminal()?;
                             log::error!("while running call wait screen: {}", err);
                             return Err(err);
                         }
@@ -350,9 +362,21 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 }
             }
             .await;
-            if result.is_err() {
-                retain_runtime_until_event_safe(&bbs).await;
-                stop_connections(&connection_token, &mut services).await;
+            retain_runtime_until_event_safe(&bbs).await;
+            scheduler_token.cancel();
+            while let Some(result) = scheduler.join_next().await {
+                if let Err(err) = result {
+                    log::error!("Scheduler supervisor failed: {err}");
+                }
+            }
+            let result = finish_operation(
+                result,
+                stop_connections_and_flush(&board, &bbs, &connection_token, &mut services),
+                restore_terminal,
+            )
+            .await;
+            if result.is_ok() {
+                print_exit_screen();
             }
             result
         }
@@ -363,10 +387,36 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     }
 }
 
+async fn finish_operation<T>(mut result: Res<T>, drain: impl std::future::Future<Output = Res<()>>, restore: impl FnOnce() -> Res<()>) -> Res<T> {
+    let drain_result = drain.await;
+    let restore_result = restore();
+    for (stage, cleanup) in [("draining connections and persistence", drain_result), ("restoring terminal", restore_result)] {
+        if let Err(err) = cleanup {
+            if result.is_err() {
+                log::error!("Secondary error while {stage}: {err}");
+            } else {
+                result = Err(err);
+            }
+        }
+    }
+    result
+}
+
 /// Exactly one scheduler lifetime, including while local sessions/tools own the
 /// foreground. Catch task panic/early return here, not only at call-wait ticks.
-async fn supervise_event_scheduler(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, board_lock: Arc<Mutex<Option<BoardLock>>>) {
-    let result = tokio::spawn(event_scheduler::run_event_scheduler(board, bbs.clone(), board_lock)).await;
+async fn supervise_event_scheduler(board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, board_lock: Arc<Mutex<Option<BoardLock>>>, token: CancellationToken) {
+    // Own the child so cancelling the supervisor cannot detach the scheduler.
+    let mut task = JoinSet::new();
+    task.spawn(event_scheduler::run_event_scheduler(board, bbs.clone(), board_lock));
+    let result = tokio::select! {
+        biased;
+        _ = token.cancelled() => {
+            // The caller has already waited for active event commands to finish.
+            task.shutdown().await;
+            return;
+        }
+        result = task.join_next() => result.unwrap(),
+    };
     let message = match result {
         Ok(()) => icy_board_tui::get_text("event_runtime_scheduler_stopped"),
         Err(error) => format!("{}: {error}", icy_board_tui::get_text("event_runtime_scheduler_stopped")),
@@ -411,6 +461,65 @@ async fn reserve_operator_exit(bbs: &Arc<Mutex<BBS>>) -> Res<()> {
 #[cfg(test)]
 mod event_operator_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cleanup_preserves_first_error_and_always_restores_after_drain() {
+        for operation_fails in [false, true] {
+            for drain_fails in [false, true] {
+                for restore_fails in [false, true] {
+                    let calls = std::cell::RefCell::new(vec!["operation"]);
+                    let original = Box::new(std::io::Error::other("operation"));
+                    let original_ptr = &*original as *const std::io::Error;
+                    let result: Res<usize> = if operation_fails { Err(original) } else { Ok(42) };
+                    let result = finish_operation(
+                        result,
+                        async {
+                            calls.borrow_mut().push("drain started");
+                            tokio::task::yield_now().await;
+                            calls.borrow_mut().push("drain finished");
+                            if drain_fails { Err("drain".into()) } else { Ok(()) }
+                        },
+                        || {
+                            calls.borrow_mut().push("restore");
+                            if restore_fails { Err("restore".into()) } else { Ok(()) }
+                        },
+                    )
+                    .await;
+                    assert_eq!(*calls.borrow(), ["operation", "drain started", "drain finished", "restore"]);
+                    if operation_fails {
+                        let err = result.unwrap_err();
+                        assert_eq!(err.to_string(), "operation");
+                        assert!(std::ptr::eq(err.downcast_ref::<std::io::Error>().unwrap(), original_ptr));
+                    } else if drain_fails {
+                        assert_eq!(result.unwrap_err().to_string(), "drain");
+                    } else if restore_fails {
+                        assert_eq!(result.unwrap_err().to_string(), "restore");
+                    } else {
+                        assert_eq!(result.unwrap(), 42);
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn normal_scheduler_stop_joins_child_without_latching_failure() {
+        let board = Arc::new(Mutex::new(IcyBoard::new()));
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let board_lock = Arc::new(Mutex::new(None));
+        let token = CancellationToken::new();
+        token.cancel();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            supervise_event_scheduler(board.clone(), bbs.clone(), board_lock.clone(), token),
+        )
+        .await
+        .unwrap();
+        assert!(bbs.lock().await.event_scheduler_error.is_none());
+        assert_eq!(Arc::strong_count(&board), 1);
+        assert_eq!(Arc::strong_count(&bbs), 1);
+        assert_eq!(Arc::strong_count(&board_lock), 1);
+    }
 
     #[tokio::test]
     async fn unexpected_scheduler_stop_is_sticky_and_preserves_active_work() {
@@ -458,6 +567,19 @@ mod event_operator_tests {
         bbs.lock().await.event_scheduler_error = None;
         reserve_operator_exit(&bbs).await.unwrap();
         assert!(bbs.lock().await.operator_maintenance);
+    }
+
+    #[tokio::test]
+    async fn exit_returns_to_runtime_owner_with_admission_closed() {
+        let mut bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let board = Arc::new(Mutex::new(IcyBoard::new()));
+        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        assert!(
+            !run_message(CallWaitMessage::Exit, &mut terminal, &board, &mut bbs, false, String::new(), None)
+                .await
+                .unwrap()
+        );
+        assert!(bbs.lock().await.admissions_closed());
     }
 
     #[tokio::test]
@@ -542,9 +664,6 @@ where
         }
         CallWaitMessage::Exit => {
             reserve_operator_exit(bbs).await?;
-            restore_terminal()?;
-            print_exit_screen();
-            process::exit(0);
         }
         CallWaitMessage::EventMonitor => {
             event_screen::run(terminal, board, bbs, full_screen).await?;

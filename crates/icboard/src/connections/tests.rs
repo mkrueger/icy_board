@@ -821,6 +821,169 @@ async fn service_supervisor_does_not_latch_completion_or_error_after_cancellatio
     }
 }
 
+#[tokio::test]
+async fn stop_flushes_writes_accepted_during_service_shutdown_before_unlock_and_restart() {
+    use icy_board_engine::icy_board::user_base::{User, UserBase};
+    use std::{future::Future, task::Poll};
+
+    let mut fixture = Fixture::new([false; 4]).await;
+    fixture.release_except(None);
+    {
+        let mut board = fixture.board.lock().await;
+        board.config.paths.user_file = "users.toml".into();
+        board
+            .edit_users(|users| {
+                users.new_user(User {
+                    name: "Drain user".into(),
+                    city: "Original".into(),
+                    ..Default::default()
+                });
+                Ok(())
+            })
+            .unwrap();
+    }
+    let lock = BoardLock::acquire(fixture.dir.path()).unwrap();
+    let probe = lock_probe(fixture.dir.path());
+    let (entered, waiting) = tokio::sync::oneshot::channel();
+    let (release, blocked) = std::sync::mpsc::channel();
+    let worker_board = fixture.board.clone();
+    let waiter = tokio::spawn(async move {
+        IcyBoard::ordered_persistence(&worker_board, move || {
+            entered.send(()).unwrap();
+            blocked.recv_timeout(DEADLINE).unwrap();
+        })
+        .await
+    });
+    timeout(DEADLINE, waiting).await.unwrap().unwrap();
+    waiter.abort();
+    assert!(waiter.await.unwrap_err().is_cancelled());
+
+    let mut generation = Generation::new();
+    let cancel = generation.token.clone();
+    let service_board = fixture.board.clone();
+    let (accepted, accepted_rx) = tokio::sync::oneshot::channel();
+    generation.services.spawn(async move {
+        cancel.cancelled().await;
+        let mut write = Box::pin(IcyBoard::write_users(&service_board, |staging| {
+            staging.edit_users(|users| {
+                users[0].city = "Service shutdown save".into();
+                Ok(())
+            })
+        }));
+        std::future::poll_fn(|cx| {
+            assert!(write.as_mut().poll(cx).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+        drop(write);
+        accepted.send(()).unwrap();
+    });
+    {
+        let stop = stop_connections_and_flush(&fixture.board, &fixture.bbs, &generation.token, &mut generation.services);
+        tokio::pin!(stop);
+        tokio::select! {
+            _ = &mut stop => panic!("stop returned before the blocked write completed"),
+            result = timeout(DEADLINE, accepted_rx) => result.unwrap().unwrap(),
+        }
+        assert!(timeout(POLL, &mut stop).await.is_err());
+        assert_eq!(timeout(DEADLINE, fixture.board.lock()).await.unwrap().users[0].city, "Original");
+        fixture.assert_no_nodes().await;
+        assert_locked(&probe);
+        release.send(()).unwrap();
+        timeout(DEADLINE, &mut stop).await.unwrap().unwrap();
+    }
+    assert!(generation.services.is_empty());
+    assert!(generation.token.is_cancelled());
+    let disk = UserBase::load(&fixture.dir.path().join("users.toml")).unwrap();
+    assert_eq!(disk[0].city, "Service shutdown save");
+    assert_eq!(fixture.board.lock().await.users[0].city, disk[0].city);
+    assert_locked(&probe);
+    drop(lock);
+    probe.try_lock().unwrap();
+    probe.unlock().unwrap();
+
+    let _lock = BoardLock::acquire(fixture.dir.path()).unwrap();
+    assert!(
+        restart_connections(
+            &fixture.bbs,
+            &fixture.board,
+            &fixture.config_file,
+            &mut generation.token,
+            &mut generation.services
+        )
+        .await
+        .is_none()
+    );
+    IcyBoard::write_users(&fixture.board, |staging| {
+        staging.edit_users(|users| {
+            users[0].city = "After restart".into();
+            Ok(())
+        })
+    })
+    .await
+    .unwrap();
+    timeout(
+        DEADLINE,
+        stop_connections_and_flush(&fixture.board, &fixture.bbs, &generation.token, &mut generation.services),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(UserBase::load(&fixture.dir.path().join("users.toml")).unwrap()[0].city, "After restart");
+}
+
+#[tokio::test]
+async fn stop_joins_live_session_and_flushes_its_final_save() {
+    use icy_board_engine::icy_board::user_base::{User, UserBase};
+
+    let fixture = Fixture::new([false; 4]).await;
+    fixture.board.lock().await.config.paths.user_file = "users.toml".into();
+    let session_board = fixture.board.clone();
+    {
+        let mut bbs = fixture.bbs.lock().await;
+        bbs.event_maintenance = false;
+        bbs.spawn_node(ConnectionType::Channel, move |_, state| {
+            let mut receiver = state.bbs_channel.take().unwrap();
+            std::thread::Builder::new().spawn(move || {
+                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+                runtime.block_on(async move {
+                    assert!(matches!(receiver.recv().await, Some(BBSMessage::Shutdown(_))));
+                    IcyBoard::write_users(&session_board, |staging| {
+                        staging.edit_users(|users| {
+                            users.new_user(User {
+                                name: "Final session save".into(),
+                                ..Default::default()
+                            });
+                            Ok(())
+                        })
+                    })
+                    .await
+                })
+            })
+        })
+        .await
+        .unwrap()
+        .unwrap();
+        bbs.operator_maintenance = true;
+    }
+    let mut generation = Generation::new();
+    timeout(
+        DEADLINE,
+        stop_connections_and_flush(&fixture.board, &fixture.bbs, &generation.token, &mut generation.services),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    fixture.assert_no_nodes().await;
+    assert_eq!(UserBase::load(&fixture.dir.path().join("users.toml")).unwrap()[0].name, "Final session save");
+    assert_eq!(fixture.board.lock().await.users[0].name, "Final session save");
+    assert_eq!(
+        Arc::strong_count(&fixture.board),
+        1,
+        "session and accepted jobs must release their board handles"
+    );
+}
+
 /// Same minimal persisted component set as event_scheduler's fixture, with the
 /// loopback listener configuration preserved for the real post-command reload.
 #[cfg(unix)]

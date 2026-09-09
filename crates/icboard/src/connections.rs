@@ -6,7 +6,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard,
-        bbs::{BBS, EventMaintenancePhase, EventMaintenanceStatus, ListenerStatus},
+        bbs::{BBS, BBSMessage, EventMaintenancePhase, EventMaintenanceStatus, ListenerStatus},
     },
 };
 use tokio::{net::TcpListener, sync::Mutex, task::JoinSet};
@@ -71,6 +71,38 @@ pub(crate) async fn stop_connections(token: &CancellationToken, services: &mut J
             log::error!("Listener task failed: {err}");
         }
     }
+}
+
+/// Admission must be closed and event work quiescent before stopping producers.
+pub(crate) async fn stop_connections_and_flush(
+    board: &Arc<Mutex<IcyBoard>>,
+    bbs: &Arc<Mutex<BBS>>,
+    token: &CancellationToken,
+    services: &mut JoinSet<()>,
+) -> Res<()> {
+    stop_connections(token, services).await;
+    finish_sessions_and_flush(board, bbs).await
+}
+
+/// Also used by direct local/PPE modes, which have no listener services.
+/// Admission must stay closed; never abandon a live session's final saves.
+pub(crate) async fn finish_sessions_and_flush(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Res<()> {
+    loop {
+        let channels = {
+            let mut bbs = bbs.lock().await;
+            bbs.clear_closed_connections().await;
+            if bbs.open_connections.lock().await.iter().all(Option::is_none) {
+                break;
+            }
+            bbs.bbs_channels.clone()
+        };
+        for channel in channels.into_iter().flatten() {
+            // Retry full queues without holding BBS/node locks or dropping handles.
+            let _ = channel.try_send(BBSMessage::Shutdown(String::new()));
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    IcyBoard::flush_persistence(board).await
 }
 
 fn spawn_service(
