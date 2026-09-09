@@ -19,15 +19,34 @@ fn decoded(bytes: &[u8]) -> String {
 #[test]
 fn help_and_no_arguments_keep_their_streams_and_exit_codes_in_both_languages() {
     for (locale, about, options) in [
-        ("en_US", "Exchange FTN and QWKnet mail with configured systems", "Options:"),
-        ("de_DE", "FTN- und QWKnet-Nachrichten mit konfigurierten Systemen austauschen", "Optionen:"),
+        ("en_US", "Exchange FTN, QWKnet and ZCONNECT mail with configured systems", "Options:"),
+        (
+            "de_DE",
+            "FTN-, QWKnet- und ZCONNECT-Nachrichten mit konfigurierten Systemen austauschen",
+            "Optionen:",
+        ),
     ] {
         let help = run(locale, &["--help"]);
         assert_eq!(help.status.code(), Some(0), "{}", decoded(&help.stderr));
         assert!(help.stderr.is_empty());
         let stdout = decoded(&help.stdout);
         assert!(stdout.contains(about) && stdout.contains(options), "{stdout}");
-        for command in ["links", "poll", "scan", "show", "toss", "qwk-links", "qwk-poll", "qwk-scan", "qwk-toss"] {
+        for command in [
+            "links",
+            "poll",
+            "scan",
+            "show",
+            "toss",
+            "qwk-links",
+            "qwk-poll",
+            "qwk-scan",
+            "qwk-toss",
+            "zconnect-links",
+            "zconnect-scan",
+            "zconnect-toss",
+            "zconnect-poll",
+            "zconnect-ack",
+        ] {
             assert!(stdout.contains(command), "{stdout}");
         }
         let no_args = run(locale, &[]);

@@ -365,29 +365,10 @@ impl IcyBoard {
             e
         })?;
 
-        let load_path = get_path(parent_path, &config.paths.language_file);
-        let languages = SupportedLanguages::load(&load_path).map_err(|e| {
-            log::error!("Error loading languages: {} from {}", e, load_path.display());
-            e
-        })?;
-
-        let load_path = get_path(parent_path, &config.paths.protocol_data_file);
-        let protocols = SupportedProtocols::load(&load_path).map_err(|e| {
-            log::error!("Error loading protocols: {} from {}", e, load_path.display());
-            e
-        })?;
-
-        let load_path = get_path(parent_path, &config.paths.pwrd_sec_level_file);
-        let sec_levels = SecurityLevelDefinitions::load(&load_path).map_err(|e| {
-            log::error!("Error loading security levels: {} from {}", e, load_path.display());
-            e
-        })?;
-
-        let load_path = get_path(parent_path, &config.paths.command_file);
-        let commands = CommandList::load(&load_path).map_err(|e| {
-            log::error!("Error loading commands: {} from {}", e, load_path.display());
-            e
-        })?;
+        let languages: SupportedLanguages = load_configured(parent_path, &config.paths.language_file)?;
+        let protocols: SupportedProtocols = load_configured(parent_path, &config.paths.protocol_data_file)?;
+        let sec_levels: SecurityLevelDefinitions = load_configured(parent_path, &config.paths.pwrd_sec_level_file)?;
+        let commands: CommandList = load_configured(parent_path, &config.paths.command_file)?;
 
         let load_path = get_path(parent_path, &config.paths.statistics_file);
         let statistics = match Statistics::load(&load_path) {
@@ -1009,6 +990,19 @@ fn get_path(parent_path: &Path, home_dir: &PathBuf) -> PathBuf {
     res
 }
 
+/// An unset path means the board never configured that file, so the same defaults
+/// apply as for a board built in memory. A configured file stays a hard error.
+fn load_configured<T: IcyBoardSerializer + Default>(parent_path: &Path, configured: &PathBuf) -> Res<T> {
+    if configured.as_os_str().is_empty() {
+        return Ok(T::default());
+    }
+    let load_path = get_path(parent_path, configured);
+    T::load(&load_path).map_err(|e| {
+        log::error!("Error loading {}: {} from {}", T::FILE_TYPE, e, load_path.display());
+        e
+    })
+}
+
 impl Default for IcyBoard {
     fn default() -> Self {
         Self::new()
@@ -1348,6 +1342,35 @@ mod tests {
         assert!(
             IcyBoard::load(&board.file_name).is_err(),
             "a broken network file must not be silently replaced with defaults"
+        );
+    }
+
+    /// A board that never configured a list file starts from the same defaults as one
+    /// built in memory, while a configured file that cannot be read stays an error.
+    #[test]
+    fn unconfigured_list_files_default_but_configured_ones_must_load() {
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().into();
+        board.file_name = root.path().join("icyboard.toml");
+        board.config.paths.conferences = "conferences.toml".into();
+        board.config.paths.user_file = "users.toml".into();
+        board.config.paths.icbtext = "icbtext.toml".into();
+        board.save_userbase().unwrap();
+        icb_text::DEFAULT_DISPLAY_TEXT.save(&root.path().join("icbtext.toml")).unwrap();
+        board.save().unwrap();
+
+        let loaded = IcyBoard::load(&board.file_name).unwrap();
+        assert!(loaded.languages.is_empty());
+        assert!(loaded.protocols.is_empty());
+        assert!(loaded.sec_levels.levels.is_empty());
+        assert!(loaded.commands.is_empty());
+
+        board.config.paths.command_file = "cmd.toml".into();
+        board.save().unwrap();
+        assert!(
+            IcyBoard::load(&board.file_name).is_err(),
+            "a configured command file that is missing must not be replaced with defaults"
         );
     }
 
