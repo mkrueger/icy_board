@@ -285,16 +285,11 @@ impl TableApplyPage {
             protect_first_record: false,
             ..Default::default()
         };
-        let original = board.users.clone();
-        let report = user_maintenance::adjust_by_table(&mut board.users, &selection, self.kind, &self.entries, Utc::now());
-        let save = board.save_userbase();
-        if save.is_err() {
-            board.users = original;
-        }
+        let save = board.edit_users(|users| Ok(user_maintenance::adjust_by_table(users, &selection, self.kind, &self.entries, Utc::now())));
         drop(board);
 
         self.result = Some(match save {
-            Ok(()) => get_text_args(
+            Ok(report) => get_text_args(
                 "icbsm_done_count",
                 HashMap::from([
                     ("changed".to_string(), report.changed.to_string()),
@@ -303,6 +298,23 @@ impl TableApplyPage {
             ),
             Err(err) => get_text_args("icbsm_save_failed", HashMap::from([("error".to_string(), err.to_string())])),
         });
+    }
+}
+
+#[cfg(all(test, unix))]
+mod save_tests {
+    use super::*;
+
+    #[test]
+    fn table_save_failure_preserves_the_entire_live_base() {
+        let fixture = crate::tabs::user_save_tests::Fixture::new();
+        let before = fixture.fail_serialization();
+        let mut page = TableApplyPage::new(fixture.board.clone(), TableKind::Uploads);
+        page.entries = vec![TableEntry { value: 0.0, security: 50 }];
+        page.run();
+        assert!(page.result.as_ref().is_some_and(|error| error.contains("users.toml")));
+        assert!(user_maintenance::has_backup(&fixture.dir.join("users.toml")));
+        fixture.assert_unchanged(&before);
     }
 }
 

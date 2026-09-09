@@ -440,7 +440,7 @@ impl IcyBoardState {
             self.session.accounting.conference_started = None;
             self.session.accounting.finished = true;
         }
-        self.persist_current_user().await?;
+        self.persist_final_user().await?;
         self.session.accounting.finish_saved = true;
         Ok(())
     }
@@ -615,18 +615,10 @@ impl IcyBoardState {
         format_credit(value, self.session.accounting.options.use_money)
     }
 
-    /// Merge monetary deltas only. Other user fields retain the existing save
-    /// semantics. Call under the board lock, then mark the successful snapshot.
-    pub(super) fn accounting_merge_for_save(&self, user: &User, latest: &User) -> Res<User> {
-        let mut merged = user.clone();
+    pub(super) fn accounting_set_update_baseline(&self, baseline: &mut User) {
         if self.session.accounting.baseline_known {
-            merged.account = merge_account(user.account.as_ref(), latest.account.as_ref(), self.session.accounting.baseline.as_ref())?;
+            baseline.account = self.session.accounting.baseline.clone();
         }
-        if let Some(account) = &merged.account {
-            account.validate()?;
-            finite(account.balance(self.session.accounting.options.concurrent_tracking, 0.0))?;
-        }
-        Ok(merged)
     }
 
     pub(super) fn accounting_mark_saved(&mut self) {
@@ -635,50 +627,10 @@ impl IcyBoardState {
     }
 }
 
-fn merge_account(current: Option<&AccountUserInf>, latest: Option<&AccountUserInf>, baseline: Option<&AccountUserInf>) -> Res<Option<AccountUserInf>> {
-    // A session that never created an account must not delete another node's.
-    let Some(current) = current else {
-        return Ok(latest.cloned());
-    };
-    current.validate()?;
-    let zero = AccountUserInf::default();
-    let baseline = baseline.unwrap_or(&zero);
-    baseline.validate()?;
-    let mut merged = latest.cloned().unwrap_or_default();
-    merged.validate()?;
-    macro_rules! delta {
-        ($($field:ident),+ $(,)?) => {
-            $(merged.$field = finite(merged.$field + finite(current.$field - baseline.$field)?)?;)+
-        };
-    }
-    delta!(
-        starting_balance,
-        start_this_session,
-        debit_call,
-        debit_time,
-        debit_msg_read,
-        debit_msg_read_capture,
-        debit_msg_write,
-        debit_msg_write_echoed,
-        debit_msg_write_private,
-        debit_download_file,
-        debit_download_bytes,
-        debit_group_chat,
-        debit_tpu,
-        debit_special,
-        credit_upload_file,
-        credit_upload_bytes,
-        credit_special,
-    );
-    if current.drop_sec_level != baseline.drop_sec_level {
-        merged.drop_sec_level = current.drop_sec_level;
-    }
-    Ok(Some(merged))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::icy_board::user_store::merge_account;
     use crate::icy_board::{IcyBoard, bbs::BBS};
     use chrono::Duration;
     use icy_net::{ConnectionType, channel::ChannelConnection};

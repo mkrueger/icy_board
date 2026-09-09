@@ -201,6 +201,13 @@ pub async fn internal_handle_client(state: IcyBoardState, login_options: Option<
     }
 }
 
+// Finalization retries failed persistence independently of the disconnected socket.
+async fn save_at_logoff(cmd: &mut PcbBoardCommand) {
+    if let Err(error) = cmd.state.save_current_user().await {
+        log::error!("Could not save '{}' at logoff: {error}", cmd.state.session.user_name);
+    }
+}
+
 async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
     let state = &mut cmd.state;
     let mut logged_in = false;
@@ -357,7 +364,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
 
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
-            cmd.state.save_current_user().await?;
+            save_at_logoff(cmd).await;
             return Ok(());
         }
 
@@ -402,7 +409,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
 
         if cmd.state.session.request_logoff {
             cmd.state.connection.shutdown().await?;
-            cmd.state.save_current_user().await?;
+            save_at_logoff(cmd).await;
             return Ok(());
         }
         thread::sleep(Duration::from_millis(10));

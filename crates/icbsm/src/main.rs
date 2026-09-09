@@ -75,6 +75,18 @@ impl Cli {
 mod cli_tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn batch_save_failure_preserves_users_after_successful_backup() {
+        let fixture = crate::tabs::user_save_tests::Fixture::new();
+        let before = fixture.fail_serialization();
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["icbsm", "--standardize-phones"]).unwrap();
+        let error = run_batch(&cli, &mut fixture.board.lock().unwrap()).unwrap_err();
+        assert!(error.to_string().contains("users.toml"));
+        assert!(user_maintenance::has_backup(&fixture.dir.join("users.toml")));
+        fixture.assert_unchanged(&before);
+    }
+
     #[test]
     fn cli_defaults_and_options() {
         let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["icbsm"]).unwrap();
@@ -229,12 +241,13 @@ fn run_batch(arguments: &Cli, icy_board: &mut IcyBoard) -> icy_board_engine::Res
     }
 
     user_maintenance::create_backup(&users_file)?;
-    let report = if arguments.pack {
-        user_maintenance::pack(&mut icy_board.users, &selection, Utc::now())
-    } else {
-        user_maintenance::standardize_phones(&mut icy_board.users, &selection, Utc::now())
-    };
-    icy_board.save_userbase()?;
+    let report = icy_board.edit_users(|users| {
+        Ok(if arguments.pack {
+            user_maintenance::pack(users, &selection, Utc::now())
+        } else {
+            user_maintenance::standardize_phones(users, &selection, Utc::now())
+        })
+    })?;
 
     println!("{} of {} user(s) changed.", report.changed, report.matched);
     for name in &report.names {

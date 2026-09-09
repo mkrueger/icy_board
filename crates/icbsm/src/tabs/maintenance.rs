@@ -26,6 +26,24 @@ use std::collections::HashMap;
 
 use super::{counter_init_from_option, counter_scope};
 
+#[cfg(all(test, unix))]
+mod save_tests {
+    use super::*;
+    use crate::tabs::user_save_tests::Fixture;
+
+    #[test]
+    fn maintenance_save_failure_preserves_the_entire_live_base() {
+        let fixture = Fixture::new();
+        let before = fixture.fail_serialization();
+        let mut page = MaintenancePage::new(fixture.board.clone(), MaintenanceOp::CopyExpiredSecurity);
+        page.run();
+        assert!(page.error.as_ref().is_some_and(|error| error.contains("users.toml")));
+        assert!(!matches!(page.stage, Stage::Done { .. }));
+        assert!(user_maintenance::has_backup(&fixture.dir.join("users.toml")));
+        fixture.assert_unchanged(&before);
+    }
+}
+
 /// The bulk operations offered below "Users File Maintenance", named the way
 /// the utility this replaces named them.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -661,28 +679,31 @@ impl MaintenancePage {
             return;
         }
 
-        let original = board.users.clone();
-        let report = match self.op {
-            MaintenanceOp::Pack => user_maintenance::pack(&mut board.users, &selection, now),
-            MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
-                user_maintenance::adjust_security(&mut board.users, &selection, new_level, target, now)
-            }
-            MaintenanceOp::CopyExpiredSecurity => user_maintenance::copy_expired_security(&mut board.users, &selection, now),
-            MaintenanceOp::InitializeCounters => user_maintenance::initialize_counters(&mut board.users, &selection, counters.0, counters.1, now),
-            MaintenanceOp::AdjustExpiration => user_maintenance::adjust_expiration(&mut board.users, &selection, change, now),
-            MaintenanceOp::ConferenceInsert => user_maintenance::conference_register(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
-            MaintenanceOp::ConferenceRemove => user_maintenance::conference_unregister(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
-            MaintenanceOp::ConferenceMove => {
-                user_maintenance::conference_move(&mut board.users, &selection, from, to, flags, reset_lastread, move_last_conference, now)
-            }
-            MaintenanceOp::StandardizePhones => user_maintenance::standardize_phones(&mut board.users, &selection, now),
-        };
+        let report = board.edit_users(|users| {
+            Ok(match self.op {
+                MaintenanceOp::Pack => user_maintenance::pack(users, &selection, now),
+                MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
+                    user_maintenance::adjust_security(users, &selection, new_level, target, now)
+                }
+                MaintenanceOp::CopyExpiredSecurity => user_maintenance::copy_expired_security(users, &selection, now),
+                MaintenanceOp::InitializeCounters => user_maintenance::initialize_counters(users, &selection, counters.0, counters.1, now),
+                MaintenanceOp::AdjustExpiration => user_maintenance::adjust_expiration(users, &selection, change, now),
+                MaintenanceOp::ConferenceInsert => user_maintenance::conference_register(users, &selection, &conferences, flags, reset_lastread, now),
+                MaintenanceOp::ConferenceRemove => user_maintenance::conference_unregister(users, &selection, &conferences, flags, reset_lastread, now),
+                MaintenanceOp::ConferenceMove => {
+                    user_maintenance::conference_move(users, &selection, from, to, flags, reset_lastread, move_last_conference, now)
+                }
+                MaintenanceOp::StandardizePhones => user_maintenance::standardize_phones(users, &selection, now),
+            })
+        });
 
-        if let Err(err) = board.save_userbase() {
-            board.users = original;
-            self.error = Some(get_text_args("icbsm_save_failed", HashMap::from([("error".to_string(), err.to_string())])));
-            return;
-        }
+        let report = match report {
+            Ok(report) => report,
+            Err(err) => {
+                self.error = Some(get_text_args("icbsm_save_failed", HashMap::from([("error".to_string(), err.to_string())])));
+                return;
+            }
+        };
         drop(board);
         self.stage = Stage::Done { report };
     }

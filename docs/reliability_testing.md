@@ -60,3 +60,45 @@ Further release gates should build on these command dialogues:
 
 Power-loss durability requires separate filesystem/VM testing, not merely
 disconnecting a caller or killing an application process.
+
+## User update transactions
+
+`IcyBoard::update_user(baseline, edited, mode)` is the optimistic record-update
+entry point. Callers retain the original snapshot, submit their edited copy,
+and refresh the baseline only after success. Unchanged fields adopt the latest
+record; conflicting edits to the same field fail without publishing any part
+of the update. Error messages identify fields, never their contents. Credentials
+remain one conservative conflict group governed by the recovery service.
+
+Session updates merge cumulative statistics and accounting deltas; editor
+updates treat counters and balances as explicit edits. Daily statistics are
+scoped to the supplied session day, so an older session cannot overwrite a newer
+day's counters. At session close, `FinalSession` keeps the stored value of
+conflicting fields (including the credential group), logs the conflict and
+still saves nonconflicting edits and activity deltas. Ordinary profile saves
+remain strict. Identity, accounting validation and I/O errors still fail the
+transaction; retries acknowledge deltas only after a successful save.
+Conference flags and read pointers merge per entry. Contacts,
+TPA vectors, QWK settings and bank records are atomic fields: simultaneous edits
+to different elements of these fields can still conflict.
+
+`IcyBoard::edit_users` handles creation, deletion, maintenance and recovery
+transactions under the existing board lock. It stages the entire base, including
+security normalization, writes it through the existing atomic-file replacement,
+and publishes it only after a successful save. `save_userbase` remains a
+compatibility wrapper; callers must not mutate live records before calling it
+when they require rollback of those mutations.
+
+Regression coverage is in `user_store_tests`, `state::user_update_tests`, VM
+`user_snapshots`, recovery tests and the ICBSM editor/list tests. It covers
+independent and conflicting two-node edits, repeated saves without duplicated
+charges/counters, stale credentials, map updates, failed saves and retries.
+
+The guarantees apply to writers sharing one loaded `IcyBoard`. They do not
+coordinate separate BBS/admin processes or manual file edits. Keep external
+user maintenance offline. Identity currently uses the exact original primary
+name plus first-logon date, not a persistent UUID: a renamed/deleted record
+requires reloading, and deliberate reuse of both identity values is not detected.
+This does not add cross-process locking, a transaction journal or stronger
+power-loss guarantees. User/group and user/message-file writes remain separate
+transactions.

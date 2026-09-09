@@ -590,14 +590,13 @@ impl PcbBoardCommand {
             });
         }
         let user_name = new_user.get_name().clone();
-        let id = self.state.get_board().await.users.new_user(new_user);
-        {
+        let id = {
             let mut board = self.state.get_board().await;
             let configured = board.config.new_user_settings.new_user_groups.clone();
             assign_new_user_groups(&mut board.groups, &configured, &user_name);
             board.groups.save(&board.config.paths.group_file)?;
-            board.save_userbase()?;
-        }
+            board.edit_users(|users| Ok(users.new_user(new_user)))?
+        };
         self.state.set_current_user(id, false).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
@@ -1105,7 +1104,7 @@ impl PcbBoardCommand {
                         cur_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
                     }
                 }
-                self.state.get_board().await.save_userbase()?;
+                self.state.persist_current_user().await?;
                 return Ok(());
             }
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
@@ -1125,6 +1124,56 @@ mod option_tests {
         groups.add_group("trial", "Trial users");
         assign_new_user_groups(&mut groups, "new_users, trial; missing", "NEW USER");
         assert_eq!(groups.get_groups("NEW USER"), vec!["new_users", "trial"]);
+    }
+
+    #[tokio::test]
+    async fn login_password_change_persists_only_on_success() {
+        use crate::menu_runner::PcbBoardCommand;
+        use icy_board_engine::icy_board::{
+            IcyBoard, IcyBoardSerializer,
+            bbs::BBS,
+            state::IcyBoardState,
+            user_base::{Password, User, UserBase},
+        };
+        use icy_net::{ConnectionType, channel::ChannelConnection};
+        use std::sync::Arc;
+
+        for fail_save in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let users_file = dir.path().join("users.toml");
+            let mut board = IcyBoard::new();
+            board.config.paths.user_file = users_file.clone();
+            board.config.paths.statistics_file = dir.path().join("stats.toml");
+            board.config.limits.password_expire_days = 30;
+            let mut user = User {
+                name: "Test Caller".into(),
+                ..Default::default()
+            };
+            user.password.password = Password::new_plaintext("old-secret").unwrap();
+            board.edit_users(|users| Ok(users.new_user(user))).unwrap();
+            let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+            let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+            let nodes = bbs.lock().await.open_connections.clone();
+            let (_peer, connection) = ChannelConnection::create_pair();
+            let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+            state.set_current_user(0, false).await.unwrap();
+            assert!(state.authorize_normal_login().await.unwrap());
+            state.session.is_local = true;
+            if fail_save {
+                state.get_board().await.config.paths.user_file = dir.path().to_path_buf();
+            }
+            state.stuff_keyboard_buffer("new-secret\rnew-secret\r", false).unwrap();
+            let mut command = PcbBoardCommand::new(state);
+            assert_eq!(command.change_password().await.is_err(), fail_save);
+
+            let expected = if fail_save { "old-secret" } else { "new-secret" };
+            assert!(command.state.get_board().await.users[0].password.password.is_valid(expected));
+            let saved = UserBase::load(&users_file).unwrap();
+            assert!(saved[0].password.password.is_valid(expected));
+            if !fail_save {
+                assert!(saved[0].password.expire_date > chrono::Utc::now() + chrono::Duration::days(29));
+            }
+        }
     }
 
     #[tokio::test]

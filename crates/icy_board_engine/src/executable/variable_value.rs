@@ -1914,9 +1914,9 @@ impl VariableValue {
                 data[dim_1][dim_2].clone()
             } else {
                 if dim_1 < data.len() {
-                    log::error!("dim1 out of bounds: {} > {}", dim_1, data.len());
-                } else {
                     log::error!("dim2 out of bounds: {} > {}", dim_2, data[dim_1].len());
+                } else {
+                    log::error!("dim1 out of bounds: {} > {}", dim_1, data.len());
                 }
                 self.vtype.create_empty_value()
             }
@@ -2366,6 +2366,27 @@ mod tests {
 
         assert_eq!(1, original.get_array_value(0, 0, 0).as_int());
         assert_eq!(9, clone.get_array_value(0, 0, 0).as_int());
+    }
+
+    #[test]
+    fn out_of_bounds_reads_report_instead_of_panicking() {
+        // Enabled error logging evaluates the diagnostics, which must not index the array.
+        let level = log::max_level();
+        log::set_max_level(log::LevelFilter::Error);
+        let empty_row = VariableValue::new_matrix(VariableType::Integer, vec![vec![VariableValue::new_int(1)], Vec::new()]);
+        let cases = [
+            (VariableValue::new_vector(VariableType::Integer, Vec::new()), (0, 0, 0)),
+            (VariableValue::new_matrix(VariableType::Integer, Vec::new()), (0, 0, 0)),
+            (empty_row.clone(), (1, 0, 0)),
+            (empty_row, (0, 1, 0)),
+            (VariableValue::new_cube(VariableType::Integer, Vec::new()), (0, 0, 0)),
+            (VariableValue::new_cube(VariableType::Integer, vec![vec![Vec::new()]]), (0, 0, 0)),
+            (VariableValue::new_cube(VariableType::Integer, vec![Vec::new()]), (0, 1, 0)),
+        ];
+        for (value, (dim_1, dim_2, dim_3)) in cases {
+            assert_eq!(0, value.get_array_value(dim_1, dim_2, dim_3).as_int());
+        }
+        log::set_max_level(level);
     }
 
     #[test]

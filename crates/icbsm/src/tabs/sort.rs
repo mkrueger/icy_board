@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{
     IcyBoard,
-    user_maintenance::{self, MaintenanceReport, SortKey},
+    user_maintenance::{self, SortKey},
 };
 use icy_board_tui::{
     BORDER_SET,
@@ -150,16 +150,11 @@ impl SortPage {
             return;
         }
 
-        let original = board.users.clone();
-        let report: MaintenanceReport = user_maintenance::sort(&mut board.users, self.key, self.reverse);
-        let save = board.save_userbase();
-        if save.is_err() {
-            board.users = original;
-        }
+        let save = board.edit_users(|users| Ok(user_maintenance::sort(users, self.key, self.reverse)));
         drop(board);
 
         self.result = Some(match save {
-            Ok(()) => get_text_args("icbsm_sort_done", HashMap::from([("count".to_string(), report.changed.to_string())])),
+            Ok(report) => get_text_args("icbsm_sort_done", HashMap::from([("count".to_string(), report.changed.to_string())])),
             Err(err) => get_text_args("icbsm_save_failed", HashMap::from([("error".to_string(), err.to_string())])),
         });
     }
@@ -233,6 +228,18 @@ mod rendering_tests {
 
     fn row_text(buffer: &Buffer, y: u16) -> String {
         (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sort_save_failure_preserves_order_and_security_metadata() {
+        let fixture = crate::tabs::user_save_tests::Fixture::new();
+        let before = fixture.fail_serialization();
+        let mut page = SortPage::new(fixture.board.clone(), SortKey::Name, "Name".into());
+        page.run();
+        assert!(page.result.as_ref().is_some_and(|error| error.contains("users.toml")));
+        assert!(user_maintenance::has_backup(&fixture.dir.join("users.toml")));
+        fixture.assert_unchanged(&before);
     }
 
     #[test]

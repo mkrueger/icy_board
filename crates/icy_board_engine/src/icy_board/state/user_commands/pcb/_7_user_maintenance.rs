@@ -85,11 +85,13 @@ impl IcyBoardState {
                 "D" => {
                     if record > 0 && self.ask_yes_no(IceText::DeleteRecord, false).await? {
                         let mut board = self.board.lock().await;
-                        let user = &mut board.users[record];
-                        user.flags.delete_flag = true;
-                        user.security_level = 0;
-                        user.exp_security_level = 0;
-                        let result = board.save_userbase();
+                        let result = board.edit_users(|users| {
+                            let user = &mut users[record];
+                            user.flags.delete_flag = true;
+                            user.security_level = 0;
+                            user.exp_security_level = 0;
+                            Ok(())
+                        });
                         drop(board);
                         self.report_save(result).await?;
                     }
@@ -97,8 +99,10 @@ impl IcyBoardState {
                 "U" => {
                     if record > 0 {
                         let mut board = self.board.lock().await;
-                        board.users[record].flags.delete_flag = false;
-                        let result = board.save_userbase();
+                        let result = board.edit_users(|users| {
+                            users[record].flags.delete_flag = false;
+                            Ok(())
+                        });
                         drop(board);
                         self.report_save(result).await?;
                     }
@@ -166,8 +170,10 @@ impl IcyBoardState {
                         parsed.to_utc_date_time()
                     };
                     let mut board = self.board.lock().await;
-                    board.users[record].expiration_date = expiration_date;
-                    let result = board.save_userbase();
+                    let result = board.edit_users(|users| {
+                        users[record].expiration_date = expiration_date;
+                        Ok(())
+                    });
                     drop(board);
                     self.report_save(result).await?;
                 }

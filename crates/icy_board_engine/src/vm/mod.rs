@@ -51,6 +51,9 @@ pub use self::io::*;
 
 pub mod errors;
 mod tests;
+#[cfg(test)]
+#[path = "tests/user_snapshots.rs"]
+mod user_snapshots;
 
 pub fn calc_stmt_table(blk: &[Statement]) -> HashMap<unicase::Ascii<String>, usize> {
     let mut res = HashMap::new();
@@ -129,6 +132,9 @@ pub struct VirtualMachine<'a> {
 
     pub file_list: VecDeque<String>,
     pub user: User,
+    // ACCOUNT refreshes `user`, but must not advance the optimistic edit baseline.
+    user_baseline: User,
+    user_variable_baseline: Vec<VariableValue>,
     pub cached_msg_header: Option<(i32, i32, u32, JamMessageHeader)>,
 
     /// What `STACKABORT` last asked for. Aborting is the default; a PPE has to
@@ -165,6 +171,7 @@ impl<'a> VirtualMachine<'a> {
     /// A machine with no program in it, which `run` fills in from an executable and a
     /// caller that only wants one function can use as it is.
     pub fn new(file_name: PathBuf, type_registry: &'a UserTypeRegistry, io: &'a mut dyn PCBoardIO, icy_board_state: &'a mut IcyBoardState) -> Self {
+        let user = icy_board_state.session.current_user.clone().unwrap_or_default();
         Self {
             file_name,
             type_registry,
@@ -190,7 +197,9 @@ impl<'a> VirtualMachine<'a> {
             fd_default_in: 0,
             fd_default_out: 0,
             file_list: VecDeque::new(),
-            user: User::default(),
+            user_baseline: user.clone(),
+            user,
+            user_variable_baseline: Vec::new(),
             use_lmrs: true,
             cached_msg_header: None,
             abort_on_stack_error: true,
@@ -207,6 +216,43 @@ impl<'a> VirtualMachine<'a> {
 }
 
 impl VirtualMachine<'_> {
+    fn select_user(&mut self, user: User) {
+        self.user_baseline = user.clone();
+        self.user = user;
+    }
+
+    fn snapshot_user_variables(&mut self) {
+        self.user_variable_baseline = if self.variable_table.has_user_vars() {
+            let last = if self.variable_table.get_version() >= 340 {
+                U_WEB
+            } else if self.variable_table.get_version() >= 300 {
+                U_ACCOUNT
+            } else {
+                U_PWDEXP
+            };
+            (1..=last).map(|id| self.variable_table.get_value(id).clone()).collect()
+        } else {
+            Vec::new()
+        };
+    }
+
+    fn user_variable_changed(&self, id: usize, element: Option<usize>) -> bool {
+        let Some(base) = self.user_variable_baseline.get(id - 1) else {
+            return true;
+        };
+        let value = self.variable_table.get_value(id);
+        if let Some(index) = element {
+            return value.get_array_value(index, 0, 0) != base.get_array_value(index, 0, 0);
+        }
+        if let (GenericVariableData::Password(left), GenericVariableData::Password(right)) = (&value.generic_data, &base.generic_data) {
+            // Password equality verifies secrets; here only identical storage records are unchanged.
+            return !matches!((left, right),
+                (Password::PlainText(l), Password::PlainText(r)) | (Password::Protected(l), Password::Protected(r))
+                | (Password::BCrypt(l), Password::BCrypt(r)) | (Password::Argon2(l), Password::Argon2(r)) if l == r);
+        }
+        value != base
+    }
+
     fn set_user_variables(&mut self) -> Res<()> {
         if !self.variable_table.has_user_vars() {
             log::warn!("Tried to set user variables, but no user variables defined.");
@@ -316,15 +362,6 @@ impl VirtualMachine<'_> {
             .value
             .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.clone()))?;
 
-        let mut i = 0;
-        while i < 5 {
-            self.variable_table
-                .get_var_entry_mut(U_NOTES)
-                .value
-                .set_array_value(i, 0, 0, VariableValue::new_string(String::new()))?;
-            i += 1;
-        }
-
         self.variable_table.set_value(
             U_PWDEXP,
             VariableValue::new_date(IcbDate::from_utc(&cur_user.password.expire_date).to_pcboard_date()),
@@ -343,81 +380,114 @@ impl VirtualMachine<'_> {
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
+        self.snapshot_user_variables();
         Ok(())
     }
 
     pub async fn put_user_variables(&self, cur_user: &mut User) {
-        cur_user.flags.expert_mode = self.variable_table.get_value(U_EXPERT).as_bool();
-        if self.variable_table.get_value(U_FSE).as_bool() {
-            cur_user.flags.fse_mode = FSEMode::Yes;
-        } else if self.variable_table.get_value(U_FSEP).as_bool() {
-            cur_user.flags.fse_mode = FSEMode::Ask;
-        } else {
-            cur_user.flags.fse_mode = FSEMode::No;
+        if !self.variable_table.has_user_vars() {
+            return;
         }
-        cur_user.flags.msg_clear = self.variable_table.get_value(U_CLS).as_bool();
+        macro_rules! field {
+            ($id:ident, $target:expr, $value:expr) => {
+                if self.user_variable_changed($id, None) {
+                    $target = $value;
+                }
+            };
+        }
+        macro_rules! string {
+            ($id:ident, $target:expr) => {
+                field!($id, $target, self.variable_table.get_value($id).as_string());
+            };
+        }
+        macro_rules! boolean {
+            ($id:ident, $target:expr) => {
+                field!($id, $target, self.variable_table.get_value($id).as_bool());
+            };
+        }
+        macro_rules! element {
+            ($id:ident, $index:expr, $target:expr) => {
+                if self.user_variable_changed($id, Some($index)) {
+                    $target = self.variable_table.get_value($id).get_array_value($index, 0, 0).as_string();
+                }
+            };
+        }
+        boolean!(U_EXPERT, cur_user.flags.expert_mode);
+        if self.user_variable_changed(U_FSE, None) || self.user_variable_changed(U_FSEP, None) {
+            cur_user.flags.fse_mode = if self.variable_table.get_value(U_FSE).as_bool() {
+                FSEMode::Yes
+            } else if self.variable_table.get_value(U_FSEP).as_bool() {
+                FSEMode::Ask
+            } else {
+                FSEMode::No
+            };
+        }
+        boolean!(U_CLS, cur_user.flags.msg_clear);
+        field!(
+            U_EXPDATE,
+            cur_user.expiration_date,
+            IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time()
+        );
+        field!(U_SEC, cur_user.security_level, self.variable_table.get_value(U_SEC).as_int() as u8);
+        field!(U_PAGELEN, cur_user.page_len, self.variable_table.get_value(U_PAGELEN).as_int() as u16);
+        field!(U_EXPSEC, cur_user.exp_security_level, self.variable_table.get_value(U_EXPSEC).as_int() as u8);
+        string!(U_CITY, cur_user.city_or_state);
+        string!(U_BDPHONE, cur_user.bus_data_phone);
+        string!(U_HVPHONE, cur_user.home_voice_phone);
+        string!(U_TRANS, cur_user.protocol);
+        string!(U_CMNT1, cur_user.user_comment);
+        string!(U_CMNT2, cur_user.sysop_comment);
 
-        cur_user.expiration_date = IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time();
-        cur_user.security_level = self.variable_table.get_value(U_SEC).as_int() as u8;
-        cur_user.page_len = self.variable_table.get_value(U_PAGELEN).as_int() as u16;
-        cur_user.exp_security_level = self.variable_table.get_value(U_EXPSEC).as_int() as u8;
-
-        cur_user.city_or_state = self.variable_table.get_value(U_CITY).as_string();
-        cur_user.bus_data_phone = self.variable_table.get_value(U_BDPHONE).as_string();
-        cur_user.home_voice_phone = self.variable_table.get_value(U_HVPHONE).as_string();
-        cur_user.protocol = self.variable_table.get_value(U_TRANS).as_string();
-        cur_user.user_comment = self.variable_table.get_value(U_CMNT1).as_string();
-        cur_user.sysop_comment = self.variable_table.get_value(U_CMNT2).as_string();
-
-        let pwd_value = self.variable_table.get_value(U_PWD);
-        cur_user.password.password = if let GenericVariableData::Password(ref pwd) = pwd_value.generic_data {
-            match pwd {
-                // A secret a PPE carried over from elsewhere is stored the way the board
-                // stores any password it is told, rather than as it stands.
-                Password::PlainText(s) | Password::Protected(s) => self.icy_board_state.create_password(s).await,
-                pwd => pwd.clone(),
-            }
-        } else {
-            // Fallback: create a password from the string representation
-            Password::new_argon2(pwd_value.as_string())
-        };
-
-        cur_user.flags.scroll_msg_body = self.variable_table.get_value(U_SCROLL).as_bool();
-        cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_LONGHDR).as_bool();
-        cur_user.flags.wide_editor = self.variable_table.get_value(U_DEF79).as_bool();
-        cur_user.alias = self.variable_table.get_value(U_ALIAS).as_string();
-        cur_user.verify_answer = self.variable_table.get_value(U_VER).as_string();
-        cur_user.street1 = self.variable_table.get_value(U_ADDR).get_array_value(0, 0, 0).as_string();
-        cur_user.street2 = self.variable_table.get_value(U_ADDR).get_array_value(1, 0, 0).as_string();
-        /* TODO?
-        cur_user.city = self
-            .variable_table
-            .get_value(U_ADDR)
-            .get_array_value(2, 0, 0)
-            .as_string();
-        */
-        cur_user.state = self.variable_table.get_value(U_ADDR).get_array_value(3, 0, 0).as_string();
-        cur_user.zip = self.variable_table.get_value(U_ADDR).get_array_value(4, 0, 0).as_string();
-        cur_user.country = self.variable_table.get_value(U_ADDR).get_array_value(6, 0, 0).as_string();
-        cur_user.custom_comment1 = self.variable_table.get_value(U_NOTES).get_array_value(0, 0, 0).as_string();
-        cur_user.custom_comment2 = self.variable_table.get_value(U_NOTES).get_array_value(1, 0, 0).as_string();
-        cur_user.custom_comment3 = self.variable_table.get_value(U_NOTES).get_array_value(2, 0, 0).as_string();
-        cur_user.custom_comment4 = self.variable_table.get_value(U_NOTES).get_array_value(3, 0, 0).as_string();
-        cur_user.custom_comment5 = self.variable_table.get_value(U_NOTES).get_array_value(4, 0, 0).as_string();
-        cur_user.password.expire_date = IcbDate::from_pcboard(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time();
-
-        if self.variable_table.get_version() >= 300 {
-            // PCBoard seems not to set this variable ever.
-            // U_ACCOUNT
+        if self.user_variable_changed(U_PWD, None) {
+            let pwd_value = self.variable_table.get_value(U_PWD);
+            cur_user.password.password = if let GenericVariableData::Password(ref pwd) = pwd_value.generic_data {
+                match pwd {
+                    Password::PlainText(s) | Password::Protected(s) => self.icy_board_state.create_password(s).await,
+                    pwd => pwd.clone(),
+                }
+            } else {
+                Password::new_argon2(pwd_value.as_string())
+            };
         }
 
+        boolean!(U_SCROLL, cur_user.flags.scroll_msg_body);
+        field!(
+            U_LONGHDR,
+            cur_user.flags.use_short_filedescr,
+            !self.variable_table.get_value(U_LONGHDR).as_bool()
+        );
+        boolean!(U_DEF79, cur_user.flags.wide_editor);
+        string!(U_ALIAS, cur_user.alias);
+        string!(U_VER, cur_user.verify_answer);
+        element!(U_ADDR, 0, cur_user.street1);
+        element!(U_ADDR, 1, cur_user.street2);
+        // U_CITY and U_ADDR(2) are the same field; whichever the PPE changed wins.
+        element!(U_ADDR, 2, cur_user.city_or_state);
+        element!(U_ADDR, 3, cur_user.state);
+        element!(U_ADDR, 4, cur_user.zip);
+        element!(U_ADDR, 5, cur_user.country);
+        element!(U_NOTES, 0, cur_user.custom_comment1);
+        element!(U_NOTES, 1, cur_user.custom_comment2);
+        element!(U_NOTES, 2, cur_user.custom_comment3);
+        element!(U_NOTES, 3, cur_user.custom_comment4);
+        element!(U_NOTES, 4, cur_user.custom_comment5);
+        field!(
+            U_PWDEXP,
+            cur_user.password.expire_date,
+            IcbDate::from_pcboard(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time()
+        );
+
+        // U_ACCOUNT is not loaded or stored by PCBoard.
         if self.variable_table.get_version() >= 340 {
-            cur_user.flags.use_short_filedescr = self.variable_table.get_value(U_SHORTDESC).as_bool();
-
-            cur_user.gender = self.variable_table.get_value(U_GENDER).as_string();
-            cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time();
-            cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
-            cur_user.web = self.variable_table.get_value(U_WEB).as_string();
+            boolean!(U_SHORTDESC, cur_user.flags.use_short_filedescr);
+            string!(U_GENDER, cur_user.gender);
+            field!(
+                U_BIRTHDATE,
+                cur_user.birth_date,
+                IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time()
+            );
+            string!(U_EMAIL, cur_user.email);
+            string!(U_WEB, cur_user.web);
         }
     }
 
@@ -1232,7 +1302,8 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             vm.variable_table = prg.variable_table.clone();
             vm.label_table = label_table;
             vm.user_types = prg.user_types.clone();
-            vm.user = user;
+            vm.select_user(user);
+            vm.snapshot_user_variables();
 
             vm.run().await?;
             Ok(!vm.aborted)

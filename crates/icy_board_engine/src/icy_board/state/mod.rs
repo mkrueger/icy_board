@@ -250,6 +250,8 @@ pub struct Session {
     saved_session_minutes: i64,
 
     pub current_user: Option<User>,
+    /// Last accepted user snapshot, before this call's pending field/statistic edits.
+    pub user_baseline: Option<User>,
     pub security_baseline: Option<User>,
     pub authenticated_security: Option<(u64, String)>,
     pub cur_user_id: i32,
@@ -345,6 +347,9 @@ pub struct Session {
     pub joined_conferences: HashSet<u16>,
 }
 
+#[cfg(test)]
+mod user_update_tests;
+
 impl Session {
     pub fn new() -> Self {
         Self {
@@ -358,6 +363,7 @@ impl Session {
             login_date: Utc::now(),
             saved_session_minutes: 0,
             current_user: None,
+            user_baseline: None,
             security_baseline: None,
             authenticated_security: None,
             cur_user_id: -1,
@@ -1753,10 +1759,11 @@ impl IcyBoardState {
             state.graphics_mode = self.session.disp_options.grapics_mode;
         }
         let mut user = self.get_board().await.users[user_number].clone();
+        self.session.user_baseline = Some(user.clone());
 
         // The daily figures belong to the day they were made on, and `last_on` still holds
         // the previous call until the user is saved again.
-        if user.stats.last_on.date_naive() != Utc::now().date_naive() {
+        if user.stats.last_on.date_naive() != self.session.login_date.date_naive() {
             user.stats.minutes_today = 0;
             user.stats.today_num_downloads = 0;
             user.stats.today_num_uploads = 0;
@@ -1848,6 +1855,9 @@ impl IcyBoardState {
         }
 
         if self.session.current_user.is_some() {
+            if self.session.request_logoff {
+                return self.persist_final_user().await;
+            }
             return self.persist_current_user().await;
         }
         log::error!("User not found in user list");
@@ -1857,53 +1867,65 @@ impl IcyBoardState {
     /// Writes the current user straight to the user base without the logoff-time
     /// accounting, so a PPE's `Session.User` change lands on disk immediately.
     pub async fn persist_current_user(&mut self) -> Res<()> {
+        self.persist_user(false).await
+    }
+
+    pub(super) async fn persist_final_user(&mut self) -> Res<()> {
+        self.persist_user(true).await
+    }
+
+    async fn persist_user(&mut self, closing: bool) -> Res<()> {
         if !self.credentials_still_current().await {
             self.session.request_logoff = true;
-            if let (Some(local), Some(baseline)) = (&self.session.current_user, &self.session.security_baseline) {
+            if !closing && let (Some(local), Some(baseline)) = (&self.session.current_user, &self.session.security_baseline) {
                 if super::password_recovery::security_fingerprint(local) != super::password_recovery::security_fingerprint(baseline) {
                     return Err("Credentials changed on another node; relogin required".into());
                 }
             }
         }
-        if let Some(user) = &self.session.current_user {
-            let mut board = self.get_board().await;
-            for u in 0..board.users.len() {
-                if board.users[u].get_name() == self.session.security_baseline.as_ref().unwrap_or(user).get_name() {
-                    let mut merged = self.accounting_merge_for_save(user, &board.users[u])?;
-                    if let Some(baseline) = &self.session.security_baseline {
-                        super::password_recovery::merge_security(user, baseline, &board.users[u], &mut merged)?;
-                    }
-                    let previous = std::mem::replace(&mut board.users[u], merged);
-                    if let Err(error) = board.save_userbase() {
-                        board.users[u] = previous;
-                        return Err(error);
-                    }
-                    let saved = board.users[u].clone();
-                    drop(board);
-                    if let Some(local) = &mut self.session.current_user {
-                        let baseline = local.clone();
-                        super::password_recovery::merge_security(&baseline, &baseline, &saved, local)?;
-                        self.session.security_baseline = Some(local.clone());
-                    }
-                    if self.session.authenticated_security.is_some() {
-                        // Only our own intentional change may refresh an authenticated revision.
-                        let was_current = self.session.authenticated_security.as_ref().is_some_and(|(revision, stamp)| {
-                            *revision == previous.credential_revision && *stamp == super::password_recovery::security_fingerprint(&previous)
-                        });
-                        if was_current {
-                            self.session.authenticated_security = Some((saved.credential_revision, super::password_recovery::security_fingerprint(&saved)));
-                        }
-                    }
-                    // Keep this call's local snapshot (notably START_SESSION).
-                    // Only its deltas were posted; the next save must compare
-                    // against this snapshot, not adopt another node's deltas.
-                    self.accounting_mark_saved();
-                    return Ok(());
-                }
+        let user = self.session.current_user.as_ref().ok_or("No current user to persist")?;
+        let mut board = self.get_board().await;
+        let identity = self.session.user_baseline.as_ref().or(self.session.security_baseline.as_ref()).unwrap_or(user);
+        let previous = board
+            .users
+            .iter()
+            .find(|stored| stored.name == identity.name)
+            .ok_or("User not found in user list")?
+            .clone();
+        let mut baseline = self.session.user_baseline.as_ref().unwrap_or(&previous).clone();
+        if let Some(security) = &self.session.security_baseline {
+            // Legacy session constructors may not yet have a full snapshot.
+            if self.session.user_baseline.is_none() {
+                baseline = security.clone();
             }
-            return Err("User not found in user list".into());
         }
-        Err("No current user to persist".into())
+        self.accounting_set_update_baseline(&mut baseline);
+        let mode = if closing {
+            super::user_store::UserUpdateMode::FinalSession {
+                day: self.session.login_date.date_naive(),
+            }
+        } else {
+            super::user_store::UserUpdateMode::Session {
+                day: self.session.login_date.date_naive(),
+            }
+        };
+        let mut saved = board.update_user(&baseline, user, mode)?;
+        drop(board);
+        // Monetary totals exposed to this call retain START_SESSION and local deltas.
+        saved.account = user.account.clone();
+        if self
+            .session
+            .authenticated_security
+            .as_ref()
+            .is_some_and(|(revision, stamp)| *revision == previous.credential_revision && *stamp == super::password_recovery::security_fingerprint(&previous))
+        {
+            self.session.authenticated_security = Some((saved.credential_revision, super::password_recovery::security_fingerprint(&saved)));
+        }
+        self.session.user_baseline = Some(saved.clone());
+        self.session.security_baseline = Some(saved.clone());
+        self.session.current_user = Some(saved);
+        self.accounting_mark_saved();
+        Ok(())
     }
 
     fn find_more_specific_file(&self, base_name: String) -> PathBuf {
@@ -4388,9 +4410,13 @@ impl IcyBoardState {
             return Ok(false);
         }
         let password = self.create_password(new_pwd.to_string()).await;
+        let previous = self.session.current_user.clone();
         if let Some(user) = &mut self.session.current_user {
             user.password.accept_new_password(password, Utc::now(), exp_days);
-            self.get_board().await.save_userbase()?;
+            if let Err(error) = self.persist_current_user().await {
+                self.session.current_user = previous;
+                return Err(error);
+            }
             return Ok(true);
         }
         Ok(false)

@@ -28,3 +28,6 @@ pub use preferences::*;
 
 pub mod dir_colors;
 pub use dir_colors::*;
+
+#[cfg(test)]
+pub(crate) mod user_save_tests;

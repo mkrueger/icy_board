@@ -89,23 +89,21 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let original = board.users.clone();
-        let report = user_maintenance::pack(&mut board.users, &selection, Utc::now());
-        let save_result = board.save_userbase();
-        if save_result.is_err() {
-            board.users = original;
-        }
+        let save_result = board.edit_users(|users| Ok(user_maintenance::pack(users, &selection, Utc::now())));
         drop(board);
 
-        if let Err(err) = save_result {
-            log::error!("Could not save the user file after packing: {err}");
-            self.display_text(
-                IceText::ErrorInUsersFile,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
-            )
-            .await?;
-            return Ok(());
-        }
+        let report = match save_result {
+            Ok(report) => report,
+            Err(err) => {
+                log::error!("Could not save the user file after packing: {err}");
+                self.display_text(
+                    IceText::ErrorInUsersFile,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
+                )
+                .await?;
+                return Ok(());
+            }
+        };
 
         for name in &report.names {
             self.print(TerminalTarget::Both, name).await?;

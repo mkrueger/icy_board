@@ -3,7 +3,9 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{
     IcyBoard,
     icb_config::PasswordStorageMethod,
+    password_recovery::security_fingerprint,
     user_base::{ChatStatus, FSEMode, Password, User},
+    user_store::UserUpdateMode,
 };
 use icy_board_tui::{
     chrome::{dim_background, dirty_title},
@@ -14,6 +16,7 @@ use icy_board_tui::{
     save_changes_dialog::SaveChangesDialog,
     tab_page::{InfoState, Page, PageMessage},
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub struct UserEditor {
@@ -21,14 +24,28 @@ pub struct UserEditor {
     menu: ConfigMenu<Arc<Mutex<User>>>,
     icy_board: Arc<Mutex<IcyBoard>>,
     num_user: usize,
-    security_baseline: User,
+    baseline: User,
+    new_user: Option<Arc<Mutex<User>>>,
+    draft_changed: Option<Arc<AtomicBool>>,
     save_dialog: Option<SaveChangesDialog>,
 }
 
 impl UserEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, num_user: usize) -> Self {
         let user = icy_board.lock().unwrap().users.get(num_user).unwrap().clone();
-        let security_baseline = user.clone();
+        Self::from_snapshot(icy_board, num_user, user)
+    }
+
+    pub(super) fn for_new_user(icy_board: Arc<Mutex<IcyBoard>>, num_user: usize, user: Arc<Mutex<User>>, draft_changed: Arc<AtomicBool>) -> Self {
+        let snapshot = user.lock().unwrap().clone();
+        let mut editor = Self::from_snapshot(icy_board, num_user, snapshot);
+        editor.new_user = Some(user);
+        editor.draft_changed = Some(draft_changed);
+        editor
+    }
+
+    pub(super) fn from_snapshot(icy_board: Arc<Mutex<IcyBoard>>, num_user: usize, user: User) -> Self {
+        let baseline = user.clone();
         let password_storage_method = icy_board.lock().unwrap().config.system_control.password_storage_method;
 
         let menu: ConfigMenu<Arc<Mutex<User>>> = {
@@ -491,7 +508,9 @@ impl UserEditor {
             .with_fitted_labels()
         };
         Self {
-            security_baseline,
+            baseline,
+            new_user: None,
+            draft_changed: None,
             state: ConfigMenuState::default(),
             menu,
             icy_board,
@@ -499,11 +518,85 @@ impl UserEditor {
             save_dialog: None,
         }
     }
+
+    fn is_dirty(&self) -> bool {
+        !same_user_edit(&self.menu.obj.lock().unwrap(), &self.baseline)
+    }
+
+    fn save(&mut self) -> icy_board_engine::Res<()> {
+        let edited = self.menu.obj.lock().unwrap().clone();
+        let saved = if let Some(user) = &self.new_user {
+            // New list records stay private until the list transaction is saved.
+            *user.lock().unwrap() = edited.clone();
+            edited
+        } else {
+            self.icy_board.lock().unwrap().update_user(&self.baseline, &edited, UserUpdateMode::Edit)?
+        };
+        self.baseline = saved.clone();
+        *self.menu.obj.lock().unwrap() = saved;
+        if let Some(changed) = &self.draft_changed {
+            changed.store(true, Ordering::Release);
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn same_user_edit(left: &User, right: &User) -> bool {
+    macro_rules! same_fields {
+        ($($field:ident),+ $(,)?) => { true $(&& left.$field == right.$field)+ };
+    }
+    // The fingerprint compares password records and history without verifying secrets.
+    // Recovery challenges are authoritative, not editable form fields.
+    security_fingerprint(left) == security_fingerprint(right)
+        && same_fields!(
+            path,
+            verify_answer,
+            city_or_state,
+            city,
+            state,
+            street1,
+            street2,
+            zip,
+            country,
+            gender,
+            web,
+            contacts,
+            date_format,
+            language,
+            bus_data_phone,
+            home_voice_phone,
+            birth_date,
+            user_comment,
+            sysop_comment,
+            custom_comment1,
+            custom_comment2,
+            custom_comment3,
+            custom_comment4,
+            custom_comment5,
+            credential_revision,
+            security_stamp,
+            recovery_issues,
+            expiration_date,
+            flags,
+            protocol,
+            page_len,
+            last_conference,
+            elapsed_time_on,
+            date_last_dir_read,
+            qwk_config,
+            account,
+            bank,
+            stats,
+            chat_status,
+            conference_flags,
+            lastread_ptr_flags,
+            tpa_records,
+        )
 }
 
 impl Page for UserEditor {
     fn render(&mut self, frame: &mut ratatui::Frame, disp_area: ratatui::prelude::Rect) {
-        let dirty = *self.menu.obj.lock().unwrap() != self.icy_board.lock().unwrap().users[self.num_user];
+        let dirty = self.is_dirty();
         let title = dirty_title(format!("{} #{}", get_text("icbsm_menu_edit_users"), self.num_user + 1), dirty);
         let footer = self.save_dialog.is_none().then(|| HotkeyBar::for_id("icb_setup_key_menu_help").line());
         let area = render_config_menu_frame(frame, disp_area, &title, footer);
@@ -533,26 +626,12 @@ impl Page for UserEditor {
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
                     self.save_dialog = None;
-                    let edited = self.menu.obj.lock().unwrap().clone();
-                    let mut board = self.icy_board.lock().unwrap();
-                    let original = board.users[self.num_user].clone();
-                    let mut merged = edited.clone();
-                    if let Err(err) = icy_board_engine::icy_board::password_recovery::merge_security(&edited, &self.security_baseline, &original, &mut merged) {
-                        return PageMessage::InfoBox(
+                    match self.save() {
+                        Ok(()) => PageMessage::Close,
+                        Err(err) => PageMessage::InfoBox(
                             InfoState::Error,
                             get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), err.to_string())])),
-                        );
-                    }
-                    board.users[self.num_user] = merged;
-                    match board.save_userbase() {
-                        Ok(()) => PageMessage::Close,
-                        Err(err) => {
-                            board.users[self.num_user] = original;
-                            PageMessage::InfoBox(
-                                InfoState::Error,
-                                get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), err.to_string())])),
-                            )
-                        }
+                        ),
                     }
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
@@ -561,7 +640,7 @@ impl Page for UserEditor {
 
         let res = self.menu.handle_key_press(key, &mut self.state);
         if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
-            if *self.menu.obj.lock().unwrap() == self.icy_board.lock().unwrap().users[self.num_user] {
+            if !self.is_dirty() {
                 return PageMessage::Close;
             }
             self.save_dialog = Some(SaveChangesDialog::new());
@@ -574,11 +653,150 @@ impl Page for UserEditor {
 #[cfg(test)]
 mod rendering_tests {
     use super::*;
+    use crate::tabs::user_save_tests::Fixture;
+    use crossterm::event::KeyCode;
     use icy_board_tui::hotkeys::HotkeyBar;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
 
     fn row_text(buffer: &Buffer, y: u16) -> String {
         (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    fn confirm_save(editor: &mut UserEditor) -> PageMessage {
+        assert!(matches!(editor.handle_key_press(KeyCode::Esc.into()), PageMessage::None));
+        assert!(editor.save_dialog.is_some());
+        editor.handle_key_press(KeyCode::Left.into());
+        editor.handle_key_press(KeyCode::Enter.into())
+    }
+
+    #[test]
+    fn editor_save_merges_other_field_updates_after_reordering() {
+        let fixture = Fixture::new();
+        let mut editor = UserEditor::new(fixture.board.clone(), 2);
+        editor.menu.obj.lock().unwrap().sysop_comment = "editor draft".into();
+        fixture
+            .board
+            .lock()
+            .unwrap()
+            .edit_users(|users| {
+                users[2].city_or_state = "Hamburg".into();
+                users[2].stats.num_times_on = 42;
+                users.swap(1, 2);
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(matches!(confirm_save(&mut editor), PageMessage::Close));
+        assert!(!editor.is_dirty());
+        let users = fixture.disk_users();
+        assert_eq!(users[1].name, "Bob");
+        assert_eq!(users[1].city_or_state, "Hamburg");
+        assert_eq!(users[1].stats.num_times_on, 42);
+        assert_eq!(users[1].sysop_comment, "editor draft");
+        assert!(users[2].sysop_comment.is_empty());
+        assert_eq!(editor.baseline.city_or_state, "Hamburg");
+    }
+
+    #[test]
+    fn conflicting_editor_save_keeps_live_record_and_draft() {
+        let mut fixture = Fixture::new();
+        let mut editor = UserEditor::new(fixture.board.clone(), 1);
+        editor.menu.obj.lock().unwrap().city_or_state = "Munich".into();
+        fixture
+            .board
+            .lock()
+            .unwrap()
+            .edit_users(|users| {
+                users[1].city_or_state = "Hamburg".into();
+                Ok(())
+            })
+            .unwrap();
+        fixture.persisted = std::fs::read(fixture.dir.join("users.toml")).unwrap();
+        let before = fixture.snapshot();
+
+        assert!(matches!(confirm_save(&mut editor), PageMessage::InfoBox(InfoState::Error, _)));
+        fixture.assert_unchanged(&before);
+        assert!(editor.is_dirty());
+        assert_eq!(editor.menu.obj.lock().unwrap().city_or_state, "Munich");
+        assert_eq!(editor.baseline.city_or_state, "Berlin");
+    }
+
+    #[test]
+    fn editor_save_failure_does_not_normalize_or_publish_any_live_user() {
+        let fixture = Fixture::new();
+        let mut editor = UserEditor::new(fixture.board.clone(), 1);
+        editor.menu.obj.lock().unwrap().sysop_comment = "draft".into();
+        {
+            let mut board = fixture.board.lock().unwrap();
+            board.users[0].email = "pending-normalization@example.invalid".into();
+            board.config.paths.user_file = fixture.dir.clone();
+        }
+        let before = fixture.snapshot();
+        assert!(matches!(confirm_save(&mut editor), PageMessage::InfoBox(InfoState::Error, _)));
+        fixture.assert_unchanged(&before);
+        assert!(editor.is_dirty());
+    }
+
+    #[test]
+    fn removed_editor_identity_never_targets_a_reused_index_or_alias() {
+        let mut fixture = Fixture::new();
+        let mut editor = UserEditor::new(fixture.board.clone(), 2);
+        editor.menu.obj.lock().unwrap().sysop_comment = "draft".into();
+        fixture
+            .board
+            .lock()
+            .unwrap()
+            .edit_users(|users| {
+                users.remove(2);
+                users[1].alias = "Bob".into();
+                Ok(())
+            })
+            .unwrap();
+        fixture.persisted = std::fs::read(fixture.dir.join("users.toml")).unwrap();
+        let before = fixture.snapshot();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        assert!(matches!(confirm_save(&mut editor), PageMessage::InfoBox(InfoState::Error, _)));
+        fixture.assert_unchanged(&before);
+    }
+
+    #[test]
+    fn unchanged_argon2_snapshot_is_clean_even_when_live_identity_disappears() {
+        let fixture = Fixture::new();
+        {
+            let mut board = fixture.board.lock().unwrap();
+            board.users[2].password.password = Password::new_argon2("secret");
+            board.users[2].password.prev_pwd.push(Password::new_argon2("previous"));
+        }
+        let mut editor = UserEditor::new(fixture.board.clone(), 2);
+        assert!(!editor.is_dirty());
+        editor.menu.obj.lock().unwrap().password.password = Password::PlainText("secret".into());
+        assert!(editor.is_dirty(), "a storage change must not be treated as password verification");
+        *editor.menu.obj.lock().unwrap() = editor.baseline.clone();
+        fixture.board.lock().unwrap().users.remove(2);
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        assert!(!row_text(terminal.backend().buffer(), 2).contains('*'));
+        assert!(matches!(editor.handle_key_press(KeyCode::Esc.into()), PageMessage::Close));
+    }
+
+    #[test]
+    fn new_user_editor_saves_only_to_the_pending_list_record() {
+        let fixture = Fixture::new();
+        let before = fixture.snapshot();
+        let pending = Arc::new(Mutex::new(User {
+            name: "NewUser4".into(),
+            ..Default::default()
+        }));
+        let changed = Arc::new(AtomicBool::new(false));
+        let mut editor = UserEditor::for_new_user(fixture.board.clone(), 3, pending.clone(), changed.clone());
+        editor.menu.obj.lock().unwrap().name = "New account".into();
+        assert!(!changed.load(Ordering::Acquire));
+        assert!(matches!(confirm_save(&mut editor), PageMessage::Close));
+        assert!(changed.load(Ordering::Acquire));
+        assert_eq!(pending.lock().unwrap().name, "New account");
+        assert!(!editor.is_dirty());
+        fixture.assert_unchanged(&before);
     }
 
     #[test]

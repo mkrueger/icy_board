@@ -291,11 +291,12 @@ pub async fn hangup(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.user = if let Some(user) = &mut vm.icy_board_state.session.current_user {
+    let user = if let Some(user) = &vm.icy_board_state.session.current_user {
         user.clone()
     } else {
         return Err(Box::new(IcyError::UserNotFound(String::new())));
     };
+    vm.select_user(user);
     vm.set_user_variables()?;
     Ok(())
 }
@@ -303,34 +304,30 @@ pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    if refresh_accounting_user(vm) {
-        // Start with the live record: runtime actions since GETUSER may have
-        // changed balances and statistics not represented by U_* variables.
-        let mut user = vm.icy_board_state.session.current_user.clone().unwrap();
-        vm.put_user_variables(&mut user).await;
-        vm.user = user.clone();
-        vm.icy_board_state.session.current_user = Some(user);
+    use crate::icy_board::user_store::{UserUpdateMode, merge_user};
+
+    let mut edited = vm.user.clone();
+    vm.put_user_variables(&mut edited).await;
+    // Daily counters in this snapshot belong to its last-on day, not today's clock.
+    let mode = UserUpdateMode::Session {
+        day: vm.user_baseline.stats.last_on.date_naive(),
+    };
+    let saved = if let Some(current) = &vm.icy_board_state.session.current_user
+        && current.name == vm.user_baseline.name
+        && current.stats.first_date_on == vm.user_baseline.stats.first_date_on
+    {
+        // Caller ACCOUNT/RECORDUSAGE already posted to current_user; do not replay them.
+        edited.account.clone_from(&vm.user_baseline.account);
+        let merged = merge_user(&vm.user_baseline, &edited, current, mode)?;
+        // Legacy PUTUSER defers caller persistence to the session save path.
+        vm.icy_board_state.session.current_user = Some(merged.clone());
+        merged
     } else {
-        // PUTUSER writes the record selected by GETALTUSER, including ACCOUNT
-        // and RECORDUSAGE adjustments, without touching the logged-in caller.
-        let mut user = vm.user.clone();
-        vm.put_user_variables(&mut user).await;
-        let mut board = vm.icy_board_state.get_board().await;
-        let index = board.users.iter().position(|stored| stored.get_name() == user.get_name());
-        if let Some(index) = index {
-            let previous = board.users[index].clone();
-            let mut merged = user.clone();
-            crate::icy_board::password_recovery::merge_security(&user, &vm.user, &previous, &mut merged)?;
-            board.users[index] = merged;
-            if let Err(error) = board.save_userbase() {
-                board.users[index] = previous;
-                return Err(error);
-            }
-            user = board.users[index].clone();
-            drop(board);
-            vm.user = user;
-        }
-    }
+        vm.icy_board_state.get_board().await.update_user(&vm.user_baseline, &edited, mode)?
+    };
+    vm.select_user(saved);
+    // Leave the visible U_* values alone, but acknowledge only successfully merged edits.
+    vm.snapshot_user_variables();
     Ok(())
 }
 
@@ -2043,12 +2040,20 @@ pub async fn download(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let user_record = vm.eval_expr(&args[0]).await?.as_int();
-    if user_record <= 0 || user_record as usize > vm.icy_board_state.get_board().await.users.len() {
+    let user = {
+        let board = vm.icy_board_state.get_board().await;
+        user_record
+            .checked_sub(1)
+            .filter(|index| *index >= 0)
+            .and_then(|index| board.users.get(index as usize))
+            .cloned()
+    };
+    let Some(user) = user else {
         // it's expected behavior, user record is unchanged.
         log::warn!("PPE getaltuser: invalid user record #{user_record}");
         return Ok(());
-    }
-    vm.user = vm.icy_board_state.get_board().await.users[user_record as usize - 1].clone();
+    };
+    vm.select_user(user);
     refresh_accounting_user(vm);
     log::info!("PPE getaltuser: switched to user #{} ({})", user_record, vm.user.name);
     vm.set_user_variables()?;
@@ -2336,7 +2341,7 @@ pub async fn brag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(user) = vm.icy_board_state.session.current_user.clone() {
-        vm.user = user;
+        vm.select_user(user);
         vm.set_user_variables()?;
     }
     Ok(())
@@ -2529,7 +2534,8 @@ pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 /// Refresh only that account, and only when the PPE selected the logged-in user.
 pub(crate) fn refresh_accounting_user(vm: &mut VirtualMachine<'_>) -> bool {
     if let Some(user) = &vm.icy_board_state.session.current_user
-        && user.get_name() == vm.user.get_name()
+        && user.name == vm.user.name
+        && user.stats.first_date_on == vm.user.stats.first_date_on
     {
         vm.user.account.clone_from(&user.account);
         true
@@ -2919,9 +2925,6 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         return Ok(());
     }
 
-    // Save current user context before we potentially switch
-    let original_user = if keep_alt_vars { None } else { Some(vm.user.clone()) };
-
     // Acquire board lock to check for duplicates and add user
     let mut board_guard = vm.icy_board_state.board.lock().await;
 
@@ -2955,7 +2958,8 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
 
     // Add user to user base
-    let record_index = board_guard.users.new_user(new_user.clone());
+    let record_index = board_guard.edit_users(|users| Ok(users.new_user(new_user)))?;
+    let new_user = board_guard.users[record_index].clone();
     log::info!("ADDUSER: created user '{}' as record #{}", trimmed, record_index + 1);
 
     // Release board lock before modifying VM state
@@ -2964,15 +2968,9 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // Handle variable context switching
     if keep_alt_vars {
         // Like GETALTUSER: switch context to new user
-        vm.user = new_user;
+        vm.select_user(new_user);
         vm.set_user_variables()?;
         log::info!("ADDUSER: context switched to new user '{trimmed}'");
-    } else {
-        // Restore original user context
-        if let Some(original) = original_user {
-            vm.user = original;
-            vm.set_user_variables()?;
-        }
     }
 
     Ok(())

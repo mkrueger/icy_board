@@ -1,11 +1,13 @@
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::vec;
 
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
-use icy_board_engine::icy_board::user_base::UserBase;
+use icy_board_engine::icy_board::user_base::{User, UserBase};
+use icy_board_engine::icy_board::user_store::UserUpdateError;
 use icy_board_tui::chrome::{dim_background, dirty_title, frame_title};
 use icy_board_tui::hotkeys::{Hotkey, HotkeyBar};
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
@@ -60,7 +62,15 @@ pub struct UserList {
     table_state: TableState,
     icy_board: Arc<Mutex<IcyBoard>>,
     save_dialog: Option<SaveChangesDialog>,
-    backup: UserBase,
+    users: UserBase,
+    /// The published transaction this copy was taken from.
+    revision: u64,
+    /// Private draft saves do not advance the board revision.
+    draft_changed: Arc<AtomicBool>,
+    #[cfg(test)]
+    rebuild_count: usize,
+    added: Vec<Arc<Mutex<User>>>,
+    removed: Vec<User>,
     has_changes: bool,
     /// Positions in the user base, in the order they are shown.
     view: Vec<usize>,
@@ -72,12 +82,17 @@ pub struct UserList {
 impl UserList {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let user_len = icy_board.lock().unwrap().users.len();
-        let backup = icy_board.lock().unwrap().users.clone();
         let mut list = Self {
             scroll_state: ScrollbarState::default().content_length(user_len),
             table_state: TableState::default().with_selected(if user_len > 0 { 0 } else { usize::MAX }),
             icy_board,
-            backup,
+            users: UserBase::default(),
+            revision: 0,
+            draft_changed: Arc::new(AtomicBool::new(false)),
+            #[cfg(test)]
+            rebuild_count: 0,
+            added: Vec::new(),
+            removed: Vec::new(),
             save_dialog: None,
             has_changes: false,
             view: Vec::new(),
@@ -90,9 +105,21 @@ impl UserList {
     }
 
     fn rebuild_view(&mut self) {
+        self.draft_changed.swap(false, Ordering::Acquire);
+        #[cfg(test)]
+        {
+            self.rebuild_count += 1;
+        }
         let board = self.icy_board.lock().unwrap();
+        self.revision = board.user_revision;
+        self.users = board.users.clone();
+        self.users.retain(|user| !self.removed.iter().any(|removed| same_identity(user, removed)));
+        for user in &self.added {
+            self.users.new_user(user.lock().unwrap().clone());
+        }
+        drop(board);
         let needle = self.search.trim().to_lowercase();
-        let mut view: Vec<usize> = board
+        let mut view: Vec<usize> = self
             .users
             .iter()
             .enumerate()
@@ -102,11 +129,10 @@ impl UserList {
 
         match self.sort {
             SortOrder::Record => {}
-            SortOrder::Name => view.sort_by_key(|i| board.users[*i].get_name().to_lowercase()),
-            SortOrder::Security => view.sort_by(|a, b| board.users[*b].security_level.cmp(&board.users[*a].security_level)),
-            SortOrder::LastOn => view.sort_by(|a, b| board.users[*b].stats.last_on.cmp(&board.users[*a].stats.last_on)),
+            SortOrder::Name => view.sort_by_key(|i| self.users[*i].get_name().to_lowercase()),
+            SortOrder::Security => view.sort_by(|a, b| self.users[*b].security_level.cmp(&self.users[*a].security_level)),
+            SortOrder::LastOn => view.sort_by(|a, b| self.users[*b].stats.last_on.cmp(&self.users[*a].stats.last_on)),
         }
-        drop(board);
 
         let len = view.len();
         self.view = view;
@@ -149,9 +175,8 @@ impl UserList {
             .collect::<Row>()
             .height(2);
 
-        let l = self.icy_board.lock().unwrap();
         let rows = self.view.iter().map(|i| {
-            let user = &l.users[*i];
+            let user = &self.users[*i];
             let last_on = if user.stats.num_times_on == 0 {
                 String::new()
             } else {
@@ -223,8 +248,10 @@ impl UserList {
     fn insert(&mut self) {
         use icy_board_engine::icy_board::user_base::{ChatStatus, Password, PasswordInfo, User, UserFlags, UserStats};
 
-        let mut board = self.icy_board.lock().unwrap();
-        let new_idx = board.users.len() + 1;
+        let mut new_idx = self.users.len() + 1;
+        while self.users.iter().any(|user| user.name == format!("NewUser{new_idx}")) {
+            new_idx += 1;
+        }
         let new_user = User {
             name: format!("NewUser{new_idx}"),
             password: PasswordInfo {
@@ -241,14 +268,12 @@ impl UserList {
             page_len: 24,
             ..Default::default()
         };
-        board.users.new_user(new_user);
-        let len = board.users.len();
-        drop(board);
+        self.added.push(Arc::new(Mutex::new(new_user)));
 
         self.search.clear();
         self.sort = SortOrder::Record;
         self.rebuild_view();
-        self.scroll_state = self.scroll_state.content_length(len);
+        self.scroll_state = self.scroll_state.content_length(self.users.len());
         self.table_state.select(Some(self.view.len().saturating_sub(1)));
         self.has_changes = true;
     }
@@ -258,12 +283,15 @@ impl UserList {
             if index == 0 {
                 return PageMessage::InfoBox(InfoState::Warning, get_text("icbsm_record_one_protected"));
             }
-            let mut board = self.icy_board.lock().unwrap();
-            if index < board.users.len() {
-                board.users.remove(index);
-                drop(board);
+            if index < self.users.len() {
+                let existing = self.users.len() - self.added.len();
+                if index >= existing {
+                    self.added.remove(index - existing);
+                } else {
+                    self.removed.push(self.users[index].clone());
+                }
                 self.rebuild_view();
-                self.has_changes = true;
+                self.has_changes = !self.added.is_empty() || !self.removed.is_empty();
             }
         }
         PageMessage::None
@@ -326,8 +354,7 @@ impl UserList {
     /// Border-only context: never take a row away from the list or search.
     fn selection_summary(&self, available_width: usize) -> Option<Line<'static>> {
         let index = self.selected_user()?;
-        let board = self.icy_board.lock().unwrap();
-        let user = board.users.get(index)?;
+        let user = self.users.get(index)?;
         let mut text = format!(" #{} · {}", index + 1, user.get_name());
         if !user.city_or_state.is_empty() {
             text.push_str(&format!(" · {}", user.city_or_state));
@@ -363,8 +390,37 @@ impl UserList {
     }
 
     fn try_save(&mut self) -> PageMessage {
-        match self.icy_board.lock().unwrap().save_userbase() {
+        let result = self.icy_board.lock().unwrap().edit_users(|users| {
+            for removed in &self.removed {
+                let mut matches = users.iter().enumerate().filter(|(_, user)| user.name == removed.name);
+                let (index, live) = matches.next().ok_or(UserUpdateError::MissingIdentity)?;
+                if matches.next().is_some() {
+                    return Err(UserUpdateError::AmbiguousIdentity.into());
+                }
+                if !same_identity(live, removed) {
+                    return Err(UserUpdateError::IdentityChanged.into());
+                }
+                if index == 0 {
+                    return Err(get_text("icbsm_record_one_protected").into());
+                }
+                if !super::user_editor::same_user_edit(live, removed) {
+                    return Err(UserUpdateError::Conflict { field: "removed user".into() }.into());
+                }
+                users.remove(index);
+            }
+            for user in &self.added {
+                let user = user.lock().unwrap().clone();
+                if users.iter().any(|live| live.name == user.name) {
+                    return Err(UserUpdateError::AmbiguousIdentity.into());
+                }
+                users.new_user(user);
+            }
+            Ok(())
+        });
+        match result {
             Ok(_) => {
+                self.added.clear();
+                self.removed.clear();
                 self.has_changes = false;
                 PageMessage::Close
             }
@@ -398,8 +454,8 @@ impl UserList {
             SaveChangesMessage::Close => {
                 self.save_dialog = None;
                 self.has_changes = false;
-                // Restore from backup
-                self.icy_board.lock().unwrap().users = self.backup.clone();
+                self.added.clear();
+                self.removed.clear();
                 Some(PageMessage::Close)
             }
             SaveChangesMessage::Cancel => {
@@ -413,6 +469,10 @@ impl UserList {
 
 impl Page for UserList {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
+        // Refresh saved editor changes without publishing pending list operations.
+        if self.draft_changed.load(Ordering::Acquire) || self.revision != self.icy_board.lock().unwrap().user_revision {
+            self.rebuild_view();
+        }
         let area = area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
 
@@ -499,7 +559,13 @@ impl Page for UserList {
             KeyCode::F(2) if self.has_changes => self.try_save(),
             KeyCode::Enter => {
                 if let Some(index) = self.selected_user() {
-                    PageMessage::OpenSubPage(Box::new(UserEditor::new(self.icy_board.clone(), index)))
+                    let existing = self.users.len() - self.added.len();
+                    let editor = if index >= existing {
+                        UserEditor::for_new_user(self.icy_board.clone(), index, self.added[index - existing].clone(), self.draft_changed.clone())
+                    } else {
+                        UserEditor::from_snapshot(self.icy_board.clone(), index, self.users[index].clone())
+                    };
+                    PageMessage::OpenSubPage(Box::new(editor))
                 } else {
                     PageMessage::None
                 }
@@ -509,9 +575,14 @@ impl Page for UserList {
     }
 }
 
+fn same_identity(left: &User, right: &User) -> bool {
+    left.name == right.name && left.stats.first_date_on == right.stats.first_date_on
+}
+
 #[cfg(test)]
 mod rendering_tests {
     use super::*;
+    use crate::tabs::user_save_tests::Fixture;
     use icy_board_engine::icy_board::user_base::User;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
 
@@ -529,6 +600,184 @@ mod rendering_tests {
 
     fn row_text(buffer: &Buffer, y: u16) -> String {
         (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    fn edit_selected_name(list: &mut UserList, terminal: &mut Terminal<TestBackend>, name: &str) {
+        let old_name = list.users[list.selected_user().unwrap()].name.clone();
+        let PageMessage::OpenSubPage(mut editor) = list.handle_key_press(KeyCode::Enter.into()) else {
+            panic!("selected user must open an editor");
+        };
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        editor.handle_key_press(KeyCode::End.into());
+        for _ in old_name.chars() {
+            editor.handle_key_press(KeyCode::Backspace.into());
+        }
+        for ch in name.chars() {
+            editor.handle_key_press(KeyCode::Char(ch).into());
+        }
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        assert!((0..25).any(|y| row_text(terminal.backend().buffer(), y).contains(name)));
+        assert!(matches!(editor.handle_key_press(KeyCode::Esc.into()), PageMessage::None));
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        editor.handle_key_press(KeyCode::Left.into());
+        assert!(matches!(editor.handle_key_press(KeyCode::Enter.into()), PageMessage::Close));
+    }
+
+    #[test]
+    fn rendered_list_refreshes_saved_private_draft_once_without_publishing_pending_operations() {
+        let fixture = Fixture::new();
+        let before = fixture.snapshot();
+        let revision = fixture.board.lock().unwrap().user_revision;
+        let mut list = UserList::new(fixture.board.clone());
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        list.handle_key_press(KeyCode::Down.into());
+        list.handle_key_press(KeyCode::Delete.into());
+        list.handle_key_press(KeyCode::Insert.into());
+        list.handle_key_press(KeyCode::F(3).into());
+        list.handle_key_press(KeyCode::Char('r').into());
+        list.handle_key_press(KeyCode::Enter.into());
+        list.handle_key_press(KeyCode::F(4).into());
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        assert!(row_text(terminal.backend().buffer(), 4).contains("NewUser3"));
+        let rebuilds = list.rebuild_count;
+
+        edit_selected_name(&mut list, &mut terminal, "Aaron");
+        fixture.assert_unchanged(&before);
+        assert_eq!(fixture.board.lock().unwrap().user_revision, revision);
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        assert!(row_text(terminal.backend().buffer(), 4).contains("Aaron"));
+        assert!(!row_text(terminal.backend().buffer(), 4).contains("NewUser3"));
+        assert_eq!(list.rebuild_count, rebuilds + 1);
+        assert_eq!(list.search, "r");
+        assert!(list.sort == SortOrder::Name);
+        assert_eq!(list.view.len(), 1);
+        assert_eq!(list.added.len(), 1);
+        assert_eq!(list.added[0].lock().unwrap().name, "Aaron");
+        assert_eq!(list.removed.len(), 1);
+        assert_eq!(list.removed[0].name, "Charlie");
+        assert!(list.has_changes);
+        for _ in 0..3 {
+            terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+            assert!(row_text(terminal.backend().buffer(), 4).contains("Aaron"));
+        }
+        assert_eq!(list.rebuild_count, rebuilds + 1, "idle frames must not recopy users");
+        fixture.assert_unchanged(&before);
+
+        list.handle_key_press(KeyCode::F(3).into());
+        list.handle_key_press(KeyCode::Enter.into());
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        for (y, name) in [(4, "Aaron"), (5, "Bob"), (6, "Sysop")] {
+            assert!(row_text(terminal.backend().buffer(), y).contains(name));
+        }
+    }
+
+    #[test]
+    fn rendered_list_refreshes_saved_user_revision_once_and_preserves_pending_operations() {
+        let fixture = Fixture::new();
+        let revision = fixture.board.lock().unwrap().user_revision;
+        let mut list = UserList::new(fixture.board.clone());
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        list.handle_key_press(KeyCode::Down.into());
+        list.handle_key_press(KeyCode::Delete.into());
+        list.handle_key_press(KeyCode::Insert.into());
+        list.handle_key_press(KeyCode::F(4).into());
+        list.handle_key_press(KeyCode::Home.into());
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        assert!(row_text(terminal.backend().buffer(), 4).contains("Bob"));
+        let rebuilds = list.rebuild_count;
+
+        edit_selected_name(&mut list, &mut terminal, "Zelda");
+        assert!(fixture.board.lock().unwrap().user_revision > revision);
+        let persisted = std::fs::read(fixture.dir.join("users.toml")).unwrap();
+        let users = fixture.disk_users();
+        assert_eq!(users.len(), 3);
+        assert_eq!(users[1].name, "Charlie");
+        assert_eq!(users[2].name, "Zelda");
+        for _ in 0..3 {
+            terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+            for (y, name) in [(4, "NewUser3"), (5, "Sysop"), (6, "Zelda")] {
+                assert!(row_text(terminal.backend().buffer(), y).contains(name));
+            }
+        }
+        assert_eq!(list.rebuild_count, rebuilds + 1, "only the revision change must recopy users");
+        assert!(list.sort == SortOrder::Name);
+        assert_eq!(list.added.len(), 1);
+        assert_eq!(list.removed.len(), 1);
+        assert!(list.has_changes);
+        assert_eq!(std::fs::read(fixture.dir.join("users.toml")).unwrap(), persisted);
+    }
+
+    #[test]
+    fn list_save_failure_keeps_insertions_and_removals_private_for_retry() {
+        let fixture = Fixture::new();
+        let mut list = UserList::new(fixture.board.clone());
+        let before = fixture.snapshot();
+        list.table_state.select(Some(1));
+        list.remove();
+        list.insert();
+        fixture.assert_unchanged(&before);
+        {
+            let mut board = fixture.board.lock().unwrap();
+            board.users[0].email = "pending-normalization@example.invalid".into();
+            board.config.paths.user_file = fixture.dir.clone();
+        }
+        let before = fixture.snapshot();
+        assert!(matches!(list.try_save(), PageMessage::InfoBox(InfoState::Error, _)));
+        fixture.assert_unchanged(&before);
+        assert!(list.has_changes);
+        assert_eq!(list.added.len(), 1);
+        assert_eq!(list.removed.len(), 1);
+
+        fixture.board.lock().unwrap().config.paths.user_file = fixture.dir.join("users.toml");
+        assert!(matches!(list.try_save(), PageMessage::Close));
+        let users = fixture.disk_users();
+        assert_eq!(users.len(), 3);
+        assert_eq!(users[1].name, "Bob");
+        assert!(users[2].name.starts_with("NewUser"));
+        assert!(!list.has_changes);
+    }
+
+    #[test]
+    fn list_discard_preserves_other_live_updates() {
+        let mut fixture = Fixture::new();
+        let mut list = UserList::new(fixture.board.clone());
+        list.insert();
+        fixture
+            .board
+            .lock()
+            .unwrap()
+            .edit_users(|users| {
+                users[1].sysop_comment = "another editor".into();
+                Ok(())
+            })
+            .unwrap();
+        fixture.persisted = std::fs::read(fixture.dir.join("users.toml")).unwrap();
+        let before = fixture.snapshot();
+        list.open_save_dialog();
+        assert!(matches!(list.handle_key_press(KeyCode::Enter.into()), PageMessage::Close));
+        fixture.assert_unchanged(&before);
+    }
+
+    #[test]
+    fn list_delete_conflict_does_not_publish_any_other_pending_change() {
+        let mut fixture = Fixture::new();
+        let mut list = UserList::new(fixture.board.clone());
+        list.table_state.select(Some(1));
+        list.remove();
+        list.insert();
+        fixture
+            .board
+            .lock()
+            .unwrap()
+            .edit_users(|users| {
+                users[1].sysop_comment = "updated after deletion was staged".into();
+                Ok(())
+            })
+            .unwrap();
+        fixture.persisted = std::fs::read(fixture.dir.join("users.toml")).unwrap();
+        let before = fixture.snapshot();
+        assert!(matches!(list.try_save(), PageMessage::InfoBox(InfoState::Error, _)));
+        fixture.assert_unchanged(&before);
     }
 
     #[test]

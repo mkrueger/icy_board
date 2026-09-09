@@ -513,9 +513,7 @@ impl RecoveryService {
                 return Ok(false);
             }
             let config = b.config.password_recovery.clone();
-            let previous = b.users[index].clone();
-            let user = &mut b.users[index];
-            normalize_security(user);
+            let user = &b.users[index];
             if user
                 .recovery_issues
                 .iter()
@@ -524,8 +522,7 @@ impl RecoveryService {
                 *outcome = "account cooldown".into();
                 return Ok(false);
             }
-            user.recovery_issues.retain(|t| *t + chrono::Duration::hours(1) > now);
-            if user.recovery_issues.len() >= config.account_per_hour as usize {
+            if user.recovery_issues.iter().filter(|t| **t + chrono::Duration::hours(1) > now).count() >= config.account_per_hour as usize {
                 *outcome = "account hourly limit".into();
                 return Ok(false);
             }
@@ -545,11 +542,11 @@ impl RecoveryService {
                 }
                 issues.push(now);
             }
-            b.users[index].recovery_issues.push(now);
-            if let Err(e) = b.save_userbase() {
-                b.users[index] = previous;
-                return Err(e);
-            }
+            b.edit_users(|users| {
+                users[index].recovery_issues.retain(|t| *t + chrono::Duration::hours(1) > now);
+                users[index].recovery_issues.push(now);
+                Ok(())
+            })?;
             (config, b.users[index].clone(), b.config.board.name.clone(), b.root_path.clone())
         };
         let template = tokio::time::timeout(
@@ -593,12 +590,10 @@ impl RecoveryService {
                 *outcome = "account or configuration changed during request".into();
                 return Ok(false);
             }
-            let previous = b.users[index].clone();
-            b.users[index].recovery = Some(challenge.clone());
-            if let Err(e) = b.save_userbase() {
-                b.users[index] = previous;
-                return Err(e);
-            }
+            b.edit_users(|users| {
+                users[index].recovery = Some(challenge.clone());
+                Ok(())
+            })?;
         }
         // Awaited by the caller: no detached SMTP jobs, retry spool or startup sends.
         let result = tokio::time::timeout(
@@ -620,10 +615,10 @@ impl RecoveryService {
         if matches!(result, Ok(Err(_))) {
             let mut b = board.lock().await;
             if b.users.get(index).and_then(|u| u.recovery.as_ref()).is_some_and(|c| c.id == challenge.id) {
-                let previous = b.users[index].clone();
-                b.users[index].recovery = None;
-                if let Err(e) = b.save_userbase() {
-                    b.users[index] = previous;
+                if let Err(e) = b.edit_users(|users| {
+                    users[index].recovery = None;
+                    Ok(())
+                }) {
                     outcome.push_str("; failed to persist challenge revocation");
                     return Err(e);
                 }
@@ -653,11 +648,10 @@ impl RecoveryService {
             };
             // Reserve an attempt before hashing so parallel nodes share the same finite budget.
             if challenge.is_some() {
-                b.users[index].recovery.as_mut().unwrap().attempts += 1;
-                if let Err(e) = b.save_userbase() {
-                    b.users[index] = user;
-                    return Err(e);
-                }
+                b.edit_users(|users| {
+                    users[index].recovery.as_mut().unwrap().attempts += 1;
+                    Ok(())
+                })?;
             }
             (user, challenge)
         };
@@ -680,12 +674,10 @@ impl RecoveryService {
         }
         if normal {
             if live.recovery.is_some() {
-                let previous = live.clone();
-                b.users[index].recovery = None;
-                if let Err(e) = b.save_userbase() {
-                    b.users[index] = previous;
-                    return Err(e);
-                }
+                b.edit_users(|users| {
+                    users[index].recovery = None;
+                    Ok(())
+                })?;
             }
             return Ok(LoginPassword::Permanent);
         }
@@ -746,15 +738,13 @@ impl RecoveryService {
         {
             return Ok(false);
         }
-        let previous = b.users[proof.index].clone();
         let expire_days = b.config.limits.password_expire_days;
-        b.users[proof.index].password.accept_new_password(password, now, expire_days);
-        b.users[proof.index].recovery = None;
         // One authoritative atomic file replacement publishes both credential and consumption.
-        if let Err(e) = b.save_userbase() {
-            b.users[proof.index] = previous;
-            return Err(e);
-        }
+        b.edit_users(|users| {
+            users[proof.index].password.accept_new_password(password, now, expire_days);
+            users[proof.index].recovery = None;
+            Ok(())
+        })?;
         Ok(true)
     }
 }
@@ -797,12 +787,10 @@ impl super::state::IcyBoardState {
             return Ok(false);
         }
         if live.recovery.is_some() {
-            let previous = live.clone();
-            board.users[index].recovery = None;
-            if let Err(e) = board.save_userbase() {
-                board.users[index] = previous;
-                return Err(e);
-            }
+            board.edit_users(|users| {
+                users[index].recovery = None;
+                Ok(())
+            })?;
         }
         let security = (board.users[index].credential_revision, security_fingerprint(&board.users[index]));
         drop(board);
@@ -1235,19 +1223,55 @@ mod tests {
         let (dir, board, service, capture) = fixture();
         let now = Utc::now();
         let good = board.lock().await.config.paths.user_file.clone();
-        board.lock().await.config.paths.user_file = dir.path().to_path_buf();
+        let persisted = std::fs::read(&good).unwrap();
+        let before = {
+            let mut b = board.lock().await;
+            b.users[0].email = "pending-normalization@example.invalid".into();
+            b.users[1].recovery_issues.push(now - chrono::Duration::hours(2));
+            b.config.paths.user_file = dir.path().to_path_buf();
+            toml::to_string(&b.users).unwrap()
+        };
         assert!(service.issue(&board, 1, now).await.is_err());
         assert!(capture.bodies.lock().unwrap().is_empty());
+        assert_eq!(toml::to_string(&board.lock().await.users).unwrap(), before);
+        assert_eq!(*service.issues.lock().unwrap(), vec![now]);
+        assert_eq!(std::fs::read(&good).unwrap(), persisted);
         board.lock().await.config.paths.user_file = good;
         assert!(service.issue(&board, 1, now).await.unwrap());
         let proof = proof(&service, &board, secret(&capture), now).await;
-        let before = board.lock().await.users[1].clone();
-        board.lock().await.config.paths.user_file = dir.path().to_path_buf();
+        let persisted = std::fs::read(dir.path().join("users.toml")).unwrap();
+        let before = {
+            let mut b = board.lock().await;
+            b.users[0].email = "another-pending-normalization@example.invalid".into();
+            b.config.paths.user_file = dir.path().to_path_buf();
+            toml::to_string(&b.users).unwrap()
+        };
         assert!(service.complete(&board, &proof, "brand-new".into(), now).await.is_err());
         let b = board.lock().await;
-        assert_eq!(security_fingerprint(&before), security_fingerprint(&b.users[1]));
+        assert_eq!(toml::to_string(&b.users).unwrap(), before);
+        assert_eq!(std::fs::read(dir.path().join("users.toml")).unwrap(), persisted);
         assert!(b.users[1].recovery.is_some());
         assert!(b.users[1].password.password.is_valid("old-secret"));
+    }
+
+    #[tokio::test]
+    async fn verification_save_failures_preserve_attempts_challenges_and_other_users() {
+        let (dir, board, service, capture) = fixture();
+        let now = Utc::now();
+        assert!(service.issue(&board, 1, now).await.unwrap());
+        let persisted = std::fs::read(dir.path().join("users.toml")).unwrap();
+        let before = {
+            let mut b = board.lock().await;
+            b.users[0].email = "pending-normalization@example.invalid".into();
+            b.config.paths.user_file = dir.path().to_path_buf();
+            toml::to_string(&b.users).unwrap()
+        };
+        // An expired challenge skips attempt reservation but is still revoked on permanent login.
+        for (candidate, when) in [(secret(&capture), now), ("old-secret".into(), now + chrono::Duration::minutes(30))] {
+            assert!(service.verify(&board, 1, candidate, when).await.is_err());
+            assert_eq!(toml::to_string(&board.lock().await.users).unwrap(), before);
+            assert_eq!(std::fs::read(dir.path().join("users.toml")).unwrap(), persisted);
+        }
     }
 
     #[tokio::test]
