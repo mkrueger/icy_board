@@ -1,0 +1,54 @@
+DECLARE PROCEDURE ChangeBoth(VAR INTEGER firstValue, VAR INTEGER secondValue)
+DECLARE PROCEDURE Move(VAR INTEGER value)
+DECLARE PROCEDURE Assign(VAR INTEGER value)
+DECLARE PROCEDURE CursorChange(VAR INTEGER position, VAR INTEGER value)
+DECLARE PROCEDURE Recurse(VAR INTEGER value, INTEGER depth)
+DECLARE FUNCTION Index() INTEGER
+INTEGER scalar, cursor, visits, data(3)
+PRINTLN "---BEGIN---"
+scalar = 5
+ChangeBoth(scalar, scalar)
+PRINTLN "alias=", scalar
+cursor = 0
+data(0) = 1
+data(1) = 2
+Move(data(cursor))
+PRINTLN "changed_index=", data(0), ":", data(1), ":", cursor
+visits = 0
+Assign(data(Index()))
+PRINTLN "index_calls=", visits, ":", data(0)
+cursor = 0
+CursorChange(cursor, data(cursor))
+PRINTLN "parameter_index=", cursor, ":", data(0), ":", data(2)
+scalar = 0
+Recurse(scalar, 2)
+PRINTLN "recursive_var=", scalar
+PRINTLN "---END---"
+END
+PROCEDURE ChangeBoth(VAR INTEGER firstValue, VAR INTEGER secondValue)
+firstValue = 10
+secondValue = 20
+ENDPROC
+PROCEDURE Move(VAR INTEGER value)
+value = 9
+cursor = 1
+ENDPROC
+PROCEDURE Assign(VAR INTEGER value)
+value = 8
+ENDPROC
+PROCEDURE CursorChange(VAR INTEGER position, VAR INTEGER value)
+position = 2
+value = 7
+ENDPROC
+PROCEDURE Recurse(VAR INTEGER value, INTEGER depth)
+IF (depth > 0) THEN
+Recurse(value, depth - 1)
+value = value + 1
+ELSE
+value = 10
+ENDIF
+ENDPROC
+FUNCTION Index() INTEGER
+visits = visits + 1
+Index = 0
+ENDFUNC

@@ -85,6 +85,12 @@ enum ResolvedLValuePathStep {
     IndexedMember(usize, usize, usize, usize),
 }
 
+pub struct WriteBackTarget {
+    root_id: usize,
+    root_indices: Option<(usize, usize, usize)>,
+    path: Vec<ResolvedLValuePathStep>,
+}
+
 struct ForEachFrame {
     variable: usize,
     collection: VariableValue,
@@ -118,7 +124,7 @@ pub struct VirtualMachine<'a> {
 
     pub return_addresses: Vec<ReturnAddress>,
     pub call_local_value_stack: Vec<VariableValue>,
-    pub write_back_stack: Vec<PPEExpr>,
+    pub write_back_stack: Vec<WriteBackTarget>,
     pub user_types: Vec<Vec<crate::executable::RecordField>>,
 
     pub label_table: HashMap<usize, usize>,
@@ -932,51 +938,64 @@ impl VirtualMachine<'_> {
                     });
                 }
 
-                let mut root_value = self.variable_table.get_value(root_id).clone();
-                let root = &mut root_value;
-                let mut target = if let Some((first, second, third)) = root_indices {
-                    root.get_array_value_mut(first, second, third).ok_or(VMError::InternalVMError)?
-                } else {
-                    root
-                };
-                let mut field_layout = None;
-                for step in resolved_path {
-                    let VariableType::UserData(type_id) = target.vtype else {
-                        return Err(VMError::NoUserTypeBase.into());
-                    };
-                    let GenericVariableData::Record(fields) = &mut target.generic_data else {
-                        return Err(VMError::NoUserTypeBase.into());
-                    };
-                    let fields = Arc::make_mut(fields);
-                    target = match step {
-                        ResolvedLValuePathStep::Member(member_id) => {
-                            field_layout = Some(self.record_field_layout(type_id, member_id)?);
-                            fields.get_mut(member_id).ok_or(VMError::InternalVMError)?
-                        }
-                        ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => {
-                            let field = self.record_field_layout(type_id, member_id)?;
-                            if field.dim == 0 {
-                                return Err(VMError::RecordFieldShapeMismatch.into());
-                            }
-                            field_layout = Some(crate::executable::RecordField::scalar(field.variable_type));
-                            fields
-                                .get_mut(member_id)
-                                .ok_or(VMError::InternalVMError)?
-                                .get_array_value_mut(first, second, third)
-                                .ok_or(VMError::InternalVMError)?
-                        }
-                    };
-                }
-                let field = field_layout.ok_or(VMError::InternalVMError)?;
-                let field_type = field.variable_type;
-                self.check_record_value(field, &value)?;
-                *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
-                self.variable_table.set_value(root_id, root_value);
+                self.set_record_target(
+                    &WriteBackTarget {
+                        root_id,
+                        root_indices,
+                        path: resolved_path,
+                    },
+                    value,
+                )?;
             }
             _ => {
                 return Err(VMError::InternalVMError.into());
             }
         }
+        Ok(())
+    }
+
+    fn set_record_target(&mut self, destination: &WriteBackTarget, value: VariableValue) -> Res<()> {
+        let root_id = destination.root_id;
+        let mut root_value = self.variable_table.get_value(root_id).clone();
+        let root = &mut root_value;
+        let mut target = if let Some((first, second, third)) = destination.root_indices {
+            root.get_array_value_mut(first, second, third).ok_or(VMError::InternalVMError)?
+        } else {
+            root
+        };
+        let mut field_layout = None;
+        for step in &destination.path {
+            let VariableType::UserData(type_id) = target.vtype else {
+                return Err(VMError::NoUserTypeBase.into());
+            };
+            let GenericVariableData::Record(fields) = &mut target.generic_data else {
+                return Err(VMError::NoUserTypeBase.into());
+            };
+            let fields = Arc::make_mut(fields);
+            target = match step {
+                ResolvedLValuePathStep::Member(member_id) => {
+                    field_layout = Some(self.record_field_layout(type_id, *member_id)?);
+                    fields.get_mut(*member_id).ok_or(VMError::InternalVMError)?
+                }
+                ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => {
+                    let field = self.record_field_layout(type_id, *member_id)?;
+                    if field.dim == 0 {
+                        return Err(VMError::RecordFieldShapeMismatch.into());
+                    }
+                    field_layout = Some(crate::executable::RecordField::scalar(field.variable_type));
+                    fields
+                        .get_mut(*member_id)
+                        .ok_or(VMError::InternalVMError)?
+                        .get_array_value_mut(*first, *second, *third)
+                        .ok_or(VMError::InternalVMError)?
+                }
+            };
+        }
+        let field = field_layout.ok_or(VMError::InternalVMError)?;
+        let field_type = field.variable_type;
+        self.check_record_value(field, &value)?;
+        *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
+        self.variable_table.set_value(root_id, root_value);
         Ok(())
     }
 
@@ -1025,15 +1044,24 @@ impl VirtualMachine<'_> {
                             }
                         }
 
-                        // get write back values
-                        let single_pass_value = if pass_flags.count_ones() == 1 {
+                        let legacy_copy_out = self.variable_table.get_version() < 400;
+                        if legacy_copy_out {
+                            for parameter in (0..parameters).rev() {
+                                if 1u16.checked_shl(parameter as u32).is_some_and(|mask| mask & pass_flags != 0) {
+                                    let value = self.call_parameter_value(first + parameter);
+                                    let target = self.write_back_stack.pop().ok_or(VMError::WriteBackStackEmpty)?;
+                                    self.set_write_back_target(&target, value).await?;
+                                }
+                            }
+                        }
+                        let single_pass_value = if !legacy_copy_out && pass_flags.count_ones() == 1 {
                             let parameter = pass_flags.trailing_zeros() as usize;
                             (parameter < parameters).then(|| self.call_parameter_value(first + parameter))
                         } else {
                             None
                         };
                         let mut pass_values = Vec::new();
-                        if pass_flags > 0 && single_pass_value.is_none() {
+                        if !legacy_copy_out && pass_flags > 0 && single_pass_value.is_none() {
                             for i in 0..parameters {
                                 if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let id = first + i;
@@ -1065,18 +1093,18 @@ impl VirtualMachine<'_> {
 
                         if let Some(value) = single_pass_value {
                             if let Some(argument_expr) = self.write_back_stack.pop() {
-                                self.set_variable(&argument_expr, value).await?;
+                                self.set_write_back_target(&argument_expr, value).await?;
                             } else {
                                 return Err(VMError::WriteBackStackEmpty.into());
                             }
-                        } else if pass_flags > 0 {
+                        } else if !legacy_copy_out && pass_flags > 0 {
                             for i in (0..parameters).rev() {
                                 if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let Some(val) = pass_values.pop() else {
                                         return Err(VMError::PassValueStackEmpty.into());
                                     };
                                     if let Some(argument_expr) = self.write_back_stack.pop() {
-                                        self.set_variable(&argument_expr, val).await?;
+                                        self.set_write_back_target(&argument_expr, val).await?;
                                     } else {
                                         return Err(VMError::WriteBackStackEmpty.into());
                                     }

@@ -215,6 +215,35 @@ fn s1_type_not_comparable_publishes_localized_text_and_stable_code() {
     }
 }
 
+#[test]
+fn s3_var_alias_publishes_localized_warning_with_stable_code() {
+    for (locale, expected) in [
+        (
+            "en_US.UTF-8",
+            "VAR arguments 1 and 2 overlap; reverse copy-out writes the earlier parameter last",
+        ),
+        (
+            "de_DE.UTF-8",
+            "VAR-Argumente 1 und 2 überlappen; die umgekehrte Rückschreibreihenfolge schreibt den früheren Parameter zuletzt",
+        ),
+    ] {
+        let mut server = Server::ready_in_locale(locale);
+        let uri = "file:///tmp/s3-var-alias.pps";
+        let source = ";$LANGVERSION 400\nINTEGER number\nChange(number, number)\nPRINT number\nPROCEDURE Change(VAR INTEGER first, VAR INTEGER second)\nfirst = 1\nsecond = 2\nENDPROC\n";
+        server.open(uri, source);
+        let diagnostics = published(&mut server, uri, 1);
+        assert!(of_severity(&diagnostics, 1).is_empty(), "{diagnostics}");
+        let warnings: Vec<_> = of_severity(&diagnostics, 2)
+            .into_iter()
+            .filter(|warning| warning["code"] == "ppl.var-alias")
+            .collect();
+        assert_eq!(warnings.len(), 1, "{diagnostics}");
+        let warning = &warnings[0];
+        assert_eq!(warning["message"].as_str().unwrap().replace(['\u{2068}', '\u{2069}'], ""), expected);
+        assert_eq!(warning["range"], source_range(source, source.find(", number").unwrap() + 2, "number"));
+    }
+}
+
 fn assert_errors(diagnostics: &Value, source: &str, expected: &[(&str, &str)]) {
     let errors = of_severity(diagnostics, 1);
     assert_eq!(errors.len(), expected.len(), "{diagnostics}");

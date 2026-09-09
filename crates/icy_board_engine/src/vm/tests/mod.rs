@@ -57,6 +57,7 @@ mod retired_terminal_api;
 mod routine_parameters;
 mod s1_record_fields;
 mod s2_logical_operators;
+mod s3_var_binding;
 mod scalars;
 mod sound;
 mod static_members;

@@ -33,6 +33,9 @@ pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
 });
 
 pub fn diagnostic_message(error: &(dyn std::error::Error + Send + Sync + 'static), loader: &FluentLanguageLoader) -> String {
+    if let Some(icy_board_ppl::compiler::CompilationWarningType::AliasedVarArguments(first, second)) = error.downcast_ref() {
+        return i18n_embed_fl::fl!(loader, "diagnostic-var-alias", first = first.to_string(), second = second.to_string());
+    }
     match error.downcast_ref::<icy_board_ppl::compiler::CompilationErrorType>() {
         Some(icy_board_ppl::compiler::CompilationErrorType::TypeNotComparable(type_name)) => {
             i18n_embed_fl::fl!(loader, "diagnostic-type-not-comparable", type_name = type_name.as_str())

@@ -266,6 +266,9 @@ pub enum CompilationErrorType {
 
 #[derive(Error, Debug)]
 pub enum CompilationWarningType {
+    #[error("VAR arguments {0} and {1} overlap; reverse copy-out writes the earlier parameter last")]
+    AliasedVarArguments(usize, usize),
+
     #[error("PPL 4.00 array indexing should use '[' and ']' instead of '(' and ')'")]
     ArrayBracketsRequired,
 
@@ -913,7 +916,7 @@ impl PPECompiler {
             HirExpr::PredefinedCall(opcode @ (FuncOpCode::ArrayValueAt | FuncOpCode::ArrayValueAt2 | FuncOpCode::ArrayValueAt3), mut arguments)
                 if !arguments.is_empty() =>
             {
-                // Keep index expressions in the copy-back path; VAR reevaluates them as before.
+                // Preserve the storage path so the VM can bind VAR indices once at call entry.
                 let base = Self::lower_variable_argument(arguments.remove(0));
                 match base {
                     HirExpr::Member(receiver, member) => HirExpr::IndexedMember(receiver, member, arguments),

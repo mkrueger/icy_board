@@ -21,6 +21,7 @@ use crate::{
 mod arrays;
 pub mod call_graph;
 mod checked;
+mod var_aliases;
 pub use checked::CheckedProgram;
 #[cfg(test)]
 mod find_references_tests;
@@ -1515,6 +1516,7 @@ impl SemanticVisitor {
                 }
             }
         }
+        self.check_var_aliases(call_parameters, arguments);
     }
 }
 

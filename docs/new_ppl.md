@@ -1845,7 +1845,8 @@ PRINTLN values[0]
 
 Whole-array assignment copies the value and adopts its bounds when element type
 and rank match, including ordinary variables declared with an initial upper
-bound. Record array fields remain fixed in shape. Explicit dynamic declarations
+bound. Record array fields declared with bounds remain fixed in shape; dynamic
+record fields (`[]`, `[,]`, `[,,]`) may adopt new bounds. Explicit dynamic declarations
 such as `INTEGER values[] = { 1, 2 }` stay dynamic; `{}` initializes an empty
 array. Local dynamic arrays start empty on each routine call and retain separate
 storage across recursive calls. An array function that exits without assigning
@@ -1890,7 +1891,31 @@ copy-in/copy-out, not shared-reference aliasing: arguments are evaluated
 left-to-right, and aliased parameters are written back in reverse parameter
 order. The first parameter therefore wins when the same array variable is
 passed more than once. Array-valued calls, read-only properties and record
-array fields are not writable variable arguments for `VAR`.
+temporaries are not writable variable arguments for `VAR`. Writable record
+field paths are supported: dynamic fields can receive new bounds, whereas
+fixed fields must still satisfy their declared shape at copy-out.
+
+`VAR` targets are bound at their argument's position in the left-to-right
+evaluation order. Indices are evaluated once, not again on return. Changing an
+index variable in a later argument or inside the procedure does not redirect
+copy-out. Record paths keep their selected indices and write into the caller's
+current value, so unrelated fields are not replaced by a stale record snapshot.
+Copy-out still validates the destination; binding a path does not permit
+changing a fixed field's shape or writing through a read-only property.
+
+Language 400 warns when two `VAR` arguments provably overlap, including the
+same variable, equal constant indices, or a whole record/array and one of its
+parts. This is a warning, not a ban. Dynamic indices are not assumed equal;
+absence of a warning is not proof that targets are disjoint. Ordinary value
+parameters do not participate. The editor diagnostic is `ppl.var-alias`.
+
+Classic PPE runtimes below 400 copy out before restoring the routine's saved
+frame, as original PCBoard does. In recursive calls, restoration can therefore
+overwrite an inner `VAR` result targeting that routine's own parameter storage.
+Runtime 400 retains its existing frame-safe rule: restore the caller's frame
+first, then copy out the saved results. This runtime distinction also applies
+to legacy-language source targeting runtime 400. Both use reverse parameter
+order and once-bound indices; neither uses shared-reference parameters.
 
 Whole-array formals carry PPE variable-header flag `0x04`
 (`VARIABLE_FLAG_ARRAY_PARAMETER`), independent of static `0x01` and dynamic
@@ -1904,8 +1929,10 @@ formal such as `INTEGER values(3)` retains rank 1 and upper bound 3 in its
 header, without `0x04`; a scalar actual goes into element zero. Only that
 element is saved/restored and copied back for `VAR`; the tail persists between
 calls and across recursion. These execution rules are derived from PCBoard
-source and covered by nine IcyBoard VM tests, not by an original-runtime run
-of the DECLARE probes. Earlier N1–N4 notes must not be read as requiring legacy
+source and covered by IcyBoard VM tests. Separate S3 original-runtime probes
+now verify indexed target binding, reverse copy-out and recursive parameter
+storage; they are not a runtime execution of all DECLARE probes.
+Earlier N1–N4 notes must not be read as requiring legacy
 headers to be flattened to `dim = 0`.
 
 Below language 400, rank-2/3 implementation formals are rejected at the raw
@@ -1916,9 +1943,12 @@ ordinary multidimensional arrays are unaffected. The
 probes from generated rank-3 parser coverage and source-derived runtime rules.
 
 Existing 4.00 source that declares arrays with parentheses is
-accepted with a migration warning; newly formatted and decompiled 4.00 source
-always writes square brackets. Older language versions retain the classic
-parenthesis syntax.
+accepted with a migration warning. Square brackets are the canonical 4.00
+notation. Formatting preserves authored delimiters, including legacy source;
+it does not guess whether an unresolved `name(...)` is an array or a function.
+Use the editor's array-bracket migration action for diagnosed legacy syntax.
+Decompiler array output uses square brackets for language 400. Older language
+versions retain classic parenthesis syntax.
 
 Everything built in that takes an array first may also be written as a member of
 that array, whichever reads better at the call site. The two spellings are the
@@ -1945,10 +1975,15 @@ compile error. `Redim` is a statement rather than a function, so it stands on a
 line of its own the way `REDIM` does. In language 400 both forms require a
 declared array variable and exactly one bound per declared dimension: they
 change bounds, not rank. Computed arrays and read-only properties cannot be
-redimensioned. Array-valued record fields have the fixed
-bounds stored in their record type and cannot use either spelling of `REDIM`.
+redimensioned. Fixed record array fields cannot use either spelling of `REDIM`;
+dynamic record array fields support both. `REDIM` allocates fresh default
+elements and does not preserve old contents.
 `Len()` reports the element count; after `Redim(20)`, it returns 21 and valid
-indices are 0 through 20. Empty dynamic arrays report zero.
+indices are 0 through 20. `Redim(0)` creates one element, not an empty array.
+Empty dynamic arrays report zero; assign an empty array of matching type and
+rank to clear resizable storage. Bounds, rank and element count are distinct:
+`INTEGER matrix[1, 2]` has rank two and six elements, with dimension counts two
+and three. An empty return preserves its declared rank.
 
 Record array elements can be assigned with square brackets, including nested
 record paths and compound assignments such as `item.rows[0].value += 1`.

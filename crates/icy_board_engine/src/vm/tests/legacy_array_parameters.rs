@@ -177,7 +177,7 @@ ENDPROC
 }
 
 #[tokio::test]
-async fn recursive_var_parameters_restore_outer_zero_before_copyout_and_preserve_tail() {
+async fn recursive_var_parameters_follow_runtime_copyout_order_and_preserve_tail() {
     let source = r#"
 INTEGER value
 Work(value, 2)
@@ -195,7 +195,28 @@ PRINT values(0), ":", values(3), ";"
 ENDPROC
 "#;
     for (language, runtime) in LEGACY_TARGETS {
-        assert_eq!("13:3;23:3;33:3;33|44:5;54:5;54", run_legacy(&compile_legacy(source, language, runtime)).await);
+        let expected = if runtime < 400 {
+            "13:3;13:3;12:3;12|23:5;23:5;23"
+        } else {
+            "13:3;23:3;33:3;33|44:5;54:5;54"
+        };
+        assert_eq!(expected, run_legacy(&compile_legacy(source, language, runtime)).await);
+    }
+}
+
+#[tokio::test]
+async fn s3_original_array_recursion_fixture_matches_runtime_contract() {
+    let source = include_str!("../../../../../compat/var_array_recursion.pps");
+    for (language, runtime) in LEGACY_TARGETS {
+        let trace = if runtime < 400 {
+            "13:3;13:3;12:3;12|23:5;23:5;23"
+        } else {
+            "13:3;23:3;33:3;33|44:5;54:5;54"
+        };
+        assert_eq!(
+            format!("---BEGIN---\nrecursive_array={trace}\n---END---\n"),
+            run_legacy(&compile_legacy(source, language, runtime)).await
+        );
     }
 }
 
@@ -307,7 +328,11 @@ async fn legacy_bytecode_and_vm_supplied_values_save_only_zero_even_with_static_
         // Exercise the synchronous VM-provided argument path on a nested frame.
         vm.prepare_call_with_values(0, 1, 2, vec![VariableValue::new_int(31)]).unwrap();
         vm.variable_table.get_value_mut(2).set_array_value(3, 0, 0, VariableValue::new_int(99)).unwrap();
-        vm.write_back_stack.push(PPEExpr::Value(3));
+        vm.write_back_stack.push(crate::vm::WriteBackTarget {
+            root_id: 3,
+            root_indices: None,
+            path: Vec::new(),
+        });
         vm.return_addresses.push(ReturnAddress::func_call(0, 1));
         vm.execute_statement(&PPECommand::EndProc).await.unwrap();
         assert_eq!(21, vm.variable_table.get_value(2).get_array_value(0, 0, 0).as_int());

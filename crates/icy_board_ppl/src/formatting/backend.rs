@@ -79,7 +79,7 @@ impl FormattingBackend for StringFormattingBackend {
             }
             i -= 1;
         }
-        let str = if self.text[i] == '(' { String::new() } else { " ".to_string() };
+        let str = if matches!(self.text[i], '(' | '[') { String::new() } else { " ".to_string() };
         self.edits.push((i + 1..start, str));
     }
 

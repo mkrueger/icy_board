@@ -1,0 +1,19 @@
+DECLARE PROCEDURE Work(INTEGER depth, VAR INTEGER values)
+INTEGER value
+PRINTLN "---BEGIN---"
+PRINT "recursive_array="
+Work(2, value)
+PRINT value, "|"
+Work(1, value)
+PRINTLN value
+PRINTLN "---END---"
+END
+PROCEDURE Work(INTEGER depth, VAR INTEGER values(3))
+values(0) = values(0) + depth
+values(3) = values(3) + 1
+IF (depth > 0) THEN
+    Work(depth - 1, values(0))
+ENDIF
+values(0) = values(0) + 10
+PRINT values(0), ":", values(3), ";"
+ENDPROC

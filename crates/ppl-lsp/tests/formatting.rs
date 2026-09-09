@@ -112,3 +112,32 @@ fn s2_formatting_preserves_short_circuit_spelling_and_parentheses() {
         assert_eq!(format_as_editor(path, &expected), expected);
     }
 }
+
+#[test]
+fn s3_array_formatting_preserves_rank_and_call_delimiters() {
+    let path = Path::new("s3.pps");
+    let source = ";$LANGVERSION 400\nTYPE Payload\n INTEGER Values[]\n INTEGER Matrix[,]\n INTEGER Cube[,,]\n INTEGER Fixed[2]\nENDTYPE\nPayload item\nINTEGER values[]={}\nINTEGER matrix[,]\nINTEGER cube[,,]\nINTEGER bounded[10]\nvalues=Make()\nitem.Values[0]=values[0]\nmatrix[0,1]=cube[0,1,2]\nPRINTLN bounded.Len(),item.Fixed[0],Read(values)\nFUNCTION Make() INTEGER[]\nENDFUNC\nFUNCTION Read(INTEGER input[]) INTEGER\nRETURN input.Len()\nENDFUNC\n";
+    let formatted = format_as_compiler(path, source);
+    assert_eq!(format_as_editor(path, source), formatted);
+    assert_eq!(format_as_compiler(path, &formatted), formatted);
+    assert_eq!(format_as_editor(path, &formatted), formatted);
+    for text in [
+        "Values[]",
+        "Matrix[,]",
+        "Cube[,,]",
+        "Fixed[2]",
+        "values[]",
+        "Make()",
+        "item.Values[0]",
+        "values[0]",
+        "Read(values)",
+    ] {
+        assert!(formatted.contains(text), "{text}: {formatted}");
+    }
+    for language in [340, 400] {
+        let source = format!(";$LANGVERSION {language}\nINTEGER data(2)\nPRINTLN data(0)\n");
+        let formatted = format_as_compiler(path, &source);
+        assert!(formatted.contains("data(2)") && formatted.contains("data(0)"), "{formatted}");
+        assert_eq!(format_as_editor(path, &source), formatted);
+    }
+}

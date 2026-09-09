@@ -75,7 +75,11 @@ impl<'a> FormattingBackend for VSCodeFormattingBackend<'a> {
             }
             i -= 1;
         }
-        let text = if self.char_at(i) == Some('(') { String::new() } else { " ".to_string() };
+        let text = if matches!(self.char_at(i), Some('(' | '[')) {
+            String::new()
+        } else {
+            " ".to_string()
+        };
         self.push(i + 1..start, text);
     }
 

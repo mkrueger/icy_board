@@ -107,7 +107,7 @@ On-Disk-Kodierung bleibt bis C1 offen; keine provisorische Kodierung veröffentl
 
 Status: Sprach-/Runtime-Umsetzung am 2026-09-09 einzeln freigegeben,
 implementiert und in EN/DE abgenommen. Die neue Dateikodierung bleibt C1/C2
-vorbehalten; S3 ist noch nicht freigegeben.
+vorbehalten; S3 wurde anschließend separat freigegeben.
 
 **Entscheidung:** Keine neuen Schlüsselwörter `ANDALSO`/`ORELSE`. Ab Sprache
 400 schließen `&&`/`||` kurz; `&`/`|` werten weiterhin beide Seiten aus. Vor
@@ -159,19 +159,60 @@ wann nicht. Compileroptimierung, VM, Decompiler, Formatter und LSP stimmen über
 
 ### S3 — Array- und `VAR`-Verträge schärfen
 
-Status: offen; erst nach S2 einzeln besprechen.
+Status: am 2026-09-09 einzeln freigegeben, einschließlich Alias-Warnungen.
+Implementiert und in EN/DE abgenommen. S4 ist nicht freigegeben.
 
-**Besprechen:**
+**Vertrag:** Copy-in/copy-out bleibt erhalten, keine Referenzsemantik.
+Argumente werden links nach rechts eingelesen, VAR-Ziele samt Indizes dabei
+einmal gebunden. Rückschreibung erfolgt in umgekehrter Parameterreihenfolge.
+Bei identischen Zielen gewinnt der erste Parameter. Sprache 400 warnt bei
+statisch nachweisbaren Überlappungen; dynamische Indizes werden nicht geraten.
+Compiler und LSP verwenden dieselbe Prüfung, Editorcode `ppl.var-alias`, EN/DE.
 
-- Copy-in/copy-out und Rückschreibreihenfolge bei Alias-Argumenten.
-- Warnung oder Fehler beim mehrfachen Übergeben desselben beschreibbaren Ziels.
-- Anfangsgröße einer Variablen versus feste Form eines Record-Felds.
-- Bounds versus Elementanzahl, leere Arrays, Rank und Verhalten bei Rückgaben.
-- Kanonische Schreibweise mit `[]`, ohne unnötige Legacy-Brüche.
+**Originalnachweis:** Zwei eigene Fixtures wurden mit PPLC 3.40 und PCBoard
+15.4/M ausgeführt. Fünf skalare/indexierte Fälle bestätigen einmalige Bindung,
+Alias-Reihenfolge und klassische Rekursion; eine Arrayrekursion bestätigt
+persistente Tails und Copy-out vor Frame-Wiederherstellung. Captures:
+`target/s3-legacy-oracle/run-8rr6bh4i`, `run-d_fi7w19`; Live-Dateien unverändert.
+Quellen und Messwerte stehen im [DECLARE-Audit](../compat/DECLARE_AUDIT.md).
+
+**Runtime-Grenze:** Klassische PPE-Runtimes schreiben vor der Frame-Restauration
+zurück, wie das Original. Runtime 400 behält ihre bisherige rekursionsfeste
+Rückgabe nach Wiederherstellung bei, auch für Legacy-Sprachquellen. Die bisherige
+doppelte Indexauswertung war eine Abweichung vom Original und ist überall korrigiert.
+
+**Arrays:** Deklarierte Bounds normaler Variablen und Parameter sind Anfangsgrößen;
+feste Recordfelder behalten ihre Form, dynamische Felder dürfen Bounds ändern.
+Bounds sind nullbasierte Obergrenzen; `Len` zählt Elemente, `REDIM ..., 0` erzeugt
+ein Element. REDIM setzt Inhalte auf Defaults zurück. Leere Werte und Rückgaben
+behalten Elementtyp und Rank 1–3. Rückschreibziele behalten ihre Formprüfung.
+
+**Schreibweise:** `[]` ist kanonisch. Der Formatter erhält bestehende Klammern;
+semantische Migration bleibt eine separate Editoraktion. Ein unerwünschtes
+Leerzeichen nach `[` bei Recordzuweisungen wurde in beiden Backends korrigiert.
+Decompiler-Roundtrips erhalten Arrayrückgaben und VAR-Zielbindung.
 
 **Abnahme:** Rekursion, Alias-Argumente, Resize, leere Rückgaben und feste
 Record-Formen sind durch Compiler-/VM-Tests abgesichert. Dokumentation benutzt
 einheitliche Begriffe; keine unbeschlossene Umstellung auf Referenzsemantik.
+
+**Nachweise 2026-09-09:**
+
+- Sechs Engine-S3-Tests bestehen: Originalfixtures mit Sprach-/Runtime-Zielen
+  und Optimierung, verschachtelte Recordpfade, überlappende Array-/Elementziele,
+  leere Rückgaben und REDIM für Rank 1–3 sowie roher/rekonstruierter Decompiler.
+- Zwei Core-Tests prüfen Alias-Warnungen, einschließlich Konstantindizes,
+  Recordpfaden, Callback-Aufrufen, Wertparametern und der Sprachversionsgrenze.
+- LSP veröffentlicht Warnung, Code und exakten Quellbereich in getrennten
+  EN-/DE-Serverprozessen. Beide Formatter erzeugen identische, idempotente
+  Arraynotation und erhalten echte Funktionsaufrufe sowie Legacy-Klammern.
+- `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine -p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet`:
+  EN und DE jeweils **2863 bestanden, 0 fehlgeschlagen, 6 ignoriert**;
+  gefilterte Kindprozess-Tests nicht doppelt gezählt.
+- All-Targets-Check der fünf Crates und Engine ohne Default-Features mit `-j4`,
+  Formatierungsprüfung der berührten Rust-Dateien und `git diff --check` bestehen.
+- S1/S2-Dateiformatgrenzen bleiben unverändert C1/C2 vorbehalten. S3 führt keine
+  neue PPE-Kodierung ein; gewöhnliche Programme werden gespeichert und geladen.
 
 ### S4 — Eigene Enums und erweiterbare Host-Enums unterscheiden (F3)
 

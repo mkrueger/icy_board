@@ -1391,6 +1391,7 @@ fn diagnostic_details(
         match warning {
             CompilationWarningType::UnusedLabel(_) => "ppl.unused-label",
             CompilationWarningType::ArrayBracketsRequired => "ppl.array-parentheses",
+            CompilationWarningType::AliasedVarArguments(_, _) => "ppl.var-alias",
             _ => return (None, None),
         }
     } else if let Some(error) = error.downcast_ref::<CompilationErrorType>() {

@@ -1,9 +1,9 @@
 use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
-use crate::executable::{PPEExpr, VariableValue, variable_table::VARIABLE_FLAG_ARRAY_PARAMETER};
+use crate::executable::{GenericVariableData, PPEExpr, VariableValue, variable_table::VARIABLE_FLAG_ARRAY_PARAMETER};
 use crate::icy_board::state::ppl_error::{ERR_KIND_STACK, ERR_STACK, PplError};
 
-use super::{ErrorHandler, ReturnAddress, VMError, VirtualMachine};
+use super::{ErrorHandler, LValuePathStep, ResolvedLValuePathStep, ReturnAddress, VMError, VirtualMachine, WriteBackTarget};
 
 impl VirtualMachine<'_> {
     pub(super) fn is_legacy_array_parameter(&self, parameter: usize) -> bool {
@@ -42,16 +42,19 @@ impl VirtualMachine<'_> {
 
     /// The destination parameter header determines whether an argument is an
     /// array value. Routine-reference headers also use dim, but for arity.
-    async fn eval_call_argument(&mut self, parameter: usize, argument: &PPEExpr) -> Res<VariableValue> {
+    fn is_whole_array_parameter(&self, parameter: usize) -> bool {
         let header = &self.variable_table.get_var_entry(parameter).header;
-        if self.variable_table.get_version() >= 400
+        self.variable_table.get_version() >= 400
             && header.dim > 0
             && header.flags & VARIABLE_FLAG_ARRAY_PARAMETER != 0
             && !matches!(
                 header.variable_type,
                 crate::executable::VariableType::Function | crate::executable::VariableType::Procedure
             )
-        {
+    }
+
+    async fn eval_call_argument(&mut self, parameter: usize, argument: &PPEExpr) -> Res<VariableValue> {
+        if self.is_whole_array_parameter(parameter) {
             self.eval_array_operand(argument).await
         } else {
             self.eval_expr(argument).await
@@ -60,35 +63,98 @@ impl VirtualMachine<'_> {
 
     #[allow(clippy::needless_range_loop)]
     pub(super) async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
-        if parameters <= 1 {
-            let value = match (parameters, arguments.first()) {
-                (1, Some(argument)) => Some(self.eval_call_argument(first, argument).await?),
-                _ => None,
-            };
-            self.save_call_frame(locals, parameters, first)?;
-            if let Some(value) = value {
-                self.set_call_parameter(first, value)?;
-                if pass_flags & 1 != 0 {
-                    self.write_back_stack.push(arguments[0].clone());
-                }
-            }
-            return Ok(());
-        }
-
         let mut values = Vec::with_capacity(parameters);
+        let mut targets = Vec::new();
         for (i, argument) in arguments.iter().take(parameters).enumerate() {
-            values.push(self.eval_call_argument(first + i, argument).await?);
+            let value = if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
+                let (target, mut value) = self.resolve_write_back_target(argument).await?;
+                if !self.is_whole_array_parameter(first + i) && value.get_dimensions() > 0 {
+                    value = self.read_array_element(&value, 0, 0, 0)?;
+                }
+                targets.push(target);
+                value
+            } else {
+                self.eval_call_argument(first + i, argument).await?
+            };
+            values.push(value);
         }
         self.save_call_frame(locals, parameters, first)?;
         for (i, value) in values.into_iter().enumerate() {
             let id = first + i;
             self.set_call_parameter(id, value)?;
+        }
+        self.write_back_stack.extend(targets);
+        Ok(())
+    }
 
-            if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
-                self.write_back_stack.push(arguments[i].clone());
+    async fn resolve_write_back_target(&mut self, argument: &PPEExpr) -> Res<(WriteBackTarget, VariableValue)> {
+        let mut root = argument;
+        let mut path = Vec::new();
+        loop {
+            match root {
+                PPEExpr::Member(base, member) => {
+                    path.push(LValuePathStep::Member(*member));
+                    root = base;
+                }
+                PPEExpr::IndexedMember(base, member, indices) => {
+                    path.push(LValuePathStep::IndexedMember(*member, indices));
+                    root = base;
+                }
+                _ => break,
             }
         }
-        Ok(())
+        path.reverse();
+        let (root_id, root_indices) = match root {
+            PPEExpr::Value(id) => (*id, None),
+            PPEExpr::Dim(id, indices) => (*id, Some(self.eval_array_indices(indices).await?)),
+            _ => return Err(VMError::InternalVMError.into()),
+        };
+        let mut value = self.variable_table.get_value(root_id).clone();
+        if let Some((first, second, third)) = root_indices {
+            value = self.read_array_element(&value, first, second, third)?;
+        }
+        let mut resolved = Vec::with_capacity(path.len());
+        for step in path {
+            let GenericVariableData::Record(fields) = &value.generic_data else {
+                return Err(VMError::NoUserTypeBase.into());
+            };
+            match step {
+                LValuePathStep::Member(member) => {
+                    value = fields.get(member).ok_or(VMError::InternalVMError)?.clone();
+                    resolved.push(ResolvedLValuePathStep::Member(member));
+                }
+                LValuePathStep::IndexedMember(member, indices) => {
+                    let field = fields.get(member).ok_or(VMError::InternalVMError)?.clone();
+                    let (first, second, third) = self.eval_array_indices(indices).await?;
+                    value = self.read_array_element(&field, first, second, third)?;
+                    resolved.push(ResolvedLValuePathStep::IndexedMember(member, first, second, third));
+                }
+            }
+        }
+        Ok((
+            WriteBackTarget {
+                root_id,
+                root_indices,
+                path: resolved,
+            },
+            value,
+        ))
+    }
+
+    pub(super) async fn set_write_back_target(&mut self, target: &WriteBackTarget, value: VariableValue) -> Res<()> {
+        if !target.path.is_empty() {
+            return self.set_record_target(target, value);
+        }
+        if let Some((first, second, third)) = target.root_indices {
+            let element_type = self.variable_table.get_var_entry(target.root_id).header.variable_type;
+            let value = self.variable_table.checked_enum_value(element_type, value)?;
+            self.check_nominal_assignment(element_type, value.vtype)?;
+            self.check_record_assignment(element_type, 0, &value)?;
+            self.variable_table.get_value_mut(target.root_id).set_array_value(first, second, third, value)?;
+            Ok(())
+        } else {
+            self.set_variable(&PPEExpr::Value(target.root_id), value).await
+        }
     }
 
     /// The same, for a call the VM makes itself and so has the arguments of already.

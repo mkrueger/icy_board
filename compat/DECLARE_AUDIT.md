@@ -133,12 +133,36 @@ These paths address the first value in formal storage rather than copying the
 entire array. The source is referenced locally, not reproduced here.
 
 [legacy_array_parameters.rs](../crates/icy_board_engine/src/vm/tests/legacy_array_parameters.rs)
-contains **9 IcyBoard VM tests** covering header round-trips, scalar input,
+contains **10 IcyBoard VM tests** covering header round-trips, scalar input,
 persistent tails, value/`VAR` recursion, scalar and indexed copyback, strings,
 and VM-supplied arguments. Its compiled-source matrix additionally includes
 350/350; a constructed-bytecode test checks unmarked parameters on runtime 400,
 the static flag, and that bit `0x04` does not enable modern calls on old
-runtimes. These are IcyBoard execution checks, not original-runtime goldens.
+runtimes. The original nine were IcyBoard execution checks, not original-runtime goldens.
+
+### S3 runtime follow-up (2026-09-09)
+
+Two separate authored probes were compiled by PPLC 3.40 and executed on an
+isolated PCBoard 15.4/M installation. They do not turn the 23 DECLARE compiler
+observations above into runtime observations.
+
+- [var_binding.pps](var_binding.pps) verifies reverse copy-out (`alias=10`),
+  a changed index retaining the original target (`changed_index=9:2:1`),
+  one index-function evaluation (`index_calls=1:8`), a VAR index parameter
+  (`parameter_index=2:7:0`), and recursive scalar VAR (`recursive_var=1`).
+- [var_array_recursion.pps](var_array_recursion.pps) produces
+  `13:3;13:3;12:3;12|23:5;23:5;23`, confirming persistent tails and copy-out
+  before frame restoration. Its array formal is last; the original compiler
+  rejected the initial variant with another formal after the array.
+- Captures: `target/s3-legacy-oracle/run-8rr6bh4i` and
+  `target/s3-legacy-oracle/run-d_fi7w19`. Both runs verified the runtime banner,
+  exited successfully and left live PCB/COMPAT/FOSSIL fingerprints unchanged.
+
+IcyBoard now binds indices once for all runtimes. Classic runtimes copy out
+before frame restoration; runtime 400 retains its existing frame-safe
+copy-out after restoration, including when fed legacy-language source.
+The old recursion test expectation described IcyBoard's prior behavior, not
+PCBoard's, and is now split by runtime with these original observations.
 
 ## Strict contract: source language 400
 
