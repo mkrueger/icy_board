@@ -123,7 +123,6 @@ impl SemanticVisitor {
         }
         if has_enum && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
             let VariableType::UserData(id) = left else { unreachable!() };
-            self.check_enum_binary_value(binary, id);
             if self.runtime < 400 {
                 self.errors.lock().unwrap().report_error(
                     binary.get_op_token().span.clone(),
@@ -944,11 +943,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     );
                 }
                 if let Some(value) = self.enum_constant_value(argument)
-                    && (value.get_type() != VariableType::Integer || !definition.domain.contains(&value.as_int()))
+                    && value.get_type() != VariableType::Integer
                 {
                     self.errors.lock().unwrap().report_error(
                         argument.get_span(),
-                        CompilationErrorType::InvalidEnumValue(value.as_int(), definition.name.to_string()),
+                        CompilationErrorType::ArgumentTypeMismatch(1, "INTEGER".to_string(), self.source_type_name(value.get_type())),
                     );
                 }
             }
@@ -2189,7 +2188,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     .first()
                     .map(|v| v.get_identifier_token().span.clone())
                     .unwrap_or_default(),
-                CompilationErrorType::BuiltinNeedsRuntime("Closed enum storage".to_string(), 400),
+                CompilationErrorType::BuiltinNeedsRuntime("Enum storage".to_string(), 400),
             );
         }
         for v in var_decl.get_variables() {

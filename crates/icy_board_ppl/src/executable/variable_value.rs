@@ -336,7 +336,7 @@ pub enum GenericVariableData {
     /// The fields of a value whose type the program declared with TYPE/ENDTYPE.
     Record(std::sync::Arc<Vec<VariableValue>>),
 
-    /// Closed enum scalar; the payload is its declaration-order default.
+    /// Nominal enum scalar; the payload is its declaration-order default.
     Enum(i32),
 
     /// The object a member expression reads, kept alive by the values that name it.

@@ -92,6 +92,23 @@ mod tests {
     use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
 
     #[test]
+    fn s4_open_enum_help_is_localized_with_independent_loaders() {
+        for (locale, enum_text, regex_text) in [
+            ("en", "An open nominal enum value.", "Open nominal regex options:"),
+            ("de", "Ein offener nominaler Enumwert.", "Offene nominale Regex-Optionen:"),
+        ] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            let help = loader.get("hint-type-enum-400");
+            assert!(help.starts_with(enum_text), "{locale}: {help}");
+            assert!(help.contains(".Has(") && help.contains("`|`") && help.contains("`&`"), "{help}");
+            let help = loader.get("hint-enum-regex-options");
+            assert!(help.starts_with(regex_text), "{locale}: {help}");
+            assert!(help.contains("Regex.Compile") && help.contains("ErrCode.Invalid"), "{help}");
+        }
+    }
+
+    #[test]
     fn s1_type_not_comparable_is_localized_with_independent_loaders() {
         for (locale, expected) in [
             (

@@ -1,4 +1,4 @@
-//! Independent compiler/source-semantic checks for checked enum expressions.
+//! Independent compiler/source-semantic checks for nominal enum expressions.
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -55,7 +55,7 @@ fn diagnostics(body: &str, language: u16, source_semantics: bool) -> Vec<String>
 }
 
 #[test]
-fn constant_cast_operands_with_enum_comparisons_are_checked() {
+fn constant_cast_operands_with_enum_comparisons_accept_unnamed_results() {
     for language in [350, 400] {
         for source_semantics in [false, true] {
             for expression in [
@@ -66,7 +66,7 @@ fn constant_cast_operands_with_enum_comparisons_are_checked() {
                 let body = format!("PRINT {expression}");
                 let errors = diagnostics(&body, language, source_semantics);
                 assert!(
-                    errors.iter().any(|error| error.contains("not a declared member")),
+                    errors.is_empty(),
                     "language={language}, source_semantics={source_semantics}, {body}: {errors:?}"
                 );
             }
@@ -75,23 +75,23 @@ fn constant_cast_operands_with_enum_comparisons_are_checked() {
 }
 
 #[test]
-fn const_casts_reject_dynamic_wrong_type_and_invalid_nested_values() {
+fn const_casts_reject_dynamic_or_wrong_type_values_but_accept_unnamed_values() {
     for language in [350, 400] {
         for source_semantics in [false, true] {
             for body in [
                 "INTEGER number = 1\nCONST Bits Value = Bits(number)",
                 "CONST Bits Value = Bits(Bits.One)",
                 "CONST Bits Value = Bits(1, 2)",
-                "CONST Bits Value = Bits(3) & Bits.One",
-                "CONST BOOLEAN Value = (Bits(3) & Bits.One) = Bits.One",
-                "CONST Bits Value = Bits.One | Bits.Two",
-                "CONST Bits Value = Bits.One & Bits.Two",
-                "CONST Bits Value = (Bits.One | Bits.Two) & Bits.One",
             ] {
                 let errors = diagnostics(body, language, source_semantics);
                 assert!(!errors.is_empty(), "language={language}, source_semantics={source_semantics}, accepted {body}");
             }
             for body in [
+                "CONST Bits Value = Bits(3) & Bits.One",
+                "CONST BOOLEAN Value = (Bits(3) & Bits.One) = Bits.One",
+                "CONST Bits Value = Bits.One | Bits.Two",
+                "CONST Bits Value = Bits.One & Bits.Two",
+                "CONST Bits Value = (Bits.One | Bits.Two) & Bits.One",
                 "CONST Bits Value = Bits(1) | Bits.One\nPRINT Value",
                 "CONST Bits Value = Bits(2) & Bits.Two\nPRINT Value",
                 "CONST BOOLEAN Value = (Bits(1) | Bits.One) = Bits.One\nPRINT Value",

@@ -128,7 +128,7 @@ hint-type-area=A conference message area with access checks and read/search oper
 hint-type-directory=A conference file directory with download access information.
 hint-type-door=A configured external program or game and its access requirement.
 hint-type-contact=One service/account pair from a user's read-only contact list.
-hint-type-enum-400=A closed nominal enum value. Values must belong to the defined numeric domain; the first member is the default. Same-type `|` and `&` return checked enum values; use `==` or `!=` to compare them. Use TOINTEGER(value) and EnumName(integer) for explicit conversion. Enum storage and checked operations require runtime 400.
+hint-type-enum-400=An open nominal enum value. Every INTEGER value is allowed, including unnamed values and flag combinations; the first member is the default. Same-type `|` and `&` return enum values; `.Has(mask)` tests all mask bits. Use `==` or `!=` to compare values, and TOINTEGER(value) or EnumName(integer) to convert explicitly. Different enum types remain distinct. Enum storage and operations require runtime 400.
 hint-member-terminal-info=Read-only capabilities and dimensions negotiated with the caller's terminal.
 hint-member-terminal-palette=Controls the 16 DOS palette entries through xterm-compatible OSC 4 and OSC 104 commands.
 hint-member-terminal-macros=Records and replays the raw byte stream sent to this caller. Slots are local to the session.
@@ -244,7 +244,7 @@ hint-enum-error-code=Portable operation result used by `Error.Code`: success, un
 hint-enum-editor-mode=User preference for the full-screen editor: `Yes`, `No`, or `Ask`.
 hint-enum-msg-field=Message-header field searched by `AREA.Find`: recipient, sender, or subject.
 hint-enum-http-method=HTTP request method accepted by the policy-controlled request builder: GET, HEAD, POST, PUT, DELETE, or PATCH. GET and HEAD cannot carry a body.
-hint-enum-regex-options=Closed regex options: `None`, `IgnoreCase`, `MultiLine`, `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Combine with `|`; test all mask bits with `options.Has(mask)` or `(options & mask) == mask`, and any bits with `(options & mask) != RegexOptions.None`. The valid numeric domain is 0–63; combinations have no additional names.
+hint-enum-regex-options=Open nominal regex options: `None`, `IgnoreCase`, `MultiLine`, `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Combine with `|`; test all mask bits with `options.Has(mask)` or `(options & mask) == mask`, and any bits with `(options & mask) != RegexOptions.None`. Unnamed values and unknown bits are preserved; Regex.Compile currently supports bits 0–5 and rejects unsupported bits with ErrKind.Regex / ErrCode.Invalid.
 hint-enum-has=Returns BOOLEAN: true if all bits in the mask are set. Receiver and mask must have the same enum type and are evaluated once, receiver first. No intermediate enum value is constructed. A zero mask always returns true; use equality with the zero member to test that no bits are set. Available from language 350; requires runtime 400.
 hint-enum-string-comparison=Ordinal Unicode comparison, either case-sensitive or case-insensitive.
 hint-enum-checksum=Algorithm used by `Bytes.GetChecksum`: `CRC32` returns 4 raw bytes in network order, `MD5` 16 bytes and `SHA256` 32 bytes. Call `ToHex()` when text is required.

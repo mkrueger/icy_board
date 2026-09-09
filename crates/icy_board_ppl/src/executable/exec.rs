@@ -79,7 +79,7 @@ pub enum ExecutableError {
     #[error("PPE variable arrays need {0} elements; loading is limited to {1}")]
     ArrayAllocationTooLarge(usize, usize),
 
-    #[error("Invalid closed enum definition for type {0}")]
+    #[error("Invalid enum definition for type {0}")]
     InvalidEnumDefinition(u8),
 
     #[error("Type {type_id} field {field_index} uses a dynamic array or host type; these record layouts have no executable encoding")]

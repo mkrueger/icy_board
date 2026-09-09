@@ -512,10 +512,7 @@ impl Decompiler {
         self.executable.variable_table.try_get_entry(*index).is_some_and(|entry| {
             entry.entry_type == crate::executable::EntryType::Constant
                 && entry.value.get_type() == VariableType::Integer
-                && self
-                    .type_registry
-                    .get_enum_from_id(id)
-                    .is_some_and(|definition| definition.domain.contains(&entry.value.as_int()))
+                && self.type_registry.get_enum_from_id(id).is_some()
         })
     }
 

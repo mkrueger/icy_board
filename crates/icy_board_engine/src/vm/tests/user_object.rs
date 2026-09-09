@@ -231,6 +231,23 @@ PRINT Session.User.EditorMode
     );
 }
 
+#[test]
+fn open_enums_unsupported_editor_modes_leave_user_unchanged() {
+    for number in [-1, 3, 99, i32::MAX] {
+        assert_eq!(
+            "2|1|1",
+            run_ppl(&format!(
+                r#"
+Session.User.EditorMode = EditorMode.Ask
+Session.User.EditorMode = EditorMode({number})
+ERROR result = Error.Last()
+PRINT Session.User.EditorMode, "|", result.Kind = ErrKind.User, "|", result.Code = ErrCode.Invalid
+"#
+            ))
+        );
+    }
+}
+
 /// The board keeps its own tally, so a PPE cannot rewrite what the caller did.
 #[test]
 fn the_board_s_own_accounting_stays_read_only() {

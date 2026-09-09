@@ -1687,7 +1687,7 @@ mod followup_invariants {
                         "array type" => fields[1] = s1_array(VariableValue::new_bool(false), rank, 0),
                         "element type" => *fields[1].get_array_value_mut(2, 2, 2).unwrap() = VariableValue::new_bool(false),
                         "nested fixed shape" => fields[0] = s1_array(VariableValue::new_int(0), 1, 2),
-                        "enum" => fields[2] = VariableValue::new_enum(VariableType::UserData(102), 99, 7),
+                        "enum" => fields[2] = VariableValue::new_enum(VariableType::UserData(99), 99, 7),
                         "nominal" => child.vtype = VariableType::UserData(101),
                         "field count" => {
                             fields.pop();
@@ -1768,7 +1768,7 @@ mod followup_invariants {
                 if let GenericVariableData::Record(fields) = &mut leaf.generic_data {
                     Arc::make_mut(fields)[0] = s1_array(VariableValue::new_int(0), 1, 2);
                 } else {
-                    *leaf = VariableValue::new_enum(VariableType::UserData(102), 99, 7);
+                    *leaf = VariableValue::new_enum(VariableType::UserData(99), 99, 7);
                 }
                 let wrong_empty = VariableValue {
                     vtype: VariableType::Boolean,
@@ -1855,7 +1855,7 @@ mod followup_invariants {
     }
 
     #[tokio::test]
-    async fn foreach_bytecode_checks_rank_nominal_type_and_enum_domain() {
+    async fn foreach_bytecode_checks_rank_nominal_type_and_enum_representation() {
         let mut state = state().await;
         let registry = crate::parser::icy_board_registry();
         let mut io = DiskIO::new(".", None);
@@ -1884,14 +1884,14 @@ mod followup_invariants {
                 "nominal target" => vm.variable_table.get_var_entry_mut(*target).header.variable_type = VariableType::Integer,
                 "invalid enum" => {
                     let element = vm.variable_table.get_value_mut(*source).get_array_value_mut(0, 0, 0).unwrap();
-                    *element = VariableValue::new_enum(element.vtype, 99, 1);
+                    *element = VariableValue::new_string("99".to_string());
                 }
                 _ => unreachable!(),
             }
             let before = vm.variable_table.get_value(*target).clone();
             let error = vm.execute_statement(&command).await.unwrap_err().to_string();
             assert!(
-                error.contains("FOREACH") || error.contains("assign") || error.contains("closed enum"),
+                error.contains("FOREACH") || error.contains("assign") || error.contains("enum type"),
                 "{invalid}: {error}"
             );
             assert_eq!(before, *vm.variable_table.get_value(*target), "{invalid}");

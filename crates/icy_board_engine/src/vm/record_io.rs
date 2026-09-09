@@ -297,10 +297,9 @@ fn decode_binary_value(template: &VariableValue, input: &mut Cursor<&[u8]>, tabl
 }
 
 fn decode_enum_scalar(template: &VariableValue, number: i32, table: &VariableTable) -> Result<VariableValue, String> {
-    // The marker carries only the default, not the domain. Validate every leaf
-    // against PPE metadata while building a new record, before publishing it.
+    // Restore each leaf's nominal type and default before publishing the record.
     if !table.is_enum(template.vtype) {
-        return Err(format!("missing closed enum metadata for {}", template.vtype));
+        return Err(format!("missing enum metadata for {}", template.vtype));
     }
     table
         .checked_enum_value(template.vtype, VariableValue::new_int(number))
@@ -443,24 +442,31 @@ mod tests {
     }
 
     #[test]
-    fn enum_record_decoding_requires_domain_metadata_and_well_formed_leaves() {
+    fn enum_record_decoding_requires_type_metadata_and_well_formed_leaves() {
         let (table, value) = enum_record();
-        for text in ["0", "8", "2147483648", "-2147483649", "1.5", "Shade.First"] {
+        for number in [0i32, 8, i32::MIN, i32::MAX] {
+            let lines = vec![number.to_string()];
+            let decoded = decode_lines(&value, &lines, &table).unwrap();
+            assert_eq!(lines, encode_lines(&decoded, &table).unwrap());
+            let decoded = decode_binary(&value, &number.to_le_bytes(), &table).unwrap();
+            assert_eq!(lines, encode_lines(&decoded, &table).unwrap());
+        }
+        for text in ["2147483648", "-2147483649", "1.5", "Shade.First"] {
             assert!(decode_lines(&value, &[text.to_string()], &table).is_err(), "{text}");
         }
-        for payload in [&[8, 0, 0, 0][..], &[253, 255, 255], &[253, 255, 255, 255, 0]] {
+        for payload in [&[253, 255, 255][..], &[253, 255, 255, 255, 0]] {
             assert!(decode_binary(&value, payload, &table).is_err(), "{payload:?}");
         }
         let missing = VariableTable::default();
         assert!(
             decode_lines(&value, &["-3".to_string()], &missing)
                 .unwrap_err()
-                .contains("missing closed enum metadata")
+                .contains("missing enum metadata")
         );
         assert!(
             decode_binary(&value, &[253, 255, 255, 255], &missing)
                 .unwrap_err()
-                .contains("missing closed enum metadata")
+                .contains("missing enum metadata")
         );
     }
 

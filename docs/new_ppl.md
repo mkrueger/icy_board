@@ -18,7 +18,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Post-test and infinite loops | 350 | any compatible runtime | `REPEAT ... UNTIL`, `LOOP ... ENDLOOP` |
 | Optional parentheses | 350 | any compatible runtime | `IF condition THEN`, `WHILE condition ...` |
 | Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
-| Closed nominal enums | 350 | 400 for storage and checked conversion | `ENUM ... ENDENUM`, scoped members such as `Color.Red`; member constants alone can target classic runtimes |
+| Open nominal enums | 350 | 400 for storage and explicit conversion | `ENUM ... ENDENUM`, scoped members such as `Color.Red`; member constants alone can target classic runtimes |
 | Compile-time modules | 350 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
 | Routine parameters | 400 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
@@ -160,7 +160,7 @@ source written for any language version can carry it.
 
 Most 3.50 syntax lowers to classic PPE instructions: constants, loops,
 initializers, brackets, compound assignments and modules can target an old
-runtime. Enum member constants can too; closed enum storage and checked
+runtime. Enum member constants can too; nominal enum storage and explicit
 conversions require runtime 400, equally for language 350 and 400.
 
 ### Initializers and indexing
@@ -213,11 +213,13 @@ ENDENUM
 Color selected = Color.Green
 ```
 
-Constants are typed compile-time expressions. Enums are closed nominal integer types:
+Constants are typed compile-time expressions. Enums are open nominal integer types:
 members are scoped below the enum name, and two different enum types cannot be
 mixed merely because their stored numbers match. Their first declared member
-is the default, even when its value is not zero. The PPE stores enum domains,
-but not source names; the decompiler synthesizes names for user enums.
+is the default, even when its value is not zero. Every signed 32-bit integer is
+a valid enum value, including unnamed flag combinations. The current PPE stores
+ordered enum metadata, not an allowed-value restriction or source names; the
+decompiler synthesizes names for user enums.
 
 ### Modules and imports
 
@@ -574,8 +576,10 @@ and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `RegexOptions` members are `None`, `IgnoreCase`, `MultiLine`,
 `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Combine them
 with `|` and test them with `&` and `==` (or `!=`). There are only these seven
-names; their numeric domain is 0–63, including unnamed combinations. No separate
-flags type is needed. Matching is Unicode-aware unless `Ascii` is selected.
+names; all combinations of their known bits are supported. Like every enum,
+`RegexOptions` can also store unknown bits, but the regex API currently rejects
+bits outside 0–5 with `ErrKind.Regex` / `ErrCode.Invalid`. No separate flags type
+is needed. Matching is Unicode-aware unless `Ascii` is selected.
 
 ```PPL
 RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.MultiLine
@@ -2037,7 +2041,7 @@ belongs to 3.50.
 ## `ENUM ... ENDENUM` Declaration (3.50)
 
 ### Function
-Defines a closed nominal integer type and its named values.
+Defines an open nominal integer type and its named values.
 
 ### Syntax
 ```PPL
@@ -2058,21 +2062,18 @@ live under the enum name, so `Color.Green` is valid and `Green` alone is not.
 Enums are nominal: different enums and plain integers cannot be assigned to or
 compared with each other. Equality and inequality are supported. `|` and `&`
 perform bitwise integer operations when both operands have the same enum type;
-the result retains that type and must belong to its valid numeric domain.
+the result retains that type, whether or not it has a declared name.
 This is a general enum rule, not an exception for `RegexOptions`. Ordinary
 integer/boolean `|` and `&` keep their existing logical behavior.
 
-For user-declared enums, the domain consists exactly of the declared member
-values. If only `One = 1` and `Two = 2` are declared, both `One | Two` (3)
-and `One & Two` (0) are invalid; declare members for 3 and 0 to permit those
-results. `RegexOptions` instead defines the domain 0–63 independently of its
-seven visible names. Closed means a fixed valid domain, not that every valid
-value must have a name.
+All enums accept every signed 32-bit integer value. If only `One = 1` and
+`Two = 2` are declared, both `One | Two` (3) and `One & Two` (0) are valid.
+There is no separate flags declaration: any enum can be used as a bitmask.
+An explicit `Bits(64)` is valid even if bit 6 has no declared name. Unknown bits
+are preserved, not stripped or mapped to an `Unknown` member.
 
-Known invalid results are compilation errors; dynamic invalid results raise a
-runtime error at the operation, including intermediate results in nested
-expressions, before assignment, printing or comparison. Operands are evaluated
-once, left to right. Compound `|=` and `&=` follow the same domain rule.
+Operands are evaluated once, left to right. Compound `|=` and `&=` retain the
+same nominal type and permit unnamed results, just like ordinary `|` and `&`.
 Arithmetic, unary negation and numeric `FOR` counters remain forbidden. These
 rules apply uniformly from language 350 onward, including built-in enums.
 
@@ -2081,11 +2082,10 @@ same nominal enum type. It tests whether all bits in the mask are present in
 the receiver. Receiver and mask are evaluated once, in that order; the method
 does not modify either value. A zero mask always returns `TRUE`.
 
-Unlike the enum expression `(value & mask) == mask`, `Has` compares the numeric
-bits without constructing an intermediate enum value. Thus, with only members
-`One = 1` and `Two = 2`, `Bits.One.Has(Bits.Two)` safely returns `FALSE` even
-though the intersection 0 is not in the enum's domain. Invalid casts or bitwise
-operations used to compute either operand still fail normally. `Has` is available
+`Has` is equivalent to testing `(value & mask) == mask`, including unnamed
+values and unknown bits. With only members `One = 1` and `Two = 2`,
+`Bits.One.Has(Bits.Two)` returns `FALSE`; `(Bits.One | Bits.Two).Has(Bits.One)`
+returns `TRUE`. Different enum types are not interchangeable. `Has` is available
 from language 350 and requires runtime 400; constant-only calls may also be used
 in `CONST` declarations.
 
@@ -2095,9 +2095,9 @@ variables, array elements, omitted record fields, fresh routine locals and
 function result slots. Array allocation and resizing use the same default.
 Aliases with the same numeric value are permitted.
 
-Use `Color(number)` to explicitly convert an `INTEGER` to `Color`. A known
-invalid constant is a compilation error; a dynamic value outside the declared
-domain raises a runtime error without assigning an invalid value. Use
+Use `Color(number)` to explicitly convert an `INTEGER` to `Color`, preserving
+the number even when no member names it. Non-integer arguments and other enum
+types are rejected; integer assignment to an enum still needs the cast. Use
 `TOINTEGER(color)` in the other direction. Arithmetic must operate on the
 explicit integer representation. Untyped output statements such as `POP` and
 `FREAD` cannot write directly into enums: read into an `INTEGER` temporary and
@@ -2105,17 +2105,32 @@ convert explicitly. Printing enum values continues to show their numeric value.
 
 Typed record I/O supports enum fields (including nested records and arrays):
 text records use decimal integers and binary records use signed little-endian
-32-bit values. `FGetRec` and `FReadRec` validate membership while decoding;
-an invalid field reports a file-format error and leaves the destination record
-unchanged.
+32-bit values. `FGetRec` and `FReadRec` preserve unnamed values and restore
+their nominal type and default. Malformed integers, overflow and truncated
+records still report a file-format error and leave the destination unchanged.
+
+Host enums use exactly the same value rules as user enums. An older program can
+store an unknown event or error value, pass it through arrays, records and
+routines, and handle it in `CASE ELSE`. Accepting a value does not imply API
+support: individual host operations reject unsupported modes, fields, methods
+or option bits with their subsystem error before changing state. For example,
+`RegexOptions(64)` is a valid value, but `Regex.Compile("x", RegexOptions(64))`
+reports `ErrKind.Regex` / `ErrCode.Invalid`. Unknown `MouseMode`, `MouseTracking`
+and `EditorMode` inputs report `Invalid`; unknown `GfxBackend` and `HttpMethod`
+inputs report `Unsupported`. An unsupported graphics init leaves live surfaces
+intact, and an unsupported editor mode leaves the user setting unchanged.
 
 Enum variables, arrays, parameters, function results and record fields retain
-their nominal type in runtime 400 PPEs, along with the ordered numeric domain.
-Storage, checked conversions and checked bitwise operations require runtime 400 even in language 350;
+their nominal type in runtime 400 PPEs, along with ordered member metadata.
+Storage, explicit conversions and bitwise operations require runtime 400 even in language 350;
 enum declarations and member constants alone can still target classic runtimes.
 The decompiler reconstructs user enum declarations with synthetic type/member
-names and preserves defaults and checked conversions. Original names are not
-stored. Recompile older beta PPEs to obtain these closed-enum guarantees.
+names and preserves defaults, unnamed values and explicit conversions. Original
+names are not stored. This replaces the earlier beta's closed-value checks;
+programs must not rely on unknown numeric values causing a VM error. Deploy
+with the updated runtime; earlier beta runtimes can still reject these values.
+The existing metadata layout is unchanged. Stable host identity independent of
+compact file-local type IDs and evolving member lists remains a C1/C2 task.
 
 ## `BEGIN ... END` Block (4.00)
 

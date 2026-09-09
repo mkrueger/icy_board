@@ -1,4 +1,4 @@
-//! Closed enum metadata must survive PPE -> source -> PPE, not just AST printing.
+//! Nominal enum metadata must survive PPE -> source -> PPE, not just AST printing.
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -49,18 +49,11 @@ PRINT "|", a
 }
 
 #[test]
-fn enum_bitwise_roundtrip_preserves_invalid_intermediate_checks() {
+fn enum_bitwise_roundtrip_preserves_unnamed_intermediates() {
     for language in [350, 400] {
         let source = "ENUM Bits\n One = 1\n Two = 2\nENDENUM\nBits a = Bits.One, b = Bits.Two\nPRINT TOINTEGER((a | b) & a)\n";
-        let executable = reload(&compile(source, language));
-        assert!(run(&executable).unwrap_err().contains("not a member of closed enum"));
-        for raw in [false, true] {
-            let (ast, issues) = decompile(executable.clone(), raw, language).unwrap();
-            assert!(issues.is_empty());
-            let text = source_text(&ast, language);
+        for text in roundtrip(compile(source, language), language, "1") {
             assert!(text.contains(" | ") && text.contains(" & "), "{text}");
-            let error = run(&reload(&compile(&text, language))).unwrap_err();
-            assert!(error.contains("not a member of closed enum") && error.ends_with("output="), "{text}: {error}");
         }
     }
 }
@@ -276,18 +269,18 @@ fn checked_casts_and_reverse_conversions_roundtrip() {
 }
 
 #[test]
-fn invalid_dynamic_cast_still_fails_after_recompilation() {
-    let executable = reload(&compile(
-        &format!("{DOMAIN}INTEGER number = 8\nShade value = Shade(number)\nPRINT value\n"),
-        400,
-    ));
-    let original = run(&executable).unwrap_err();
-    assert!(original.contains("not a member of closed enum"), "{original}");
-    for raw in [false, true] {
-        let (ast, _) = decompile(executable.clone(), raw, 400).unwrap();
-        let rebuilt = reload(&compile(&source_text(&ast, 400), 400));
-        let error = run(&rebuilt).unwrap_err();
-        assert!(error.contains("not a member of closed enum"), "{error}");
+fn unnamed_casts_and_constants_survive_recompilation() {
+    for language in [350, 400] {
+        roundtrip(
+            compile(
+                &format!(
+                    "{DOMAIN}INTEGER number = 8\nShade value = Shade(number)\nCONST Shade Unknown = Shade(64)\nPRINT value, \"|\", Unknown, \"|\", value | Unknown, \"|\", value.Has(Shade(0))\n"
+                ),
+                language,
+            ),
+            language,
+            "8|64|72|1",
+        );
     }
 }
 

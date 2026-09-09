@@ -214,24 +214,65 @@ einheitliche Begriffe; keine unbeschlossene Umstellung auf Referenzsemantik.
 - S1/S2-Dateiformatgrenzen bleiben unverändert C1/C2 vorbehalten. S3 führt keine
   neue PPE-Kodierung ein; gewöhnliche Programme werden gespeichert und geladen.
 
-### S4 — Eigene Enums und erweiterbare Host-Enums unterscheiden (F3)
+### S4 — Einheitlich offene nominale Enums (F3)
 
-Status: offen; erst nach S3 einzeln besprechen.
+Status: am 2026-09-09 ausdrücklich freigegeben, umgesetzt und in EN/DE
+validiert. Die frühere Variante mit geschlossenen eigenen
+Enums wurde zugunsten eines einheitlichen Vertrags verworfen.
 
-**Besprechen:**
+**Beschlossener Vertrag:**
 
-- Geschlossene eigene Enums beibehalten oder begründet ändern.
-- Für Host-Enums offene nominale Werte, `Unknown`-Behandlung oder versionierte
-  API-Profile vergleichen; die bloße Existenz eines `Unknown`-Members löst nicht
-  automatisch die Behandlung aller zukünftigen Zahlenwerte.
-- Verhalten unbekannter Event-/Fehlerwerte bei Zuweisung, Vergleich und Fallunterscheidung.
-- Host-Typidentität und dateilokale Typnummern konzeptionell trennen.
+- Eigene und Host-Enums sind ab ihrer Einführung in Sprachversion 350 offen:
+  jeder vorzeichenbehaftete 32-Bit-Integerwert ist zulässig. Benannte Mitglieder
+  sind keine abgeschlossene Wertemenge; das erste Mitglied bleibt der Default.
+- Nominale Typprüfung bleibt erhalten: keine impliziten Integerkonvertierungen,
+  keine Vermischung verschiedener Enumtypen. `EnumName(integer)` und
+  `TOINTEGER(value)` konvertieren ausdrücklich; Arithmetik, unäre numerische
+  Operationen und numerische FOR-Zähler bleiben für Enums verboten.
+- Alle Enums unterstützen `|`, `&`, `|=`, `&=` und `.Has(mask)`. Ein separates
+  Flags-Konzept ist nicht nötig. Unbenannte Kombinationen, Null und unbekannte
+  Bits bleiben erhalten; `.Has(Nullmaske)` ergibt TRUE. Operanden werden einmal
+  von links nach rechts ausgewertet.
+- Unbekannte Werte überstehen Zuweisung, Arrays, Records, Parameter, Ergebnisse,
+  Gleichheitsvergleich und Fallunterscheidung. Record-I/O erhält die Zahlen;
+  fehlerhafte Integer und beschädigte Frames werden weiterhin atomar abgewiesen.
+- Hostoperationen prüfen ihre tatsächlich unterstützten Eingaben vor
+  Seiteneffekten. Unbekannte Regexbits, Stringvergleiche, Checksummen,
+  Nachrichtenfelder, Maus- und Editormodi melden `Invalid`; HTTP-Methoden und
+  Grafik-Backends melden `Unsupported`. Ungültige Grafikinitialisierung und
+  Editormodi erhalten bestehende Ressourcen beziehungsweise Benutzereinstellungen.
+- Keine neue PPE-Kodierung. Die bisherige geordnete Enum-Metadatenliste bleibt
+  erhalten, beschränkt aber nicht mehr den Wertebereich. Alte Beta-Runtimes
+  können unbekannte Werte weiterhin ablehnen: die aktualisierte Runtime ist
+  erforderlich. Der frühere Domainfehler ist kein verlässlicher Kontrollfluss mehr.
 
-**Abnahme:** Ein altes Programm kann mit einer neueren Runtime entsprechend dem
-beschlossenen Vertrag umgehen. Neue Werte führen nicht überraschend vor der
-eigenen Fallback-Behandlung zum Abbruch. Eigene nominale Typen bleiben getrennt.
+**Fokussierte Abnahme:**
 
-Die endgültige Binärrepräsentation dieser Entscheidung wird erst in C1 festgelegt.
+- Mit dem heutigen Katalog kompiliertes und geladenes PPE erhält injizierte
+  zukünftige Event-/Fehlerobjekte. Unbekannte positive und negative Werte erreichen
+  über Host-Properties, Arrays, Records und Routinen unverändert `CASE ELSE`.
+- Eigene Enumkonstanten, Casts, Bitmasken und `.Has(...)` in 350/400; Compiler und
+  direkte LSP-Semantik stimmen überein. Nominale Fehlertests bleiben bestehen.
+- PPE-/Decompiler-/Recompiler-Roundtrips erhalten unbenannte Werte. Optimierte
+  und unoptimierte Ausführung liefern gleiche Werte und Operandenreihenfolge.
+- EN-/DE-Hilfetexte mit unabhängigen Locale-Loadern geprüft. Record-I/O prüft
+  Werterhalt an allen verschachtelten Blättern sowie atomare Formatfehler.
+
+**Gesamtprüfung:**
+
+- `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine -p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet`:
+  EN und DE in getrennten Prozessen jeweils **2871 bestanden, 0 fehlgeschlagen,
+  6 ignoriert**; gefilterte Kindprozess-Tests nicht doppelt gezählt.
+- All-Targets-Check der fünf Crates und Engine ohne Default-Features mit `-j4`
+  bestanden. Formatierungsprüfung, Editor-Diagnosen der produktiven Änderungen
+  und `git diff --check` ohne Befund.
+
+**Offene Dateiformatabnahme:** Host-Typidentität ist ein stabiler API-Vertrag,
+nicht die aktuelle Werteliste oder eine kompakte dateilokale Typnummer. Die
+bisherige Decompiler-Erkennung über ID und Metadatenliste ist noch keine dauerhafte
+Zuordnung. Diese Repräsentation und Tests mit tatsächlich unterschiedlichen
+Katalog-/Typ-ID-Belegungen bleiben C1/C2; F3 ist damit noch nicht vollständig
+geschlossen. S5 wird erst separat besprochen und freigegeben.
 
 ### S5 — Text-, Binär- und Positionsverträge (F1)
 

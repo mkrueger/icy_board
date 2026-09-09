@@ -308,25 +308,6 @@ impl SemanticVisitor {
         )
     }
 
-    fn check_enum_binary_value(&mut self, binary: &crate::ast::BinaryExpression, id: u8) {
-        let left = self.enum_constant_value(binary.get_left_expression());
-        let right = self.enum_constant_value(binary.get_right_expression());
-        if let (Some(left), Some(right)) = (left, right) {
-            let value = if binary.get_op() == crate::ast::BinOp::And {
-                left.as_int() & right.as_int()
-            } else {
-                left.as_int() | right.as_int()
-            };
-            let definition = self.type_registry.get_enum_from_id(id).unwrap();
-            if !definition.domain.contains(&value) {
-                self.errors.lock().unwrap().report_error(
-                    binary.get_op_token().span.clone(),
-                    CompilationErrorType::InvalidEnumValue(value, definition.name.to_string()),
-                );
-            }
-        }
-    }
-
     /// Validate constant enum operators without visiting runtime expressions or
     /// adding intermediate constants to the emitted variable table.
     fn check_constant_enum_operations(&mut self, expr: &Expression) -> bool {
@@ -339,19 +320,7 @@ impl SemanticVisitor {
                 for argument in call.get_arguments() {
                     self.check_constant_enum_operations(argument);
                 }
-                if let Some(VariableType::UserData(id)) = self.declared_constant_type(expr) {
-                    let definition = self.type_registry.get_enum_from_id(id).unwrap();
-                    if let Some(value) = self.enum_constant_value(expr) {
-                        if !definition.domain.contains(&value.as_int()) {
-                            self.errors.lock().unwrap().report_error(
-                                expr.get_span(),
-                                CompilationErrorType::InvalidEnumValue(value.as_int(), definition.name.to_string()),
-                            );
-                        }
-                    }
-                    return true;
-                }
-                false
+                self.declared_constant_type(expr).is_some_and(|kind| self.type_registry.is_enum_type(kind))
             }
             Expression::Unary(value) => {
                 if self.check_constant_enum_operations(value.get_expression()) {
@@ -383,10 +352,6 @@ impl SemanticVisitor {
                             .unwrap()
                             .report_error(expr.get_span(), CompilationErrorType::InvalidEnumOperation);
                     } else if matches!(value.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
-                        let Some(VariableType::UserData(id)) = self.declared_constant_type(value.get_left_expression()) else {
-                            unreachable!()
-                        };
-                        self.check_enum_binary_value(value, id);
                         return true;
                     }
                 }
@@ -1018,19 +983,19 @@ impl SemanticVisitor {
             return;
         }
         if self.type_registry.is_enum_type(result) {
-            self.errors.lock().unwrap().report_error(
-                span.clone(),
-                CompilationErrorType::BuiltinNeedsRuntime("Closed enum signatures".to_string(), 400),
-            );
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(span.clone(), CompilationErrorType::BuiltinNeedsRuntime("Enum signatures".to_string(), 400));
         }
         for parameter in parameters {
             match parameter {
                 ParameterSpecifier::Variable(value) => {
                     if self.type_registry.is_enum_type(value.get_variable_type()) {
-                        self.errors.lock().unwrap().report_error(
-                            span.clone(),
-                            CompilationErrorType::BuiltinNeedsRuntime("Closed enum signatures".to_string(), 400),
-                        );
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(span.clone(), CompilationErrorType::BuiltinNeedsRuntime("Enum signatures".to_string(), 400));
                     }
                 }
                 ParameterSpecifier::Function(value) => self.check_enum_signature_runtime(value.get_parameters(), value.get_return_type(), span.clone()),

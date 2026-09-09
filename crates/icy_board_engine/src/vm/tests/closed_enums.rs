@@ -1,4 +1,4 @@
-//! Closed enum contracts, exercised through serialization and the real VM.
+//! Open nominal enum contracts, exercised through serialization and the real VM.
 use super::{compile, compile_errors, compile_errors_with_runtime, run_ppl};
 use crate::executable::{GenericVariableData, VariableType, VariableValue};
 
@@ -6,6 +6,34 @@ const DOMAIN: &str = "ENUM Shade\n First = 7\n Second = -3\n Alias = 7\nENDENUM\
 
 fn source(language: u16, body: &str) -> String {
     format!(";$LANGVERSION {language}\n{DOMAIN}{body}\n")
+}
+
+#[test]
+fn open_enums_unnamed_constants_casts_and_masks() {
+    for language in [350, 400] {
+        assert_eq!(
+            "3|0|1|1|0|8|-2147483648|2147483647|64",
+            run_ppl(&format!(
+                r#";$LANGVERSION {language}
+ENUM Bits
+ A = 0
+ B = 1
+ C = 2
+ENDENUM
+CONST Bits Combined = Bits.B | Bits.C
+CONST Bits Unknown = Bits(8)
+Bits flags = Combined
+PRINT flags, "|", Bits.B & Bits.C, "|", flags.Has(Bits.B), "|"
+PRINT flags.Has(Bits(0)), "|", flags.Has(Unknown), "|"
+INTEGER number = 8
+flags = Bits(number)
+PRINT flags, "|", TOINTEGER(Bits(-2147483647 - 1)), "|", Bits(2147483647), "|"
+RegexOptions future = RegexOptions(64)
+PRINT future
+"#
+            ))
+        );
+    }
 }
 
 #[test]
@@ -41,7 +69,7 @@ ENDFUNC
 }
 
 #[test]
-fn closed_enums_checked_cast_and_reverse_preserve_domain() {
+fn open_enums_cast_and_reverse_preserve_integer_values() {
     for language in [350, 400] {
         assert_eq!(
             "-3|1|7",
@@ -50,7 +78,12 @@ fn closed_enums_checked_cast_and_reverse_preserve_domain() {
                 "INTEGER number = -3\nShade value = Shade(number)\nPRINT TOINTEGER(value), \"|\", value = Shade.Second, \"|\", TOINTEGER(Shade.Alias)"
             ))
         );
-        for value in ["0", "8", "1.5", "TRUE", "\"7\"", "Shade.First"] {
+        for value in ["0", "8", "-999", "2147483647"] {
+            assert_eq!(value, run_ppl(&source(language, &format!("Shade value = Shade({value})\nPRINT value"))));
+        }
+        assert_eq!("1", run_ppl(&source(language, "PRINT Shade(TRUE)")));
+        assert!(!compile_errors(&source(language, "BOOLEAN flag = TRUE\nPRINT Shade(flag)")).is_empty());
+        for value in ["1.5", "\"7\"", "Shade.First"] {
             let errors = compile_errors(&source(language, &format!("Shade value = Shade({value})\nPRINT value")));
             assert!(!errors.is_empty(), "accepted cast of {value} in {language}");
         }
@@ -58,7 +91,7 @@ fn closed_enums_checked_cast_and_reverse_preserve_domain() {
 }
 
 #[tokio::test]
-async fn closed_enums_invalid_dynamic_cast_does_not_publish_a_value() {
+async fn open_enums_wrong_type_dynamic_cast_does_not_publish_a_value() {
     use crate::{
         executable::{FuncOpCode, PPEExpr},
         icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
@@ -97,9 +130,14 @@ async fn closed_enums_invalid_dynamic_cast_does_not_publish_a_value() {
         FuncOpCode::EnumCast.get_definition(),
         vec![PPEExpr::Value(type_constant), PPEExpr::Value(bad_constant)],
     );
-    assert!(vm.eval_expr(&expr).await.unwrap_err().to_string().contains("not a member of closed enum"));
+    *vm.variable_table.get_value_mut(bad_constant) = VariableValue::new_string("8".to_string());
+    assert!(vm.eval_expr(&expr).await.is_err());
     assert_eq!(7, vm.variable_table.get_value(value_id).as_int());
-    assert!(vm.set_variable(&PPEExpr::Value(value_id), VariableValue::new_int(8)).await.is_err());
+    assert!(
+        vm.set_variable(&PPEExpr::Value(value_id), VariableValue::new_string("8".to_string()))
+            .await
+            .is_err()
+    );
     assert_eq!(7, vm.variable_table.get_value(value_id).as_int());
 }
 
@@ -215,19 +253,25 @@ fn closed_enums_require_runtime400_for_storage_casts_and_signatures() {
 }
 
 #[test]
-fn closed_enums_runtime_write_guard_is_atomic_and_nominal() {
+fn open_enums_runtime_write_guard_is_atomic_and_nominal() {
     let executable = compile(&source(400, "Shade value\nPRINT value"));
     let table = &executable.variable_table;
     let (&id, _) = table.enums.iter().find(|(_, values)| *values == &vec![7, -3, 7]).unwrap();
     let kind = VariableType::UserData(id);
     assert_eq!(7, table.checked_enum_value(kind, VariableValue::new_int(7)).unwrap().as_int());
-    assert!(table.checked_enum_value(kind, VariableValue::new_int(0)).is_err());
+    for number in [0, 8, i32::MIN, i32::MAX] {
+        assert_eq!(number, table.checked_enum_value(kind, VariableValue::new_int(number)).unwrap().as_int());
+    }
     assert!(
         table
             .checked_enum_value(kind, VariableValue::new_enum(VariableType::UserData(id - 1), 7, 7))
             .is_err()
     );
     let array = VariableValue::new_vector(VariableType::Integer, vec![VariableValue::new_int(7), VariableValue::new_int(0)]);
+    let checked = table.checked_enum_value(kind, array).unwrap();
+    assert_eq!(0, checked.get_array_value(1, 0, 0).as_int());
+    let other = VariableValue::new_enum(VariableType::UserData(id - 1), 0, 0);
+    let array = VariableValue::new_vector(kind, vec![VariableValue::new_enum(kind, 7, 7), other]);
     assert!(table.checked_enum_value(kind, array).is_err());
     let value = table.checked_enum_value(kind, VariableValue::new_int(-3)).unwrap().emptied();
     assert_eq!(7, value.as_int());
@@ -292,7 +336,7 @@ FCLOSE 1
 }
 
 #[test]
-fn closed_enums_record_reads_reject_each_invalid_leaf_atomically() {
+fn open_enums_record_reads_preserve_each_unnamed_leaf() {
     // Paint is 16 signed 32-bit leaves: Serial, Tone, 2+4+8 array elements.
     let paint: Vec<i32> = std::iter::once(99).chain(std::iter::repeat_n(-3, 15)).collect();
     for (read, binary) in [("FGETREC", false), ("FREADREC", true)] {
@@ -321,14 +365,23 @@ value.Serial = 42
 {record_type} before = value
 FOPEN 1, "bad.dat", O_RD, S_DN
 {read} 1, value
-PRINT value = before, "|", value.Serial = 42, "|", FERR(1), "|"
-PRINT Error.Last().Kind = ErrKind.File, "|", Error.Last().Code = ErrCode.Format, "|"
-PRINT INSTR(Error.Last().Message, "not a member of closed enum") > 0
+PRINT value = before, "|", value.Serial, "|", before.Serial, "|", FERR(1), "|"
+FCLOSE 1
+FCREATE 1, "copy.dat", O_WR, S_DN
+FPUTREC 1, value
+FCLOSE 1
+FOPEN 1, "copy.dat", O_RD, S_DN
+STRING line
+INTEGER index
+FOR index = 0 TO {bad_leaf}
+ FGET 1, line
+NEXT
+PRINT line
 FCLOSE 1
 "#
                 );
                 assert_eq!(
-                    "1|1|1|1|1|1",
+                    "0|99|42|0|8",
                     super::run_ppl_with_files(&source(400, &body), &[("bad.dat", &bytes)]),
                     "{read}, {record_type}, leaf {bad_leaf}"
                 );
@@ -447,7 +500,9 @@ fn closed_enums_empty_declarations_and_constant_operations_are_checked() {
         ] {
             let errors = compile_errors(&source(language, &format!("CONST INTEGER Bad = {expression}\nPRINT Bad")));
             assert!(
-                errors.iter().any(|error| error.to_lowercase().contains("enum")),
+                errors
+                    .iter()
+                    .any(|error| error.to_lowercase().contains("enum") || error.contains("Can't assign Shade to Integer")),
                 "{language}, {expression}: {errors:?}"
             );
         }

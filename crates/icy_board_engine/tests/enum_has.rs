@@ -227,12 +227,6 @@ fn invalid_arguments_and_receivers_are_rejected_in_compiler_and_source_semantics
                 "Bits items(1)\nPRINT items.Has(Bits.One)",
                 "Bits items(1)\nPRINT Bits.One.Has(items)",
                 "TYPE Boxed\n Bits Items(1)\nENDTYPE\nBoxed box\nPRINT box.Items.Has(Bits.One)",
-                "PRINT Bits(0).Has(Bits.One)",
-                "PRINT Bits.One.Has(Bits(0))",
-                "PRINT (Bits.One & Bits.Two).Has(Bits.One)",
-                "PRINT Bits.One.Has(Bits.One & Bits.Two)",
-                "CONST BOOLEAN Bad = Bits(0).Has(Bits.One)",
-                "CONST BOOLEAN Bad = Bits.One.Has(Bits(0))",
                 "ENUM Other\n One = 1\nENDENUM\nPRINT Bits.One.Has(Other.One)",
             ] {
                 let source = format!("{SPARSE}{body}\n");
@@ -246,9 +240,21 @@ fn invalid_arguments_and_receivers_are_rejected_in_compiler_and_source_semantics
 }
 
 #[test]
-fn invalid_dynamic_operand_casts_still_fail() {
+fn unnamed_constant_and_dynamic_masks_use_all_bits() {
     for language in [350, 400] {
-        for expression in ["Bits(n).Has(Bits.One)", "Bits.One.Has(Bits(n))", "(a & b).Has(a)", "a.Has(a & b)"] {
+        for (expression, expected) in [
+            ("Bits(n).Has(Bits.One)", "0"),
+            ("Bits.One.Has(Bits(n))", "1"),
+            ("(a & b).Has(a)", "0"),
+            ("a.Has(a & b)", "1"),
+            ("Bits(0).Has(Bits.One)", "0"),
+            ("Bits.One.Has(Bits(0))", "1"),
+            ("(Bits.One & Bits.Two).Has(Bits.One)", "0"),
+            ("Bits.One.Has(Bits.One & Bits.Two)", "1"),
+            ("Bits(64).Has(Bits(64))", "1"),
+            ("Bits(-1).Has(Bits(64))", "1"),
+            ("Bits.One.Has(Bits(64))", "0"),
+        ] {
             let executable = compile(
                 &format!("{SPARSE}INTEGER n = 0\nBits a = Bits.One, b = Bits.Two\nPRINT {expression}\n"),
                 language,
@@ -256,11 +262,12 @@ fn invalid_dynamic_operand_casts_still_fail() {
                 false,
             )
             .unwrap();
-            let error = run(&executable).unwrap_err();
-            assert!(
-                error.contains("not a member of closed enum") && error.ends_with("output="),
-                "{expression}: {error}"
-            );
+            assert_eq!(expected, run(&executable).unwrap(), "{expression}");
+            let source =
+                format!("{SPARSE}CONST INTEGER n = 0\nCONST Bits a = Bits.One\nCONST Bits b = Bits.Two\nCONST BOOLEAN Result = {expression}\nPRINT Result\n");
+            compile(&source, language, 400, true).unwrap();
+            let executable = compile(&source, language, 400, false).unwrap();
+            assert_eq!(expected, run(&executable).unwrap(), "{source}");
         }
     }
 }

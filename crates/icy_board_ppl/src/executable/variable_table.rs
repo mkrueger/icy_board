@@ -494,14 +494,14 @@ pub struct VariableTable {
     version: u16,
     entries: Vec<TableEntry>,
     has_user_vars: bool,
-    /// Closed integer domains, in declaration order (the first value is the default).
+    /// Known integer values, in declaration order (the first value is the default).
     pub enums: std::collections::BTreeMap<u8, Vec<i32>>,
     /// Rebuilt from layouts by `fill_in_records`; never serialized. Check before record I/O.
     pub record_io_unsupported_types: std::collections::BTreeSet<u8>,
 }
 
 impl VariableTable {
-    /// Legacy array reads outside the bounds yield an empty value. For a closed
+    /// Legacy array reads outside the bounds yield an empty value. For an
     /// enum that value must be its first member, never an untyped numeric zero.
     pub fn array_value(&self, array: &VariableValue, first: usize, second: usize, third: usize) -> VariableValue {
         if let VariableType::UserData(id) = array.vtype
@@ -518,7 +518,7 @@ impl VariableTable {
         array.get_array_value(first, second, third)
     }
 
-    /// Check a domain at the write boundary before publishing any part of a value.
+    /// Check the nominal type before publishing any part of a value.
     pub fn checked_enum_value(&self, expected: VariableType, value: VariableValue) -> Res<VariableValue> {
         let VariableType::UserData(id) = expected else {
             return Ok(value);
@@ -567,9 +567,6 @@ impl VariableTable {
             )),
             GenericVariableData::None | GenericVariableData::Enum(_) => {
                 let number = unsafe { value.data.int_value };
-                if !members.contains(&number) {
-                    return Err(super::VMError::InvalidEnumValue(id, number.to_string()).into());
-                }
                 return Ok(VariableValue::new_enum(expected, number, default));
             }
             _ => return Err(super::VMError::InvalidEnumValue(id, "non-integer value".to_string()).into()),

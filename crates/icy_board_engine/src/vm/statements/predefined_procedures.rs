@@ -4512,6 +4512,14 @@ pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Asci
         let requested = arguments
             .first()
             .map_or(crate::icy_board::state::ppl_graphics::GFX_BACKEND_AUTO, VariableValue::as_int);
+        if !matches!(requested, 0 | 2 | 3) {
+            vm.set_error(PplError::new(
+                ERR_KIND_GFX,
+                crate::icy_board::state::ppl_error::ERR_UNSUPPORTED,
+                "unsupported GfxBackend value",
+            ));
+            return Ok(VariableValue::new_bool(false));
+        }
         let fullscreen = arguments.get(1).is_none_or(VariableValue::as_bool);
         gfx_init(vm, requested, fullscreen).await?;
         return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));

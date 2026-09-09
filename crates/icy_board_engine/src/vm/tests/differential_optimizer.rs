@@ -157,6 +157,38 @@ fn assert_equivalent(source: &str) -> ExecutionSnapshot {
 }
 
 #[test]
+fn s4_open_enums_optimization_preserves_unnamed_values_and_operand_order() {
+    for language in [350, 400] {
+        let snapshot = assert_equivalent(&format!(
+            r#";$LANGVERSION {language}
+ENUM Bits
+ One = 1
+ Two = 2
+ENDENUM
+CONST Bits Mask = Bits.One | Bits.Two
+INTEGER calls = 0
+Bits result = LeftValue() | RightValue()
+result |= Bits(64)
+PRINT result, "|", result.Has(Mask), "|", result.Has(Bits(0)), "|", calls, "|"
+PRINT (Bits.One & Bits.Two) = Bits(0), "|", TOINTEGER(Bits(-1))
+FUNCTION LeftValue() Bits
+ calls = calls + 1
+ PRINT "L"
+ RETURN Bits.One
+ENDFUNC
+FUNCTION RightValue() Bits
+ calls = calls + 1
+ PRINT "R"
+ RETURN Bits.Two
+ENDFUNC
+"#
+        ));
+        assert_eq!(Ok(()), snapshot.result);
+        assert_eq!(b"LR67|1|1|2|1|-1", snapshot.output.as_slice());
+    }
+}
+
+#[test]
 fn generated_arithmetic_and_branches_are_equivalent() {
     for left in -3..=3 {
         for right in -3..=3 {

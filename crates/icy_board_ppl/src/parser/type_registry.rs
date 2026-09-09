@@ -13,13 +13,13 @@ pub struct UserTypeDefinition {
     pub fields: Vec<(unicase::Ascii<String>, RecordField)>,
 }
 
-/// A closed, nominal integer domain. The first declared member is its default.
+/// An open, nominal integer type. The first declared member is its default.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDefinition {
     pub id: u8,
     pub name: unicase::Ascii<String>,
     pub variants: Vec<(unicase::Ascii<String>, i32)>,
-    /// Ordered valid numeric values, independently of the visible member names.
+    /// Ordered known numeric values retained for the existing PPE metadata.
     /// The first value is the default; user declarations retain aliases/order.
     pub domain: Vec<i32>,
 }
@@ -390,7 +390,7 @@ impl UserTypeRegistry {
         self.register_enum(CHECKSUM_ENUM_ID, "Checksum", &[("CRC32", 0), ("MD5", 1), ("SHA256", 2)]);
     }
 
-    /// Configure a builtin domain without inventing additional member names.
+    /// Retain the existing builtin metadata without inventing member names.
     fn set_enum_domain(&self, id: u8, domain: Vec<i32>) {
         let mut enums = self.enums.write().unwrap();
         let definition = enums.iter_mut().find(|definition| definition.id == id).expect("registered enum");

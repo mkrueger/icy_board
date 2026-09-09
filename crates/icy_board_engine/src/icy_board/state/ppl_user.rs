@@ -347,6 +347,8 @@ impl UserDataValue for PplUser {
             Some("PageLength must be between 0 and 65535")
         } else if (*name == *SECURITY_LEVEL || *name == *EXPIRED_SECURITY_LEVEL) && u8::try_from(number).is_err() {
             Some("security levels must be between 0 and 255")
+        } else if *name == *EDITOR_MODE && !(0..=2).contains(&number) {
+            Some("unsupported EditorMode value")
         } else {
             None
         };

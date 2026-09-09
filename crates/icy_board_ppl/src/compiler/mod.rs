@@ -140,11 +140,8 @@ pub enum CompilationErrorType {
     #[error("Can't compare {0} with {1}")]
     EnumComparisonTypeMismatch(String, String),
 
-    #[error("Closed enums do not support arithmetic, unary operators or numeric FOR counters; convert explicitly with TOINTEGER first")]
+    #[error("Enums do not support arithmetic, unary operators or numeric FOR counters; convert explicitly with TOINTEGER first")]
     InvalidEnumOperation,
-
-    #[error("{0} is not a declared member of enum {1}")]
-    InvalidEnumValue(i32, String),
 
     #[error("{0} cannot write an enum through an untyped VAR output; use an INTEGER temporary and an explicit checked enum conversion")]
     EnumUntypedOutput(String),
@@ -849,7 +846,7 @@ impl PPECompiler {
         if needs_enums {
             if self.runtime < 400 {
                 return Err(CompilationErrorType::BuiltinNeedsRuntime(
-                    "Closed enum storage and checked conversions".to_string(),
+                    "Enum storage and explicit conversions".to_string(),
                     400,
                 ));
             }

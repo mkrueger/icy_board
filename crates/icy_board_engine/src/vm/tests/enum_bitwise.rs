@@ -5,15 +5,15 @@ const SPARSE: &str = "ENUM Bits\n One = 1\n Two = 2\nENDENUM\n";
 const COMPOSITE: &str = "ENUM Bits\n Both = 3\n One = 1\n Two = 2\n Zero = 0\n Alias = 3\nENDENUM\n";
 
 #[test]
-fn enum_bitwise_fatal_errors_with_onerror_preserve_assignment_targets() {
-    for statement in [
-        "a = a | b",
-        "a |= b",
-        "a &= b",
-        "items(0) |= b",
-        "items(0) &= b",
-        "box.Value |= b",
-        "box.Value &= b",
+fn enum_bitwise_unnamed_results_update_assignment_targets() {
+    for (statement, expected) in [
+        ("a = a | b", "3|1|1"),
+        ("a |= b", "3|1|1"),
+        ("a &= b", "0|1|1"),
+        ("items(0) |= b", "1|3|1"),
+        ("items(0) &= b", "1|0|1"),
+        ("box.Value |= b", "1|1|3"),
+        ("box.Value &= b", "1|1|0"),
     ] {
         let body = format!(
             r#"
@@ -25,54 +25,26 @@ Bits items(1)
 Boxed box
 ONERROR GOTO Failed
 {statement}
-PRINT "escaped"
+PRINT a, "|", items(0), "|", box.Value
 EXIT
 :Failed
-PRINT a, "|", items(0), "|", box.Value, "|", Error.Last().OK
+PRINT "unexpected error"
 "#
         );
-        // Domain violations are fatal VM errors, not recoverable subsystem
-        // errors. Even an armed ONERROR must not let a fallback value escape.
-        let error = checked_run_inspecting(&source(400, SPARSE, &body), |table| {
-            use crate::executable::GenericVariableData;
-            // PPE serialization replaces source names, so inspect storage by
-            // shape; entry kinds are also inferred only by the decompiler.
-            // The only enum scalars are a=1 and b=2, in that order.
-            let variables = table.get_entries();
-            let scalars: Vec<_> = variables
-                .iter()
-                .filter(|entry| matches!(entry.value.generic_data, GenericVariableData::Enum(_)))
-                .map(|entry| entry.value.as_int())
-                .collect();
-            assert_eq!(vec![1, 2], scalars, "{statement}");
-            let items = variables
-                .iter()
-                .find(|entry| matches!(entry.value.generic_data, GenericVariableData::Dim1(_)))
-                .unwrap();
-            assert_eq!(1, items.value.get_array_value(0, 0, 0).as_int(), "{statement}");
-            let fields = variables
-                .iter()
-                .find_map(|entry| match &entry.value.generic_data {
-                    GenericVariableData::Record(fields) => Some(fields),
-                    _ => None,
-                })
-                .unwrap();
-            assert_eq!(1, fields[0].as_int(), "{statement}");
-        })
-        .unwrap_err();
-        assert!(
-            error.contains("not a member of closed enum") && error.ends_with("output="),
-            "{statement}: {error}"
-        );
+        assert_eq!(expected, checked_run(&source(400, SPARSE, &body)).unwrap(), "{statement}");
     }
 }
 
 #[test]
-fn enum_bitwise_evaluated_boolean_and_arithmetic_identities_keep_checks() {
-    for expression in ["FALSE & ((a | b) = a)", "TRUE | ((a & b) = a)", "0 * TOINTEGER(a | b)", "TOINTEGER(a & b) * 0"] {
+fn enum_bitwise_evaluated_boolean_and_arithmetic_identities_accept_unnamed_values() {
+    for (expression, expected) in [
+        ("FALSE & ((a | b) = a)", "0"),
+        ("TRUE | ((a & b) = a)", "1"),
+        ("0 * TOINTEGER(a | b)", "0"),
+        ("TOINTEGER(a & b) * 0", "0"),
+    ] {
         let body = format!("Bits a = Bits.One, b = Bits.Two\nPRINT {expression}");
-        let error = checked_run(&source(400, SPARSE, &body)).unwrap_err();
-        assert!(error.contains("not a member of closed enum"), "{expression}: {error}");
+        assert_eq!(expected, checked_run(&source(400, SPARSE, &body)).unwrap(), "{expression}");
     }
 }
 
@@ -104,24 +76,23 @@ PRINT Bits.One | Bits.Two, "|", Bits.Both = (a | b), "|", a <> b, "|", 2 | 4, "|
 }
 
 #[test]
-fn enum_bitwise_known_invalid_results_are_errors_in_every_context() {
+fn enum_bitwise_unnamed_constants_are_valid_but_wrong_types_are_errors() {
     for language in [350, 400] {
-        for expression in [
-            "Bits.One | Bits.Two",
-            "Bits.One & Bits.Two",
-            "(Bits.One | Bits.Two) & Bits.One",
-            "Bits(1) | Bits(2)",
+        for (expression, number) in [
+            ("Bits.One | Bits.Two", "3"),
+            ("Bits.One & Bits.Two", "0"),
+            ("(Bits.One | Bits.Two) & Bits.One", "1"),
+            ("Bits(1) | Bits(2)", "3"),
         ] {
-            for body in [
-                format!("PRINT {expression}"),
-                format!("PRINT TOINTEGER({expression})"),
-                format!("PRINT ({expression}) = Bits.One"),
-                format!("IF (({expression}) = Bits.One) PRINT 1"),
-                format!("CONST Bits Bad = {expression}\nPRINT Bad"),
-                format!("Bits bad = {expression}\nPRINT bad"),
+            for (body, expected) in [
+                (format!("PRINT {expression}"), number),
+                (format!("PRINT TOINTEGER({expression})"), number),
+                (format!("PRINT ({expression}) = Bits.One"), if number == "1" { "1" } else { "0" }),
+                (format!("IF (({expression}) = Bits.One) PRINT 1"), if number == "1" { "1" } else { "" }),
+                (format!("CONST Bits Combined = {expression}\nPRINT Combined"), number),
+                (format!("Bits combined = {expression}\nPRINT combined"), number),
             ] {
-                let errors = compile_errors(&source(language, SPARSE, &body));
-                assert!(errors.iter().any(|e| e.contains("not a declared member")), "{language}: {body}: {errors:?}");
+                assert_eq!(expected, run_ppl(&source(language, SPARSE, &body)), "{language}: {body}");
             }
         }
         for expression in [
@@ -139,7 +110,7 @@ fn enum_bitwise_known_invalid_results_are_errors_in_every_context() {
             assert!(!compile_errors(&source(language, COMPOSITE, &body)).is_empty(), "{language}: {body}");
         }
         let aliases = "CONST Bits A = Bits.One\nCONST Bits B = A\nCONST Bits Bad = (B | Bits.Two) & A\nPRINT Bad";
-        assert!(!compile_errors(&source(language, SPARSE, aliases)).is_empty());
+        assert_eq!("1", run_ppl(&source(language, SPARSE, aliases)));
     }
 }
 
@@ -201,24 +172,20 @@ fn checked_run_inspecting(source: &str, inspect: impl FnOnce(&crate::executable:
 }
 
 #[test]
-fn enum_bitwise_dynamic_invalid_results_cannot_escape_or_be_masked() {
+fn enum_bitwise_dynamic_unnamed_results_can_be_passed_returned_and_masked() {
     for language in [350, 400] {
-        for expression in ["a | b", "a & b", "(a | b) & a", "(a & b) | a"] {
-            for statement in [
-                format!("PRINT {expression}"),
-                format!("PRINT TOINTEGER({expression})"),
-                format!("PRINT ({expression}) = a"),
-                format!("IF (({expression}) = a) PRINT 99"),
-                format!("a = {expression}"),
-                format!("Use({expression})\nPROCEDURE Use(Bits value)\nPRINT value\nENDPROC"),
-                format!("PRINT Result()\nFUNCTION Result() Bits\nRETURN {expression}\nENDFUNC"),
+        for (expression, number) in [("a | b", "3"), ("a & b", "0"), ("(a | b) & a", "1"), ("(a & b) | a", "1")] {
+            for (statement, expected) in [
+                (format!("PRINT {expression}"), number),
+                (format!("PRINT TOINTEGER({expression})"), number),
+                (format!("PRINT ({expression}) = a"), if number == "1" { "1" } else { "0" }),
+                (format!("IF (({expression}) = a) PRINT 99"), if number == "1" { "99" } else { "" }),
+                (format!("a = {expression}\nPRINT a"), number),
+                (format!("Use({expression})\nPROCEDURE Use(Bits value)\nPRINT value\nENDPROC"), number),
+                (format!("PRINT Result()\nFUNCTION Result() Bits\nRETURN {expression}\nENDFUNC"), number),
             ] {
                 let body = format!("Bits a = Bits.One, b = Bits.Two\n{statement}");
-                let error = checked_run(&source(language, SPARSE, &body)).unwrap_err();
-                assert!(
-                    error.contains("not a member of closed enum") && error.ends_with("output="),
-                    "{language}: {body}: {error}"
-                );
+                assert_eq!(expected, checked_run(&source(language, SPARSE, &body)).unwrap(), "{language}: {body}");
             }
         }
     }
@@ -345,7 +312,7 @@ fn enum_bitwise_regex_has_seven_names_full_domain_and_correct_bits() {
         executable
             .variable_table
             .checked_enum_value(VariableType::UserData(REGEX_OPTIONS_ENUM_ID), crate::executable::VariableValue::new_int(64))
-            .is_err()
+            .is_ok()
     );
     for language in [350, 400] {
         let program = r#"

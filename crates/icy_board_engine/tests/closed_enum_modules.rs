@@ -35,14 +35,18 @@ fn enum_bitwise_module_aliases_constants_initializers_and_lsp_agree() {
 }
 
 #[test]
-fn enum_bitwise_module_constants_and_intermediate_domains_are_checked() {
+fn enum_bitwise_module_constants_and_unnamed_intermediates_are_preserved() {
     let bits = "MODULE BitsModule\nENUM Bits\n One = 1\n Two = 2\nENDENUM\nCONST Bits Alias = Bits.One\nENDMODULE\n";
-    for expression in ["F.Bits.One | F.Bits.Two", "F.Alias & F.Bits.Two", "(F.Alias | F.Bits.Two) & F.Bits.One"] {
+    for (expression, expected) in [
+        ("F.Bits.One | F.Bits.Two", "3"),
+        ("F.Alias & F.Bits.Two", "0"),
+        ("(F.Alias | F.Bits.Two) & F.Bits.One", "1"),
+    ] {
         for declaration in [format!("CONST F.Bits Bad = {expression}"), format!("F.Bits Bad = {expression}")] {
             let values = format!("IMPORT BitsModule AS F\nMODULE Values\n{declaration}\nENDMODULE\n");
-            rejects(
+            succeeds(
                 &[("main.pps", "IMPORT Values AS V\nPRINT V.Bad\n"), ("bits.pps", bits), ("values.pps", &values)],
-                "not a declared member",
+                expected,
             );
         }
     }
@@ -250,11 +254,11 @@ fn same_domain_numbers_do_not_make_different_module_enums_assignable() {
 }
 
 #[test]
-fn checked_casts_reject_wrong_enum_arguments_and_invalid_constant_values() {
+fn enum_casts_reject_noninteger_arguments() {
     for (expression, diagnostic) in [
         ("E.Color(E.Color.First)", "INTEGER"),
-        ("E.Color(8)", "not a declared member"),
-        ("E.Color(1 - 1 + 8)", "not a declared member"),
+        ("E.Color(1.5)", "INTEGER"),
+        ("E.Color(\"8\")", "INTEGER"),
     ] {
         let main = format!("IMPORT Colors AS E\nPRINT {expression}\n");
         rejects(&[("main.pps", &main), ("colors.pps", COLORS)], diagnostic);
@@ -262,17 +266,17 @@ fn checked_casts_reject_wrong_enum_arguments_and_invalid_constant_values() {
 }
 
 #[test]
-fn qualified_dynamic_cast_checks_domain_at_runtime() {
-    for language in [350, 400] {
-        let sources = [
-            ("main.pps", "IMPORT Colors AS E\nINTEGER number = 8\nPRINT E.Color(number)\n"),
+fn qualified_casts_preserve_unnamed_values() {
+    succeeds(
+        &[
+            (
+                "main.pps",
+                "IMPORT Colors AS E\nINTEGER number = 8\nPRINT E.Color(number), \"|\", E.Color(8), \"|\", E.Color(1 - 1 + 8)\n",
+            ),
             ("colors.pps", COLORS),
-        ];
-        assert!(lsp_diagnostics(&sources, language).is_empty());
-        let executable = compile(&sources, language).unwrap();
-        let error = run(&executable).unwrap_err();
-        assert!(error.contains("not a member of closed enum"), "{error}");
-    }
+        ],
+        "8|8|8",
+    );
 }
 
 #[test]
@@ -381,12 +385,12 @@ fn shared_lsp_lowering_classifies_qualified_and_same_module_calls_as_enum_casts(
 }
 
 #[test]
-fn nonmodule_constant_casts_reject_zero_when_it_is_not_a_member() {
-    for argument in ["0", "ZeroNumber", "FirstNumber + 1"] {
+fn nonmodule_constant_casts_accept_unnamed_integer_values() {
+    for (argument, expected) in [("0", "0"), ("ZeroNumber", "0"), ("FirstNumber + 1", "8")] {
         let main = format!(
             "ENUM Color\n First = 7\nENDENUM\nCONST INTEGER ZeroNumber = 0\nCONST INTEGER FirstNumber = 7\nColor value = Color({argument})\nPRINT value\n"
         );
-        rejects(&[("main.pps", &main)], "not a declared member");
+        succeeds(&[("main.pps", &main)], expected);
     }
 }
 

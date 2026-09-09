@@ -23,8 +23,7 @@ pub fn const_value_with_members(expr: &Expression, lookup: ConstantLookup<'_>, m
     expr.visit(&mut ConstEvaluator { lookup, member, enums: &[] })
 }
 
-/// Nominal constant evaluation, including checked-cast operands. Domain errors
-/// are diagnosed separately at every source operation, never just at the root.
+/// Nominal constant evaluation, including explicit enum casts and bitwise values.
 pub fn const_enum_value(expr: &Expression, lookup: ConstantLookup<'_>, enums: &[crate::parser::EnumDefinition]) -> Option<VariableValue> {
     expr.visit(&mut ConstEvaluator {
         lookup,

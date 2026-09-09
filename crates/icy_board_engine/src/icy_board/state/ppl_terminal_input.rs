@@ -49,6 +49,11 @@ impl UserDataValue for PplTerminalInput {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *MOUSE_ON && (!(0..=1).contains(&arguments[0].as_int()) || !(0..=2).contains(&arguments.get(1).map_or(2, VariableValue::as_int))) {
+            use super::ppl_error::{ERR_INVALID, ERR_KIND_TERM, PplError};
+            vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "unsupported MouseMode or MouseTracking value"));
+            return Ok(VariableValue::new_bool(false));
+        }
         vm.icy_board_state.term_input_member(name, arguments).await
     }
 
