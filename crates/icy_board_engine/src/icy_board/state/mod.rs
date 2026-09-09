@@ -1,7 +1,9 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
+    future::Future,
     path::{Path, PathBuf},
+    pin::Pin,
     str::FromStr,
     sync::Arc,
     thread,
@@ -657,6 +659,12 @@ impl KeyChar {
     }
 }
 
+struct PendingUserSave {
+    submitted: User,
+    operation: Option<Pin<Box<dyn Future<Output = Res<(User, User)>> + Send>>>,
+    saved: Option<(User, User)>,
+}
+
 pub struct IcyBoardState {
     root_path: PathBuf,
     pub connection: Box<dyn Connection>,
@@ -669,6 +677,7 @@ pub struct IcyBoardState {
     pub transfer_statistics: TransferStatistics,
 
     pub session: Session,
+    pending_user_save: Option<PendingUserSave>,
 
     pub display_text: IcbTextFile,
 
@@ -847,6 +856,7 @@ impl IcyBoardState {
             display_text,
             env_vars: HashMap::new(),
             session,
+            pending_user_save: None,
             transfer_statistics: TransferStatistics::default(),
             user_screen: VirtualScreen::new(p1),
             sysop_screen: VirtualScreen::new(p2),
@@ -1741,6 +1751,9 @@ impl IcyBoardState {
     }
 
     pub async fn set_current_user(&mut self, user_number: usize, join_conference: bool) -> Res<()> {
+        if self.pending_user_save.is_some() {
+            self.persist_user(self.session.cur_user_id != user_number as i32).await?;
+        }
         if user_number >= self.get_board().await.users.len() {
             log::error!("User number {user_number} is out of range");
             return Err(IcyBoardError::UserNumberInvalid(user_number).into());
@@ -1774,8 +1787,8 @@ impl IcyBoardState {
         let old_language = self.session.language.clone();
         user.stats.num_times_on += 1;
         let last_conference: u16 = user.last_conference;
-        self.get_board().await.statistics.add_caller(user.get_name().clone());
-        self.get_board().await.save_statistics()?;
+        let caller_name = user.get_name().clone();
+        IcyBoard::write_statistics(&self.board, move |statistics| statistics.add_caller(caller_name)).await?;
         if !user.date_format.is_empty() {
             self.session.date_format.clone_from(&user.date_format);
         }
@@ -1875,6 +1888,7 @@ impl IcyBoardState {
     }
 
     async fn persist_user(&mut self, closing: bool) -> Res<()> {
+        self.reconcile_pending_user_save(closing).await?;
         if !self.credentials_still_current().await {
             self.session.request_logoff = true;
             if !closing && let (Some(local), Some(baseline)) = (&self.session.current_user, &self.session.security_baseline) {
@@ -1883,23 +1897,17 @@ impl IcyBoardState {
                 }
             }
         }
-        let user = self.session.current_user.as_ref().ok_or("No current user to persist")?;
-        let mut board = self.get_board().await;
-        let identity = self.session.user_baseline.as_ref().or(self.session.security_baseline.as_ref()).unwrap_or(user);
-        let previous = board
-            .users
-            .iter()
-            .find(|stored| stored.name == identity.name)
-            .ok_or("User not found in user list")?
+        let user = self.session.current_user.as_ref().ok_or("No current user to persist")?.clone();
+        let identity = self
+            .session
+            .user_baseline
+            .as_ref()
+            .or(self.session.security_baseline.as_ref())
+            .unwrap_or(&user)
+            .name
             .clone();
-        let mut baseline = self.session.user_baseline.as_ref().unwrap_or(&previous).clone();
-        if let Some(security) = &self.session.security_baseline {
-            // Legacy session constructors may not yet have a full snapshot.
-            if self.session.user_baseline.is_none() {
-                baseline = security.clone();
-            }
-        }
-        self.accounting_set_update_baseline(&mut baseline);
+        let baseline = self.session.user_baseline.clone().or_else(|| self.session.security_baseline.clone());
+        let accounting_baseline = self.accounting_update_baseline();
         let mode = if closing {
             super::user_store::UserUpdateMode::FinalSession {
                 day: self.session.login_date.date_naive(),
@@ -1909,15 +1917,71 @@ impl IcyBoardState {
                 day: self.session.login_date.date_naive(),
             }
         };
-        let mut saved = board.update_user(&baseline, user, mode)?;
-        drop(board);
+        let edited = user.clone();
+        let board = self.board.clone();
+        self.pending_user_save = Some(PendingUserSave {
+            submitted: user,
+            operation: Some(Box::pin(async move {
+                IcyBoard::write_users(&board, move |board| {
+                    let previous = board
+                        .users
+                        .iter()
+                        .find(|stored| stored.name == identity)
+                        .ok_or("User not found in user list")?
+                        .clone();
+                    let mut baseline = baseline.unwrap_or_else(|| previous.clone());
+                    if let Some(account) = accounting_baseline {
+                        baseline.account = account;
+                    }
+                    let saved = board.update_user(&baseline, &edited, mode)?;
+                    Ok((saved, previous))
+                })
+                .await
+            })),
+            saved: None,
+        });
+        self.reconcile_pending_user_save(closing).await
+    }
+
+    async fn reconcile_pending_user_save(&mut self, closing: bool) -> Res<()> {
+        let Some(pending) = self.pending_user_save.as_mut() else {
+            return Ok(());
+        };
+        if let Some(operation) = pending.operation.as_mut() {
+            // Keep both queue admission and acknowledgement alive when the caller is cancelled.
+            let result = operation.await;
+            pending.operation = None;
+            match result {
+                Ok(saved) => pending.saved = Some(saved),
+                Err(error) => {
+                    self.pending_user_save = None;
+                    return Err(error);
+                }
+            }
+        }
+        let (saved, previous) = pending.saved.as_ref().expect("completed user save");
+        let mut saved = saved.clone();
         // Monetary totals exposed to this call retain START_SESSION and local deltas.
-        saved.account = user.account.clone();
+        saved.account = pending.submitted.account.clone();
+        let mut submitted = pending.submitted.clone();
+        let mut current = self.session.current_user.as_ref().ok_or("No current user to reconcile")?.clone();
+        let day = self.session.login_date.date_naive();
+        let midnight = day.and_hms_opt(0, 0, 0).expect("midnight").and_utc();
+        // Both snapshots' daily counters already belong to the submitted session day.
+        submitted.stats.last_on = submitted.stats.last_on.max(midnight);
+        current.stats.last_on = current.stats.last_on.max(midnight);
+        let mode = if closing {
+            super::user_store::UserUpdateMode::FinalSession { day }
+        } else {
+            super::user_store::UserUpdateMode::Session { day }
+        };
+        let mut rebased = super::user_store::merge_user(&submitted, &current, &saved, mode)?;
+        rebased.account = current.account;
         if self
             .session
             .authenticated_security
             .as_ref()
-            .is_some_and(|(revision, stamp)| *revision == previous.credential_revision && *stamp == super::password_recovery::security_fingerprint(&previous))
+            .is_some_and(|(revision, stamp)| *revision == previous.credential_revision && *stamp == super::password_recovery::security_fingerprint(previous))
         {
             self.session.authenticated_security = Some((saved.credential_revision, super::password_recovery::security_fingerprint(&saved)));
         }
@@ -1925,6 +1989,8 @@ impl IcyBoardState {
         self.session.security_baseline = Some(saved.clone());
         self.session.current_user = Some(saved);
         self.accounting_mark_saved();
+        self.session.current_user = Some(rebased);
+        self.pending_user_save = None;
         Ok(())
     }
 
@@ -2047,6 +2113,11 @@ impl IcyBoardState {
 
     pub async fn get_board(&'_ self) -> tokio::sync::MutexGuard<'_, IcyBoard> {
         self.board.lock().await
+    }
+
+    /// Capture the current configuration without retaining the mutable board lock.
+    pub async fn configuration_snapshot(&self) -> super::snapshot::Snapshot<super::icb_config::IcbConfig> {
+        self.board.lock().await.configuration_snapshot()
     }
 
     /// The event the board is heading towards, if any is scheduled.

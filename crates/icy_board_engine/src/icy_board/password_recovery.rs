@@ -18,8 +18,8 @@ use tokio::{io::AsyncReadExt, sync::Semaphore};
 
 use super::{
     IcyBoard,
-    icb_config::PasswordStorageMethod,
-    user_base::{Password, PasswordVerdict, User},
+    icb_config::{IcbConfig, PasswordStorageMethod},
+    user_base::{Password, PasswordVerdict, User, UserBase},
 };
 use crate::Res;
 
@@ -291,23 +291,22 @@ pub fn merge_security(local: &User, baseline: &User, live: &User, merged: &mut U
     Ok(())
 }
 
-fn eligible(board: &IcyBoard, index: usize) -> bool {
-    ineligible_reason(board, index).is_none()
+fn eligible(config: &IcbConfig, users: &UserBase, index: usize) -> bool {
+    ineligible_reason(config, users, index).is_none()
 }
 
 pub fn has_recovery_email(user: &User) -> bool {
     mailbox(&user.email).is_some()
 }
 
-fn ineligible_reason(board: &IcyBoard, index: usize) -> Option<&'static str> {
-    let c = &board.config;
+fn ineligible_reason(c: &IcbConfig, users: &UserBase, index: usize) -> Option<&'static str> {
     if !c.password_recovery.enabled {
         return Some("recovery disabled");
     }
     if let Err(reason) = c.password_recovery.validate(c.system_control.password_storage_method) {
         return Some(reason);
     }
-    let Some(u) = board.users.get(index) else {
+    let Some(u) = users.get(index) else {
         return Some("user not found");
     };
     if index == 0 || u.security_level >= c.sysop_command_level.sysop || u.exp_security_level >= c.sysop_command_level.sysop {
@@ -444,12 +443,12 @@ impl MailSender for SmtpMailSender {
 
 pub struct RecoveryService {
     sender: Arc<dyn MailSender>,
-    generation: AtomicU64,
+    generation: Arc<AtomicU64>,
     /// Reject overload rather than queue an unbounded collection of hash jobs.
     slots: Arc<Semaphore>,
     /// Slow mail delivery must not occupy the authentication workers.
     authentication_slots: Arc<Semaphore>,
-    issues: Mutex<Vec<DateTime<Utc>>>,
+    issues: Arc<Mutex<Vec<DateTime<Utc>>>>,
 }
 
 impl Default for RecoveryService {
@@ -474,10 +473,10 @@ impl RecoveryService {
     pub fn new(sender: Arc<dyn MailSender>) -> Self {
         Self {
             sender,
-            generation: AtomicU64::new(0),
+            generation: Arc::new(AtomicU64::new(0)),
             slots: Arc::new(Semaphore::new(2)),
             authentication_slots: Arc::new(Semaphore::new(2)),
-            issues: Mutex::new(Vec::new()),
+            issues: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -506,11 +505,10 @@ impl RecoveryService {
             return Ok(false);
         };
         let generation = self.generation.load(Ordering::SeqCst);
-        let (config, user, board_name, root_path) = {
-            let mut b = board.lock().await;
-            if let Some(reason) = ineligible_reason(&b, index) {
-                *outcome = reason.into();
-                return Ok(false);
+        let issues = self.issues.clone();
+        let reservation = IcyBoard::write_users(board, move |b| {
+            if let Some(reason) = ineligible_reason(&b.config, &b.users, index) {
+                return Ok(Err(reason));
             }
             let config = b.config.password_recovery.clone();
             let user = &b.users[index];
@@ -519,15 +517,13 @@ impl RecoveryService {
                 .iter()
                 .any(|t| *t > now || *t + chrono::Duration::minutes(config.cooldown_minutes.into()) > now)
             {
-                *outcome = "account cooldown".into();
-                return Ok(false);
+                return Ok(Err("account cooldown"));
             }
             if user.recovery_issues.iter().filter(|t| **t + chrono::Duration::hours(1) > now).count() >= config.account_per_hour as usize {
-                *outcome = "account hourly limit".into();
-                return Ok(false);
+                return Ok(Err("account hourly limit"));
             }
             {
-                let mut issues = self.issues.lock().unwrap();
+                let mut issues = issues.lock().unwrap();
                 issues.retain(|t| *t + chrono::Duration::hours(1) > now);
                 // Persisted account histories also enforce the board limit after restart.
                 let persisted = b
@@ -537,8 +533,7 @@ impl RecoveryService {
                     .filter(|t| **t + chrono::Duration::hours(1) > now)
                     .count();
                 if issues.iter().any(|t| *t > now) || issues.len().max(persisted) >= config.board_per_hour as usize {
-                    *outcome = "board hourly limit or clock rollback".into();
-                    return Ok(false);
+                    return Ok(Err("board hourly limit or clock rollback"));
                 }
                 issues.push(now);
             }
@@ -547,7 +542,15 @@ impl RecoveryService {
                 users[index].recovery_issues.push(now);
                 Ok(())
             })?;
-            (config, b.users[index].clone(), b.config.board.name.clone(), b.root_path.clone())
+            Ok(Ok((config, b.users[index].clone(), b.config.board.name.clone(), b.root_path.clone())))
+        })
+        .await?;
+        let (config, user, board_name, root_path) = match reservation {
+            Ok(snapshot) => snapshot,
+            Err(reason) => {
+                *outcome = reason.into();
+                return Ok(false);
+            }
         };
         let template = tokio::time::timeout(
             Duration::from_secs(config.timeout_seconds.into()),
@@ -579,21 +582,28 @@ impl RecoveryService {
             expires: now + chrono::Duration::minutes(config.ttl_minutes.into()),
             attempts: 0,
         };
-        {
-            let mut b = board.lock().await;
-            if self.generation.load(Ordering::SeqCst) != generation
-                || !eligible(&b, index)
-                || b.config.password_recovery != config
-                || security_fingerprint(&b.users[index]) != challenge.context
-                || b.users[index].credential_revision != challenge.revision
+        let current_generation = self.generation.clone();
+        let pending = challenge.clone();
+        let expected_config = config.clone();
+        let installed = IcyBoard::write_users(board, move |b| {
+            if current_generation.load(Ordering::SeqCst) != generation
+                || !eligible(&b.config, &b.users, index)
+                || b.config.password_recovery != expected_config
+                || security_fingerprint(&b.users[index]) != pending.context
+                || b.users[index].credential_revision != pending.revision
             {
-                *outcome = "account or configuration changed during request".into();
                 return Ok(false);
             }
             b.edit_users(|users| {
-                users[index].recovery = Some(challenge.clone());
+                users[index].recovery = Some(pending);
                 Ok(())
             })?;
+            Ok(true)
+        })
+        .await?;
+        if !installed {
+            *outcome = "account or configuration changed during request".into();
+            return Ok(false);
         }
         // Awaited by the caller: no detached SMTP jobs, retry spool or startup sends.
         let result = tokio::time::timeout(
@@ -613,15 +623,19 @@ impl RecoveryService {
         };
         drop(slot);
         if matches!(result, Ok(Err(_))) {
-            let mut b = board.lock().await;
-            if b.users.get(index).and_then(|u| u.recovery.as_ref()).is_some_and(|c| c.id == challenge.id) {
-                if let Err(e) = b.edit_users(|users| {
-                    users[index].recovery = None;
-                    Ok(())
-                }) {
-                    outcome.push_str("; failed to persist challenge revocation");
-                    return Err(e);
+            if let Err(e) = IcyBoard::write_users(board, move |b| {
+                if b.users.get(index).and_then(|u| u.recovery.as_ref()).is_some_and(|c| c.id == challenge.id) {
+                    b.edit_users(|users| {
+                        users[index].recovery = None;
+                        Ok(())
+                    })?;
                 }
+                Ok(())
+            })
+            .await
+            {
+                outcome.push_str("; failed to persist challenge revocation");
+                return Err(e);
             }
         }
         Ok(matches!(result, Ok(Ok(()))))
@@ -630,19 +644,19 @@ impl RecoveryService {
     pub async fn verify(&self, board: &Arc<tokio::sync::Mutex<IcyBoard>>, index: usize, candidate: String, now: DateTime<Utc>) -> Res<LoginPassword> {
         let started = std::time::Instant::now();
         let slot = self.authentication_slots.clone().acquire_owned().await?;
-        let (user, challenge) = {
-            let mut b = board.lock().await;
+        let generation = self.generation.clone();
+        let reserved = IcyBoard::write_users(board, move |b| {
             let Some(user) = b.users.get(index) else {
-                return Ok(LoginPassword::Invalid);
+                return Ok(None);
             };
             if user.flags.disabled_flag || user.flags.delete_flag {
-                return Ok(LoginPassword::Invalid);
+                return Ok(None);
             }
             let user = user.clone();
-            let challenge = if eligible(&b, index) {
-                user.recovery.clone().filter(|c| {
-                    c.runtime_generation == self.generation.load(Ordering::SeqCst) && usable(&user, c, now, b.config.password_recovery.max_attempts)
-                })
+            let challenge = if eligible(&b.config, &b.users, index) {
+                user.recovery
+                    .clone()
+                    .filter(|c| c.runtime_generation == generation.load(Ordering::SeqCst) && usable(&user, c, now, b.config.password_recovery.max_attempts))
             } else {
                 None
             };
@@ -653,7 +667,11 @@ impl RecoveryService {
                     Ok(())
                 })?;
             }
-            (user, challenge)
+            Ok(Some((user, challenge)))
+        })
+        .await?;
+        let Some((user, challenge)) = reserved else {
+            return Ok(LoginPassword::Invalid);
         };
         let snapshot = user.clone();
         let proof_challenge = challenge.clone();
@@ -665,35 +683,38 @@ impl RecoveryService {
             )
         })
         .await?;
-        let mut b = board.lock().await;
-        let Some(live) = b.users.get(index) else {
-            return Ok(LoginPassword::Invalid);
-        };
-        if security_fingerprint(live) != security_fingerprint(&user) || live.credential_revision != user.credential_revision {
-            return Ok(LoginPassword::Invalid);
-        }
-        if normal {
-            if live.recovery.is_some() {
-                b.edit_users(|users| {
-                    users[index].recovery = None;
-                    Ok(())
-                })?;
+        let generation = self.generation.clone();
+        IcyBoard::write_users(board, move |b| {
+            let Some(live) = b.users.get(index) else {
+                return Ok(LoginPassword::Invalid);
+            };
+            if security_fingerprint(live) != security_fingerprint(&user) || live.credential_revision != user.credential_revision {
+                return Ok(LoginPassword::Invalid);
             }
-            return Ok(LoginPassword::Permanent);
-        }
-        if temporary && eligible(&b, index) {
-            let c = challenge.unwrap();
-            let finished = now + chrono::Duration::from_std(started.elapsed()).unwrap_or_default();
-            if usable(live, &c, finished, b.config.password_recovery.max_attempts)
-                && live
-                    .recovery
-                    .as_ref()
-                    .is_some_and(|current| current.id == c.id && current.runtime_generation == self.generation.load(Ordering::SeqCst))
-            {
-                return Ok(LoginPassword::Temporary(RecoveryProof { index, challenge: c }));
+            if normal {
+                if live.recovery.is_some() {
+                    b.edit_users(|users| {
+                        users[index].recovery = None;
+                        Ok(())
+                    })?;
+                }
+                return Ok(LoginPassword::Permanent);
             }
-        }
-        Ok(LoginPassword::Invalid)
+            if temporary && eligible(&b.config, &b.users, index) {
+                let c = challenge.unwrap();
+                let finished = now + chrono::Duration::from_std(started.elapsed()).unwrap_or_default();
+                if usable(live, &c, finished, b.config.password_recovery.max_attempts)
+                    && live
+                        .recovery
+                        .as_ref()
+                        .is_some_and(|current| current.id == c.id && current.runtime_generation == generation.load(Ordering::SeqCst))
+                {
+                    return Ok(LoginPassword::Temporary(RecoveryProof { index, challenge: c }));
+                }
+            }
+            Ok(LoginPassword::Invalid)
+        })
+        .await
     }
 
     pub async fn complete(&self, board: &Arc<tokio::sync::Mutex<IcyBoard>>, proof: &RecoveryProof, candidate: String, now: DateTime<Utc>) -> Res<bool> {
@@ -701,60 +722,65 @@ impl RecoveryService {
         let slot = self.authentication_slots.clone().acquire_owned().await?;
         let (user, config) = {
             let b = board.lock().await;
-            if !proof_valid(&b, proof, now) {
+            if !proof_valid(&b.config, &b.users, &b.password_recovery_service, proof, now) {
                 return Ok(false);
             }
-            (b.users[proof.index].clone(), (*b.config).clone())
+            (b.users[proof.index].clone(), b.config.clone())
         };
         if candidate.is_empty() || candidate.len() > 12 {
             return Ok(false);
         }
         let context = security_fingerprint(&user);
         let challenge = proof.challenge.clone();
+        let min_pwd_length = config.limits.min_pwd_length;
+        let storage_method = config.system_control.password_storage_method;
         let (password, _slot) = tokio::task::spawn_blocking(move || {
-            if user.password.check_new_password(&user.name, &candidate, config.limits.min_pwd_length) != PasswordVerdict::Ok
-                || challenge.hash.is_valid(&candidate)
-            {
+            if user.password.check_new_password(&user.name, &candidate, min_pwd_length) != PasswordVerdict::Ok || challenge.hash.is_valid(&candidate) {
                 return (None, slot);
             }
-            let hash =
-                if matches!(user.password.password, Password::Argon2(_)) || config.system_control.password_storage_method == PasswordStorageMethod::Argon2 {
-                    Password::new_argon2(candidate)
-                } else {
-                    Password::new_bcrypt(candidate)
-                };
+            let hash = if matches!(user.password.password, Password::Argon2(_)) || storage_method == PasswordStorageMethod::Argon2 {
+                Password::new_argon2(candidate)
+            } else {
+                Password::new_bcrypt(candidate)
+            };
             (Some(hash), slot)
         })
         .await?;
         let Some(password) = password else {
             return Ok(false);
         };
-        let mut b = board.lock().await;
-        let now = now + chrono::Duration::from_std(started.elapsed()).unwrap_or_default();
-        if !proof_valid(&b, proof, now)
-            || security_fingerprint(&b.users[proof.index]) != context
-            || b.config.limits.min_pwd_length != config.limits.min_pwd_length
-            || b.config.system_control.password_storage_method != config.system_control.password_storage_method
-        {
-            return Ok(false);
-        }
-        let expire_days = b.config.limits.password_expire_days;
-        // One authoritative atomic file replacement publishes both credential and consumption.
-        b.edit_users(|users| {
-            users[proof.index].password.accept_new_password(password, now, expire_days);
-            users[proof.index].recovery = None;
-            Ok(())
-        })?;
-        Ok(true)
+        let proof = RecoveryProof {
+            index: proof.index,
+            challenge: proof.challenge.clone(),
+        };
+        IcyBoard::write_users(board, move |b| {
+            let now = now + chrono::Duration::from_std(started.elapsed()).unwrap_or_default();
+            if !proof_valid(&b.config, &b.users, &b.password_recovery_service, &proof, now)
+                || security_fingerprint(&b.users[proof.index]) != context
+                || b.config.limits.min_pwd_length != min_pwd_length
+                || b.config.system_control.password_storage_method != storage_method
+            {
+                return Ok(false);
+            }
+            let expire_days = b.config.limits.password_expire_days;
+            // One authoritative atomic file replacement publishes both credential and consumption.
+            b.edit_users(|users| {
+                users[proof.index].password.accept_new_password(password, now, expire_days);
+                users[proof.index].recovery = None;
+                Ok(())
+            })?;
+            Ok(true)
+        })
+        .await
     }
 }
 
-fn proof_valid(board: &IcyBoard, proof: &RecoveryProof, now: DateTime<Utc>) -> bool {
-    eligible(board, proof.index)
-        && board.users[proof.index].recovery.as_ref().is_some_and(|c| {
-            c.runtime_generation == board.password_recovery_service.generation.load(Ordering::SeqCst)
+fn proof_valid(config: &IcbConfig, users: &UserBase, recovery: &RecoveryService, proof: &RecoveryProof, now: DateTime<Utc>) -> bool {
+    eligible(config, users, proof.index)
+        && users[proof.index].recovery.as_ref().is_some_and(|c| {
+            c.runtime_generation == recovery.generation.load(Ordering::SeqCst)
                 && c.id == proof.challenge.id
-                && usable(&board.users[proof.index], &proof.challenge, now, board.config.password_recovery.max_attempts)
+                && usable(&users[proof.index], &proof.challenge, now, config.password_recovery.max_attempts)
         })
 }
 
@@ -774,26 +800,28 @@ impl super::state::IcyBoardState {
         let Some(baseline) = self.session.security_baseline.as_ref() else {
             return Ok(false);
         };
-        let mut board = self.get_board().await;
+        let stamp = security_fingerprint(baseline);
+        let revision = baseline.credential_revision;
         let index = self.session.cur_user_id as usize;
-        let Some(live) = board.users.get(index) else {
+        let security = IcyBoard::write_users(&self.board, move |board| {
+            let Some(live) = board.users.get(index) else {
+                return Ok(None);
+            };
+            if live.flags.disabled_flag || live.flags.delete_flag || security_fingerprint(live) != stamp || live.credential_revision != revision {
+                return Ok(None);
+            }
+            if live.recovery.is_some() {
+                board.edit_users(|users| {
+                    users[index].recovery = None;
+                    Ok(())
+                })?;
+            }
+            Ok(Some((board.users[index].credential_revision, security_fingerprint(&board.users[index]))))
+        })
+        .await?;
+        let Some(security) = security else {
             return Ok(false);
         };
-        if live.flags.disabled_flag
-            || live.flags.delete_flag
-            || security_fingerprint(live) != security_fingerprint(baseline)
-            || live.credential_revision != baseline.credential_revision
-        {
-            return Ok(false);
-        }
-        if live.recovery.is_some() {
-            board.edit_users(|users| {
-                users[index].recovery = None;
-                Ok(())
-            })?;
-        }
-        let security = (board.users[index].credential_revision, security_fingerprint(&board.users[index]));
-        drop(board);
         self.session.authenticated_security = Some(security);
         Ok(true)
     }
@@ -1114,6 +1142,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn concurrent_requests_share_rate_and_attempt_reservations() {
+        let (dir, board, service, capture) = fixture();
+        let now = Utc::now();
+        let (first, second) = tokio::join!(service.issue(&board, 1, now), service.issue(&board, 1, now));
+        assert_ne!(first.unwrap(), second.unwrap());
+        assert_eq!(capture.bodies.lock().unwrap().len(), 1);
+        assert_eq!(*service.issues.lock().unwrap(), vec![now]);
+
+        let mut attempts = tokio::task::JoinSet::new();
+        for _ in 0..8 {
+            let board = board.clone();
+            let service = service.clone();
+            attempts.spawn(async move { service.verify(&board, 1, "wrong".into(), now).await });
+        }
+        while let Some(result) = attempts.join_next().await {
+            assert!(matches!(result.unwrap().unwrap(), LoginPassword::Invalid));
+        }
+        let b = board.lock().await;
+        assert_eq!(b.users[1].recovery.as_ref().unwrap().attempts, 5);
+        assert_eq!(b.users[1].recovery_issues, vec![now]);
+        let persisted = super::super::user_base::UserBase::load(&dir.path().join("users.toml")).unwrap();
+        assert_eq!(toml::to_string(&persisted).unwrap(), toml::to_string(&b.users).unwrap());
+    }
+
+    #[tokio::test]
+    async fn writer_callbacks_use_the_calling_services_generation_and_reservations() {
+        let (dir, board, board_service, capture) = fixture();
+        let service = RecoveryService::new(capture.clone());
+        let now = Utc::now();
+        let good = board.lock().await.config.paths.user_file.clone();
+        board.lock().await.config.paths.user_file = dir.path().to_path_buf();
+        assert!(service.issue(&board, 1, now).await.is_err());
+        assert_eq!(*service.issues.lock().unwrap(), vec![now]);
+        assert!(board_service.issues.lock().unwrap().is_empty());
+
+        board.lock().await.config.paths.user_file = good;
+        assert!(service.issue(&board, 1, now).await.unwrap());
+        service.revoke_runtime_challenges();
+        assert!(matches!(
+            service.verify(&board, 1, secret(&capture), now).await.unwrap(),
+            LoginPassword::Invalid
+        ));
+        assert_eq!(board.lock().await.users[1].recovery.as_ref().unwrap().attempts, 0);
+        assert!(matches!(
+            board_service.verify(&board, 1, secret(&capture), now).await.unwrap(),
+            LoginPassword::Temporary(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn queued_issuance_checks_the_preceding_writers_published_users() {
+        use std::{future::Future, task::Poll};
+
+        let (_dir, board, service, capture) = fixture();
+        let (entered, ready) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel();
+        let editing = board.clone();
+        let writer = tokio::spawn(async move {
+            IcyBoard::write_users(&editing, move |b| {
+                entered.send(()).unwrap();
+                wait.recv_timeout(Duration::from_secs(30)).unwrap();
+                b.edit_users(|users| {
+                    users[1].flags.disabled_flag = true;
+                    Ok(())
+                })
+            })
+            .await
+        });
+        ready.await.unwrap();
+        assert!(!board.lock().await.users[1].flags.disabled_flag);
+        let request = service.issue(&board, 1, Utc::now());
+        tokio::pin!(request);
+        std::future::poll_fn(|cx| {
+            assert!(request.as_mut().poll(cx).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+        release.send(()).unwrap();
+        writer.await.unwrap().unwrap();
+        assert!(!request.await.unwrap());
+        assert!(service.issues.lock().unwrap().is_empty());
+        assert!(board.lock().await.users[1].recovery_issues.is_empty());
+        assert!(capture.bodies.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn issuance_limits_persist_and_overload_does_not_send() {
         let (_dir, board, service, capture) = fixture();
         let now = Utc::now();
@@ -1272,6 +1386,47 @@ mod tests {
             assert_eq!(toml::to_string(&board.lock().await.users).unwrap(), before);
             assert_eq!(std::fs::read(dir.path().join("users.toml")).unwrap(), persisted);
         }
+    }
+
+    #[tokio::test]
+    async fn smtp_rejection_cannot_revoke_a_newer_challenge() {
+        struct RejectFirst {
+            started: tokio::sync::Notify,
+            release: Semaphore,
+            calls: AtomicU64,
+        }
+        #[async_trait]
+        impl MailSender for RejectFirst {
+            async fn send(&self, _: &PasswordRecoveryConfig, _: &str, _: &str, _: String) -> Result<(), ()> {
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    self.started.notify_one();
+                    self.release.acquire().await.unwrap().forget();
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        let sender = Arc::new(RejectFirst {
+            started: tokio::sync::Notify::new(),
+            release: Semaphore::new(0),
+            calls: AtomicU64::new(0),
+        });
+        let (dir, board, service) = fixture_with(sender.clone());
+        let now = Utc::now();
+        let sending_board = board.clone();
+        let sending_service = service.clone();
+        let first = tokio::spawn(async move { sending_service.issue(&sending_board, 1, now).await });
+        sender.started.notified().await;
+        let first_id = board.lock().await.users[1].recovery.as_ref().unwrap().id.clone();
+        assert!(service.issue(&board, 1, now + chrono::Duration::minutes(10)).await.unwrap());
+        let replacement = toml::to_string(board.lock().await.users[1].recovery.as_ref().unwrap()).unwrap();
+        assert_ne!(board.lock().await.users[1].recovery.as_ref().unwrap().id, first_id);
+        sender.release.add_permits(1);
+        assert!(!first.await.unwrap().unwrap());
+        assert_eq!(toml::to_string(board.lock().await.users[1].recovery.as_ref().unwrap()).unwrap(), replacement);
+        let persisted = super::super::user_base::UserBase::load(&dir.path().join("users.toml")).unwrap();
+        assert_eq!(toml::to_string(persisted[1].recovery.as_ref().unwrap()).unwrap(), replacement);
     }
 
     #[tokio::test]

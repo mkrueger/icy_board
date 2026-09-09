@@ -32,6 +32,7 @@ use super::{
     advance_read_pointer, attributes, display_flags, may_read_header, next_in_range, record_recipient_read, requires_read_password,
 };
 use crate::icy_board::{
+    IcyBoard,
     limits::{self, BatchSoFar, TransferHistory},
     state::user_commands::pcb::u_upload_file::create_protocol,
 };
@@ -798,11 +799,9 @@ impl IcyBoardState {
         // Logging failures do not turn a confirmed delivery into a failed
         // transfer or suppress the pending message-pointer commit.
         let log_result = self.log_transfer(false, &sent, protocol, state.send_state.errors, cps).await;
-        let statistics_result = {
-            let mut board = self.get_board().await;
-            board.statistics.add_download(state);
-            board.save_statistics()
-        };
+        let files = state.send_state.finished_files.len() as u64;
+        let bytes = state.send_state.total_bytes_transfered;
+        let statistics_result = IcyBoard::write_statistics(&self.board, move |statistics| statistics.add_download_totals(files, bytes)).await;
         if let Err(error) = &log_result {
             log::error!("Delivered capture: transfer log failed: {error}");
         }

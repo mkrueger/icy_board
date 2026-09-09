@@ -29,6 +29,7 @@ use self::{
     pcboard_data::PcbBoardData,
     qwknet::QwkNetworkConfig,
     sec_levels::SecurityLevelDefinitions,
+    snapshot::Snapshot,
     statistics::Statistics,
     user_base::UserBase,
     xfer_protocols::SupportedProtocols,
@@ -53,9 +54,10 @@ pub mod login_server;
 pub mod macro_parser;
 pub mod menu;
 pub mod message_area;
-pub mod path_check;
 pub mod password_recovery;
+pub mod path_check;
 pub mod pcb;
+pub mod persistence;
 pub mod qwknet;
 pub mod sec_levels;
 pub mod security_expr;
@@ -124,8 +126,10 @@ pub enum IcyBoardError {
 pub struct IcyBoard {
     pub file_name: PathBuf,
     pub root_path: PathBuf,
+    /// Public for offline construction; runtime mutations must use `write_users`, not direct assignment.
     pub users: UserBase,
-    pub config: snapshot::Snapshot<IcbConfig>,
+    /// Public for offline construction; runtime mutations must use `ordered_persistence`.
+    pub config: Snapshot<IcbConfig>,
     pub conferences: ConferenceBase,
     pub default_display_text: IcbTextFile,
 
@@ -133,6 +137,7 @@ pub struct IcyBoard {
     pub protocols: SupportedProtocols,
     pub sec_levels: SecurityLevelDefinitions,
     pub groups: GroupList,
+    /// Public for offline construction; runtime mutations must use `write_statistics`, not direct assignment.
     pub statistics: Statistics,
     pub commands: CommandList,
     pub ftn: FtnConfig,
@@ -143,6 +148,19 @@ pub struct IcyBoard {
     pub password_recovery_service: std::sync::Arc<password_recovery::RecoveryService>,
     /// Counts published user-base transactions, so a view can tell that its copy still holds.
     pub user_revision: u64,
+    /// Public for offline construction; never replace the writer on a running board (it owns the shared gate).
+    pub persistence_writer: std::sync::Arc<persistence::PersistenceWriter>,
+}
+
+pub(super) fn resolve_file_from_root(root_path: &Path, file: &Path) -> PathBuf {
+    if file.as_os_str().is_empty() {
+        return PathBuf::new();
+    }
+    let path = root_path.join(file);
+    if path.exists() {
+        return path;
+    }
+    lookup_case_insensitive(&path)
 }
 
 impl IcyBoard {
@@ -169,10 +187,11 @@ impl IcyBoard {
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
             password_recovery_service: std::sync::Arc::new(password_recovery::RecoveryService::default()),
             user_revision: 0,
+            persistence_writer: std::sync::Arc::default(),
         }
     }
 
-    pub fn configuration_snapshot(&self) -> snapshot::Snapshot<IcbConfig> {
+    pub fn configuration_snapshot(&self) -> Snapshot<IcbConfig> {
         self.config.clone()
     }
 
@@ -301,29 +320,7 @@ impl IcyBoard {
     }
 
     pub fn resolve_file<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
-        if file.as_ref().as_os_str().is_empty() {
-            return PathBuf::new();
-        }
-        let mut s = PathBuf::from(file.as_ref());
-        if !s.is_absolute() {
-            s = self.root_path.join(s);
-        }
-        if s.exists() {
-            return s;
-        }
-        /*
-                let mut s: String = file
-                .as_ref()
-                .to_string_lossy()
-                .to_string()
-                .chars()
-                .map(|x| match x {
-                    '\\' => '/',
-                    _ => x,
-                })
-                .collect();
-        */
-        lookup_case_insensitive(&s)
+        resolve_file_from_root(&self.root_path, file.as_ref())
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
@@ -489,6 +486,7 @@ impl IcyBoard {
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
             password_recovery_service: std::sync::Arc::new(password_recovery::RecoveryService::default()),
             user_revision: 0,
+            persistence_writer: std::sync::Arc::default(),
         };
 
         for conf in board.conferences.iter_mut() {
@@ -957,14 +955,6 @@ impl IcyBoard {
         self.users[i] = new_user;
         Ok(())
     }*/
-
-    pub fn save_statistics(&self) -> Res<()> {
-        let r = &self.config.paths.statistics_file;
-        if let Err(err) = self.statistics.save(&r) {
-            log::error!("Error saving statistics to {} : {err}", r.display());
-        }
-        Ok(())
-    }
 }
 
 /// PPEs and `PCBoard` configurations name their files the way DOS did, so the case of a
@@ -1117,6 +1107,11 @@ pub(crate) fn load_internal<T: IcyBoardSerializer, P: AsRef<Path>>(path: &P) -> 
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static BEFORE_FILE_SYNC: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
 /// Writes through a temporary file in the target directory and renames it into
 /// place, so a crash or a full disk can never leave a half-written file behind.
 pub fn write_atomic<P: AsRef<Path>>(path: P, contents: &[u8]) -> std::io::Result<()> {
@@ -1127,6 +1122,12 @@ pub fn write_atomic<P: AsRef<Path>>(path: P, contents: &[u8]) -> std::io::Result
 
     let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
     tmp.write_all(contents)?;
+    #[cfg(test)]
+    BEFORE_FILE_SYNC.with(|hook| {
+        if let Some(wait) = hook.borrow_mut().take() {
+            wait();
+        }
+    });
     tmp.as_file().sync_all()?;
 
     if let Ok(meta) = fs::metadata(path) {

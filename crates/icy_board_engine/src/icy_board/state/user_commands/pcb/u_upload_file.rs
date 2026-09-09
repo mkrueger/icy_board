@@ -8,6 +8,7 @@ use crate::icy_board::upload_quarantine::{QuarantineStatus, UploadQuarantine};
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
+        IcyBoard,
         icb_text::IceText,
         state::{
             NodeStatus,
@@ -892,8 +893,8 @@ impl IcyBoardState {
         // Accepted intake only. Credit fields take positive paybacks; the
         // separate byte/time ratio allowances below are not monetary credits.
         self.accounting_record_upload(name, bytes)?;
-        let config = self.get_board().await.config.file_transfer.clone();
-        let (credit, seconds) = upload_credits(bytes, cps, config.upload_credit_bytes, config.upload_credit_time);
+        let config = self.get_board().await.configuration_snapshot();
+        let (credit, seconds) = upload_credits(bytes, cps, config.file_transfer.upload_credit_bytes, config.file_transfer.upload_credit_time);
         let credit = credit.min(i64::MAX as u64) as i64;
         if let Some(user) = &mut self.session.current_user {
             user.stats.num_uploads = user.stats.num_uploads.saturating_add(1);
@@ -913,13 +914,7 @@ impl IcyBoardState {
         self.transfer_statistics.uploaded_files = self.transfer_statistics.uploaded_files.saturating_add(1);
         self.transfer_statistics.uploaded_bytes = self.transfer_statistics.uploaded_bytes.saturating_add(bytes.min(usize::MAX as u64) as usize);
         self.transfer_statistics.uploaded_cps = cps.min(usize::MAX as u64) as usize;
-        let mut state = TransferState::new("Accepted upload".into());
-        state.recieve_state.finished_files.push((name.into(), PathBuf::new()));
-        state.recieve_state.total_bytes_transfered = bytes;
-        let mut board = self.get_board().await;
-        board.statistics.add_upload(&state);
-        board.save_statistics()?;
-        drop(board);
+        IcyBoard::write_statistics(&self.board, move |statistics| statistics.add_upload_totals(1, bytes)).await?;
         self.accounting_check_balance().await?;
         Ok(())
     }

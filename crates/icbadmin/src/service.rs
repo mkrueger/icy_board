@@ -154,56 +154,69 @@ impl LiveAdminBackend {
 
     async fn mutate_live_fn<F>(&self, fingerprint: &str, actor: &str, action: &str, mutator: F) -> Result<ApplyResultDto>
     where
-        F: Fn(&mut IcbConfig) -> Result<Vec<FieldChangeDto>> + Send,
+        F: Fn(&mut IcbConfig) -> Result<Vec<FieldChangeDto>> + Send + 'static,
     {
-        let _file_lock = BoardLock::acquire(&self.root_path)?;
-        backup::check_fingerprint(&self.board_file, fingerprint)?;
-        let mut board = self.board.lock().await;
+        let board = self.board.clone();
+        let root_path = self.root_path.clone();
+        let board_file = self.board_file.clone();
+        let fingerprint = fingerprint.to_owned();
+        let actor = actor.to_owned();
+        let action = action.to_owned();
+        IcyBoard::ordered_persistence(&self.board, move || {
+            let _file_lock = BoardLock::acquire(&root_path)?;
+            backup::check_fingerprint(&board_file, &fingerprint)?;
+            let snapshot = board.blocking_lock().configuration_snapshot();
+            let mut edited = relative_config(&root_path, &snapshot);
+            let changes = mutator(&mut edited)?;
+            if changes.is_empty() {
+                return Ok(ApplyResultDto {
+                    changed_fields: Vec::new(),
+                    backup: None,
+                    fingerprint: backup::fingerprint(&board_file)?,
+                });
+            }
 
-        let mut edited = relative_config(&self.root_path, &board.config);
-        let changes = mutator(&mut edited)?;
-        if changes.is_empty() {
-            return Ok(ApplyResultDto {
-                changed_fields: Vec::new(),
-                backup: None,
-                fingerprint: backup::fingerprint(&self.board_file)?,
-            });
-        }
-        board.config = edited.into();
-        board.resolve_paths();
+            let mut disk_config = IcbConfig::load(&board_file).map_err(|e| AdminError::Load(e.to_string()))?;
+            // Apply the same section mutation onto the disk image.
+            let _ = mutator(&mut disk_config)?;
 
-        let mut disk_config = IcbConfig::load(&self.board_file).map_err(|e| AdminError::Load(e.to_string()))?;
-        // Apply the same section mutation onto the disk image.
-        let _ = mutator(&mut disk_config)?;
+            let backup_path = backup::create_backup(&root_path, &board_file)?;
+            disk_config.save(&board_file).map_err(|e| AdminError::Save(e.to_string()))?;
+            if let Err(e) = IcbConfig::load(&board_file) {
+                let _ = std::fs::copy(&backup_path, &board_file);
+                return Err(AdminError::Save(format!(
+                    "written configuration could not be read back ({e}), the backup was restored"
+                )));
+            }
 
-        let backup_path = backup::create_backup(&self.root_path, &self.board_file)?;
-        disk_config.save(&self.board_file).map_err(|e| AdminError::Save(e.to_string()))?;
-        if let Err(e) = IcbConfig::load(&self.board_file) {
-            let _ = std::fs::copy(&backup_path, &self.board_file);
-            return Err(AdminError::Save(format!(
-                "written configuration could not be read back ({e}), the backup was restored"
-            )));
-        }
+            {
+                let mut board = board.blocking_lock();
+                board.config = edited.into();
+                board.resolve_paths();
+            }
 
-        let changed_fields: Vec<String> = changes.iter().map(|c| c.field.clone()).collect();
-        backup::append_audit(
-            &self.root_path,
-            &serde_json::json!({
-                "time": chrono::Utc::now().to_rfc3339(),
-                "actor": actor,
-                "action": action,
-                "mode": "live",
-                "file": self.board_file.display().to_string(),
-                "backup": backup_path.display().to_string(),
-                "changes": changes.iter().map(|c| serde_json::json!({ "field": c.field, "old": c.old, "new": c.new })).collect::<Vec<_>>(),
-            }),
-        );
+            let changed_fields: Vec<String> = changes.iter().map(|c| c.field.clone()).collect();
+            backup::append_audit(
+                &root_path,
+                &serde_json::json!({
+                    "time": chrono::Utc::now().to_rfc3339(),
+                    "actor": actor,
+                    "action": action,
+                    "mode": "live",
+                    "file": board_file.display().to_string(),
+                    "backup": backup_path.display().to_string(),
+                    "changes": changes.iter().map(|c| serde_json::json!({ "field": c.field, "old": c.old, "new": c.new })).collect::<Vec<_>>(),
+                }),
+            );
 
-        Ok(ApplyResultDto {
-            changed_fields,
-            backup: Some(backup_path.display().to_string()),
-            fingerprint: backup::fingerprint(&self.board_file)?,
+            Ok(ApplyResultDto {
+                changed_fields,
+                backup: Some(backup_path.display().to_string()),
+                fingerprint: backup::fingerprint(&board_file)?,
+            })
         })
+        .await
+        .map_err(|error| AdminError::Save(error.to_string()))?
     }
 }
 

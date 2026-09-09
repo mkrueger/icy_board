@@ -614,9 +614,7 @@ where
             match app.run(terminal, full_screen, bbs).await {
                 Ok(msg) => {
                     if msg == SystemStatisticsScreenMessage::Reset {
-                        let mut board = board.lock().await;
-                        board.statistics = Default::default();
-                        board.save_statistics()?;
+                        IcyBoard::write_statistics(board, move |statistics| *statistics = Default::default()).await?;
                     }
                     // just exit
                 }

@@ -14,7 +14,6 @@ use crate::{
         macro_parser::MacroCommand,
         pcb::user_inf::AccountUserInf,
         sec_levels::SecurityLevel,
-        user_base::User,
     },
 };
 
@@ -34,6 +33,7 @@ pub struct AccountingSession {
     start_balance_seeded: bool,
     finished: bool,
     finish_saved: bool,
+    finish_save_required: bool,
     invocation_depth: usize,
     finish_requested: bool,
     pub(super) invocation_settlement_failed: bool,
@@ -61,6 +61,7 @@ impl Default for AccountingSession {
             start_balance_seeded: false,
             finished: false,
             finish_saved: false,
+            finish_save_required: false,
             invocation_depth: 0,
             finish_requested: false,
             invocation_settlement_failed: false,
@@ -425,11 +426,17 @@ impl IcyBoardState {
     /// active until all enclosing usage has settled. Failed persistence may be
     /// retried, but neither clock nor audit entries are posted twice.
     pub async fn accounting_finish(&mut self) -> Res<()> {
+        self.session.accounting.finish_save_required |= self.pending_user_save.is_some();
+        self.reconcile_pending_user_save(true).await?;
         self.session.accounting.finish_requested = true;
         if self.accounting_invocation_active() {
             return Ok(());
         }
         if !self.session.accounting.begun || self.session.accounting.finish_saved {
+            if self.session.accounting.finish_save_required {
+                self.persist_final_user().await?;
+                self.session.accounting.finish_save_required = false;
+            }
             return Ok(());
         }
         if !self.session.accounting.finished {
@@ -442,6 +449,7 @@ impl IcyBoardState {
         }
         self.persist_final_user().await?;
         self.session.accounting.finish_saved = true;
+        self.session.accounting.finish_save_required = false;
         Ok(())
     }
 
@@ -615,9 +623,14 @@ impl IcyBoardState {
         format_credit(value, self.session.accounting.options.use_money)
     }
 
-    pub(super) fn accounting_set_update_baseline(&self, baseline: &mut User) {
-        if self.session.accounting.baseline_known {
-            baseline.account = self.session.accounting.baseline.clone();
+    pub(super) fn accounting_update_baseline(&self) -> Option<Option<AccountUserInf>> {
+        self.session.accounting.baseline_known.then(|| self.session.accounting.baseline.clone())
+    }
+
+    #[cfg(test)]
+    pub(super) fn accounting_set_update_baseline(&self, baseline: &mut super::User) {
+        if let Some(account) = self.accounting_update_baseline() {
+            baseline.account = account;
         }
     }
 
@@ -631,7 +644,7 @@ impl IcyBoardState {
 mod tests {
     use super::*;
     use crate::icy_board::user_store::merge_account;
-    use crate::icy_board::{IcyBoard, bbs::BBS};
+    use crate::icy_board::{IcyBoard, bbs::BBS, user_base::User};
     use chrono::Duration;
     use icy_net::{ConnectionType, channel::ChannelConnection};
     use std::{path::PathBuf, sync::Arc};

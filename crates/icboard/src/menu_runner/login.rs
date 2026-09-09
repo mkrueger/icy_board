@@ -6,6 +6,7 @@ use chrono::{Datelike, Local, Utc};
 use icy_board_engine::{
     datetime::{IcbDate, IcbTime},
     icy_board::{
+        IcyBoard,
         icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
         icb_text::IceText,
         pcb::user_inf::AccountUserInf,
@@ -580,22 +581,30 @@ impl PcbBoardCommand {
             self.register_public_conferences(&mut new_user).await;
         }
 
-        // Only genuine registration receives the opening grant. Loading an
-        // existing user with no account must not mint new-user credit.
-        if let Some(rates) = &self.state.get_board().await.config.accounting.accounting_config {
-            rates.validate()?;
-            new_user.account = Some(AccountUserInf {
-                starting_balance: rates.new_user_balance,
-                ..Default::default()
-            });
-        }
         let user_name = new_user.get_name().clone();
-        let id = {
-            let mut board = self.state.get_board().await;
-            let configured = board.config.new_user_settings.new_user_groups.clone();
-            assign_new_user_groups(&mut board.groups, &configured, &user_name);
-            board.groups.save(&board.config.paths.group_file)?;
-            board.edit_users(|users| Ok(users.new_user(new_user)))?
+        let live_board = self.state.board.clone();
+        let id = IcyBoard::write_users(&self.state.board, move |board| {
+            if board.config.system_control.is_closed_board || board.users.iter().any(|user| user.is_valid_loginname(&user_name)) {
+                return Ok(None);
+            }
+            // Only genuine registration receives the opening grant.
+            if let Some(rates) = &board.config.accounting.accounting_config {
+                rates.validate()?;
+                new_user.account = Some(AccountUserInf {
+                    starting_balance: rates.new_user_balance,
+                    ..Default::default()
+                });
+            }
+            // Groups are not part of the writer's user snapshot.
+            let mut groups = live_board.blocking_lock().groups.clone();
+            assign_new_user_groups(&mut groups, &board.config.new_user_settings.new_user_groups, &user_name);
+            groups.save(&board.config.paths.group_file)?;
+            live_board.blocking_lock().groups = groups;
+            board.edit_users(|users| Ok(Some(users.new_user(new_user))))
+        })
+        .await?;
+        let Some(id) = id else {
+            return Ok(false);
         };
         self.state.set_current_user(id, false).await?;
 

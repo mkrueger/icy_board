@@ -13,6 +13,7 @@ use crate::{
     datetime::{IcbDate, IcbTime},
     executable::{GenericVariableData, PPEExpr, VariableType, VariableValue},
     icy_board::{
+        IcyBoard,
         ftn::queue,
         icb_config::IcbColor,
         state::{
@@ -323,7 +324,8 @@ pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
         vm.icy_board_state.session.current_user = Some(merged.clone());
         merged
     } else {
-        vm.icy_board_state.get_board().await.update_user(&vm.user_baseline, &edited, mode)?
+        let baseline = vm.user_baseline.clone();
+        IcyBoard::write_users(&vm.icy_board_state.board, move |board| board.update_user(&baseline, &edited, mode)).await?
     };
     vm.select_user(saved);
     // Leave the visible U_* values alone, but acknowledge only successfully merged edits.
@@ -2925,45 +2927,41 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         return Ok(());
     }
 
-    // Acquire board lock to check for duplicates and add user
-    let mut board_guard = vm.icy_board_state.board.lock().await;
+    let name = trimmed.to_string();
+    let created = IcyBoard::write_users(&vm.icy_board_state.board, move |board| {
+        let duplicate = board
+            .users
+            .iter()
+            .any(|u| u.get_name().eq_ignore_ascii_case(&name) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(&name)));
+        if duplicate {
+            return Ok(None);
+        }
 
-    // Validate for duplicates (case-insensitive name/alias check)
-    let duplicate = board_guard
-        .users
-        .iter()
-        .any(|u| u.get_name().eq_ignore_ascii_case(trimmed) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(trimmed)));
+        let mut new_user = User::default();
+        new_user.set_name(name);
+        new_user.stats.first_date_on = Utc::now();
+        new_user.stats.last_on = Utc::now();
+        new_user.security_level = board.config.new_user_settings.sec_level;
 
-    if duplicate {
+        if board.config.accounting.enabled
+            && let Some(acc_cfg) = &board.config.accounting.accounting_config
+        {
+            new_user.account = Some(AccountUserInf {
+                starting_balance: acc_cfg.new_user_balance,
+                start_this_session: acc_cfg.new_user_balance,
+                ..Default::default()
+            });
+        }
+
+        let record_index = board.edit_users(|users| Ok(users.new_user(new_user)))?;
+        Ok(Some((record_index, board.users[record_index].clone())))
+    })
+    .await?;
+    let Some((record_index, new_user)) = created else {
         log::warn!("ADDUSER: duplicate username '{trimmed}', no user created");
         return Ok(());
-    }
-
-    // Create new user with system defaults
-    let mut new_user = User::default();
-    new_user.set_name(trimmed.to_string());
-    new_user.stats.first_date_on = Utc::now();
-    new_user.stats.last_on = Utc::now();
-    new_user.security_level = board_guard.config.new_user_settings.sec_level;
-
-    // Initialize accounting if enabled
-    if board_guard.config.accounting.enabled
-        && let Some(acc_cfg) = &board_guard.config.accounting.accounting_config
-    {
-        new_user.account = Some(AccountUserInf {
-            starting_balance: acc_cfg.new_user_balance,
-            start_this_session: acc_cfg.new_user_balance,
-            ..Default::default()
-        });
-    }
-
-    // Add user to user base
-    let record_index = board_guard.edit_users(|users| Ok(users.new_user(new_user)))?;
-    let new_user = board_guard.users[record_index].clone();
+    };
     log::info!("ADDUSER: created user '{}' as record #{}", trimmed, record_index + 1);
-
-    // Release board lock before modifying VM state
-    drop(board_guard);
 
     // Handle variable context switching
     if keep_alt_vars {

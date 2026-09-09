@@ -71,12 +71,9 @@ impl Statistics {
         self.today.messages += 1;
     }
 
-    pub fn add_download(&mut self, state: &icy_net::protocol::TransferState) {
+    pub fn add_download_totals(&mut self, files: u64, bytes: u64) {
         self.begin_day();
-        let files = state.send_state.finished_files.len() as u64;
-        // `file_size` is the file being sent and is cleared as each one finishes, so the
-        // running total is the only thing left to count once a batch is done.
-        let kb = state.send_state.total_bytes_transfered / 1024;
+        let kb = bytes / 1024;
         self.total.downloads += files;
         self.total.downloads_kb += kb;
 
@@ -84,10 +81,9 @@ impl Statistics {
         self.today.downloads_kb += kb;
     }
 
-    pub fn add_upload(&mut self, state: &icy_net::protocol::TransferState) {
+    pub fn add_upload_totals(&mut self, files: u64, bytes: u64) {
         self.begin_day();
-        let files = state.recieve_state.finished_files.len() as u64;
-        let kb = state.recieve_state.total_bytes_transfered / 1024;
+        let kb = bytes / 1024;
         self.total.uploads += files;
         self.total.uploads_kb += kb;
 
@@ -138,32 +134,11 @@ impl PCBoardImport for Statistics {
 #[cfg(test)]
 mod tests {
     use super::{Statistics, UsageStatistics};
-    use icy_net::protocol::TransferState;
-    use std::path::PathBuf;
-
-    /// What a protocol leaves behind after a batch: every file moved to `finished_files`,
-    /// with the running total in `total_bytes_transfered` and `file_size` cleared.
-    fn finished_batch(files: &[(&str, u64)]) -> TransferState {
-        let mut state = TransferState::new("Test".to_string());
-        for (name, size) in files {
-            state.send_state.file_name = name.to_string();
-            state.send_state.file_size = *size;
-            state.send_state.total_bytes_transfered += *size;
-            state.send_state.finish_file(PathBuf::from(name));
-
-            state.recieve_state.file_name = name.to_string();
-            state.recieve_state.file_size = *size;
-            state.recieve_state.total_bytes_transfered += *size;
-            state.recieve_state.finish_file(PathBuf::from(name));
-        }
-        state.is_finished = true;
-        state
-    }
 
     #[test]
     fn a_finished_download_counts_files_and_kilobytes() {
         let mut stats = Statistics::default();
-        stats.add_download(&finished_batch(&[("A.ZIP", 2048), ("B.ZIP", 1024)]));
+        stats.add_download_totals(2, 2048 + 1024);
         assert_eq!(stats.total.downloads, 2);
         assert_eq!(stats.total.downloads_kb, 3);
         assert_eq!(stats.today.downloads_kb, 3);
@@ -172,10 +147,84 @@ mod tests {
     #[test]
     fn a_finished_upload_counts_files_and_kilobytes() {
         let mut stats = Statistics::default();
-        stats.add_upload(&finished_batch(&[("A.ZIP", 4096)]));
+        stats.add_upload_totals(1, 4096);
         assert_eq!(stats.total.uploads, 1);
         assert_eq!(stats.total.uploads_kb, 4);
         assert_eq!(stats.today.uploads_kb, 4);
+    }
+
+    #[test]
+    fn transfer_totals_roll_over_and_add_with_per_batch_kilobyte_rounding() {
+        let mut stats = Statistics {
+            today_date: "1993-09-06".into(),
+            today: UsageStatistics {
+                downloads: 99,
+                uploads: 99,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        stats.add_download_totals(2, 2047);
+        stats.add_download_totals(1, 1023);
+        stats.add_upload_totals(2, 3071);
+        stats.add_upload_totals(1, 1023);
+        for counts in [&stats.today, &stats.total] {
+            assert_eq!(counts.downloads, 3);
+            assert_eq!(counts.downloads_kb, 1);
+            assert_eq!(counts.uploads, 3);
+            assert_eq!(counts.uploads_kb, 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn writer_preserves_concurrent_deltas_and_applies_reset_in_order() {
+        use crate::icy_board::{IcyBoard, IcyBoardSerializer};
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("statistics.toml");
+        let mut board = IcyBoard::new();
+        board.config.paths.statistics_file = path.clone();
+        let board = Arc::new(Mutex::new(board));
+        let mut jobs = Vec::new();
+        for _ in 0..16 {
+            let board = board.clone();
+            jobs.push(tokio::spawn(async move {
+                IcyBoard::write_statistics(&board, move |statistics| {
+                    statistics.add_message();
+                    statistics.add_download_totals(2, 3072);
+                    statistics.add_upload_totals(1, 2048);
+                })
+                .await
+                .unwrap();
+            }));
+        }
+        for job in jobs {
+            job.await.unwrap();
+        }
+        let saved = Statistics::load(&path).unwrap();
+        for counts in [&saved.today, &saved.total] {
+            assert_eq!(counts.messages, 16);
+            assert_eq!(counts.downloads, 32);
+            assert_eq!(counts.downloads_kb, 48);
+            assert_eq!(counts.uploads, 16);
+            assert_eq!(counts.uploads_kb, 32);
+        }
+        assert_eq!(board.lock().await.statistics.total.messages, 16);
+        IcyBoard::write_statistics(&board, move |statistics| *statistics = Default::default())
+            .await
+            .unwrap();
+        IcyBoard::write_statistics(&board, move |statistics| statistics.add_message()).await.unwrap();
+        let saved = Statistics::load(&path).unwrap();
+        assert_eq!(saved.total.messages, 1);
+        assert_eq!(saved.total.downloads, 0);
+        assert_eq!(saved.total.uploads, 0);
+
+        // A directory as the destination forces the historical log-only save failure.
+        board.lock().await.config.paths.statistics_file = directory.path().to_path_buf();
+        IcyBoard::write_statistics(&board, move |statistics| statistics.add_message()).await.unwrap();
+        assert_eq!(board.lock().await.statistics.total.messages, 2);
     }
 
     /// The caller number is the lifetime one, which is what ends up in the caller log.

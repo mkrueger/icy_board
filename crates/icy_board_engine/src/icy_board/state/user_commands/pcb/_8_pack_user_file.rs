@@ -1,5 +1,6 @@
 use chrono::Utc;
 
+use crate::icy_board::IcyBoard;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::user_maintenance::{self, UserSelection};
 use crate::{Res, datetime::IcbDate, icy_board::state::IcyBoardState};
@@ -76,21 +77,15 @@ impl IcyBoardState {
             ..Default::default()
         };
 
-        let mut board = self.board.lock().await;
-        let users_file = board.resolve_file(&board.config.paths.user_file);
-        if let Err(err) = user_maintenance::create_backup(&users_file) {
-            log::error!("Could not back up the user file before packing: {err}");
-            drop(board);
-            self.display_text(
-                IceText::ErrorInUsersFile,
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,
-            )
-            .await?;
-            return Ok(());
-        }
-
-        let save_result = board.edit_users(|users| Ok(user_maintenance::pack(users, &selection, Utc::now())));
-        drop(board);
+        let save_result = IcyBoard::write_users(&self.board, move |board| {
+            let users_file = board.resolve_file(&board.config.paths.user_file);
+            if let Err(err) = user_maintenance::create_backup(&users_file) {
+                log::error!("Could not back up the user file before packing: {err}");
+                return Err(err);
+            }
+            board.edit_users(|users| Ok(user_maintenance::pack(users, &selection, Utc::now())))
+        })
+        .await;
 
         let report = match save_result {
             Ok(report) => report,

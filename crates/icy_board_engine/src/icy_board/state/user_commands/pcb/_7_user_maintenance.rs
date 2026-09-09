@@ -1,6 +1,7 @@
 use crate::datetime::IcbDate;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::user_base::User;
+use crate::icy_board::{IcyBoard, user_store::UserUpdateError};
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
@@ -84,26 +85,28 @@ impl IcyBoardState {
                 }
                 "D" => {
                     if record > 0 && self.ask_yes_no(IceText::DeleteRecord, false).await? {
-                        let mut board = self.board.lock().await;
-                        let result = board.edit_users(|users| {
-                            let user = &mut users[record];
-                            user.flags.delete_flag = true;
-                            user.security_level = 0;
-                            user.exp_security_level = 0;
-                            Ok(())
-                        });
-                        drop(board);
+                        let result = IcyBoard::write_users(&self.board, move |board| {
+                            board.edit_users(|users| {
+                                let user = users.get_mut(record).ok_or(UserUpdateError::MissingIdentity)?;
+                                user.flags.delete_flag = true;
+                                user.security_level = 0;
+                                user.exp_security_level = 0;
+                                Ok(())
+                            })
+                        })
+                        .await;
                         self.report_save(result).await?;
                     }
                 }
                 "U" => {
                     if record > 0 {
-                        let mut board = self.board.lock().await;
-                        let result = board.edit_users(|users| {
-                            users[record].flags.delete_flag = false;
-                            Ok(())
-                        });
-                        drop(board);
+                        let result = IcyBoard::write_users(&self.board, move |board| {
+                            board.edit_users(|users| {
+                                users.get_mut(record).ok_or(UserUpdateError::MissingIdentity)?.flags.delete_flag = false;
+                                Ok(())
+                            })
+                        })
+                        .await;
                         self.report_save(result).await?;
                     }
                 }
@@ -138,7 +141,9 @@ impl IcyBoardState {
                 "C" | "E" => {
                     let current = {
                         let board = self.board.lock().await;
-                        let user = &board.users[record];
+                        let Some(user) = board.users.get(record) else {
+                            continue;
+                        };
                         if user.expiration_date == chrono::DateTime::<chrono::Utc>::default() {
                             String::new()
                         } else {
@@ -169,12 +174,13 @@ impl IcyBoardState {
                         }
                         parsed.to_utc_date_time()
                     };
-                    let mut board = self.board.lock().await;
-                    let result = board.edit_users(|users| {
-                        users[record].expiration_date = expiration_date;
-                        Ok(())
-                    });
-                    drop(board);
+                    let result = IcyBoard::write_users(&self.board, move |board| {
+                        board.edit_users(|users| {
+                            users.get_mut(record).ok_or(UserUpdateError::MissingIdentity)?.expiration_date = expiration_date;
+                            Ok(())
+                        })
+                    })
+                    .await;
                     self.report_save(result).await?;
                 }
                 "L" | "S" => {

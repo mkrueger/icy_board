@@ -1,4 +1,12 @@
-use std::{fs, net::SocketAddr, path::PathBuf};
+use std::{
+    fs,
+    future::{Future, poll_fn},
+    net::SocketAddr,
+    path::PathBuf,
+    pin::pin,
+    task::Poll,
+    time::Duration,
+};
 
 use std::sync::Arc;
 
@@ -14,6 +22,7 @@ use icy_board_engine::icy_board::{
     icb_config::IcbConfig,
     lock::LOCK_FILE_NAME,
     upload_quarantine::{QuarantineRecord, QuarantineStatus, UploadQuarantine},
+    user_base::{User, UserBase},
 };
 use tokio::sync::Mutex;
 
@@ -361,6 +370,131 @@ async fn live_backend_updates_disk_and_running_board() {
     let saved = IcbConfig::load(&f.file).unwrap();
     assert_eq!(saved.board.name, "Live Board");
     assert_eq!(saved.board.num_nodes, 12);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn live_config_waits_for_user_commit_and_preserves_reader_snapshots() {
+    let f = fixture();
+    let current = f.backend.get_paths_settings().await.unwrap();
+    let before = f.board.lock().await.configuration_snapshot();
+    let old_user_file = before.paths.user_file.clone();
+    fs::create_dir_all(old_user_file.parent().unwrap()).unwrap();
+    let new_user_file = f.backend.root_path().join("new-users.toml");
+    let mut patch = current.settings.clone();
+    patch.user_file = "new-users.toml".into();
+
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let writer_board = f.board.clone();
+    let expected_config = before.clone();
+    let writer = tokio::spawn(async move {
+        IcyBoard::write_users(&writer_board, move |context| {
+            assert!(context.config.ptr_eq(&expected_config));
+            entered_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            context.edit_users(|users| {
+                users.new_user(User {
+                    name: "Ordered user".into(),
+                    ..Default::default()
+                });
+                Ok(())
+            })
+        })
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(10), entered_rx).await.unwrap().unwrap();
+
+    let mut update = pin!(f.backend.update_paths_settings(&patch, &current.fingerprint, "test"));
+    // Poll through submission while the first writer deliberately cannot finish.
+    poll_fn(|cx| {
+        assert!(update.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    let during = tokio::time::timeout(Duration::from_secs(2), f.board.lock())
+        .await
+        .expect("a stalled writer must not hold the board lock");
+    assert!(during.configuration_snapshot().ptr_eq(&before));
+    assert!(during.users.is_empty());
+    drop(during);
+    assert_eq!(f.backend.get_paths_settings().await.unwrap().settings.user_file, current.settings.user_file);
+    assert_eq!(IcbConfig::load(&f.file).unwrap().paths.user_file, PathBuf::from(&current.settings.user_file));
+    release_tx.send(()).unwrap();
+
+    tokio::time::timeout(Duration::from_secs(10), writer).await.unwrap().unwrap().unwrap();
+    tokio::time::timeout(Duration::from_secs(10), update).await.unwrap().unwrap();
+    assert_eq!(UserBase::load(&old_user_file).unwrap()[0].name, "Ordered user");
+    assert!(!new_user_file.exists());
+    let after = f.board.lock().await.configuration_snapshot();
+    assert_eq!(after.paths.user_file, new_user_file);
+    assert_eq!(before.paths.user_file, old_user_file);
+    assert!(!after.ptr_eq(&before));
+
+    IcyBoard::write_users(&f.board, move |context| {
+        assert_eq!(context.config.paths.user_file, new_user_file);
+        context.edit_users(|users| {
+            users[0].city = "After config update".into();
+            Ok(())
+        })
+    })
+    .await
+    .unwrap();
+    assert_eq!(UserBase::load(&after.paths.user_file).unwrap()[0].city, "After config update");
+    assert_ne!(UserBase::load(&old_user_file).unwrap()[0].city, "After config update");
+}
+
+#[tokio::test]
+async fn backup_failure_does_not_replace_live_config() {
+    let f = fixture();
+    let current = f.backend.get_general_settings().await.unwrap();
+    let before = f.board.lock().await.configuration_snapshot();
+    let disk_before = fs::read(&f.file).unwrap();
+    fs::write(f.backend.root_path().join("backups"), "not a directory").unwrap();
+    let mut patch = current.settings.clone();
+    patch.board_name = "Must not publish".into();
+
+    let error = f.backend.update_general_settings(&patch, &current.fingerprint, "test").await.unwrap_err();
+    assert!(matches!(error, AdminError::Io(_)));
+    assert!(f.board.lock().await.configuration_snapshot().ptr_eq(&before));
+    assert_eq!(fs::read(&f.file).unwrap(), disk_before);
+    assert!(!f.backend.root_path().join("icbadmin-audit.log").exists());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn save_failure_does_not_replace_live_config() {
+    use std::os::unix::fs::PermissionsExt;
+
+    struct RestorePermissions(PathBuf, fs::Permissions);
+    impl Drop for RestorePermissions {
+        fn drop(&mut self) {
+            fs::set_permissions(&self.0, self.1.clone()).unwrap();
+        }
+    }
+
+    let f = fixture();
+    let current = f.backend.get_general_settings().await.unwrap();
+    let before = f.board.lock().await.configuration_snapshot();
+    let disk_before = fs::read(&f.file).unwrap();
+    let root = f.backend.root_path();
+    fs::create_dir(root.join("backups")).unwrap();
+    let _file_lock = icbadmin::backup::BoardLock::acquire(root).unwrap();
+    let restore = RestorePermissions(root.to_path_buf(), fs::metadata(root).unwrap().permissions());
+    fs::set_permissions(root, fs::Permissions::from_mode(0o555)).unwrap();
+    if tempfile::NamedTempFile::new_in(root).is_ok() {
+        eprintln!("skipping permission failure injection: process can write to a read-only directory");
+        return;
+    }
+    let mut patch = current.settings.clone();
+    patch.board_name = "Must not publish".into();
+    let result = f.backend.update_general_settings(&patch, &current.fingerprint, "test").await;
+    drop(restore);
+
+    assert!(matches!(result, Err(AdminError::Save(_))), "{result:?}");
+    assert_eq!(fs::read_dir(root.join("backups")).unwrap().count(), 1);
+    assert!(f.board.lock().await.configuration_snapshot().ptr_eq(&before));
+    assert_eq!(fs::read(&f.file).unwrap(), disk_before);
+    assert!(!root.join("icbadmin-audit.log").exists());
 }
 
 async fn conference_fixture() -> (Fixture, PathBuf) {

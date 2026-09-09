@@ -12,7 +12,13 @@ use crate::icy_board::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use icy_net::{ConnectionType, channel::ChannelConnection};
-use std::sync::{Arc, LazyLock};
+use std::{
+    future::{Future, poll_fn},
+    pin::Pin,
+    sync::{Arc, LazyLock, mpsc},
+    task::Poll,
+    time::Duration,
+};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
@@ -186,6 +192,287 @@ fn session_snapshot(state: &IcyBoardState) -> SessionSnapshot {
         saved_minutes: state.session.saved_session_minutes,
         request_logoff: state.session.request_logoff,
     }
+}
+
+const SAVE_DEADLINE: Duration = Duration::from_secs(10);
+
+async fn poll_pending<F: Future>(mut future: Pin<&mut F>) {
+    poll_fn(|cx| {
+        assert!(future.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+}
+
+async fn cancel_at_file_sync(state: &mut IcyBoardState) -> mpsc::Sender<()> {
+    let (entered_tx, entered) = tokio::sync::oneshot::channel();
+    let (release, released) = mpsc::channel();
+    IcyBoard::ordered_persistence(&state.board, move || {
+        crate::icy_board::BEFORE_FILE_SYNC.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                entered_tx.send(()).unwrap();
+                released.recv_timeout(SAVE_DEADLINE).unwrap();
+            }));
+        });
+    })
+    .await
+    .unwrap();
+    let mut save = Box::pin(state.persist_current_user());
+    tokio::select! {
+        result = &mut save => panic!("save completed before cancellation: {result:?}"),
+        result = tokio::time::timeout(SAVE_DEADLINE, entered) => result.unwrap().unwrap(),
+    }
+    drop(save);
+    assert!(state.pending_user_save.is_some());
+    release
+}
+
+#[tokio::test]
+async fn cancelled_state_save_rebases_later_edits_and_posts_activity_once() {
+    for (login_day, finalize) in [(8, false), (8, true), (9, false), (9, true)] {
+        let mut f = Fixture::new(8, [login_day, login_day]).await;
+        f.first.accounting_start().await.unwrap();
+        f.second.accounting_start().await.unwrap();
+        edit(&mut f.second).web = "https://example.invalid/other-node".into();
+        edit(&mut f.second).stats.messages_read += 5;
+        f.second.accounting_record(16, "CREDIT", "", 30.0, 1).unwrap();
+        f.second.persist_current_user().await.unwrap();
+        edit(&mut f.first).city = "Submitted city".into();
+        edit(&mut f.first).stats.messages_read += 2;
+        edit(&mut f.first).stats.today_num_downloads += 2;
+        f.first.accounting_record(4, "READ", "", 2.0, 1).unwrap();
+        let baseline = session_snapshot(&f.first);
+        let release = cancel_at_file_sync(&mut f.first).await;
+        assert_eq!(session_snapshot(&f.first), baseline);
+        assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+        edit(&mut f.first).city = "Later city".into();
+        edit(&mut f.first).stats.messages_read += 3;
+        edit(&mut f.first).stats.today_num_downloads += 3;
+        f.first.accounting_record(4, "READ", "", 3.0, 1).unwrap();
+        f.first.accounting_record(16, "CREDIT", "", 4.0, 1).unwrap();
+        release.send(()).unwrap();
+        tokio::time::timeout(SAVE_DEADLINE, IcyBoard::flush_persistence(&f.first.board))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(f.disk()[CALLER].stats.messages_read, 27);
+        assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 2.0);
+        if finalize {
+            f.first.accounting_finish().await.unwrap();
+            f.first.accounting_finish().await.unwrap();
+        } else {
+            f.first.persist_current_user().await.unwrap();
+        }
+        f.first.persist_current_user().await.unwrap();
+        let disk = f.disk();
+        assert_eq!(disk[CALLER].city, "Later city");
+        assert_eq!(disk[CALLER].web, "https://example.invalid/other-node");
+        assert_eq!(disk[CALLER].stats.num_times_on, 12);
+        assert_eq!(disk[CALLER].stats.messages_read, 30);
+        assert_eq!(disk[CALLER].stats.today_num_downloads, if login_day == 8 { 8 } else { 5 });
+        let account = disk[CALLER].account.as_ref().unwrap();
+        assert_eq!(account.debit_msg_read, 5.0);
+        assert_eq!(account.credit_special, 34.0);
+        let account = local(&f.first).account.as_ref().unwrap();
+        assert_eq!(account.start_this_session, 100.0);
+        assert_eq!(account.credit_special, 4.0);
+        assert_eq!(account.debit_msg_read, 5.0);
+        assert_eq!(f.first.session.calculate_balance(), 99.0);
+        assert_refreshed(&f.first);
+        f.assert_disk_matches_board().await;
+    }
+}
+
+#[tokio::test]
+async fn cancelled_save_does_not_reauthorize_credentials_changed_before_acknowledgement() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    f.first.accounting_start().await.unwrap();
+    let authorization = f.first.session.authenticated_security.clone();
+    edit(&mut f.first).stats.messages_read += 2;
+    f.first.accounting_record(4, "READ", "", 2.0, 1).unwrap();
+    let release = cancel_at_file_sync(&mut f.first).await;
+    edit(&mut f.first).email = "later-local@example.invalid".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    f.first.accounting_record(4, "READ", "", 3.0, 1).unwrap();
+    release.send(()).unwrap();
+    IcyBoard::write_users(&f.first.board, |board| {
+        board.edit_users(|users| {
+            users[CALLER].email = "authoritative@example.invalid".into();
+            users[CALLER].flags.disabled_flag = true;
+            Ok(())
+        })
+    })
+    .await
+    .unwrap();
+    let live = security_fingerprint(&f.disk()[CALLER]);
+    assert!(f.first.persist_current_user().await.is_err());
+    f.first.accounting_finish().await.unwrap();
+    f.first.accounting_finish().await.unwrap();
+    assert_eq!(security_fingerprint(&f.disk()[CALLER]), live);
+    assert_eq!(f.first.session.authenticated_security, authorization);
+    assert!(f.first.session.request_logoff);
+    assert!(!f.first.credentials_still_current().await);
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 5.0);
+    f.assert_disk_matches_board().await;
+}
+
+#[tokio::test]
+async fn cancelled_failed_save_keeps_uncommitted_edits_for_retry() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    f.first.accounting_start().await.unwrap();
+    edit(&mut f.first).city = "Submitted city".into();
+    edit(&mut f.first).stats.messages_read += 2;
+    f.first.accounting_record(4, "READ", "", 2.0, 1).unwrap();
+    let baseline = f.first.session.user_baseline.clone().unwrap();
+    let release = cancel_at_file_sync(&mut f.first).await;
+    edit(&mut f.first).city = "Later city".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    f.first.accounting_record(4, "READ", "", 3.0, 1).unwrap();
+    let path = f.root.path().join("users.toml");
+    std::fs::remove_file(&path).unwrap();
+    std::fs::create_dir(&path).unwrap();
+    release.send(()).unwrap();
+    let snapshot = session_snapshot(&f.first);
+    assert!(f.first.persist_current_user().await.is_err());
+    assert!(f.first.pending_user_save.is_none());
+    assert_eq!(session_snapshot(&f.first), snapshot);
+    assert_user_eq(f.first.session.user_baseline.as_ref().unwrap(), &baseline);
+    assert_eq!(f.first.get_board().await.users[CALLER].stats.messages_read, 20);
+    std::fs::remove_dir(&path).unwrap();
+    f.first.persist_current_user().await.unwrap();
+    f.first.accounting_finish().await.unwrap();
+    assert_eq!(f.disk()[CALLER].city, "Later city");
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 5.0);
+    assert_refreshed(&f.first);
+    f.assert_disk_matches_board().await;
+}
+
+#[tokio::test]
+async fn cancelled_save_retains_successful_receipt_through_rebase_conflict() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    f.first.accounting_start().await.unwrap();
+    edit(&mut f.second).city = "Other node city".into();
+    f.second.persist_current_user().await.unwrap();
+    edit(&mut f.first).stats.messages_read += 2;
+    f.first.accounting_record(4, "READ", "", 2.0, 1).unwrap();
+    let release = cancel_at_file_sync(&mut f.first).await;
+    edit(&mut f.first).city = "Later conflicting city".into();
+    edit(&mut f.first).web = "https://example.invalid/later".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    f.first.accounting_record(4, "READ", "", 3.0, 1).unwrap();
+    release.send(()).unwrap();
+    for _ in 0..2 {
+        let error = f.first.persist_current_user().await.unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<UserUpdateError>(),
+            Some(&UserUpdateError::Conflict { field: "city".into() })
+        );
+        assert!(f.first.pending_user_save.as_ref().unwrap().saved.is_some());
+        assert_eq!(f.disk()[CALLER].stats.messages_read, 22);
+    }
+    f.first.accounting_finish().await.unwrap();
+    f.first.persist_final_user().await.unwrap();
+    assert_eq!(f.disk()[CALLER].city, "Other node city");
+    assert_eq!(f.disk()[CALLER].web, "https://example.invalid/later");
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 5.0);
+    assert_refreshed(&f.first);
+    f.assert_disk_matches_board().await;
+}
+
+#[tokio::test]
+async fn cancelled_before_queue_admission_resumes_the_same_submission_once() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    f.first.accounting_start().await.unwrap();
+    let board = f.first.board.clone();
+    let (entered_tx, entered) = tokio::sync::oneshot::channel();
+    let (release, released) = mpsc::channel();
+    let mut blocker = Box::pin(IcyBoard::ordered_persistence(&board, move || {
+        entered_tx.send(()).unwrap();
+        released.recv_timeout(SAVE_DEADLINE).unwrap();
+    }));
+    poll_pending(blocker.as_mut()).await;
+    tokio::time::timeout(SAVE_DEADLINE, entered).await.unwrap().unwrap();
+    let mut queued = Vec::new();
+    for _ in 0..32 {
+        let mut request = Box::pin(IcyBoard::ordered_persistence(&board, || ()));
+        poll_pending(request.as_mut()).await;
+        queued.push(request);
+    }
+    edit(&mut f.first).city = "Submitted city".into();
+    edit(&mut f.first).stats.messages_read += 2;
+    f.first.accounting_record(4, "READ", "", 2.0, 1).unwrap();
+    for _ in 0..2 {
+        let mut save = Box::pin(f.first.persist_current_user());
+        poll_pending(save.as_mut()).await;
+        drop(save);
+        assert!(f.first.pending_user_save.as_ref().unwrap().operation.is_some());
+    }
+    edit(&mut f.first).city = "Later city".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    f.first.accounting_record(4, "READ", "", 3.0, 1).unwrap();
+    release.send(()).unwrap();
+    tokio::time::timeout(SAVE_DEADLINE, blocker).await.unwrap().unwrap();
+    for request in queued {
+        tokio::time::timeout(SAVE_DEADLINE, request).await.unwrap().unwrap();
+    }
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 20);
+    let revision = f.first.get_board().await.user_revision;
+    f.first.accounting_finish().await.unwrap();
+    assert_eq!(f.first.get_board().await.user_revision, revision + 2);
+    f.first.accounting_finish().await.unwrap();
+    assert_eq!(f.disk()[CALLER].city, "Later city");
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 5.0);
+    assert_refreshed(&f.first);
+    f.assert_disk_matches_board().await;
+}
+
+#[tokio::test]
+async fn switching_user_settles_cancelled_save_and_later_edits_without_active_accounting() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    edit(&mut f.first).stats.messages_read += 2;
+    let release = cancel_at_file_sync(&mut f.first).await;
+    edit(&mut f.first).city = "Later city".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    release.send(()).unwrap();
+    f.first.set_current_user(2, false).await.unwrap();
+    assert!(f.first.pending_user_save.is_none());
+    assert_eq!(f.first.session.cur_user_id, 2);
+    assert_eq!(local(&f.first).name, "Unrelated sentinel");
+    assert_eq!(local(&f.first).stats.messages_read, 0);
+    assert_eq!(f.disk()[CALLER].city, "Later city");
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].stats.num_times_on, 11);
+    f.assert_disk_matches_board().await;
+}
+
+#[tokio::test]
+async fn finalization_retries_cancelled_failed_save_without_started_accounting() {
+    let mut f = Fixture::new(8, [8, 8]).await;
+    edit(&mut f.first).stats.messages_read += 2;
+    let release = cancel_at_file_sync(&mut f.first).await;
+    edit(&mut f.first).city = "Later city".into();
+    edit(&mut f.first).stats.messages_read += 3;
+    let path = f.root.path().join("users.toml");
+    std::fs::remove_file(&path).unwrap();
+    std::fs::create_dir(&path).unwrap();
+    release.send(()).unwrap();
+    assert!(f.first.accounting_finish().await.is_err());
+    assert!(f.first.pending_user_save.is_none());
+    assert!(f.first.accounting_finish().await.is_err());
+    std::fs::remove_dir(&path).unwrap();
+    f.first.accounting_finish().await.unwrap();
+    let revision = f.first.get_board().await.user_revision;
+    f.first.accounting_finish().await.unwrap();
+    assert_eq!(f.first.get_board().await.user_revision, revision);
+    assert_eq!(f.disk()[CALLER].city, "Later city");
+    assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
+    assert_eq!(f.disk()[CALLER].stats.num_times_on, 11);
+    assert_refreshed(&f.first);
+    f.assert_disk_matches_board().await;
 }
 
 #[tokio::test]

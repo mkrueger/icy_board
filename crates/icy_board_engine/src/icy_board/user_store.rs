@@ -1,6 +1,6 @@
-//! Typed, optimistic user updates under the board's existing exclusive lock.
+//! Typed optimistic merges shared by offline editors and the runtime persistence writer.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use chrono::NaiveDate;
 use thiserror::Error;
@@ -8,7 +8,9 @@ use thiserror::Error;
 use crate::Res;
 
 use super::{
-    IcyBoard, IcyBoardSerializer, password_recovery,
+    IcyBoard, IcyBoardSerializer,
+    icb_config::IcbConfig,
+    password_recovery, resolve_file_from_root,
     user_base::{ConferenceFlags, LastReadStatus, User, UserBase, UserStats},
     user_inf::AccountUserInf,
 };
@@ -50,6 +52,14 @@ pub enum UserUpdateError {
     AmbiguousIdentity,
     #[error("User update identity has been replaced")]
     IdentityChanged,
+    #[error("Runtime persistence is active; submit this change through the writer")]
+    WriterBusy,
+    #[error("Board persistence transaction gate is poisoned; committed state must be verified before restarting")]
+    WriterPoisoned,
+    #[error("Board persistence writer stopped before acknowledging the request")]
+    WriterStopped,
+    #[error("Board persistence callback panicked")]
+    WriterPanicked,
 }
 
 fn conflict(field: &str) -> Box<dyn std::error::Error + Send + Sync> {
@@ -134,7 +144,41 @@ pub fn merge_user(baseline: &User, edited: &User, latest: &User, mode: UserUpdat
 }
 
 impl IcyBoard {
-    /// Resolve the exact original primary name, not the alias/login-name lookup.
+    /// Offline-only update by exact primary name; rejects an active or poisoned writer gate.
+    pub fn update_user(&mut self, baseline: &User, edited: &User, mode: UserUpdateMode) -> Res<User> {
+        let writer = self.persistence_writer.clone();
+        let _offline = writer.offline_guard()?;
+        self.user_write_core().update_user(baseline, edited, mode)
+    }
+
+    /// Offline-only staged save; rejects an active or poisoned writer gate.
+    pub fn edit_users<R>(&mut self, edit: impl FnOnce(&mut UserBase) -> Res<R>) -> Res<R> {
+        let writer = self.persistence_writer.clone();
+        let _offline = writer.offline_guard()?;
+        self.user_write_core().edit_users(edit)
+    }
+
+    fn user_write_core(&mut self) -> UserWriteCore<'_> {
+        UserWriteCore {
+            users: &mut self.users,
+            revision: &mut self.user_revision,
+            config: &self.config,
+            root_path: &self.root_path,
+            recovery: &self.password_recovery_service,
+        }
+    }
+}
+
+// Callers hold the writer gate for the entire operation, including publication.
+pub(super) struct UserWriteCore<'a> {
+    pub users: &'a mut UserBase,
+    pub revision: &'a mut u64,
+    pub config: &'a IcbConfig,
+    pub root_path: &'a Path,
+    pub recovery: &'a password_recovery::RecoveryService,
+}
+
+impl UserWriteCore<'_> {
     pub fn update_user(&mut self, baseline: &User, edited: &User, mode: UserUpdateMode) -> Res<User> {
         let concurrent_tracking = self.config.accounting.concurrent_tracking;
         let index = self.edit_users(|users| {
@@ -160,24 +204,18 @@ impl IcyBoard {
         Ok(self.users[index].clone())
     }
 
-    /// Publish only after the complete staged base has been saved successfully.
     pub fn edit_users<R>(&mut self, edit: impl FnOnce(&mut UserBase) -> Res<R>) -> Res<R> {
         let mut staging = self.users.clone();
         let result = edit(&mut staging)?;
         for user in staging.iter_mut() {
             password_recovery::normalize_security(user);
-            if !self.config.password_recovery.enabled
-                || user
-                    .recovery
-                    .as_ref()
-                    .is_some_and(|challenge| self.password_recovery_service.is_revoked(challenge))
-            {
+            if !self.config.password_recovery.enabled || user.recovery.as_ref().is_some_and(|challenge| self.recovery.is_revoked(challenge)) {
                 user.recovery = None;
             }
         }
-        staging.save(&self.resolve_file(&self.config.paths.user_file))?;
-        self.users = staging;
-        self.user_revision += 1;
+        staging.save(&resolve_file_from_root(self.root_path, &self.config.paths.user_file))?;
+        *self.users = staging;
+        *self.revision += 1;
         Ok(result)
     }
 }

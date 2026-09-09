@@ -82,17 +82,66 @@ Conference flags and read pointers merge per entry. Contacts,
 TPA vectors, QWK settings and bank records are atomic fields: simultaneous edits
 to different elements of these fields can still conflict.
 
-`IcyBoard::edit_users` handles creation, deletion, maintenance and recovery
-transactions under the existing board lock. It stages the entire base, including
-security normalization, writes it through the existing atomic-file replacement,
-and publishes it only after a successful save. `save_userbase` remains a
-compatibility wrapper; callers must not mutate live records before calling it
-when they require rollback of those mutations.
+Runtime callers submit `IcyBoard::write_users` requests. A bounded queue and one
+dedicated thread serialize checks, merges, security normalization and atomic
+file replacement. The writer takes cheap copy-on-write user/configuration
+snapshots under a short board lock, then releases it before cloning user records,
+serializing or performing file I/O. It briefly reacquires the lock to publish
+the saved base and revision; only then does the caller receive success.
+Readers retain the previous committed snapshot while a write is in progress.
+The callback's `UserWriteContext` exposes read-only snapshots and staged
+`edit_users`/`update_user` methods, not a mutable live board.
+
+Statistics use separate `write_statistics` payloads in the same ordered queue;
+their existing log-only disk-error policy is unchanged. Live-admin configuration
+transactions and backups deliberately share this FIFO with user/statistics writes.
+Policy and path changes cannot interleave with an active user write. A slow backup
+or save delays every later writer; this is ordering, not a write-throughput
+improvement. Snapshot readers retain short board-lock access during persistence
+I/O. Captured configuration snapshots remain stable; capturing again observes
+the latest published configuration.
+
+An accepted request completes even if its waiting caller is cancelled. Sessions
+retain the pending request and its acknowledgement, reconcile later local edits,
+and advance saved baselines before retrying or switching users. This prevents
+reposting already committed accounting deltas after cancellation; it does not
+add process-crash recovery.
+
+`flush_persistence` waits for prior requests; it is not an aggregate success report
+for their individual writes. Synchronous `IcyBoard::edit_users`
+and `update_user` remain available to offline tools and share the merge code;
+they return `WriterBusy` while the runtime writer holds its transaction gate.
+Both synchronous and queued operations fail closed with `WriterPoisoned` if the
+gate is poisoned: an interrupted transaction may have left disk and memory
+inconsistent. Poison is not cleared or treated as a stopped worker; committed
+state must be verified before restarting. `WriterStopped` denotes failure to
+obtain a worker acknowledgement, while a caught callback panic is `WriterPanicked`.
+`save_userbase` remains an offline compatibility wrapper.
+
+The public `users`, `statistics`, `config` and `persistence_writer` fields remain
+available for offline struct literals and initialization. This boundary is a
+caller contract, not type-enforced: direct live mutation bypasses the gate and
+can be silently overwritten by an in-flight worker. Holding the board lock alone
+does not prevent this, since the worker releases it during I/O. Replacing the
+writer also breaks shared ordering. Stop producers and drain accepted work before
+direct offline mutation; guarded offline user edits can coexist with an idle
+worker but reject an active or poisoned gate. Runtime mutations must use
+`write_users`, `write_statistics` or `ordered_persistence`. A snapshot-identity
+check before disk I/O cannot close this race, and detecting a conflict after
+commit would not roll back the durable write.
 
 Regression coverage is in `user_store_tests`, `state::user_update_tests`, VM
 `user_snapshots`, recovery tests and the ICBSM editor/list tests. It covers
 independent and conflicting two-node edits, repeated saves without duplicated
 charges/counters, stale credentials, map updates, failed saves and retries.
+`persistence_tests` additionally pauses the actual file-write path immediately
+before `sync_all`, checks that reads and the async executor remain available,
+and verifies FIFO merges, delayed acknowledgements, cancellation, failed writes,
+panic isolation, poison rejection, idle offline edits, busy-gate rejection and
+shutdown barriers. `UserWriteContext` doctests pair forbidden direct mutation
+examples with a compiling read/staged-write example using the same API. Snapshot
+tests check copy-on-write isolation and unchanged TOML formats; live-admin tests check ordered config
+publication and retention of live settings after failed persistence.
 
 The guarantees apply to writers sharing one loaded `IcyBoard`. They do not
 coordinate separate BBS/admin processes or manual file edits. Keep external

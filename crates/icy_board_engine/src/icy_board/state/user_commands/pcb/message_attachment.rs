@@ -19,6 +19,7 @@ use super::u_upload_file::create_protocol;
 use crate::{
     Res,
     icy_board::{
+        IcyBoard,
         icb_text::IceText,
         state::{
             IcyBoardState, Session,
@@ -462,10 +463,10 @@ impl IcyBoardState {
         if let Some(user) = &mut self.session.current_user {
             user.stats.messages_left += 1;
         }
-        self.get_board().await.statistics.add_message();
+        let statistics_result = IcyBoard::write_statistics(&self.board, move |statistics| statistics.add_message()).await;
         charged?;
         flushed?;
-        self.get_board().await.save_statistics()?;
+        statistics_result?;
         self.accounting_check_balance().await?;
         self.display_text(text, display_flags::DEFAULT).await?;
         self.println(TerminalTarget::Both, &number.to_string()).await?;

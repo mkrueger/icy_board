@@ -12,7 +12,7 @@ use crate::{Res, icy_board::state::IcyBoardState};
 
 use super::u_upload_file::create_protocol;
 use crate::{
-    icy_board::{icb_text::IceText, state::functions::display_flags},
+    icy_board::{IcyBoard, icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
 };
 
@@ -376,14 +376,8 @@ impl IcyBoardState {
             .map(|path| path.file_name().unwrap_or_default().to_string_lossy().to_string())
             .collect();
         self.count_downloads(&paths, &sent).await;
-        let mut successful = state.clone();
-        successful.send_state.total_bytes_transfered = bytes;
-        successful.send_state.finished_files = sent.iter().cloned().zip(paths).collect();
-        {
-            let mut board = self.board.lock().await;
-            board.statistics.add_download(&successful);
-            board.save_statistics()?;
-        }
+        let files = completed.len() as u64;
+        IcyBoard::write_statistics(&self.board, move |statistics| statistics.add_download_totals(files, bytes)).await?;
         // Commit completed-file accounting even if the connection subsequently
         // fails while printing the summary or caller log.
         self.accounting_check_balance().await?;
