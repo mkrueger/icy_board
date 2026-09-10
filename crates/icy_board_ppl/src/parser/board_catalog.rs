@@ -505,7 +505,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_named_function(n("SetVolume"), vec![("volume", V::Integer)], V::Boolean);
             registry.add_named_function_with(n("Play"), vec![("looping", V::Boolean)], 0, V::Boolean);
             registry.add_function(n("Stop"), Vec::new(), V::Boolean);
-            registry.add_named_function(n("Fade"), vec![("durationMs", V::Integer), ("targetVolume", V::Integer)], V::Boolean);
+            registry.add_named_function(n("Fade"), vec![("targetVolume", V::Integer), ("durationMs", V::Integer)], V::Boolean);
             registry.add_function(n("Free"), Vec::new(), V::Boolean);
             registry.add_named_static_function(n("Load"), vec![("file", V::UnboundedString)], V::UserData(AUDIO_ID as u32));
             registry.add_static_function(n("StopAll"), Vec::new(), V::Boolean);

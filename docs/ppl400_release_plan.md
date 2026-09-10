@@ -608,11 +608,31 @@ Surface, Grafik-Reinitialisierung sowie relevante verschachtelte PPE-Aufrufe.
 
 ### R2 — Audio-Vertrag vereinheitlichen (F5)
 
-**Besprechen:** Kanonische `Fade`-Argumentreihenfolge, Einheiten, Clamp-/Fehlerregeln.
+Status: am 2026-09-10 besprochen, freigegeben und umgesetzt.
 
-**Abnahme:** API-Katalog, LSP, Dokumentation und Runtime stimmen überein.
-Ein Ausgabe-Test prüft sowohl die gewünschte Lautstärke als auch die Dauer der
-tatsächlich erzeugten Terminalsequenz.
+**Befund:** Runtime, Dokumentation und Tests lasen `Fade(targetVolume, durationMs)`;
+nur der API-Katalog und damit die LSP-Signaturhilfe nannten die Dauer zuerst. Wer
+der Signaturhilfe folgte und `Fade(250, 0)` schrieb, bekam Lautstärke 250 —
+geklemmt auf 100 — und Dauer 0, also einen sofortigen Sprung auf volle Lautstärke
+statt eines Ausblendens.
+
+**Entscheidung:** Der Katalog wird an Runtime und Dokumentation angeglichen, nicht
+umgekehrt. Die Reihenfolge lautet verbindlich `Fade(targetVolume, durationMs)`.
+Die Alternative, die Runtime umzustellen, hätte das Verhalten jedes bestehenden
+Programms geändert und wurde ausdrücklich verworfen.
+
+**Kompatibilität:** keine. Parameternamen werden nur von der LSP-Signaturhilfe
+gelesen — beide Parameter sind `INTEGER`, benannte Argumente gibt es nicht. Kein
+Programm ändert seine Bedeutung, nichts muss neu übersetzt werden.
+
+**Einheiten:** Lautstärke ist ein Prozentwert und wird auf 0–100 geklemmt; eine
+Dauer von null oder weniger ändert die Lautstärke sofort statt gleitend.
+
+**Abnahme:** Katalog, LSP, Dokumentation und Runtime nennen dieselbe Reihenfolge.
+Zwei Ausgabe-Tests prüfen die tatsächlich gesendete Terminalsequenz mit
+Lautstärke *und* Dauer (`Volume;C=2;V=-60.00dB;T=250`) sowie das Klemmen von
+Lautstärke und negativer Dauer. Ein LSP-Test sichert die Reihenfolge in der
+Signaturhilfe ab.
 
 ### A1 — API-ABI und Fehlerverträge einfrieren (F3)
 
@@ -773,7 +793,7 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 - [x] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
 - [x] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.
 - [x] F4: Stale Handles bleiben auch nach Wiederverwendung ungültig.
-- [ ] F5: `Fade`-Vertrag einschließlich realer Ausgabe konsistent.
+- [x] F5: `Fade`-Vertrag einschließlich realer Ausgabe konsistent.
 - [ ] F6: Metadatenzugriff skaliert unabhängig von vollständigen User-Snapshots.
 - [ ] E1 Dateibrowser abgenommen.
 - [ ] E2 Nachrichtenleser mit Antwortfunktion abgenommen.

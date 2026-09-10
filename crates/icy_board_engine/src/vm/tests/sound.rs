@@ -123,9 +123,32 @@ fn a_sound_object_carries_its_own_channel() {
     assert!(output.contains("SyncTERM:A;Volume;C=2;"), "{output:?}");
     assert!(output.contains("Queue;C=2;S=2;L"), "{output:?}");
     assert_eq!(output.matches("1\n").count(), 3, "{output:?}");
-    assert!(output.contains("T=250"), "{output:?}");
+    // Fade takes the volume first: silence reached over 250 ms, not the reverse.
+    assert!(output.contains("Volume;C=2;V=-60.00dB;T=250"), "{output:?}");
     assert_eq!(output.matches("Flush;C=2;O=0").count(), 2, "{output:?}");
     assert!(output.ends_with("0\n"), "{output:?}");
+}
+
+#[test]
+fn fade_reads_the_volume_first_and_clamps_both_arguments() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO music = Audio.Load("tone.wav")
+        PRINTLN music.Fade(50, 100)
+        PRINTLN music.Fade(150, -5)
+        PRINTLN music.Fade(-20, 0)
+        "#,
+        &[("tone.wav", TONE)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
+    );
+
+    // 50 % is -6.02 dB below the client's headroom compensation of 12 dB.
+    assert!(output.contains("Volume;C=2;V=5.98dB;T=100"), "{output:?}");
+    // An out of range volume clamps to 100, a negative duration means at once.
+    assert!(output.contains("Volume;C=2;V=12.00dB\x1b"), "{output:?}");
+    assert!(output.contains("Volume;C=2;V=-60.00dB\x1b"), "{output:?}");
+    assert!(!output.contains("T=-5"), "{output:?}");
+    assert_eq!(output.matches("1\n").count(), 3, "{output:?}");
 }
 
 #[test]

@@ -872,8 +872,12 @@ ENDIF
 | `Valid`, `Playing`, `Channel` | Read-only state |
 | `SetVolume(percent)` | Set playback volume and return whether it succeeded; failures update `Error.Last()` |
 | `Play([loop])`, `Stop()` | Start or stop playback |
-| `Fade(percent, milliseconds)` | Change volume over time |
+| `Fade(targetVolume, durationMs)` | Reach `targetVolume` over `durationMs` |
 | `Free()` | Give the channel back |
+
+Volume is a percentage and is clamped to 0 through 100; `Fade` takes the volume
+first and the duration second. A duration of zero or less changes the volume at
+once instead of over time.
 
 Audio that ends produces `EventKind.Audio` with its channel in `Event.Channel`.
 `Audio.StopAll()` flushes every channel the PPE started, and

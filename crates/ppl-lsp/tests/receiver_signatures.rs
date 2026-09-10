@@ -340,3 +340,22 @@ fn localized_new_string_results_are_unbounded_without_rewriting_legacy_bigstr() 
         assert!(text.lines().any(|line| line.contains("BIGSTR") && line.contains("2048")));
     }
 }
+
+/// R2: the signature help used to name the duration first while the runtime read
+/// the volume first, so following the hint faded the wrong way.
+#[test]
+fn audio_fade_signature_names_the_volume_before_the_duration() {
+    let (ast, visitor) = analyze("AUDIO music\nPRINTLN music.Valid\n", 400);
+    let help = signature(&visitor, "music.Fade(", ast.language_version);
+
+    assert!(help.signatures[0].label.contains("Fade(INTEGER targetVolume, INTEGER durationMs)"), "{help:?}");
+    let parameters = help.signatures[0].parameters.as_ref().unwrap();
+    let labels: Vec<_> = parameters
+        .iter()
+        .map(|parameter| match &parameter.label {
+            ParameterLabel::Simple(text) => text.clone(),
+            ParameterLabel::LabelOffsets([start, end]) => help.signatures[0].label[*start as usize..*end as usize].to_string(),
+        })
+        .collect();
+    assert_eq!(labels, vec!["INTEGER targetVolume", "INTEGER durationMs"], "{help:?}");
+}
