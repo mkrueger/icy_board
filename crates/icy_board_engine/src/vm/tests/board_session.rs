@@ -165,6 +165,33 @@ fn a_board_value_can_be_kept_in_a_variable() {
     assert_eq!(output, "Icy Board 2\n");
 }
 
+/// A password reads as a fixed mask everywhere, so a PPE can check one but
+/// never learn it, not even its length.
+#[test]
+fn a_password_reads_as_its_mask_and_never_as_the_secret() {
+    let seed = |board: &mut crate::icy_board::IcyBoard| {
+        seed_board(board);
+        board.conferences[0].password = crate::icy_board::user_base::Password::PlainText("secret".to_string());
+    };
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE guarded = Board.Conferences[0]
+        CONFERENCE open = Board.Conferences[1]
+        PrintLn guarded.Password
+        PrintLn "[", guarded.Password, "]"
+        PrintLn guarded.Password.Len(), " ", LEN(guarded.Password)
+        PrintLn guarded.Password = "secret", " ", guarded.Password = "guess"
+        PrintLn open.Password, " ", open.Password.Len()
+        "#,
+        seed,
+    );
+
+    assert_eq!(
+        output, "******\n[******]\n6 6\n1 0\n****** 6\n",
+        "the mask must not vary with the stored password"
+    );
+}
+
 #[test]
 fn session_reports_the_call_it_is_running_in() {
     let output = run_ppl(

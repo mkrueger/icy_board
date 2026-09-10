@@ -696,14 +696,49 @@ Arten werden nur auf ausdrückliche Anweisung neu erzeugt.
 
 ### A2 — BBS-Berechtigungen und Objektlebensdauer
 
-**Besprechen:** Privilegierter Sysop-Datenzugriff versus benutzerbezogene sichere
-Operationen; Snapshot-/Live-Verhalten; Nachrichtennummer versus Arrayposition;
-JAM-Read-Flag versus persönlicher Last-read-Cursor.
+Status: am 2026-09-10 besprochen, freigegeben und umgesetzt.
 
-**Abnahme:** Ein PPE-Autor kann erkennen, welche Prüfung er selbst durchführen
-muss. Die Nachrichtenleser-Abnahme enthält private und nicht zugängliche Inhalte.
-Header-Snapshot und später geladenes Message-Body-Verhalten sind ausdrücklich
-geregelt. Keine pauschale Behauptung, dass PPEs eine Sandbox darstellen.
+**Befund (verifiziert).** `Area.Read()` und `Area.Find()` in
+[message_area.rs](../crates/icy_board_engine/src/icy_board/message_area.rs)
+wenden keine der Prüfungen an, die der interaktive Leser über
+`may_read_header` und `requires_read_password` anwendet: privat, gelöscht,
+`MSG_NODISP` und Passwortschutz. Ein PPE liest damit auch private Post.
+
+Die Benutzerseite ist dagegen bereits abgesichert, an einem laufenden PPE
+gemessen: `USER` hat keinen `Password`-Getter, Konferenz-, Verzeichnis- und
+Tür-Passwörter werden über `protected()` herausgegeben, und Schreibversuche auf
+fremde Benutzer scheitern mit gesetztem `Error.Last()`.
+
+**Entscheidung: dokumentieren statt erzwingen.** PPL ist eine API für
+Programmierer und Sysops, nicht für Endanwender; PPEs installiert der Sysop und
+sie laufen mit der Reichweite des Boards. Eine erzwungene Filterung nähme
+Auswertungen — etwa statistische Erhebungen über alle Nachrichten — die
+Grundlage. Der ungefilterte Blick ist gewollt, das Risiko wird benannt statt
+weggeregelt. Verworfen wurden deshalb die Varianten „Runtime filtert wie der
+interaktive Leser" und „neuer `CanRead()`-Member".
+
+**Was der PPE-Autor selbst prüfen muss**, steht jetzt in
+[new_ppl.md](new_ppl.md) unter „Who may see a message is the program's
+decision", mit einem übersetzbaren Muster für `IsDeleted`, `NeedsPassword`,
+`IsPrivate` samt Name und Alias sowie Sysop-Ausnahme.
+
+**Ehrlich benannte Lücke:** Ein als nicht anzeigbar markierter Header
+(`MSG_NODISP`) hat keinen eigenen Member. Ein PPE kann den interaktiven Leser
+deshalb derzeit nicht exakt nachbilden.
+
+**Zugesichert bleibt:** Lesen verändert nichts. `Read()`, `Find()` und `Text()`
+setzen kein Read-Flag und bewegen keinen Last-read-Zeiger, ein zweiter Durchlauf
+sieht dasselbe. `HighMsg()`/`LowMsg()` liefern unverändert die rohen Grenzen der
+Message-Base; Lücken beantwortet `Valid = FALSE`. Nachrichtennummer bleibt
+Nummer, nicht Position.
+
+**Nebenbefund behoben:** `"[" + conf.Password + "]"` brachte die VM zum Absturz
+(`promote_to` kannte `Password` nicht und fiel auf `Integer` zurück, worauf
+`as_int()` panickte), und `conf.Password.Len()` war ein Übersetzungsfehler.
+Passwörter verhalten sich jetzt bei Textoperationen wie ihre Maske, und `Len()`
+antwortet wie das bereits vorhandene `LEN()` mit der Maskenlänge. Ein Test hält
+fest, dass die Maske nicht mit dem gespeicherten Passwort variiert und ein
+Vergleich weiterhin funktioniert.
 
 ### A3 — Board-/Benutzerzugriff skalierbar machen (F6)
 

@@ -324,6 +324,16 @@ pub(super) fn string_member_type(name: &unicase::Ascii<String>) -> Option<Variab
         .map(|member| member.return_type)
 }
 
+/// A password is not text, but it reads as a fixed mask, so asking for its
+/// length is meaningful and answers with the mask's rather than the secret's.
+pub(super) fn carries_string_members(receiver: VariableType, name: &unicase::Ascii<String>) -> bool {
+    match receiver {
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => true,
+        VariableType::Password => name.as_ref().eq_ignore_ascii_case("Len"),
+        _ => false,
+    }
+}
+
 pub(super) fn bytes_member_type(name: &unicase::Ascii<String>) -> Option<VariableType> {
     BYTES_MEMBERS
         .iter()

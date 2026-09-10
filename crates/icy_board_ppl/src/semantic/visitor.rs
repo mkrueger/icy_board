@@ -21,7 +21,8 @@ use crate::{
 
 use super::{
     ArrayShape, FunctionContainer, FunctionDeclaration, ReferenceType, References, SemanticInfo, SemanticVisitor, StaticReceiver, VariableLookups,
-    array_member, array_procedure, bytes_member, bytes_member_type, string_member, string_member_type, string_type_name, takes_whole_array,
+    array_member, array_procedure, bytes_member, bytes_member_type, carries_string_members, string_member, string_member_type, string_type_name,
+    takes_whole_array,
 };
 
 impl SemanticVisitor {
@@ -643,7 +644,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             return VariableType::Boolean;
         }
-        if matches!(t, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+        if carries_string_members(t, member_reference_expression.get_identifier())
             && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
         {
             self.member_receiver_type_lookup
@@ -1161,7 +1162,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::EnumHas(id));
                 return VariableType::Boolean;
             }
-            if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+            if carries_string_members(receiver_type, member.get_identifier())
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {
                 let argument_types: Vec<_> = call

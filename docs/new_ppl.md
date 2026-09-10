@@ -1359,6 +1359,41 @@ ordinary lookup miss: `Read()` answers an invalid `MSG`, `Text()` answers an
 empty string and `Error.Last().OK` remains true. Running off the end of `Find()`
 works the same way.
 
+#### Who may see a message is the program's decision
+
+`Read()` and `Find()` return what the message base holds. They do **not** apply
+the checks the interactive reader applies: a private message, a message that
+needs a password and a deleted message all come back like any other. This is
+deliberate. A PPE is installed by the SysOp and runs with the board's own reach,
+and a maintenance or statistics program needs the unfiltered view.
+
+The consequence is that **a program showing message content to a caller has to
+filter it itself.** The header carries what that decision needs:
+
+```PPL
+LONG n
+BOOLEAN mine
+
+FOR n = area.LowMsg() TO area.HighMsg()
+	MSG msg = area.Read(n)
+	IF !msg.Valid || msg.IsDeleted CONTINUE
+	IF msg.NeedsPassword && !Session.IsSysop CONTINUE
+	mine = (msg.To = Session.UserName) || (msg.From = Session.UserName)
+	mine = mine || (msg.To = Session.AliasName) || (msg.From = Session.AliasName)
+	IF msg.IsPrivate && !mine && !Session.IsSysop CONTINUE
+	PRINTLN msg.From, ": ", msg.Subject
+NEXT
+```
+
+One thing the interactive reader honours cannot be reproduced this way: a header
+marked as not for display carries no member of its own, so a PPE cannot see that
+flag. A program that must match the reader exactly is not yet able to.
+
+Reading changes nothing. `Read()`, `Find()` and `Text()` never set the read flag
+and never move the caller's last-read pointer, so walking an area leaves the
+board as it was and a second walk sees the same thing. `IsRead` reports the
+stored flag, which only the interactive reader sets.
+
 An operation that cannot read the base is different. `Read()`, `Find()`,
 `LowMsg()`, `HighMsg()` and `Text()` keep their normal invalid/zero/empty return
 value, and also report `ErrKind.Msg`: `ErrCode.Io` for a filesystem failure and

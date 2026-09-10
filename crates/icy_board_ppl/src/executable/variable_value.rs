@@ -576,6 +576,11 @@ impl PartialEq for VariableValue {
 }
 
 fn promote_to(l: VariableType, r: VariableType) -> VariableType {
+    // A password reads as its mask, so combining it with anything behaves like
+    // text. Comparisons never get here; they handle passwords on their own.
+    if l == VariableType::Password || r == VariableType::Password {
+        return VariableType::UnboundedString;
+    }
     if l == r {
         return l;
     }

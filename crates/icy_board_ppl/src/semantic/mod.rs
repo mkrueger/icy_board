@@ -34,7 +34,9 @@ mod visitor;
 use arrays::ArrayShape;
 use call_graph::CallGraph;
 pub use members::{ARRAY_MEMBERS, ARRAY_PROCEDURES, ArrayMember, BYTES_MEMBERS, STRING_MEMBERS, ScalarMember, array_member, array_procedure};
-use members::{StaticReceiver, bytes_member, bytes_member_type, string_member, string_member_type, string_type_name, takes_whole_array};
+use members::{
+    StaticReceiver, bytes_member, bytes_member_type, carries_string_members, string_member, string_member_type, string_type_name, takes_whole_array,
+};
 use symbols::parameter_lists_match;
 pub use symbols::{FunctionContainer, FunctionDeclaration, ModuleExport, ModuleSymbolKind, ReferenceType, References, SemanticInfo, VariableLookups};
 pub use variable_table::LookupVariabeleTable;
