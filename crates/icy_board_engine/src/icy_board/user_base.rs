@@ -1188,6 +1188,12 @@ impl UserBase {
         self.users.is_empty()
     }
 
+    /// Shares the list as it is now, so a reader can hold on to this moment
+    /// without copying every user.
+    pub fn snapshot(&self) -> Snapshot<Vec<User>> {
+        self.users.clone()
+    }
+
     pub fn import_pcboard(pcb_user: &[PcbUser]) -> Self {
         let mut users = Vec::new();
         for u in pcb_user {

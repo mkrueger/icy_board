@@ -658,12 +658,45 @@ geregelt. Keine pauschale Behauptung, dass PPEs eine Sandbox darstellen.
 
 ### A3 — Board-/Benutzerzugriff skalierbar machen (F6)
 
-**Besprechen:** Lazy-Erzeugung, getrennte Snapshots oder begrenzte Queries;
-Snapshot-Zeitpunkt, Suche, Pagination und Verhalten bei parallelen Änderungen.
+Status: am 2026-09-10 gemessen, besprochen, freigegeben und umgesetzt.
 
-**Abnahme:** Ein Metadatenzugriff wie `Board.Name` erstellt keinen vollständigen
-Benutzer-Clone. Aufwand für große Userbases wird gemessen. Bestehende
-Snapshot-Garantien bleiben erhalten oder werden ausdrücklich geändert.
+**Messung zuerst.** Der ursprüngliche Verdacht „jeder Zugriff klont“ traf nicht zu:
+`Board` wird bereits einmal pro VM zwischengespeichert. Das eigentliche Problem lag
+tiefer — der Snapshot materialisierte die gesamte Userbase sofort. Fünf Läufe je
+Zelle, jeweils das Minimum, Grundlinie ist derselbe Aufbau ohne `Board`-Zugriff:
+
+| Users | Grundlinie | `Board.Name` vorher | `Board.Name` nachher |
+| ---: | ---: | ---: | ---: |
+| 1.000 | 1,1 ms | +0,49 ms | +0 |
+| 10.000 | 3,6 ms | +5,01 ms | +0 |
+| 50.000 | 19,0 ms | +35,60 ms | +0 |
+
+Vorher kostete `Board.Name` genauso viel wie `Board.Users` — der direkte Nachweis,
+dass ein reiner Metadatenzugriff die ganze Userbase bezahlte, linear mit rund
+0,5–0,7 µs je Benutzer. Bei 50.000 Benutzern verdreifachte das die Laufzeit eines
+kleinen PPEs.
+
+**Umsetzung:** `PplBoard` erfasst beim ersten Board-Zugriff nur noch die geteilte
+Benutzerliste — `UserBase` speichert bereits `Snapshot<Vec<User>>`, also ein `Arc`
+mit Copy-on-Write, was die Erfassung O(1) macht — und baut das PPL-Array erst,
+wenn `Users` gelesen wird. Dasselbe für `Conferences`.
+
+**Snapshot-Zeitpunkt unverändert.** Weil das `Arc` den Stand beim ersten
+Board-Zugriff festhält, bleibt die eingefrorene Sicht exakt dieselbe wie zuvor.
+Eine spätere Materialisierung liest nicht neu. Es gab also nichts neu
+festzulegen; die Alternative mit verschobenem Zeitpunkt war dafür nicht nötig.
+
+**Abnahme:** Zwei Unit-Tests belegen deterministisch, dass Metadaten die
+Benutzerliste nicht materialisieren und dass die einmal gebaute Liste geteilt
+wird — statt einer zeitbasierten Prüfung, die in CI schwanken würde. Die 17
+Board-/Session- und 11 Benutzer-Snapshot-Tests bleiben unverändert gültig:
+`Board.Users` ist weiterhin ein typisiertes Array mit `.Len()`, jedes Element ein
+unabhängiger Snapshot, Schreibversuche werden abgelehnt und ein Index außerhalb
+liefert `Valid = FALSE`.
+
+**Offen:** Suche und Pagination über die Userbase sind weiterhin nicht Teil der
+API; wer alle Benutzer durchgeht, materialisiert sie weiterhin vollständig. Das
+ist der Preis des zugesicherten Array-Vertrags und bleibt A2/A4 vorbehalten.
 
 ### A4 — Datei- und Nachrichtenworkflows vervollständigen
 
@@ -794,7 +827,7 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 - [x] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.
 - [x] F4: Stale Handles bleiben auch nach Wiederverwendung ungültig.
 - [x] F5: `Fade`-Vertrag einschließlich realer Ausgabe konsistent.
-- [ ] F6: Metadatenzugriff skaliert unabhängig von vollständigen User-Snapshots.
+- [x] F6: Metadatenzugriff skaliert unabhängig von vollständigen User-Snapshots.
 - [ ] E1 Dateibrowser abgenommen.
 - [ ] E2 Nachrichtenleser mit Antwortfunktion abgenommen.
 - [ ] E3 Interaktive Terminalanwendung und Client-Matrix abgenommen.
