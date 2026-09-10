@@ -1,0 +1,10 @@
+compile|1|1|([a-z]+)-([0-9]+)
+ismatch|1|0|1
+isvalid|0|1|1
+find|1|item-42|6|2
+group|item|42|1
+findall|3|a-1|c-3
+findall|2
+replace|x x|x b-2
+split|3
+broken|0|0|1|1

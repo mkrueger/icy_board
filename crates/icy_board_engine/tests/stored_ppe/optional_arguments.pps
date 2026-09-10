@@ -1,0 +1,25 @@
+' Calls that leave optional arguments out, which is what a stored program must
+' keep doing when a later host appends more of them.
+REGEX plain = Regex.Compile("([a-z]+)-([0-9]+)")
+REGEX folded = Regex.Compile("ABC", RegexOptions.IgnoreCase)
+PRINTLN "compile|", plain.Valid, "|", folded.Valid, "|", plain.Pattern
+
+PRINTLN "ismatch|", plain.IsMatch("item-42"), "|", plain.IsMatch("item-42", 4), "|", folded.IsMatch("xxabcxx")
+PRINTLN "isvalid|", Regex.IsValid("["), "|", Regex.IsValid("a+"), "|", Regex.IsValid("A", RegexOptions.IgnoreCase)
+
+REGEXMATCH found = plain.Find("order item-42 now")
+PRINTLN "find|", found.Success, "|", found.Value, "|", found.Start, "|", found.GroupCount
+PRINTLN "group|", found.Group(1), "|", found.Group(2), "|", found.GroupMatched(1)
+
+REGEXMATCH all[] = plain.FindAll("a-1 b-2 c-3")
+PRINTLN "findall|", all.Len(), "|", all[0].Value, "|", all[2].Value
+REGEXMATCH limited[] = plain.FindAll("a-1 b-2 c-3", 0, 2)
+PRINTLN "findall|", limited.Len()
+
+PRINTLN "replace|", plain.Replace("a-1 b-2", "x"), "|", plain.Replace("a-1 b-2", "x", 1)
+STRING parts[] = plain.Split("a-1;b-2")
+PRINTLN "split|", parts.Len()
+
+' A pattern that does not compile reports through the object and through Error.
+REGEX broken = Regex.Compile("[")
+PRINTLN "broken|", broken.Valid, "|", Error.Last().OK, "|", Error.Last().Kind = ErrKind.Regex, "|", Error.Last().Message.Len() > 0

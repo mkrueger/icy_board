@@ -1,0 +1,405 @@
+# The PPL host API as it is frozen for 4.00.
+#
+# Member ids may move: a stored program binds by qualified name and signature,
+# not by id, so reordering is safe and is covered by imports400's bind tests.
+# What this file guards is the surface itself. Removing or renaming a type,
+# member or enum variant makes stored programs fail to load, and so does
+# changing a parameter that a stored call already passes. Appending an optional
+# parameter is allowed and stays loadable.
+#
+# Update with: UPDATE_API_CATALOG=1 cargo test -p icy_board_ppl --test api_catalog
+
+TYPE Conference (30)
+    0 getter Name: UnboundedString
+    1 getter Number: Integer
+    2 getter Valid: Boolean
+    3 getter IsPublic: Boolean
+    4 getter IsReadOnly: Boolean
+    5 getter AllowAliases: Boolean
+    6 getter EchoMail: Boolean
+    7 getter AutoRejoin: Boolean
+    8 getter PrivateUploads: Boolean
+    9 getter Password: Password
+   10 getter Directories: Directory[1]
+   11 getter Areas: Area[1]
+   12 getter Doors: Door[1]
+   13 func   HasAccess() -> Boolean
+   14 func   CanPost() -> Boolean
+   15 func   CanAttach() -> Boolean
+
+TYPE Area (31)
+    0 getter Name: UnboundedString
+    1 getter Number: Integer
+    2 getter Valid: Boolean
+    3 getter IsReadOnly: Boolean
+    4 getter AllowAliases: Boolean
+    5 getter QwkName: UnboundedString
+    6 getter EchoTag: UnboundedString
+    7 getter EchoOrigin: UnboundedString
+    8 func   HasAccess() -> Boolean
+    9 func   CanEnter() -> Boolean
+   10 func   CanAttach() -> Boolean
+   11 func   HighMsg() -> Long
+   12 func   LowMsg() -> Long
+   13 func   Read(messageNumber: Long) -> Msg
+   14 func   Find(field: MsgField, text: UnboundedString, startMessage?: Long) -> Msg
+
+TYPE Directory (32)
+    0 getter Name: UnboundedString
+    1 getter Number: Integer
+    2 getter Valid: Boolean
+    3 getter Path: UnboundedString
+    4 getter IsFree: Boolean
+    5 getter HasNewFiles: Boolean
+    6 getter Password: Password
+    7 func   HasAccess() -> Boolean
+    8 func   CanDownload() -> Boolean
+
+TYPE Door (33)
+    0 getter Name: UnboundedString
+    1 getter Number: Integer
+    2 getter Valid: Boolean
+    3 getter Description: UnboundedString
+    4 getter Path: UnboundedString
+    5 getter Password: Password
+    6 func   HasAccess() -> Boolean
+
+TYPE Surface (35)
+    0 getter Width: Integer
+    1 getter Height: Integer
+    2 getter Valid: Boolean
+    3 func   Clear(rgba: Unsigned) -> Boolean
+    4 func   SetPixel(x: Integer, y: Integer, rgba: Unsigned) -> Boolean
+    5 func   GetPixel(x: Integer, y: Integer) -> Unsigned
+    6 func   FillRect(x: Integer, y: Integer, width: Integer, height: Integer, rgba: Unsigned) -> Boolean
+    7 func   DrawRect(x: Integer, y: Integer, width: Integer, height: Integer, rgba: Unsigned) -> Boolean
+    8 func   Blit(source: Surface, destinationX: Integer, destinationY: Integer) -> Boolean
+    9 func   BlitRect(source: Surface, sourceX: Integer, sourceY: Integer, width: Integer, height: Integer, destinationX: Integer, destinationY: Integer) -> Boolean
+   10 func   Present() -> Boolean
+   11 func   PresentAt(column: Integer, row: Integer) -> Boolean
+   12 func   PresentRect(sourceX: Integer, sourceY: Integer, sourceWidth: Integer, sourceHeight: Integer, column?: Integer, row?: Integer, destinationWidth?: Integer, destinationHeight?: Integer, flip?: Integer) -> Boolean
+   13 func   Pin() -> Boolean
+   14 func   Unpin() -> Boolean
+   15 func   Free() -> Boolean
+   16 func   static New(width: Integer, height: Integer) -> Surface
+   17 func   static Load(file: UnboundedString) -> Surface
+
+TYPE Event (36)
+    0 getter Kind: EventKind
+    1 getter Code: Integer
+    2 getter ScanCode: Integer
+    3 getter Text: UnboundedString
+    4 getter Pressed: Boolean
+    5 getter X: Integer
+    6 getter Y: Integer
+    7 getter Button: MouseButton
+    8 getter Pixels: Boolean
+    9 getter Repeated: Boolean
+   10 getter WheelX: Integer
+   11 getter WheelY: Integer
+   12 getter Time: Unsigned
+   13 getter Action: MouseAction
+   14 getter Channel: Integer
+   15 getter Dropped: Integer
+   16 getter LeftDown: Boolean
+   17 getter MiddleDown: Boolean
+   18 getter RightDown: Boolean
+   19 getter Shift: Boolean
+   20 getter Alt: Boolean
+   21 getter Ctrl: Boolean
+   22 getter Meta: Boolean
+
+TYPE Audio (37)
+    0 getter Valid: Boolean
+    1 getter Playing: Boolean
+    2 getter Channel: Integer
+    3 func   SetVolume(volume: Integer) -> Boolean
+    4 func   Play(looping?: Boolean) -> Boolean
+    5 func   Stop() -> Boolean
+    6 func   Fade(targetVolume: Integer, durationMs: Integer) -> Boolean
+    7 func   Free() -> Boolean
+    8 func   static Load(file: UnboundedString) -> Audio
+    9 func   static StopAll() -> Boolean
+
+TYPE Error (38)
+    0 getter OK: Boolean
+    1 getter Kind: ErrKind
+    2 getter Code: ErrCode
+    3 getter Message: UnboundedString
+    4 getter Channel: Integer
+    5 func   static Last() -> Error
+    6 func   static Clear() -> Boolean
+
+TYPE TermInfo (39)
+    0 getter Program: UnboundedString
+    1 getter DeviceAttrs: UnboundedString
+    2 getter RipVersion: UnboundedString
+    3 getter Columns: Integer
+    4 getter Rows: Integer
+    5 getter CTermLevel: Integer
+    6 getter CellWidth: Integer
+    7 getter CellHeight: Integer
+    8 getter ScreenWidth: Integer
+    9 getter ScreenHeight: Integer
+   10 getter Utf8: Boolean
+   11 getter Sixel: Boolean
+   12 getter Jxl: Boolean
+   13 getter InlineGraphics: Boolean
+   14 getter Audio: Boolean
+   15 getter PhysicalKeys: Boolean
+   16 getter PixelMouse: Boolean
+   17 getter ClientBlit: Boolean
+   18 getter SynchronizedOutput: Boolean
+   19 getter TerminalMacros: Boolean
+
+TYPE TermInput (40)
+    0 func   Poll() -> Event
+    1 func   Wait(timeoutMs: Integer) -> Event
+    2 func   MouseOn(mode: MouseMode, tracking?: MouseTracking) -> Boolean
+    3 func   MouseOff() -> Boolean
+    4 func   KeyboardOn(echo?: Boolean) -> Boolean
+    5 func   KeyboardOff() -> Boolean
+    6 func   Release() -> Boolean
+
+TYPE Terminal (41) [instance]
+    0 getter Info: TermInfo
+    1 getter Gfx: Gfx
+    2 getter Input: TermInput
+    3 getter Margins: Margins
+    4 getter Palette: Palette
+    5 getter Macros: Macros
+    6 func   BeginUpdate() -> Boolean
+    7 func   EndUpdate() -> Boolean
+    8 func   SetFont(font: Integer, slot?: Integer) -> Boolean
+    9 func   LoadFont(font: Integer, file: UnboundedString) -> Boolean
+
+TYPE Gfx (42)
+    0 getter Backend: GfxBackend
+    1 func   Init(backend?: GfxBackend, fullscreen?: Boolean) -> Boolean
+    2 func   SetPacing(enabled: Boolean) -> Boolean
+    3 func   Shutdown() -> Boolean
+
+TYPE Margins (43)
+    0 getter Top: Integer
+    1 getter Bottom: Integer
+    2 getter Left: Integer
+    3 getter Right: Integer
+    4 getter HasVertical: Boolean
+    5 getter HasHorizontal: Boolean
+    6 func   SetVertical(top: Integer, bottom: Integer) -> Boolean
+    7 func   SetHorizontal(left: Integer, right: Integer) -> Boolean
+    8 func   ResetVertical() -> Boolean
+    9 func   ResetHorizontal() -> Boolean
+   10 func   ResetAll() -> Boolean
+
+TYPE Palette (44)
+    0 func   Set(color: Integer, rgba: Unsigned) -> Boolean
+    1 func   Reset(color: Integer) -> Boolean
+    2 func   ResetAll() -> Boolean
+
+TYPE Macros (45)
+    0 getter Recording: Boolean
+    1 func   BeginRecord(slot: Integer) -> Boolean
+    2 func   EndRecord() -> Boolean
+    3 func   Play(slot: Integer) -> Boolean
+    4 func   Delete(slot: Integer) -> Boolean
+    5 func   DeleteAll() -> Boolean
+
+TYPE Board (46) [instance]
+    0 getter Name: UnboundedString
+    1 getter Location: UnboundedString
+    2 getter Operator: UnboundedString
+    3 getter SysopName: UnboundedString
+    4 getter NodeCount: Integer
+    5 getter Conferences: Conference[1]
+    6 getter Users: User[1]
+
+TYPE Session (47) [instance]
+    0 getter Conference: Conference
+    1 getter User: User
+    2 getter Area: Area
+    3 getter Directory: Directory
+    4 getter UserName: UnboundedString
+    5 getter AliasName: UnboundedString
+    6 getter Language: UnboundedString
+    7 getter SecurityLevel: Integer
+    8 getter Node: Integer
+    9 getter MinutesLeft: Integer
+   10 getter PageLength: Integer
+   11 getter IsLocal: Boolean
+   12 getter IsSysop: Boolean
+   13 func   RequestPasswordRecovery(userName: UnboundedString) -> Boolean
+
+TYPE User (48)
+    0 field  Alias: UnboundedString
+    1 field  VerifyAnswer: UnboundedString
+    2 field  Street1: UnboundedString
+    3 field  Street2: UnboundedString
+    4 field  City: UnboundedString
+    5 field  State: UnboundedString
+    6 field  Zip: UnboundedString
+    7 field  Country: UnboundedString
+    8 field  BusinessPhone: UnboundedString
+    9 field  HomePhone: UnboundedString
+   10 field  Email: UnboundedString
+   11 field  Web: UnboundedString
+   12 field  Gender: UnboundedString
+   13 field  Comment: UnboundedString
+   14 field  SysopComment: UnboundedString
+   15 field  Protocol: UnboundedString
+   16 getter Name: UnboundedString
+   17 getter Language: UnboundedString
+   18 getter DateFormat: UnboundedString
+   19 getter Valid: Boolean
+   20 getter RecordNumber: Integer
+   21 field  BirthDate: Date
+   22 field  ExpirationDate: Date
+   23 field  PasswordExpires: Date
+   24 getter FirstDateOn: Date
+   25 getter LastDateOn: Date
+   26 getter LastDirRead: Date
+   27 field  PageLength: Integer
+   28 field  SecurityLevel: Integer
+   29 field  ExpiredSecurityLevel: Integer
+   30 getter MinutesToday: Integer
+   31 getter TimesOn: ULong
+   32 getter MessagesRead: ULong
+   33 getter MessagesLeft: ULong
+   34 getter Uploads: ULong
+   35 getter Downloads: ULong
+   36 getter UploadBytes: ULong
+   37 getter DownloadBytes: ULong
+   38 getter DownloadBytesToday: ULong
+   39 field  ExpertMode: Boolean
+   40 field  ClearScreen: Boolean
+   41 field  ScrollMessageBody: Boolean
+   42 field  ShortDescriptions: Boolean
+   43 field  LongHeader: Boolean
+   44 field  WideEditor: Boolean
+   45 getter UseGraphics: Boolean
+   46 getter UseAlias: Boolean
+   47 field  EditorMode: EditorMode
+   48 getter Notes: UnboundedString[1]
+   49 getter Contacts: CONTACT[1]
+   50 func   SetPassword(password: UnboundedString) -> Boolean
+   51 func   AddContact(service: UnboundedString, account: UnboundedString) -> Boolean
+   52 func   RemoveContact(index: Integer) -> Boolean
+   53 func   SetNote(index: Integer, text: UnboundedString) -> Boolean
+
+TYPE Msg (49)
+    0 getter Number: Long
+    1 getter Valid: Boolean
+    2 getter From: UnboundedString
+    3 getter To: UnboundedString
+    4 getter Subject: UnboundedString
+    5 getter Status: UnboundedString
+    6 getter Date: Date
+    7 getter Time: Time
+    8 getter ReplyTo: Long
+    9 getter Size: Long
+   10 getter IsPrivate: Boolean
+   11 getter IsRead: Boolean
+   12 getter IsDeleted: Boolean
+   13 getter IsEcho: Boolean
+   14 getter NeedsPassword: Boolean
+   15 func   Text() -> UnboundedString
+
+TYPE Http (50)
+    0 func   static Get(url: UnboundedString) -> HttpResponse
+    1 func   static New(method: HttpMethod, url: UnboundedString) -> HttpRequest
+    2 func   static Download(url: UnboundedString, file: UnboundedString) -> HttpResponse
+    3 func   static UrlEncode(text: UnboundedString) -> UnboundedString
+    4 func   static UrlDecode(text: UnboundedString) -> UnboundedString
+    5 func   static FormEncode(text: UnboundedString) -> UnboundedString
+    6 func   static FormDecode(text: UnboundedString) -> UnboundedString
+
+TYPE HttpRequest (51)
+    0 getter Url: UnboundedString
+    1 getter Method: HttpMethod
+    2 func   SetQuery(name: UnboundedString, value: UnboundedString) -> Boolean
+    3 func   SetHeader(name: UnboundedString, value: UnboundedString) -> Boolean
+    4 func   SetText(text: UnboundedString, contentType?: UnboundedString) -> Boolean
+    5 func   SetBytes(data: Bytes, contentType?: UnboundedString) -> Boolean
+    6 func   SetForm(name: UnboundedString, value: UnboundedString) -> Boolean
+    7 func   Send() -> HttpResponse
+
+TYPE HttpResponse (52)
+    0 getter Valid: Boolean
+    1 getter OK: Boolean
+    2 getter Status: Integer
+    3 getter FinalUrl: UnboundedString
+    4 getter Size: Long
+    5 getter ContentType: UnboundedString
+    6 func   Text() -> UnboundedString
+    7 func   Bytes() -> Bytes
+    8 func   Header(name: UnboundedString) -> UnboundedString
+    9 func   Save(file: UnboundedString) -> Boolean
+
+TYPE Regex (53)
+    0 getter Valid: Boolean
+    1 getter Pattern: UnboundedString
+    2 func   static Compile(pattern: UnboundedString, options?: RegexOptions) -> Regex
+    3 func   static Escape(text: UnboundedString) -> UnboundedString
+    4 func   static IsValid(pattern: UnboundedString, options?: RegexOptions) -> Boolean
+    5 func   IsMatch(text: UnboundedString, start?: Integer) -> Boolean
+    6 func   Find(text: UnboundedString, start?: Integer) -> RegexMatch
+    7 func   FindAll(text: UnboundedString, start?: Integer, limit?: Integer) -> RegexMatch[1]
+    8 func   Replace(text: UnboundedString, replacement: UnboundedString, limit?: Integer) -> UnboundedString
+    9 func   Split(text: UnboundedString, limit?: Integer) -> UnboundedString[1]
+
+TYPE RegexMatch (54)
+    0 getter Success: Boolean
+    1 getter Value: UnboundedString
+    2 getter Start: Integer
+    3 getter Length: Integer
+    4 getter GroupCount: Integer
+    5 func   Group(index: Integer) -> UnboundedString
+    6 func   NamedGroup(name: UnboundedString) -> UnboundedString
+    7 func   GroupMatched(index: Integer) -> Boolean
+    8 func   NamedGroupMatched(name: UnboundedString) -> Boolean
+    9 func   GroupStart(index: Integer) -> Integer
+   10 func   NamedGroupStart(name: UnboundedString) -> Integer
+   11 func   GroupLength(index: Integer) -> Integer
+   12 func   NamedGroupLength(name: UnboundedString) -> Integer
+
+ENUM Checksum (2147483634)
+  CRC32=0, MD5=1, SHA256=2
+
+ENUM StringComparison (2147483635)
+  Ordinal=0, OrdinalIgnoreCase=1
+
+ENUM RegexOptions (2147483636)
+  None=0, IgnoreCase=1, MultiLine=2, DotMatchesNewLine=4, IgnoreWhitespace=8, SwapGreed=16, Ascii=32
+
+ENUM HttpMethod (2147483637)
+  Get=0, Head=1, Post=2, Put=3, Delete=4, Patch=5
+
+ENUM MsgField (2147483638)
+  To=7, From=11, Subject=12
+
+ENUM EditorMode (2147483639)
+  Yes=0, No=1, Ask=2
+
+ENUM ErrCode (2147483640)
+  Ok=0, Unavailable=1, Invalid=2, Io=3, Format=4, Limit=5, Unsupported=6, Stack=7, Denied=8, Timeout=9
+
+ENUM ErrKind (2147483641)
+  None=0, File=1, DBase=2, Stack=3, Gfx=4, Font=5, Audio=6, Term=7, Msg=8, Net=9, User=10, String=11, Regex=12
+
+ENUM GfxBackend (2147483642)
+  None=-1, Auto=0, Sixel=2, Jxl=3
+
+ENUM MouseTracking (2147483643)
+  Buttons=0, Drag=1, All=2
+
+ENUM MouseMode (2147483644)
+  Text=0, Pixels=1
+
+ENUM MouseButton (2147483645)
+  None=-1, Left=0, Middle=1, Right=2, WheelUp=3, WheelDown=4, WheelLeft=5, WheelRight=6
+
+ENUM MouseAction (2147483646)
+  None=0, Press=1, Release=2, Motion=3, Wheel=4
+
+ENUM EventKind (2147483647)
+  None=0, Key=1, KeyEdge=2, Mouse=3, Overflow=4, Audio=5

@@ -1092,6 +1092,19 @@ normal result. Trying to operate on an invalid resource is a failure. With no
 handler installed, operational failures remain available through `Error.Last()`
 and execution continues; they do not automatically become fatal errors.
 
+Which member reports that depends on what is being asked, and the three are not
+interchangeable:
+
+| Member | Question | Where |
+| :--- | :--- | :--- |
+| `Valid` | Does this handle refer to something that exists? | Objects reached by number, index or lookup |
+| `OK` | Was the answer itself good? | `ERROR`, and `HTTPRESPONSE` alongside `Valid` |
+| `Success` | Did the search hit? | `REGEXMATCH` |
+
+Objects a PPE simply has, such as `Board`, `Session` and `Terminal`, carry none
+of them: no lookup happened that could have failed. An operation that either
+works or does not returns `BOOLEAN` and leaves the detail in `Error.Last()`.
+
 ### ON ERROR
 
 `ON ERROR` says where a failed operation sends the program. It may be written as

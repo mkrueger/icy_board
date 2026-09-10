@@ -230,13 +230,19 @@ impl HostCatalog {
                     .iter()
                     .find(|(_, member)| member.name.eq_ignore_ascii_case(&expected.name))
                     .ok_or_else(|| ContainerError::Unsupported(format!("host member {}.{}", actual.name, expected.name)))?;
-                if expected.kind != actual.kind
-                    || expected.is_static != actual.is_static
-                    || expected.required != actual.required
-                    || expected.rank != actual.rank
-                    || remap(expected.result)? != actual.result
-                    || expected.parameters.iter().copied().map(remap).collect::<Result<Vec<_>>>()? != actual.parameters
-                {
+                let stored = expected.parameters.iter().copied().map(remap).collect::<Result<Vec<_>>>()?;
+                // A newer host may append optional parameters and may ask for fewer of
+                // them, but must not change what a stored call already passes. The other
+                // direction stays a mismatch: a program cannot run on a host that is older
+                // than the signature it was built against.
+                let compatible = expected.kind == actual.kind
+                    && expected.is_static == actual.is_static
+                    && expected.rank == actual.rank
+                    && remap(expected.result)? == actual.result
+                    && actual.parameters.len() >= stored.len()
+                    && actual.parameters[..stored.len()] == stored[..]
+                    && actual.required <= expected.required;
+                if !compatible {
                     return Err(ContainerError::Unsupported(format!("host signature {}", expected.name)));
                 }
                 members.insert((id, member_id), new_id);
@@ -481,5 +487,68 @@ mod tests {
         let member = current.types.values_mut().find_map(|typ| typ.members.values_mut().next()).unwrap();
         member.rank = (member.rank + 1) % 4;
         assert!(loaded.bind(&current).is_err());
+    }
+
+    /// The catalog is frozen against removal and renaming, not against growth:
+    /// appending an optional parameter must keep stored programs loadable.
+    #[test]
+    fn binds_against_a_host_that_gained_optional_parameters() {
+        let catalog = HostCatalog::from_registry(&UserTypeRegistry::icy_board_registry());
+        let used = catalog
+            .types
+            .iter()
+            .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
+            .collect();
+        let loaded = HostCatalog::decode(&catalog.encode(&used).unwrap()).unwrap();
+
+        let with_optional = |extra: usize, required: Option<usize>| {
+            let mut current = catalog.clone();
+            let member = current
+                .types
+                .values_mut()
+                .find_map(|typ| typ.members.values_mut().find(|member| member.kind >= 2))
+                .unwrap();
+            for _ in 0..extra {
+                member.parameters.push(VariableType::Integer);
+            }
+            if let Some(required) = required {
+                member.required = required;
+            }
+            current
+        };
+
+        loaded.bind(&with_optional(1, None)).expect("one appended optional parameter");
+        loaded.bind(&with_optional(3, None)).expect("several appended optional parameters");
+        loaded.bind(&with_optional(1, Some(0))).expect("a host that asks for fewer parameters");
+
+        // Requiring the appended parameter would break a stored call that omits it.
+        let mut demanding = with_optional(1, None);
+        let member = demanding
+            .types
+            .values_mut()
+            .find_map(|typ| typ.members.values_mut().find(|member| member.kind >= 2))
+            .unwrap();
+        member.required = member.parameters.len();
+        assert!(loaded.bind(&demanding).is_err(), "a newly required parameter must not bind");
+
+        // A program built against the longer signature must not load on the older host.
+        let longer = with_optional(1, None);
+        let used = longer
+            .types
+            .iter()
+            .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
+            .collect();
+        let newer = HostCatalog::decode(&longer.encode(&used).unwrap()).unwrap();
+        assert!(newer.bind(&catalog).is_err(), "compatibility only relaxes towards newer hosts");
+
+        // Changing a parameter a stored call already passes stays a mismatch.
+        let mut changed = catalog.clone();
+        let member = changed
+            .types
+            .values_mut()
+            .find_map(|typ| typ.members.values_mut().find(|member| member.kind >= 2 && !member.parameters.is_empty()))
+            .unwrap();
+        member.parameters[0] = VariableType::Double;
+        assert!(loaded.bind(&changed).is_err());
     }
 }

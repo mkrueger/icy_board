@@ -636,14 +636,63 @@ Signaturhilfe ab.
 
 ### A1 — API-ABI und Fehlerverträge einfrieren (F3)
 
-**Besprechen:** Explizite stabile IDs oder gleichwertige maschinelle
-ABI-Absicherung; Mindest-API-Versionen; optionale Parameter und Defaults;
-einheitliche Regeln für `Valid`, `Success`, `Error.Last()` und unbekannte Werte.
+Status: am 2026-09-10 besprochen, freigegeben und umgesetzt.
 
-**Abnahme:** Vollständiger Katalog mit Typ-/Member-Identität, Signaturen,
-Rückgabetypen und Array-Rängen. Unbeabsichtigtes Umordnen wird durch Tests erkannt.
-Neue Runtime-Versionen werden mit unverändert gespeicherten alten PPE-Fixtures
-getestet, nicht nur durch Neukompilieren alter Quellen.
+**Befund.** Die Bindung war bereits stärker als angenommen: ein gespeichertes
+Programm bindet über den qualifizierten Namen und die Signatur, nicht über die
+gespeicherte ID. Umordnen von Typen und Membern ist deshalb unschädlich, ebenso
+das Hinzufügen neuer Typen und Member — nachgemessen an allen vier üblichen
+Änderungen. Eine Signatur- oder Namensänderung endet in einem harten Ladefehler
+mit benanntem Member, nicht in stiller Fehlinterpretation.
+
+Genau eine übliche Evolutionsform war unnötig blockiert: das Anhängen eines
+**optionalen** Parameters wurde als Bruch behandelt, weil `parameters` und
+`required` auf exakte Gleichheit verglichen wurden. Wer `Regex.Find(text, start)`
+um ein `limit` ergänzt hätte, hätte jede bestehende PPE unladbar gemacht.
+
+**Entscheidung.** `bind()` akzeptiert zusätzlich angehängte optionale Parameter
+und ein gelockertes `required`, sofern die gespeicherte Parameterliste ein
+Präfix der aktuellen ist. Die Lockerung ist einseitig: ein Programm, das gegen
+die längere Signatur gebaut wurde, wird auf der älteren Laufzeit weiterhin
+abgelehnt. Alles andere bleibt streng. Laufzeitseitig ist das gedeckt, weil die
+VM die Argumentzahl gegen die aktuelle Registry prüft und fehlende optionale
+Argumente ohnehin mit Vorgabewerten liest.
+
+**Verworfen:** explizite stabile Member-IDs samt Versionsnummern. Sie hätten
+Format und Pflege belastet, ohne etwas zu lösen, das die Namensbindung nicht
+schon leistet. Ebenfalls gestrichen: der ursprünglich geplante Punkt
+„Mindest-API-Versionen". Die Bindung meldet bereits `host member
+icy_board.Conference.Name`, was einer Versionsnummer überlegen ist.
+
+**Kompatibilität:** rein erweiternd. Was heute lädt, lädt weiter; es kommen nur
+Fälle hinzu, die bisher abgelehnt wurden. Keine Formatänderung.
+
+**Fehlerverträge.** Die Prüfung ergab kein Durcheinander, sondern drei
+verschiedene Fragen: `Valid` beantwortet, ob ein per Nummer, Index oder Suche
+geholtes Handle auf etwas Vorhandenes zeigt; `OK`, ob die Antwort selbst gut
+war; `Success`, ob eine Suche getroffen hat. `HTTPRESPONSE` führt bewusst beide
+ersten, weil ein Netzwerkfehler und ein 404 unterscheidbar bleiben müssen.
+Zugangsobjekte ohne Lookup führen keins davon. Aktionen liefern `BOOLEAN` und
+legen die Einzelheiten in `Error.Last()`. Die Regel wird festgeschrieben, nicht
+geändert — ein Vereinheitlichen wäre ein Verhaltensbruch ohne Gewinn. Die beiden
+subtilen Regeln zur Fehlerlebensdauer (ein Erfolg löscht einen älteren Fehler;
+der erste Fehler einer Anweisung gewinnt) waren bereits dokumentiert.
+
+**Nicht in A1 gelöst:** `Regex.Find()` auf einem ungültigen Regex liefert ein
+`REGEXMATCH` mit `Success = FALSE`, also dasselbe wie „kein Treffer";
+unterscheiden lässt sich das nur über `Error.Last()`. Das ist eine
+Verhaltensfrage und gehört nicht in einen Freeze.
+
+**Abnahme.** Der Katalog liegt als eingecheckte Textdatei
+[api_catalog.txt](../crates/icy_board_ppl/tests/api_catalog.txt) mit allen Typen,
+Membern, Signaturen, optionalen Parametern, Rängen, Rückgabetypen und
+Enum-Varianten; ein Test vergleicht sie und zeigt bei Abweichung die geänderten
+Zeilen. Ein zweiter Test hält fest, welcher Typ `Valid`, `OK` oder `Success`
+führt. Drei mit 4.00 gebaute PPE-Dateien liegen binär im Repo und werden
+geladen und ausgeführt, nicht neu übersetzt; sie decken Host-Objekte samt
+Read-only-Vertrag, Aufrufe mit ausgelassenen optionalen Argumenten sowie
+Records, Enums, `VAR`-Parameter, Kurzschluss und `ON ERROR` ab. Beide Fixture-
+Arten werden nur auf ausdrückliche Anweisung neu erzeugt.
 
 ### A2 — BBS-Berechtigungen und Objektlebensdauer
 

@@ -1,0 +1,56 @@
+' Language surface a stored program relies on: declared records and enums,
+' VAR parameters, short-circuit evaluation and the error handler.
+TYPE Entry
+    STRING label
+    INTEGER values[4]
+    BOOLEAN flag
+ENDTYPE
+
+ENUM Tone
+    Quiet = 0
+    Loud = 7
+ENDENUM
+
+DECLARE PROCEDURE Fill(VAR Entry item, INTEGER seed)
+DECLARE FUNCTION Total(Entry item) INTEGER
+
+Entry box
+Fill(box, 3)
+PRINTLN "record|", box.label, "|", box.values[2], "|", box.flag, "|", Total(box)
+
+Tone tone = Tone.Loud
+PRINTLN "enum|", tone = Tone.Loud, "|", tone = Tone.Quiet
+
+' The right side must not run when the left already decides the answer.
+INTEGER touched
+PRINTLN "shortcircuit|", FALSE && Touch(), "|", TRUE || Touch(), "|", touched
+
+ON ERROR GOTO Handler
+FOPEN 1, "does-not-exist.txt", O_RD, S_DN
+PRINTLN "not reached"
+EXIT
+
+:Handler
+PRINTLN "handler|", Error.Last().OK, "|", Error.Last().Kind = ErrKind.File
+
+PROCEDURE Fill(VAR Entry item, INTEGER seed)
+    INTEGER i
+    item.label = "filled"
+    FOR i = 0 TO 3
+        item.values[i] = seed * i
+    NEXT
+    item.flag = TRUE
+ENDPROC
+
+FUNCTION Total(Entry item) INTEGER
+    INTEGER sum, i
+    FOR i = 0 TO 3
+        sum = sum + item.values[i]
+    NEXT
+    Total = sum
+ENDFUNC
+
+FUNCTION Touch() BOOLEAN
+    touched = touched + 1
+    Touch = TRUE
+ENDFUNC

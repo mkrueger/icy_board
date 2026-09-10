@@ -1,0 +1,25 @@
+' Host objects as a stored program sees them: metadata, typed collections,
+' lookups that miss, and the read-only contract.
+PRINTLN "board|", Board.Name, "|", Board.Location, "|", Board.Operator, "|", Board.SysopName, "|", Board.NodeCount
+PRINTLN "counts|", Board.Conferences.Len(), "|", Board.Users.Len()
+
+CONFERENCE conferences[]
+conferences = Board.Conferences
+INTEGER i
+FOR i = 0 TO conferences.Len() - 1
+    CONFERENCE conf = conferences[i]
+    PRINTLN "conf|", i, "|", conf.Name, "|", conf.Number, "|", conf.Valid, "|", conf.IsPublic
+NEXT
+
+USER first = Board.Users[0]
+PRINTLN "user|", first.Name, "|", first.Valid, "|", first.City
+
+' A lookup that misses stays readable and says so.
+PRINTLN "missing|", Board.Users[99].Valid, "|[", Board.Users[99].Name, "]"
+PRINTLN "missing|", Board.Conferences[-1].Valid, "|[", Board.Conferences[-1].Name, "]"
+
+' Writing through a snapshot is refused and reported, without stopping the program.
+Board.Users[0].City = "Changed"
+PRINTLN "readonly|", Error.Last().OK, "|", Board.Users[0].City
+
+PRINTLN "session|", Session.Node, "|", Session.SecurityLevel, "|", Session.IsLocal, "|", Session.PageLength
