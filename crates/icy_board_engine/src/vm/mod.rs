@@ -791,7 +791,7 @@ impl VirtualMachine<'_> {
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
                 self.goto(proc_offset)?;
-                self.run().await?;
+                self.run_statements(false).await?;
                 self.fpclear = false;
                 let result = self.variable_table.get_value(return_var_id).clone();
                 if let Some(previous) = saved_value_result {
@@ -802,16 +802,30 @@ impl VirtualMachine<'_> {
         }
     }
 
-    #[async_recursion(?Send)]
     async fn run(&mut self) -> Res<()> {
+        self.run_statements(true).await
+    }
+
+    #[async_recursion(?Send)]
+    async fn run_statements(&mut self, trap_errors: bool) -> Res<()> {
         let commands = Arc::clone(&self.commands);
         let max_ptr = commands.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {
+            if self.icy_board_state.session.request_logoff {
+                return Err(icy_net::NetError::ConnectionClosed.into());
+            }
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             // log::info!("{p}: {c}");
             self.execute_statement(&commands[p]).await?;
-            self.check_error_trap()?;
+            if self.icy_board_state.session.request_logoff {
+                return Err(icy_net::NetError::ConnectionClosed.into());
+            }
+            if trap_errors {
+                self.check_error_trap()?;
+            } else {
+                self.publish_operation_result();
+            }
         }
         Ok(())
     }

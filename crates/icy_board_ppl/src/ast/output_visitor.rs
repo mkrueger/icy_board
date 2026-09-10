@@ -618,6 +618,22 @@ impl AstVisitor<()> for OutputVisitor {
         self.output(goto.get_label());
     }
 
+    fn visit_on_error_statement(&mut self, on_error: &super::OnErrorStatement) {
+        self.output_keyword("On Error ");
+        match on_error.get_mode() {
+            super::OnErrorMode::Off => {
+                self.output_keyword("Off");
+                return;
+            }
+            super::OnErrorMode::Goto => self.output_keyword("Goto "),
+            super::OnErrorMode::Gosub => self.output_keyword("Gosub "),
+            super::OnErrorMode::Procedure => {}
+        }
+        if let Some(target) = on_error.get_target() {
+            self.output(target);
+        }
+    }
+
     fn visit_label_statement(&mut self, label: &super::LabelStatement) {
         self.output.push(':');
         self.output(label.get_label());

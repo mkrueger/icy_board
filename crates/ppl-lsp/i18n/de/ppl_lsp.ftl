@@ -44,7 +44,7 @@ hint-keyword-endenum=Beendet eine `ENUM`-Deklaration.
 hint-keyword-type=Beginnt die Deklaration eines benutzerdefinierten Datensatztyps mit benannten Feldern.
 hint-keyword-endtype=Beendet eine `TYPE`-Deklaration.
 hint-keyword-begin=Beginnt nach den Deklarationen den ausführbaren Teil eines strukturierten PPL-400-Programms.
-hint-keyword-onerror=Legt die Routine oder Marke fest, die Laufzeitfehler des aktuellen Programms behandelt.
+hint-keyword-onerror=Installiert einen VM-weiten Handler für operative Fehler nach der aktuellen VM-Anweisung. Fatale VM- und Sitzungsfehler umgehen ihn; ON ERROR OFF lässt die manuelle Prüfung mit Error.Last() bestehen.
 hint-keyword-foreach=Beginnt eine PPL-400-Schleife über ein echtes Array. Jeder Durchlauf weist der Schleifenvariable das nächste Element zu; bei einem leeren Array gibt es keinen Durchlauf. Die Elementvariable muss zum Arraytyp kompatibel sein.
 hint-keyword-endforeach=Beendet eine `FOREACH`-Schleife und wechselt zum nächsten Element der Sammlung.
 hint-keyword-exit=Beendet das aktuelle PPE. In PPL 400 ersetzt diese kontextabhängige Anweisung den klassischen Anweisungsnamen `END`.
@@ -1384,7 +1384,7 @@ hint-function-instrr=Gibt die Position ganz rechts von @2 in @1 `(1-LEN(@1))` od
 hint-function-base64enc=Kodiert die Bytes von @1 als Base64-Text. Ein String-Argument steuert seine UTF-8-Bytes bei.
 hint-function-base64dec=Dekodiert den Base64-Text in @1 in einen Byte-Blob. Fehlerhafte Eingaben werden mit `ErrCode.Format` gemeldet.
 hint-function-tobytes=Die binäre Darstellung von @1 als Byte-Blob. Zeichenfolgen verwenden UTF-8; numerische Skalare werden mit fester Breite in Little-Endian-Reihenfolge gespeichert.
-hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF – legt fest, wohin die Programmausführung bei einer fehlgeschlagenen Operation verzweigt.
+hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - installiert einen VM-weiten Handler für operative Fehler. Die erste ausstehende Ursache bleibt über spätere Operationen und verschachtelte Funktionsauswertung bis zum Ende der aufrufenden VM-Anweisung erhalten; Error.Clear() löscht sie ausdrücklich. GOTO deaktiviert sich; zurückkehrende Handler bleiben ohne rekursiven Aufruf aktiv. Fatale VM- und Sitzungsfehler umgehen Handler.
 hint-function-fdordaka=Gibt die Adresse zurück, auf die dieses Board antwortet, im Format zone:net/node mit angehängter Point-Nummer,
     sofern vorhanden. Existiert kein entsprechender Datensatz, wird eine leere Zeichenfolge zurückgegeben.
 

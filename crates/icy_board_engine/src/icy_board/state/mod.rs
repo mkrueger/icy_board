@@ -83,6 +83,9 @@ mod edit_key_tests;
 mod paging_tests;
 
 #[cfg(test)]
+mod s6_cleanup_tests;
+
+#[cfg(test)]
 mod option_tests {
     use super::{Duration, keyboard_timeout_elapsed};
 
@@ -1264,23 +1267,25 @@ impl IcyBoardState {
     }
 
     async fn run_ppe_with_color_restore<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, restore_color: bool) -> Res<bool> {
-        let mut keep_answers = false;
-        match Executable::read_file(&file_name, false) {
-            Ok(executable) => {
-                keep_answers = self
-                    .run_executable_with_color_restore(file_name, answer_file, executable, restore_color)
-                    .await?;
-            }
+        let result = match Executable::read_file(&file_name, false) {
+            Ok(executable) => self.run_executable_with_color_restore(file_name, answer_file, executable, restore_color).await,
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
                 self.session.op_text = format!("{err}");
-                self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
-                    .await?;
+                if self
+                    .display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                    .await
+                    .is_err()
+                {
+                    Err(err)
+                } else {
+                    Ok(false)
+                }
             }
-        }
+        };
         // clear all ppe parameters
         self.session.tokens.clear();
-        Ok(keep_answers)
+        result
     }
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<bool> {
@@ -1316,21 +1321,33 @@ impl IcyBoardState {
         self.ppe_nesting += 1;
         let result = run(&canonicalized_path, &executable, &mut io, self).await;
         self.ppe_nesting -= 1;
+        if let Err(err) = &result {
+            log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
+            self.session.op_text = format!("{err}");
+        }
         if self.ppe_nesting == 0 {
             self.cleanup_ppl_media().await;
         }
-        if let Some((user_color, sysop_color)) = caller_colors {
-            self.restore_ppe_color(TerminalTarget::User, user_color).await?;
-            self.restore_ppe_color(TerminalTarget::Sysop, sysop_color).await?;
-        }
+        let color_result = if let Some((user_color, sysop_color)) = caller_colors {
+            let user_result = self.restore_ppe_color(TerminalTarget::User, user_color).await;
+            let sysop_result = self.restore_ppe_color(TerminalTarget::Sysop, sysop_color).await;
+            user_result.and(sysop_result)
+        } else {
+            Ok(())
+        };
         match result {
-            Ok(keep_answers) => Ok(keep_answers),
+            Ok(keep_answers) => color_result.map(|()| keep_answers),
             Err(err) => {
-                log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
-                self.session.op_text = format!("{err}");
-                self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
-                    .await?;
-                Ok(false)
+                if color_result.is_err()
+                    || self
+                        .display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await
+                        .is_err()
+                {
+                    Err(err)
+                } else {
+                    Ok(false)
+                }
             }
         }
     }
@@ -4022,6 +4039,9 @@ impl IcyBoardState {
 
         let deadline = timeout.map(|timeout| Instant::now() + timeout);
         loop {
+            if self.session.request_logoff {
+                return Err(icy_net::NetError::ConnectionClosed.into());
+            }
             let result = if let Some(deadline) = deadline {
                 let remaining = deadline.saturating_duration_since(Instant::now());
                 if remaining.is_zero() {

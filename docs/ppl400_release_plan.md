@@ -1,6 +1,6 @@
 # PPL 400: Plan bis zum Ende der Beta
 
-Stand: 2026-09-09. Zieltermin: ungefähr 2026-10-09.
+Stand: 2026-09-10. Zieltermin: ungefähr 2026-10-09.
 
 ## Ziel und Arbeitsweise
 
@@ -18,8 +18,12 @@ Dieser Plan ist **keine pauschale Implementierungsfreigabe**.
 - Nach Umsetzung Ergebnisse und tatsächlich ausgeführte Tests zusammenfassen;
   dann den nächsten Schritt besprechen.
 - F1–F6 sind verbindliche Arbeitspakete. Ihre genaue Lösung wird jeweils besprochen.
-- Die Sprachnachschärfungen werden einzeln entschieden und die freigegebenen
+- Die Sprachnachschärfungen S1–S6 werden einzeln entschieden und die freigegebenen
   Änderungen umgesetzt, **bevor der PPE-400-Container besprochen und geändert wird**.
+- Am 2026-09-10 ausdrücklich geänderte Reihenfolge: **C1 → C2 → S7**.
+  S7 führt anschließend Sprach- und Formatentscheidungen zusammen. Die separate
+  Freigabe jedes Schritts bleibt erforderlich; frühere Reihenfolgen in den
+  historischen Abschlussprotokollen sind damit überholt.
 - Keine vollständige VM-Neuentwicklung als Vorannahme. Ein neues Containerformat
   ist eine zu begründende Entscheidung, kein bereits beschlossener Selbstzweck.
 - Bestehende PCBoard-PPEs behalten ihren Format- und Semantikvertrag. Unveröffentlichte
@@ -330,35 +334,63 @@ gebunden. Formatierung, Diff-Check und Editor-Diagnostik ohne neue Fehler.
 
 **Abgrenzung:** F1s Unicode-Dateipfad ist damit nachgewiesen. Größere Literale,
 Binärkonstanten, S1/S2-Kodierungen und F2/F3 bleiben C1/C2 vorbehalten. Die
-übrige Containerentscheidung bleibt nach S7 separat freigabepflichtig.
+übrige Containerentscheidung bleibt in C1 separat freigabepflichtig.
 
 ### S6 — Fehlerfluss und strukturiertes Cleanup
 
-Status: offen; erst nach S5 einzeln besprechen.
+Status: am 2026-09-10 einzeln freigegeben, umgesetzt und validiert.
 
-**Besprechen:**
+**Beschluss:** `ON ERROR` bleibt erhalten. `TRY … CATCH … FINALLY … ENDTRY`
+ist als spätere Sprachentwicklung gewünscht, wird aber ausdrücklich vertagt,
+um zuerst den Releaseplan abzuarbeiten. Auch `DEFER` wird nicht eingeführt.
+Ohne Handler bleiben operative Fehler manuell über `Error.Last()` prüfbar;
+kein neuer automatischer Abbruch.
 
-- `ON ERROR` am Anweisungsende, erste Fehlerursache und spätere Seiteneffekte.
-- Abwesenheit, EOF, ungültige Ressource, operative Fehler und fatale VM-Fehler.
-- Ob ein kleiner Cleanup-Mechanismus wie `DEFER` jetzt sinnvoll und zeitlich
-  tragbar ist; keine große Exception-Hierarchie ohne konkreten Bedarf.
-- Reichweite bei Routineende, `EXIT`, `STOP`, Fehler und Disconnect.
+**Vertrag und Korrekturen:**
 
-**Abnahme:** Beschlossene Regeln sind eindeutig getestet. Ein bewusst vertagtes
-Sprachfeature wird als vertagt dokumentiert, nicht als implementiert dargestellt.
+- Die erste ausstehende operative Ursache bleibt bis zum Ende der aufrufenden
+  VM-Anweisung erhalten, auch über verschachtelte Funktionen hinweg. Spätere
+  Operanden und Seiteneffekte laufen weiter; kein Rollback. `Error.Clear()`
+  löscht ausdrücklich auch den ausstehenden Handleraufruf.
+- Handler sind VM-weit, nicht routine-lokal. GOTO deaktiviert sich vor dem
+  Sprung; GOSUB und Prozedurhandler bleiben ohne rekursiven Aufruf aktiv.
+  Prozedurargumentfehler werden vor dem Rumpf behandelt; Rücksprung und
+  `VAR`-Rückschreiben bleiben erhalten.
+- EOF und erfolglose Suche sind normale Ergebnisse; ungültige Ressourcennutzung
+  ist ein operativer Fehler. Fatale VM- und Sitzungsfehler umgehen Handler.
+- Cleanup erfolgt am äußersten PPE-Ende, nicht bei Routine- oder innerem
+  PPE-Rücksprung. Nach Ausgabefehlern werden lokale Ressourcen weiter freigegeben;
+  beide Farbwiederherstellungen werden versucht. Ursprüngliche Ausführungs- und
+  Ladefehler werden nicht durch spätere Diagnose-/Restore-Fehler verdeckt.
+- Tatsächliches Eingabe-EOF beendet zeitbegrenztes und unbegrenztes Event-Warten
+  sowie weitere VM-Ausführung. PPE-Parameter werden auch bei Fehlern gelöscht.
+- Der AST-Ausgabebesucher erhält jetzt alle ON-ERROR-Formen; die
+  Decompiler-Labelbereinigung zählt GOTO-/GOSUB-Handlerziele als Referenzen.
 
-### S7 — Sprachentscheidungen zusammenführen
+**Gezielte Abnahme:** 29 Fehlervertragstests bestanden, einschließlich echter
+PPE-Dateien und Roh-/rekonstruiertem Decompile/Recompile. Rekursive Argumente,
+Handlerfehler und leere Aufruf-/VAR-Stapel mit und ohne Optimierung geprüft.
+Wiederholte Sendefehler nach realer Ressourcenaktivierung decken EXIT, STOP,
+VM-Fehler, ersten Transportfehler, Diagnoseausgabe und Farbwiederherstellung ab.
+Eine tatsächlich geschlossene Eingaberichtung prüft EOF, ausbleibenden
+Folgecode/Handler und Cleanup. Fehlende und beschädigte PPE-Dateien behalten
+ihre Ladeursache trotz fehlgeschlagener Diagnoseausgabe. LSP-Hilfe mit
+unabhängigen englischen/deutschen Locale-Loadern geprüft.
 
-Status: offen; eigener Besprechungspunkt nach S1–S6.
+**Gesamtvalidierung:** `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine
+-p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet` in getrennten
+EN- und DE-Prozessen: jeweils **2.889 bestanden, 0 fehlgeschlagen, 6 ignoriert**.
+All-Target-Checks der fünf Pakete und Engine-All-Targets ohne Default-Features
+bestanden. Die bestehenden Tests für äußeres PPE-Ende und Ressourcen des
+aufrufenden PPE bleiben grün.
 
-**Besprechen:** Zusammenspiel der Änderungen, offen gebliebene Entscheidungen,
-notwendige Layoutinformationen und realistische Restzeit.
+**Grenzen:** Reset-Sequenzen sind bei ausgefallener Verbindung best-effort;
+lokale Freigabe garantiert keinen reparierten entfernten Terminalzustand.
+Kein Nachweis für Prozessabsturz, erzwungenen Future-Abbruch oder unerkannte
+Verbindungsabbrüche. Keine neue Cleanup-Syntax und keine Containeränderung.
+S7 sowie C1/übriges C2 bleiben eigene Freigabeschritte.
 
-**Abnahme:** Die freigegebenen Sprachänderungen sind umgesetzt und soweit ohne
-neues Dateiformat möglich getestet. Formatabhängige Abnahmen sind ausdrücklich
-aufgelistet. Erst danach C1 beginnen.
-
-## Containerformat: eigener Schritt nach den Sprachänderungen
+## Containerformat: eigene Schritte nach S1–S6
 
 ### C1 — PPE-400-Formatentscheidung (F1/F2/F3)
 
@@ -417,10 +449,21 @@ Compiler, Serializer, Loader und Decompiler gemeinsam aktualisieren.
   kontrolliert zurückgewiesen; optionale Erweiterungen gemäß Vertrag behandelt.
 - Bestehende Legacy-PPEs behalten ihre Ausführung.
 
+### S7 — Sprachentscheidungen zusammenführen
+
+Status: offen; am 2026-09-10 ausdrücklich hinter C1 und C2 verschoben.
+
+**Besprechen:** Zusammenspiel der Sprach- und Formatänderungen, offen gebliebene
+Entscheidungen, verbleibende Abnahmelücken und realistische Restzeit.
+
+**Abnahme:** Die freigegebenen Sprach- und Formatänderungen sind gemeinsam
+getestet. Noch offene und bewusst vertagte Anforderungen sind ausdrücklich
+aufgelistet. Kein erneuter Format- oder Sprachumbau ohne eigene Freigabe.
+
 ## Runtime- und API-Arbeitspakete
 
 Auch die folgenden Schritte werden jeweils einzeln besprochen und freigegeben.
-Eine Reihenfolgeänderung ist möglich, aber nur ausdrücklich; C1 bleibt nach S7.
+Die am 2026-09-10 freigegebene Reihenfolge lautet C1, C2, anschließend S7.
 Die UTF-8-Literalkodierung wurde als begrenzte Ausnahme mit S5 freigegeben.
 
 ### R1 — Ressourcenidentität korrigieren (F4)
@@ -569,8 +612,8 @@ Zielrahmen, keine belastbare Aufwandsschätzung vor den Einzelentscheidungen.
 
 | Zeitraum | Schwerpunkt | Kontrollpunkt |
 | --- | --- | --- |
-| Woche 1 | P0; S1–S6 einzeln besprechen und freigegebene Sprachänderungen umsetzen; S7 | Keine offenen, unbeabsichtigten Sprachverträge in die Formatentscheidung mitnehmen. |
-| Woche 2 | C1 separat entscheiden; C2 sowie R1/R2; A1–A3 | F1–F6 bearbeitet beziehungsweise konkret terminiert; Format-/ABI-Roundtrips belastbar. |
+| Woche 1 | P0; S1–S6 einzeln besprechen und freigegebene Sprachänderungen umsetzen | Anforderungen aus den freigegebenen Sprachverträgen für C1 festhalten. |
+| Woche 2 | C1 separat entscheiden; C2; anschließend S7; R1/R2 und A1–A3 | F1–F6 bearbeitet beziehungsweise konkret terminiert; Format-/ABI-Roundtrips belastbar. |
 | Woche 3 | A4–A6 bedarfsgetrieben; E1–E3 als echte PPEs bauen und abnehmen | BBS- und Terminalworkflows ohne interne Dateiparser; gefundene Lücken priorisieren. |
 | Woche 4 | Regressionen, Client-Matrix, Legacy-Kompatibilität, Dokumentationsabgleich | Keine neuen Sprachkonzepte; Go/No-Go anhand nachgewiesener Ergebnisse. |
 
@@ -597,8 +640,8 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 ### Go/No-Go-Checkliste
 
 - [x] P0 abgeschlossen; stabiler Build und reproduzierbare Baseline.
-- [ ] S1–S6 jeweils einzeln besprochen; freigegebene Änderungen umgesetzt.
-- [ ] S7 abgeschlossen; Container erst danach separat entschieden.
+- [x] S1–S6 jeweils einzeln besprochen; freigegebene Änderungen umgesetzt.
+- [ ] C1 separat entschieden, C2 umgesetzt; anschließend S7 abgeschlossen.
 - [x] F1: Unicode-Datei-Roundtrip nachgewiesen (S5, vorgezogener UTF-8-Literalteil).
 - [ ] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
 - [ ] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.

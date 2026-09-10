@@ -1058,17 +1058,21 @@ ENDIF
 | `Message` | Informational English text, meant for a log rather than control flow |
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
-`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Audio`, `Term` or
-`Msg`. `ErrCode` is `Ok`, `Unavailable`, `Invalid`, `Io`, `Format`, `Limit`,
-`Unsupported` or `Stack`.
+`ErrKind` includes `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Audio`,
+`Term`, `Msg`, `Net`, `User`, `String` and `Regex`. `ErrCode` includes `Ok`,
+`Unavailable`, `Invalid`, `Io`, `Format`, `Limit`, `Unsupported`, `Stack`,
+`Denied` and `Timeout`. These are open nominal enums; retain a fallback for
+unknown values.
 
 Use `Kind` and `Code` when a PPE has to make a decision. `Message` may include
 paths and operating-system text, and its wording may change between releases.
 
-An operation that works clears the error, so `Error.Last()` always answers for
-the last thing that was tried rather than for the last thing that failed.
-`Error.Clear()` forgets it as well. The value is a copy, so a PPE can keep one
-while it carries on:
+A successful fallible operation clears an older error, but cannot clear an
+error still pending for the current VM statement. The first pending failure
+wins over later failures, including those in nested function evaluation.
+Later operands and their side effects still run; there is no rollback.
+`Error.Clear()` explicitly clears both the published error and pending handler
+dispatch. The value is a copy, so a PPE can keep one while it carries on:
 
 ```PPL
 ERROR failed = Error.Last()
@@ -1079,11 +1083,18 @@ and that `FGET` or `FREAD` reaching the end of a file raises it. Reaching the en
 is not an error, so it leaves `Error.Last().OK` true and never reaches an
 `ON ERROR` handler.
 
+A search with no match or an empty handle's `Valid = FALSE` is likewise a
+normal result. Trying to operate on an invalid resource is a failure. With no
+handler installed, operational failures remain available through `Error.Last()`
+and execution continues; they do not automatically become fatal errors.
+
 ### ON ERROR
 
 `ON ERROR` says where a failed operation sends the program. It may be written as
 one word, `ONERROR`. GOSUB and procedure handlers stay armed; GOTO is disarmed
 before the jump because its cleanup path has no natural return boundary.
+The setting is VM-wide, not routine-local: returning from a routine that changed
+the handler does not restore the previous setting. A nested PPE has its own VM.
 
 | Form | What it does |
 | :--- | :--- |
@@ -1112,9 +1123,42 @@ failure inside the handler is recorded but does not call the handler again.
 an invalid VM instruction, or a disconnected session is fatal to execution and
 does not enter a handler.
 
-The handler runs once the failing statement is over, so the statement always
-finishes first. `ON ERROR` also catches running out of call stack, which lets a
-runaway recursion apologise instead of disappearing.
+Dispatch occurs after the invoking VM instruction completes, not at an inner
+function's statement boundary. Thus an assignment receives its result before
+its handler runs. A procedure-call instruction evaluates arguments and installs
+the call frame before dispatch; a returning handler resumes at the procedure
+body, and normal `VAR` copy-back occurs when that procedure returns. Structured
+source statements may lower to several VM instructions. Fatal failures abort
+execution without waiting for this operational-error boundary.
+
+`ON ERROR` also catches the checked call-stack limit, which lets runaway
+recursion report an operational `Stack` error instead of corrupting the VM.
+
+### PPE cleanup
+
+The BBS releases session-owned PPE resources when the outermost PPE finishes,
+including ordinary completion, `EXIT`, `STOP`, fatal execution failure and a
+detected disconnect. Nested PPE return and ordinary routine return do not release
+the parent's resources. Cleanup releases input modes and events, graphics,
+audio, terminal macros, synchronized updates and changed margins. PPE parameters
+are cleared even when loading, execution or diagnostic output fails.
+
+Terminal reset output is best-effort. Local cleanup continues after send
+failures, but a disconnected terminal cannot be guaranteed to receive reset
+sequences. Both caller-color restorations are attempted. An existing execution
+or loading error remains the primary diagnostic if restoration or error display
+also fails; successfully reported PPE failures retain the existing `FALSE`
+completion result.
+
+Detected input EOF ends timed and indefinite event waits and bypasses
+`ON ERROR`; no later VM instruction runs. These guarantees apply to normal
+asynchronous completion and detected session failures, not process crashes,
+forced future cancellation or an undetected dead connection. Cleanup does not
+execute user-defined handlers after a fatal VM failure.
+
+`TRY ... CATCH ... FINALLY ... ENDTRY` is desired future work, deliberately
+postponed while the PPL 400 release plan is completed. `DEFER` is also postponed.
+Neither construct is available in this release step; `ON ERROR` remains supported.
 
 > **Note:** icy_term does not read the slot argument yet, so a font it accepts
 > applies regardless of which slot was named. SyncTERM uses the slot as written.

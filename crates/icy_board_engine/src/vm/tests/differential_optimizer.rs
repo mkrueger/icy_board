@@ -157,6 +157,51 @@ fn assert_equivalent(source: &str) -> ExecutionSnapshot {
 }
 
 #[test]
+fn s6_recursive_argument_errors_preserve_handler_and_var_frames() {
+    for (handler, declaration, body) in [
+        (
+            "GOSUB Report",
+            "",
+            ":Report\nPRINT \"handler:\", value, \":\", Error.Last().Kind = ErrKind.String, \"|\"\nTerminal.LoadFont(43, \"missing.fnt\")\nRETURN",
+        ),
+        (
+            "Report",
+            "DECLARE PROCEDURE Report(ERROR problem)",
+            "PROCEDURE Report(ERROR problem)\nPRINT \"handler:\", value, \":\", problem.Kind = ErrKind.String, \"|\"\nTerminal.LoadFont(43, \"missing.fnt\")\nENDPROC",
+        ),
+    ] {
+        let snapshot = assert_equivalent(&format!(
+            r#"
+{declaration}
+DECLARE FUNCTION Failing(INTEGER depth) INTEGER
+DECLARE PROCEDURE Update(VAR INTEGER target, INTEGER delta)
+INTEGER value = 1
+ON ERROR {handler}
+Update(value, Failing(2))
+PRINT "done:", value
+EXIT
+{body}
+FUNCTION Failing(INTEGER depth) INTEGER
+    IF depth > 0 RETURN Failing(depth - 1)
+    BYTES bad = BASE64DEC("!")
+    RETURN 7
+ENDFUNC
+PROCEDURE Update(VAR INTEGER target, INTEGER delta)
+    PRINT "body:", target, ":", delta, "|"
+    target = target + delta
+ENDPROC
+"#
+        ));
+        assert_eq!(snapshot.result, Ok(()), "{handler}");
+        assert_eq!(snapshot.output, b"handler:1:1|body:1:7|done:8", "{handler}");
+        assert_eq!(snapshot.return_addresses, 0, "{handler}");
+        assert_eq!(snapshot.call_locals, 0, "{handler}");
+        assert_eq!(snapshot.write_backs, 0, "{handler}");
+        assert!(!snapshot.error_pending, "{handler}");
+    }
+}
+
+#[test]
 fn s4_open_enums_optimization_preserves_unnamed_values_and_operand_order() {
     for language in [350, 400] {
         let snapshot = assert_equivalent(&format!(

@@ -92,6 +92,22 @@ mod tests {
     use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
 
     #[test]
+    fn s6_error_help_is_localized_with_independent_loaders() {
+        for (locale, scope, fatal) in [("en", "VM-wide", "Fatal"), ("de", "VM-weiten", "Fatale")] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            for key in ["hint-keyword-onerror", "hint-statement-on-error"] {
+                assert!(loader.has(key), "{locale}: {key}");
+                let help = loader.get(key);
+                assert!(help.contains(scope) && help.contains(fatal), "{locale}: {help}");
+            }
+            let help = loader.get("hint-statement-on-error");
+            assert!(help.contains("Error.Clear()") && help.contains("GOTO") && help.contains("GOSUB"), "{help}");
+            assert!(loader.get("hint-keyword-onerror").contains("Error.Last()"));
+        }
+    }
+
+    #[test]
     fn s5_text_help_is_localized_with_independent_loaders() {
         for (locale, codepoint, cells) in [("en", "Unicode code point", "terminal cells"), ("de", "Unicode-Codepoint", "Terminalzellen")] {
             let loader = fluent_language_loader!();

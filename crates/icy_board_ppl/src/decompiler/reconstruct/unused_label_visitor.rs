@@ -28,4 +28,12 @@ impl AstVisitor<()> for UnusedLabelVisitor {
     fn visit_gosub_statement(&mut self, gosub: &crate::ast::GosubStatement) {
         self.used_labels.insert(unicase::Ascii::new(gosub.get_label().to_string()));
     }
+
+    fn visit_on_error_statement(&mut self, on_error: &crate::ast::OnErrorStatement) {
+        if matches!(on_error.get_mode(), crate::ast::OnErrorMode::Goto | crate::ast::OnErrorMode::Gosub)
+            && let Some(target) = on_error.get_target()
+        {
+            self.used_labels.insert(target.clone());
+        }
+    }
 }

@@ -1,6 +1,51 @@
 use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_files_and_input};
 
 #[test]
+fn s6_nested_function_keeps_first_error_until_outer_statement_finishes() {
+    let source = r#"
+DECLARE FUNCTION Later() INTEGER
+ON ERROR GOSUB Report
+PRINT "before|", BASE64DEC("!").ToString(), Later(), "|after|"
+PRINT "done"
+EXIT
+:Report
+PRINT "handler:", Error.Last().Kind = ErrKind.String, ":", Error.Last().Code = ErrCode.Format, "|"
+RETURN
+FUNCTION Later() INTEGER
+    PRINT "nested|"
+    Terminal.LoadFont(43, "missing.fnt")
+    RETURN 7
+ENDFUNC
+"#;
+    let expected = "before|nested|7|after|handler:1:1|done";
+    assert_error_roundtrip(source, expected);
+}
+
+fn assert_error_roundtrip(source: &str, expected: &str) {
+    assert_eq!(run_ppl(source), expected);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("errors.ppe");
+    std::fs::write(&path, super::compile(source).to_buffer().unwrap()).unwrap();
+    let executable = crate::executable::Executable::read_file(&path, false).unwrap();
+    for raw in [None, Some(false), Some(true)] {
+        let loaded = if let Some(raw) = raw {
+            let (ast, issues) = crate::decompiler::decompile(executable.clone(), raw, 400).unwrap();
+            assert!(issues.is_empty());
+            let mut visitor = crate::ast::output_visitor::OutputVisitor::default();
+            visitor.version = 400;
+            ast.visit(&mut visitor);
+            std::fs::write(&path, super::compile(&visitor.output).to_buffer().unwrap()).unwrap();
+            crate::executable::Executable::read_file(&path, false).unwrap()
+        } else {
+            executable.clone()
+        };
+        let (kept, output) = super::run_executable_collecting(loaded, |_| {}, &[], None, b"", false, false);
+        assert!(kept, "raw={raw:?}");
+        assert_eq!(output, expected, "raw={raw:?}");
+    }
+}
+
+#[test]
 fn the_error_api_requires_runtime_400() {
     for runtime in [330, 340] {
         let errors = compile_errors_with_runtime("PrintLn Error.Last().Code\nError.Clear()", runtime);
@@ -10,6 +55,97 @@ fn the_error_api_requires_runtime_400() {
         );
     }
     assert!(compile_errors_with_runtime("PrintLn Error.Last().Code\nError.Clear()", 400).is_empty());
+}
+
+#[test]
+fn s6_function_error_traps_once_after_assignment_in_each_handler_mode() {
+    for (handler, declaration, body, expected) in [
+        ("GOTO Failed", "", ":Failed\nPRINT value, \"|\", Error.Last().Kind = ErrKind.String\n", "4|1"),
+        (
+            "GOSUB Failed",
+            "",
+            ":Failed\nPRINT value, \"|\", Error.Last().Kind = ErrKind.String\nRETURN\n",
+            "4|1done",
+        ),
+        (
+            "Failed",
+            "DECLARE PROCEDURE Failed(ERROR problem)",
+            "PROCEDURE Failed(ERROR problem)\nPRINT value, \"|\", problem.Kind = ErrKind.String\nENDPROC\n",
+            "4|1done",
+        ),
+    ] {
+        let source = format!(
+            r#"
+{declaration}
+DECLARE FUNCTION Failing() INTEGER
+INTEGER value = 0
+ON ERROR {handler}
+value = Failing() + 1
+PRINT "done"
+EXIT
+{body}
+FUNCTION Failing() INTEGER
+    BYTES bad = BASE64DEC("!")
+    BYTES good = TOBYTES("ok")
+    RETURN 3
+ENDFUNC
+"#
+        );
+        assert_error_roundtrip(&source, expected);
+    }
+}
+
+#[test]
+fn s6_handler_setting_is_vm_wide_and_clear_is_explicit() {
+    let source = r#"
+DECLARE PROCEDURE Install()
+DECLARE PROCEDURE Report(ERROR problem)
+DECLARE FUNCTION ClearPending() INTEGER
+Install()
+BYTES bad = BASE64DEC("!")
+ON ERROR GOTO Unexpected
+PRINT BASE64DEC("!").ToString(), ClearPending(), "|"
+ON ERROR OFF
+bad = BASE64DEC("!")
+PRINT Error.Last().Kind = ErrKind.String, "|"
+BYTES good = TOBYTES("ok")
+PRINT Error.Last().OK
+EXIT
+:Unexpected
+PRINT "unexpected"
+EXIT
+PROCEDURE Install()
+    ON ERROR Report
+ENDPROC
+PROCEDURE Report(ERROR problem)
+    PRINT "handled:", problem.Kind = ErrKind.String, "|"
+ENDPROC
+FUNCTION ClearPending() INTEGER
+    Error.Clear()
+    RETURN 9
+ENDFUNC
+"#;
+    assert_error_roundtrip(source, "handled:1|9|1|1");
+}
+
+#[test]
+fn s6_absence_is_normal_but_invalid_resource_use_is_an_error() {
+    let output = run_ppl(
+        r#"
+Terminal.Gfx.Init(GfxBackend.Sixel)
+ON ERROR GOSUB Report
+REGEXMATCH missing = REGEX.Compile("x").Find("abc")
+SURFACE empty
+PRINT missing.Success, "|", empty.Valid, "|", "abc".Find("x"), "|", Error.Last().OK, "|"
+BOOLEAN drawn = empty.Clear(0)
+PRINT "done"
+EXIT
+:Report
+PRINT "invalid:", Error.Last().Kind = ErrKind.Gfx, ":", Error.Last().Code = ErrCode.Invalid, "|"
+RETURN
+"#,
+    );
+    assert_eq!(output, "\x1b[2J\x1b[H\x1b[?25l\x1b[?7l\x1b[?80l\x1b[?1070l0|0|-1|1|invalid:1:1|done");
 }
 
 #[test]
