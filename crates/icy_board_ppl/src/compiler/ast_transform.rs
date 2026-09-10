@@ -21,8 +21,8 @@ use crate::{
 /// semantically revisited during lowering. Span-keyed maps must belong to this file.
 pub(crate) struct TransformationSemanticInput<'a> {
     pub function_type_lookup: &'a HashMap<CallId, SemanticInfo>,
-    pub enum_binary_types: &'a HashMap<u64, u8>,
-    pub user_type_lookup: &'a HashMap<usize, u8>,
+    pub enum_binary_types: &'a HashMap<u64, u32>,
+    pub user_type_lookup: &'a HashMap<usize, u32>,
     /// Resolved assignment target types, keyed by LetStatement's identifier span.start.
     /// Include scalar/array/function-result targets as well as member targets.
     /// MemberCall targets are resolved from user_type_lookup and the registry.
@@ -37,7 +37,7 @@ pub(crate) struct GeneratedTransformationInfo {
     /// None is global/main scope; Some(name) is a module-bound routine name.
     pub temporaries: HashMap<Option<unicase::Ascii<String>>, Vec<(VariableType, VariableSpecifier)>>,
     pub function_type_lookup: HashMap<CallId, SemanticInfo>,
-    pub enum_binary_types: HashMap<u64, u8>,
+    pub enum_binary_types: HashMap<u64, u32>,
 }
 
 pub struct AstTransformationVisitor {
@@ -51,12 +51,12 @@ pub struct AstTransformationVisitor {
     local_bindings: Option<HashSet<unicase::Ascii<String>>>,
     enums: Vec<EnumDefinition>,
     loop_counters: HashSet<usize>,
-    compound_receiver_types: HashMap<usize, u8>,
-    compound_record_types: HashSet<u8>,
-    compound_members: HashMap<(u8, unicase::Ascii<String>), (usize, VariableType)>,
-    record_fields: HashMap<(u8, unicase::Ascii<String>), crate::executable::RecordField>,
+    compound_receiver_types: HashMap<usize, u32>,
+    compound_record_types: HashSet<u32>,
+    compound_members: HashMap<(u32, unicase::Ascii<String>), (usize, VariableType)>,
+    record_fields: HashMap<(u32, unicase::Ascii<String>), crate::executable::RecordField>,
     function_type_lookup: HashMap<CallId, SemanticInfo>,
-    enum_binary_types: HashMap<u64, u8>,
+    enum_binary_types: HashMap<u64, u32>,
     compound_target_types: HashMap<usize, VariableType>,
     routine_scope: Option<unicase::Ascii<String>>,
     generated: GeneratedTransformationInfo,
@@ -93,7 +93,7 @@ impl AstTransformationVisitor {
 
     /// Receiver types come from source semantic analysis. Records must keep
     /// their storage path; reference objects must instead keep their identity.
-    pub(crate) fn set_compound_receiver_types(&mut self, types: HashMap<usize, u8>, registry: &crate::parser::UserTypeRegistry) {
+    pub(crate) fn set_compound_receiver_types(&mut self, types: HashMap<usize, u32>, registry: &crate::parser::UserTypeRegistry) {
         self.compound_record_types = types.values().copied().filter(|id| registry.is_record_type(*id)).collect();
         self.compound_members.clear();
         self.record_fields.clear();
@@ -350,7 +350,7 @@ impl AstTransformationVisitor {
     /// Source semantics already checked the nominal type and domain, including
     /// unnamed valid values. Like Enum.Member, a known value needs no runtime
     /// cast. Enclosing bitwise expressions retain their checked binary IDs.
-    fn enum_constant_expression(&self, id: u8, value: i32, token: &Spanned<Token>) -> Option<Expression> {
+    fn enum_constant_expression(&self, id: u32, value: i32, token: &Spanned<Token>) -> Option<Expression> {
         self.enums.iter().find(|definition| definition.id == id)?;
         Some(Expression::Const(ConstantExpression::new(
             token.clone(),

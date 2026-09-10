@@ -4,7 +4,7 @@ PPLC works basically like the old one - specify file name and you're all set.
 But it has way more to offer now:
 
 ```
-Usage: pplc [-d] [--nowarnings] [--version] [--mono] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--stdout] [--check] [--print-config] [--print-config-json] [--] [<file>]
+Usage: pplc [-d] [--nowarnings] [--version] [--mono] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--stdout] [--check] [--compression <compression>] [--debug] [--print-config] [--print-config-json] [--] [<file>]
 
 PCBoard Programming Language Compiler
 
@@ -30,6 +30,8 @@ Options:
   --stdout          with --format, write the result to stdout and leave the file
                     alone
   --check           checks source/package for errors without compiling
+  --compression     section compression for runtime 400: none (default), zstd
+  --debug           keep variable names in the executable
   --print-config    prints the effective compiler configuration without
                     compiling
   --print-config-json
@@ -77,7 +79,21 @@ Defines                none
 an editor can discover a package's actual output instead of reproducing the
 compiler's rules.
 
+### Compression and debug names
+
+Runtime 400 stores the program in sections, and each section can be packed with
+Zstd. `--compression zstd` turns that on; the default is `none`. The choice is
+recorded in the file, so the loader never has to guess from a length difference.
+Compression is a runtime-400 feature; asking for it on an older target is an
+error rather than a silent fallback.
+
+`--debug` keeps the variable names in the executable. Without it the names are
+left out, and nothing else about the program changes — a stripped and an
+unstripped build have the same content identity. There is no source path, source
+text or line number in a PPE either way.
+
 ### Disassembling
+
 Instead of creating a .PPE executable it can print a disassembler. This is useful to find out what the compiler does with the input code.
 
  A .PPE executable basically consits out of a variable table that cotains all variables and constants used in the .PPE file.
@@ -107,13 +123,23 @@ Real uncompressed script buffer size: 12 bytes
 00000: 000A 0001 0001 0000 0000 0001 
 ```
 
+That example targets a PCBoard runtime, where each instruction has a word
+encoding to show. Runtime 400 has none: its instructions are stored in their own
+section and jumps address instruction indices. The listing there prints the
+instructions and their operands without the word dump, and ends with the
+instruction count instead of a script buffer size.
+
 ### Supported versions
 
 PPLC is designed to generate valid output files PCBoard 15.0-15.4 and icy board. Using `--version` changes the container format and sets the language version to that value.
 With `--langversion` it's possible to specify a special language version. This is useful for using the new PPL4 features for old PCBoard versions.
 Recommened is language verison 350.
 
-Versions 400+ is just for icy board. PPE files are no longer crypted and some additional features are implemented making version 400 incompatible with PCBoard.
+Versions 400+ is just for icy board. Runtime 400 writes a different container
+entirely — sectioned, unencrypted and validated before it runs, described in
+[ppe_format.md](ppe_format.md) — which makes it incompatible with PCBoard.
+PPEs from the unreleased 400 beta use the old container and have to be
+recompiled; the loader says so instead of misreading them.
 
 ### Packages
 Packages are a new feature. They help to create bigger projects and to distribute/generate PPLs with different versions.

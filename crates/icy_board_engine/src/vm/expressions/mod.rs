@@ -346,7 +346,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
         FuncOpCode::EnumHas => {
             let type_id = arg.eval_expr(&arguments[0]).await?.as_int();
-            let id = u8::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
+            let id = u32::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
             // Values are owned snapshots: evaluating the mask may mutate the receiver.
             let receiver = arg.eval_expr(&arguments[1]).await?;
             let mask = arg.eval_expr(&arguments[2]).await?;
@@ -360,7 +360,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::EnumCast => {
             let type_id = arg.eval_expr(&arguments[0]).await?.as_int();
             let value = arg.eval_expr(&arguments[1]).await?;
-            let id = u8::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
+            let id = u32::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
             if value.get_type() != crate::executable::VariableType::Integer || !arg.variable_table.enums.contains_key(&id) {
                 return Err(crate::executable::VMError::InvalidEnumValue(id, value.as_string()).into());
             }

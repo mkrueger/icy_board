@@ -256,12 +256,16 @@ fn hir_validation_valid_ppe_roundtrips_and_keeps_label_zero() {
     ] {
         let compiler = valid_compiler(source);
         let executable = compiler.create_executable().unwrap();
-        assert_eq!(compiler.get_script().serialize(), executable.script_buffer);
+        assert_eq!(
+            compiler.get_script().statements.len(),
+            executable.in_memory_script.as_ref().unwrap().statements.len()
+        );
         let mut bytes = executable.to_buffer().unwrap();
         let decoded = Executable::from_buffer(&mut bytes, false).unwrap();
         let script = PPEScript::from_ppe_file(&decoded).unwrap();
         assert!(script.bugged_offsets.is_empty());
-        assert_eq!(script.serialize(), executable.script_buffer);
+        assert_eq!(compiler.get_script().statements.len(), script.statements.len());
+        assert_eq!(bytes, decoded.to_buffer().unwrap());
         if let Some(index) = compiler
             .get_hir_program()
             .commands

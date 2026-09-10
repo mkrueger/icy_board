@@ -62,11 +62,11 @@ impl VirtualMachine<'_> {
     }
 
     #[allow(clippy::needless_range_loop)]
-    pub(super) async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
+    pub(super) async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_modes: &[bool]) -> Res<()> {
         let mut values = Vec::with_capacity(parameters);
         let mut targets = Vec::new();
         for (i, argument) in arguments.iter().take(parameters).enumerate() {
-            let value = if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
+            let value = if pass_modes.get(i).copied().unwrap_or(false) {
                 let (target, mut value) = self.resolve_write_back_target(argument).await?;
                 if !self.is_whole_array_parameter(first + i) && value.get_dimensions() > 0 {
                     value = self.read_array_element(&value, 0, 0, 0)?;

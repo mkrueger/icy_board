@@ -316,11 +316,11 @@ PRINT item.Value.Number
     assert_eq!(2, executable.user_types.len());
     assert_eq!(2, executable.user_types[0].len());
     assert_eq!(2, executable.user_types[1].len());
-    assert_eq!(VariableType::UserData(FIRST_USER_TYPE_ID as u8), executable.user_types[1][0].variable_type);
+    assert_eq!(VariableType::UserData(FIRST_USER_TYPE_ID as u32), executable.user_types[1][0].variable_type);
     assert_eq!(VariableType::Integer, executable.user_types[1][1].variable_type);
 
     let item = executable.variable_table.get_entries().iter().find(|entry| entry.get_name() == "item").unwrap();
-    assert_eq!(VariableType::UserData((FIRST_USER_TYPE_ID + 1) as u8), item.header.variable_type);
+    assert_eq!(VariableType::UserData((FIRST_USER_TYPE_ID + 1) as u32), item.header.variable_type);
 
     let mut bytes = executable.to_buffer().unwrap();
     let loaded = Executable::from_buffer(&mut bytes, false).unwrap();

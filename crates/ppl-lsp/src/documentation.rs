@@ -132,53 +132,53 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::Unsigned => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
         VariableType::Long => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-long")),
         VariableType::ULong => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ulong")),
-        VariableType::UserData(id) if id == REGEX_ID as u8 => get_sig_hint(Signature::new("REGEX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex")),
-        VariableType::UserData(id) if id == REGEX_MATCH_ID as u8 => {
+        VariableType::UserData(id) if id == REGEX_ID as u32 => get_sig_hint(Signature::new("REGEX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex")),
+        VariableType::UserData(id) if id == REGEX_MATCH_ID as u32 => {
             get_sig_hint(Signature::new("REGEXMATCH".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-match"))
         }
-        VariableType::UserData(id) if id == BOARD_ID as u8 => get_sig_hint(Signature::new("BOARD".to_string()), fl!(LANGUAGE_LOADER, "hint-type-board")),
-        VariableType::UserData(id) if id == SESSION_ID as u8 => get_sig_hint(Signature::new("SESSION".to_string()), fl!(LANGUAGE_LOADER, "hint-type-session")),
-        VariableType::UserData(id) if id == USER_ID as u8 => get_sig_hint(Signature::new("USER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-user")),
-        VariableType::UserData(id) if id == HTTP_ID as u8 => get_sig_hint(Signature::new("HTTP".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http")),
-        VariableType::UserData(id) if id == HTTP_REQUEST_ID as u8 => {
+        VariableType::UserData(id) if id == BOARD_ID as u32 => get_sig_hint(Signature::new("BOARD".to_string()), fl!(LANGUAGE_LOADER, "hint-type-board")),
+        VariableType::UserData(id) if id == SESSION_ID as u32 => get_sig_hint(Signature::new("SESSION".to_string()), fl!(LANGUAGE_LOADER, "hint-type-session")),
+        VariableType::UserData(id) if id == USER_ID as u32 => get_sig_hint(Signature::new("USER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-user")),
+        VariableType::UserData(id) if id == HTTP_ID as u32 => get_sig_hint(Signature::new("HTTP".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http")),
+        VariableType::UserData(id) if id == HTTP_REQUEST_ID as u32 => {
             get_sig_hint(Signature::new("HTTPREQUEST".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http-request"))
         }
-        VariableType::UserData(id) if id == HTTP_RESPONSE_ID as u8 => {
+        VariableType::UserData(id) if id == HTTP_RESPONSE_ID as u32 => {
             get_sig_hint(Signature::new("HTTPRESPONSE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http-response"))
         }
-        VariableType::UserData(id) if id == GFX_ID as u8 => get_sig_hint(Signature::new("GFX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-gfx")),
-        VariableType::UserData(id) if id == SURFACE_ID as u8 => get_sig_hint(Signature::new("SURFACE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-surface")),
+        VariableType::UserData(id) if id == GFX_ID as u32 => get_sig_hint(Signature::new("GFX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-gfx")),
+        VariableType::UserData(id) if id == SURFACE_ID as u32 => get_sig_hint(Signature::new("SURFACE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-surface")),
         VariableType::UserData(id) if id == GFX_BACKEND_ENUM_ID => {
             get_sig_hint(Signature::new("GFXBACKEND".to_string()), fl!(LANGUAGE_LOADER, "hint-type-gfx-backend"))
         }
         VariableType::UserData(id) if id == CHECKSUM_ENUM_ID => {
             get_sig_hint(Signature::new("CHECKSUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-checksum"))
         }
-        VariableType::UserData(id) if id == TERMINAL_ID as u8 => {
+        VariableType::UserData(id) if id == TERMINAL_ID as u32 => {
             get_sig_hint(Signature::new("TERMINAL".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminal"))
         }
-        VariableType::UserData(id) if id == TERM_INFO_ID as u8 => {
+        VariableType::UserData(id) if id == TERM_INFO_ID as u32 => {
             get_sig_hint(Signature::new("TERMINFO".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminfo"))
         }
-        VariableType::UserData(id) if id == TERM_INPUT_ID as u8 => {
+        VariableType::UserData(id) if id == TERM_INPUT_ID as u32 => {
             get_sig_hint(Signature::new("TERMINPUT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminput"))
         }
-        VariableType::UserData(id) if id == MARGINS_ID as u8 => get_sig_hint(Signature::new("MARGINS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-margins")),
-        VariableType::UserData(id) if id == PALETTE_ID as u8 => get_sig_hint(Signature::new("PALETTE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-palette")),
-        VariableType::UserData(id) if id == MACROS_ID as u8 => get_sig_hint(Signature::new("MACROS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-macros")),
-        VariableType::UserData(id) if id == AUDIO_ID as u8 => get_sig_hint(Signature::new("AUDIO".to_string()), fl!(LANGUAGE_LOADER, "hint-type-audio")),
-        VariableType::UserData(id) if id == ERROR_ID as u8 => get_sig_hint(Signature::new("ERROR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-error")),
-        VariableType::UserData(id) if id == EVENT_ID as u8 => get_sig_hint(Signature::new("EVENT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-event")),
-        VariableType::UserData(id) if id == MSG_ID as u8 => get_sig_hint(Signature::new("MSG".to_string()), fl!(LANGUAGE_LOADER, "hint-type-msg")),
-        VariableType::UserData(id) if id == CONFERENCE_ID as u8 => {
+        VariableType::UserData(id) if id == MARGINS_ID as u32 => get_sig_hint(Signature::new("MARGINS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-margins")),
+        VariableType::UserData(id) if id == PALETTE_ID as u32 => get_sig_hint(Signature::new("PALETTE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-palette")),
+        VariableType::UserData(id) if id == MACROS_ID as u32 => get_sig_hint(Signature::new("MACROS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-macros")),
+        VariableType::UserData(id) if id == AUDIO_ID as u32 => get_sig_hint(Signature::new("AUDIO".to_string()), fl!(LANGUAGE_LOADER, "hint-type-audio")),
+        VariableType::UserData(id) if id == ERROR_ID as u32 => get_sig_hint(Signature::new("ERROR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-error")),
+        VariableType::UserData(id) if id == EVENT_ID as u32 => get_sig_hint(Signature::new("EVENT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-event")),
+        VariableType::UserData(id) if id == MSG_ID as u32 => get_sig_hint(Signature::new("MSG".to_string()), fl!(LANGUAGE_LOADER, "hint-type-msg")),
+        VariableType::UserData(id) if id == CONFERENCE_ID as u32 => {
             get_sig_hint(Signature::new("CONFERENCE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-conference"))
         }
-        VariableType::UserData(id) if id == MESSAGE_AREA_ID as u8 => get_sig_hint(Signature::new("AREA".to_string()), fl!(LANGUAGE_LOADER, "hint-type-area")),
-        VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u8 => {
+        VariableType::UserData(id) if id == MESSAGE_AREA_ID as u32 => get_sig_hint(Signature::new("AREA".to_string()), fl!(LANGUAGE_LOADER, "hint-type-area")),
+        VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u32 => {
             get_sig_hint(Signature::new("DIRECTORY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-directory"))
         }
-        VariableType::UserData(id) if id == DOOR_ID as u8 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
-        VariableType::UserData(id) if id == CONTACT_ID as u8 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
+        VariableType::UserData(id) if id == DOOR_ID as u32 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
+        VariableType::UserData(id) if id == CONTACT_ID as u32 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
         VariableType::UserData(id)
             if matches!(
                 id,
@@ -236,13 +236,13 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     let VariableType::UserData(id) = var_type else {
         return None;
     };
-    if id == BOARD_ID as u8 && member.eq_ignore_ascii_case("Users") {
+    if id == BOARD_ID as u32 && member.eq_ignore_ascii_case("Users") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-board-users"));
     }
-    if id == USER_ID as u8 && member.eq_ignore_ascii_case("Valid") {
+    if id == USER_ID as u32 && member.eq_ignore_ascii_case("Valid") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid"));
     }
-    if id == TERMINAL_ID as u8 {
+    if id == TERMINAL_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "info" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminal-info")),
             "gfx" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminal-gfx")),
@@ -257,7 +257,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == TERM_INFO_ID as u8 {
+    if id == TERM_INFO_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "program" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminfo-program")),
             "deviceattrs" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminfo-device-attrs")),
@@ -277,7 +277,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == MARGINS_ID as u8 {
+    if id == MARGINS_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "setvertical" => Some(fl!(LANGUAGE_LOADER, "hint-member-margins-set-vertical")),
             "sethorizontal" => Some(fl!(LANGUAGE_LOADER, "hint-member-margins-set-horizontal")),
@@ -289,7 +289,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == TERM_INPUT_ID as u8 {
+    if id == TERM_INPUT_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "poll" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminput-poll")),
             "wait" => Some(fl!(LANGUAGE_LOADER, "hint-member-terminput-wait")),
@@ -301,7 +301,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == PALETTE_ID as u8 {
+    if id == PALETTE_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "set" => Some(fl!(LANGUAGE_LOADER, "hint-member-palette-set")),
             "reset" => Some(fl!(LANGUAGE_LOADER, "hint-member-palette-reset")),
@@ -309,7 +309,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == MACROS_ID as u8 {
+    if id == MACROS_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "recording" => Some(fl!(LANGUAGE_LOADER, "hint-member-macros-recording")),
             "beginrecord" => Some(fl!(LANGUAGE_LOADER, "hint-member-macros-begin-record")),
@@ -320,7 +320,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == AUDIO_ID as u8 {
+    if id == AUDIO_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-valid")),
             "playing" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-playing")),
@@ -335,7 +335,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == ERROR_ID as u8 {
+    if id == ERROR_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "ok" => Some(fl!(LANGUAGE_LOADER, "hint-member-error-ok")),
             "kind" => Some(fl!(LANGUAGE_LOADER, "hint-member-error-kind")),
@@ -347,7 +347,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == EVENT_ID as u8 {
+    if id == EVENT_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "kind" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-kind")),
             "code" | "text" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-key")),
@@ -364,7 +364,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == GFX_ID as u8 {
+    if id == GFX_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "init" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-init")),
             "shutdown" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-shutdown")),
@@ -382,7 +382,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == SURFACE_ID as u8 {
+    if id == SURFACE_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "width" | "height" => Some(fl!(LANGUAGE_LOADER, "hint-member-surface-dimension")),
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-surface-valid")),
@@ -404,7 +404,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == MSG_ID as u8 {
+    if id == MSG_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "number" | "replyto" | "size" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-number")),
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-valid")),
@@ -415,14 +415,14 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == CONTACT_ID as u8 {
+    if id == CONTACT_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "service" => Some(fl!(LANGUAGE_LOADER, "hint-member-contact-service")),
             "account" => Some(fl!(LANGUAGE_LOADER, "hint-member-contact-account")),
             _ => None,
         };
     }
-    if id == CONFERENCE_ID as u8 {
+    if id == CONFERENCE_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-identity")),
             "ispublic" | "isreadonly" | "allowaliases" | "echomail" | "autorejoin" | "privateuploads" => {
@@ -434,7 +434,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == MESSAGE_AREA_ID as u8 {
+    if id == MESSAGE_AREA_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-identity")),
             "isreadonly" | "allowaliases" | "qwkname" | "echotag" | "echoorigin" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-options")),
@@ -445,7 +445,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == FILE_DIRECTORY_ID as u8 {
+    if id == FILE_DIRECTORY_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-identity")),
             "path" | "isfree" | "hasnewfiles" | "password" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-options")),
@@ -453,7 +453,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == DOOR_ID as u8 {
+    if id == DOOR_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-door-identity")),
             "description" | "path" | "password" => Some(fl!(LANGUAGE_LOADER, "hint-member-door-options")),
@@ -461,7 +461,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == BOARD_ID as u8 {
+    if id == BOARD_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "location" | "operator" | "sysopname" | "nodecount" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-property")),
             "conferences" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-conferences")),
@@ -469,7 +469,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == SESSION_ID as u8 {
+    if id == SESSION_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "requestpasswordrecovery" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-request-password-recovery")),
             "conference" | "area" | "directory" | "user" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-context")),
@@ -479,7 +479,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == USER_ID as u8 {
+    if id == USER_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid")),
             "recordnumber" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-record-number")),
@@ -576,7 +576,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == HTTP_ID as u8 {
+    if id == HTTP_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "get" => Some(fl!(LANGUAGE_LOADER, "hint-http-get")),
             "new" => Some(fl!(LANGUAGE_LOADER, "hint-http-new")),
@@ -588,7 +588,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == HTTP_REQUEST_ID as u8 {
+    if id == HTTP_REQUEST_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "url" | "method" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-property")),
             "setquery" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-query")),
@@ -600,7 +600,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == HTTP_RESPONSE_ID as u8 {
+    if id == HTTP_RESPONSE_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "valid" | "ok" | "status" | "finalurl" | "size" | "contenttype" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-property")),
             "text" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-text")),
@@ -610,7 +610,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == REGEX_ID as u8 {
+    if id == REGEX_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-regex-valid")),
             "pattern" => Some(fl!(LANGUAGE_LOADER, "hint-regex-pattern")),
@@ -625,7 +625,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             _ => None,
         };
     }
-    if id == REGEX_MATCH_ID as u8 {
+    if id == REGEX_MATCH_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "success" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-success")),
             "value" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-value")),
@@ -1600,15 +1600,15 @@ mod test {
     fn new_runtime_types_have_hover_documentation() {
         for variable_type in [
             VariableType::Bytes,
-            VariableType::UserData(BOARD_ID as u8),
-            VariableType::UserData(SESSION_ID as u8),
-            VariableType::UserData(USER_ID as u8),
-            VariableType::UserData(HTTP_ID as u8),
-            VariableType::UserData(HTTP_REQUEST_ID as u8),
-            VariableType::UserData(HTTP_RESPONSE_ID as u8),
+            VariableType::UserData(BOARD_ID as u32),
+            VariableType::UserData(SESSION_ID as u32),
+            VariableType::UserData(USER_ID as u32),
+            VariableType::UserData(HTTP_ID as u32),
+            VariableType::UserData(HTTP_REQUEST_ID as u32),
+            VariableType::UserData(HTTP_RESPONSE_ID as u32),
             VariableType::UserData(CHECKSUM_ENUM_ID),
-            VariableType::UserData(GFX_ID as u8),
-            VariableType::UserData(SURFACE_ID as u8),
+            VariableType::UserData(GFX_ID as u32),
+            VariableType::UserData(SURFACE_ID as u32),
             VariableType::UserData(GFX_BACKEND_ENUM_ID),
         ] {
             assert!(super::get_type_hover(variable_type).is_some(), "missing hover for {variable_type}");

@@ -48,7 +48,7 @@ impl PplSurface {
 
 /// Resolve a `SURFACE` argument only in the graphics allocation that issued it.
 pub fn surface_handle(value: &VariableValue, graphics: &super::ppl_graphics::PplGraphicsState) -> Option<i32> {
-    if value.get_type() != VariableType::UserData(SURFACE_ID as u8) {
+    if value.get_type() != VariableType::UserData(SURFACE_ID as u32) {
         return None;
     }
     let GenericVariableData::UserData(object) = &value.generic_data else {

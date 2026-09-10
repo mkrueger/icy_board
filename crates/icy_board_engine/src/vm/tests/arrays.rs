@@ -136,10 +136,20 @@ fn indexing_takes_one_index_per_dimension() {
 #[test]
 fn foreach_compiles_to_its_statement_bytecode() {
     let executable = compile("INTEGER values(1)\nINTEGER value\nFOREACH value IN values\n  PRINT value\nENDFOREACH");
-    assert!(executable.script_buffer.contains(&(crate::executable::OpCode::ForEach as i16)));
-    assert!(executable.script_buffer.contains(&(crate::executable::OpCode::NextForEach as i16)));
-    assert!(!executable.script_buffer.contains(&-306));
-    assert!(!executable.script_buffer.contains(&-307));
+    let loaded = crate::executable::Executable::from_buffer(&mut executable.to_buffer().unwrap(), false).unwrap();
+    let script = crate::executable::PPEScript::from_ppe_file(&loaded).unwrap();
+    assert!(
+        script
+            .statements
+            .iter()
+            .any(|statement| matches!(statement.command, crate::executable::PPECommand::ForEach(..)))
+    );
+    assert!(
+        script
+            .statements
+            .iter()
+            .any(|statement| matches!(statement.command, crate::executable::PPECommand::NextForEach(..)))
+    );
 }
 
 #[test]

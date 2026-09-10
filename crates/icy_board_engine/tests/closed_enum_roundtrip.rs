@@ -173,12 +173,12 @@ fn scalars_aliases_defaults_and_equality_roundtrip_in_both_languages() {
             "{DOMAIN}Shade value\nPRINT value, \"|\"\nvalue = Shade.Second\nPRINT value, \"|\", value = Shade.Second, \"|\", Shade.First <> value\nvalue = Shade.Alias\nPRINT \"|\", TOINTEGER(value)\n"
         );
         for text in roundtrip(compile(&source, language), language, "7|-3|1|1|7") {
-            assert!(text.contains("ENUM ENUM241"), "{text}");
+            assert!(text.contains("ENUM ENUM2147483633"), "{text}");
             assert!(
                 text.contains("MEMBER001 = 7") && text.contains("MEMBER002 = -3") && text.contains("MEMBER003 = 7"),
                 "{text}"
             );
-            assert!(text.contains("ENUM241.MEMBER002"), "{text}");
+            assert!(text.contains("ENUM2147483633.MEMBER002"), "{text}");
         }
     }
 }
@@ -262,7 +262,7 @@ fn checked_casts_and_reverse_conversions_roundtrip() {
             "{DOMAIN}INTEGER number = -4\nShade value = Shade(number + 1)\nPRINT TOINTEGER(value), \"|\", Shade(number + 1) = Shade.Second, \"|\", Shade.First = Shade(7)\n"
         );
         for text in roundtrip(compile(&source, language), language, "-3|1|1") {
-            assert!(text.contains("ENUM241("), "{text}");
+            assert!(text.contains("ENUM2147483633("), "{text}");
             assert!(!text.contains("EnumCast"), "{text}");
         }
     }
@@ -326,25 +326,25 @@ ENDFUNC
 "#,
         400,
     );
-    // A PPE need not carry unused enum domains. Its remaining id 240 must not
-    // be confused with the source registry's first free id, 241.
-    executable.variable_table.enums.remove(&241);
+    executable
+        .variable_table
+        .enums
+        .remove(&(icy_board_engine::parser::EVENT_KIND_ENUM_ID - icy_board_engine::parser::BUILTIN_ENUM_COUNT as u32));
     for text in roundtrip(executable, 400, "-3|7") {
-        assert!(text.contains("ENUM ENUM240") && text.contains("ENUM240("), "{text}");
+        assert!(text.contains("ENUM ENUM2147483632") && text.contains("ENUM2147483632("), "{text}");
     }
 }
 
 #[test]
-fn builtin_id_with_a_different_default_gets_a_synthetic_declaration() {
+fn builtin_enum_keeps_its_identity_when_known_values_are_extended() {
     let mut executable = compile("MouseTracking tracking\nPRINT tracking\n", 400);
     executable
         .variable_table
         .enums
-        .insert(icy_board_engine::parser::MOUSE_TRACKING_ENUM_ID, vec![2, 0, 1]);
-    for text in roundtrip(executable, 400, "2") {
-        assert!(text.contains("ENUM ENUM251"), "{text}");
-        assert!(text.contains("MEMBER001 = 2"), "{text}");
-        assert!(!text.contains("MouseTracking"), "{text}");
+        .insert(icy_board_engine::parser::MOUSE_TRACKING_ENUM_ID, vec![0, 1, 2, 99]);
+    for text in roundtrip(executable, 400, "0") {
+        assert!(!text.contains("ENDENUM"), "{text}");
+        assert!(text.contains("MouseTracking"), "{text}");
     }
 }
 
@@ -411,11 +411,9 @@ ENDFUNC
             _ => {}
         }
     }
-    let rewritten = script.serialize();
-    assert_eq!(executable.script_buffer.len(), rewritten.len());
-    executable.script_buffer = rewritten;
+    executable.in_memory_script = Some(script);
     for text in roundtrip(executable, 400, "-3|-3|-3|1") {
-        assert!(text.matches("ENUM241(").count() >= 3, "{text}");
+        assert!(text.matches("ENUM2147483633(").count() >= 3, "{text}");
         assert!(text.to_ascii_uppercase().contains("STRINGCOMPARISON("), "{text}");
     }
 }
@@ -436,8 +434,8 @@ Second two = Second.Other
 PRINT TOINTEGER(one), ",", TOINTEGER(two)
 "#;
     for text in roundtrip(compile(source, 400), 400, "-3,-3") {
-        assert!(text.contains("ENUM ENUM241") && text.contains("ENUM ENUM240"), "{text}");
-        assert!(text.contains("ENUM241.MEMBER002") && text.contains("ENUM240.MEMBER002"), "{text}");
+        assert!(text.contains("ENUM ENUM2147483633") && text.contains("ENUM ENUM2147483632"), "{text}");
+        assert!(text.contains("ENUM2147483633.MEMBER002") && text.contains("ENUM2147483632.MEMBER002"), "{text}");
     }
 }
 

@@ -54,7 +54,7 @@ pub struct SemanticVisitor {
     pub module_exports: HashMap<unicase::Ascii<String>, Vec<ModuleExport>>,
 
     /// Maps member references -> user type IDs
-    pub user_type_lookup: HashMap<usize, u8>,
+    pub user_type_lookup: HashMap<usize, u32>,
 
     /// Maps built-in scalar member references -> receiver types.
     pub member_receiver_type_lookup: HashMap<usize, VariableType>,
@@ -63,10 +63,10 @@ pub struct SemanticVisitor {
     pub instance_provider_lookup: HashMap<usize, FuncOpCode>,
 
     /// Maps a type name a static member was called on -> that type's id.
-    pub static_receiver_lookup: HashMap<usize, u8>,
+    pub static_receiver_lookup: HashMap<usize, u32>,
 
     pub function_type_lookup: HashMap<CallId, SemanticInfo>,
-    pub enum_binary_types: HashMap<u64, u8>,
+    pub enum_binary_types: HashMap<u64, u32>,
     /// Source LET identifier offset -> assigned element/member/function-result type.
     /// Like the member lookups, snapshot and clear this map between source files.
     pub compound_target_types: HashMap<usize, VariableType>,
@@ -525,19 +525,21 @@ impl SemanticVisitor {
             }
             let id = variable_table.variable_table.len() + 1;
             let parameters = f.parameters.len();
-            if parameters > u8::MAX as usize {
+            let maximum_parameters = if self.runtime >= 400 { 4096 } else { u8::MAX as usize };
+            let maximum_locals = if self.runtime >= 400 { 65_536 } else { u8::MAX as usize };
+            if parameters > maximum_parameters {
                 let span = match &f.functions {
                     FunctionDeclaration::Function(function) => function.get_identifier_token().span.clone(),
                     FunctionDeclaration::Procedure(procedure) => procedure.get_identifier_token().span.clone(),
                 };
                 self.errors.lock().unwrap().report_error(
                     span,
-                    CompilationErrorType::TooManyRoutineParameters(f.name.to_string(), parameters, u8::MAX as usize),
+                    CompilationErrorType::TooManyRoutineParameters(f.name.to_string(), parameters, maximum_parameters),
                 );
             }
 
             if let FunctionDeclaration::Function(func) = &f.functions {
-                let maximum_locals = u8::MAX as usize - 1;
+                let maximum_locals = maximum_locals - 1;
                 if locals > maximum_locals {
                     self.errors.lock().unwrap().report_error(
                         func.get_identifier_token().span.clone(),
@@ -554,11 +556,11 @@ impl SemanticVisitor {
                     flags: 0,
                 };
                 let function_value = FunctionValue {
-                    parameters: parameters.min(u8::MAX as usize) as u8,
-                    local_variables: (locals + 1).min(u8::MAX as usize) as u8,
+                    parameters: parameters as u32,
+                    local_variables: (locals + 1) as u32,
                     start_offset: 0,
-                    first_var_id: id as i16,
-                    return_var: (id + locals + parameters + 1) as i16,
+                    first_var_id: id as i32,
+                    return_var: (id + locals + parameters + 1) as i32,
                 };
                 variable_table.push(TableEntry::new(
                     f.name.to_string(),
@@ -572,22 +574,23 @@ impl SemanticVisitor {
                 ));
                 variable_table.start_define_function_body(func.get_identifier().clone());
             } else if let FunctionDeclaration::Procedure(proc) = &f.functions {
-                if let Some((index, _)) = proc
-                    .get_parameters()
-                    .iter()
-                    .enumerate()
-                    .skip(u16::BITS as usize)
-                    .find(|(_, parameter)| parameter.is_var())
+                if self.runtime < 400
+                    && let Some((index, _)) = proc
+                        .get_parameters()
+                        .iter()
+                        .enumerate()
+                        .skip(u16::BITS as usize)
+                        .find(|(_, parameter)| parameter.is_var())
                 {
                     self.errors.lock().unwrap().report_error(
                         proc.get_identifier_token().span.clone(),
                         CompilationErrorType::VarParameterOutOfRange(f.name.to_string(), index + 1, u16::BITS as usize),
                     );
                 }
-                if locals > u8::MAX as usize {
+                if locals > maximum_locals {
                     self.errors.lock().unwrap().report_error(
                         proc.get_identifier_token().span.clone(),
-                        CompilationErrorType::TooManyRoutineLocals(f.name.to_string(), locals, u8::MAX as usize),
+                        CompilationErrorType::TooManyRoutineLocals(f.name.to_string(), locals, maximum_locals),
                     );
                 }
                 let header = VarHeader {
@@ -600,11 +603,11 @@ impl SemanticVisitor {
                     flags: 0,
                 };
                 let procedure_value = ProcedureValue {
-                    parameters: parameters.min(u8::MAX as usize) as u8,
-                    local_variables: locals.min(u8::MAX as usize) as u8,
+                    parameters: parameters as u32,
+                    local_variables: locals as u32,
                     start_offset: 0,
-                    first_var_id: id as i16,
-                    pass_flags: proc.get_pass_flags(),
+                    first_var_id: id as i32,
+                    pass_flags: proc.get_pass_flags() as u32,
                 };
                 variable_table.push(TableEntry::new(
                     f.name.to_string(),
@@ -616,6 +619,10 @@ impl SemanticVisitor {
                     },
                     EntryType::Procedure,
                 ));
+                variable_table
+                    .variable_table
+                    .routine_modes
+                    .insert(id, proc.get_parameters().iter().map(|parameter| parameter.is_var()).collect());
                 variable_table.start_define_function_body(proc.get_identifier().clone());
             }
 
@@ -630,9 +637,12 @@ impl SemanticVisitor {
                         unreachable!("function parameter has no function signature");
                     };
                     new_entry.value = VariableValue::new_function(FunctionValue {
-                        parameters: signature.get_parameters().len() as u8,
+                        parameters: signature.get_parameters().len() as u32,
                         ..FunctionValue::default()
                     });
+                    if self.runtime >= 400 {
+                        new_entry.header.dim = 0;
+                    }
                     variable_table.push(new_entry);
                     continue;
                 }
@@ -644,10 +654,17 @@ impl SemanticVisitor {
                         unreachable!("procedure parameter has no procedure signature");
                     };
                     new_entry.value = VariableValue::new_procedure(ProcedureValue {
-                        parameters: signature.get_parameters().len() as u8,
-                        pass_flags: signature.get_pass_flags(),
+                        parameters: signature.get_parameters().len() as u32,
+                        pass_flags: signature.get_pass_flags() as u32,
                         ..ProcedureValue::default()
                     });
+                    if self.runtime >= 400 {
+                        new_entry.header.dim = 0;
+                    }
+                    variable_table.variable_table.routine_modes.insert(
+                        r.variable_table_index,
+                        signature.get_parameters().iter().map(|parameter| parameter.is_var()).collect(),
+                    );
                     variable_table.push(new_entry);
                     continue;
                 }
@@ -1196,7 +1213,7 @@ impl SemanticVisitor {
             .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
     }
 
-    fn first_unserializable_record_field(&self, type_id: u8, prefix: &str) -> Option<(String, VariableType)> {
+    fn first_unserializable_record_field(&self, type_id: u32, prefix: &str) -> Option<(String, VariableType)> {
         let definition = self.type_registry.get_user_type_from_id(type_id)?;
         for (name, field) in &definition.fields {
             let path = if prefix.is_empty() { name.to_string() } else { format!("{prefix}.{name}") };
@@ -1223,7 +1240,7 @@ impl SemanticVisitor {
 
     /// Resolves a field of a record the program declared and remembers the type, so
     /// code generation can look the field up again by the member's source position.
-    fn resolve_record_field(&mut self, type_id: u8, member: &unicase::Ascii<String>, span: &core::ops::Range<usize>) -> VariableType {
+    fn resolve_record_field(&mut self, type_id: u32, member: &unicase::Ascii<String>, span: &core::ops::Range<usize>) -> VariableType {
         let Some(definition) = self.type_registry.get_record_type_from_id(type_id) else {
             self.errors.lock().unwrap().report_error(span.clone(), CompilationErrorType::TypeNotFound);
             return VariableType::None;

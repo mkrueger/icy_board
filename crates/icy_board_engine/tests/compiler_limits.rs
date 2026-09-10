@@ -10,9 +10,15 @@ use icy_board_engine::{
 };
 
 fn diagnostics(source: &str) -> Vec<String> {
+    diagnostics_for_runtime(source, 340)
+}
+
+fn diagnostics_for_runtime(source: &str, runtime: u16) -> Vec<String> {
     let registry = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let workspace = Workspace::default();
+    let mut workspace = Workspace::default();
+    workspace.package.runtime = Some(runtime);
+    workspace.set_default_language_version(Some(400));
     let ast = parse_ast(PathBuf::from("limits.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
 
@@ -76,7 +82,8 @@ fn too_many_declarations_are_rejected_before_ids_wrap() {
     }
     let registry = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let workspace = Workspace::default();
+    let mut workspace = Workspace::default();
+    workspace.package.runtime = Some(340);
     let ast = parse_ast(
         PathBuf::from("declarations.pps"),
         errors.clone(),

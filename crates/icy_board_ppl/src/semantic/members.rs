@@ -11,8 +11,8 @@ use crate::{
 use super::SemanticVisitor;
 
 pub(super) enum StaticReceiver {
-    Instance(u8),
-    StaticMember(u8),
+    Instance(u32),
+    StaticMember(u32),
     NotAType,
     Rejected,
 }
@@ -383,7 +383,7 @@ impl SemanticVisitor {
     /// Looks a callable member up on a board object.
     pub(super) fn member_function_signature(
         &self,
-        user_type: u8,
+        user_type: u32,
         name: &unicase::Ascii<String>,
     ) -> Option<(usize, usize, Vec<VariableType>, VariableType, u8)> {
         let registry = self.type_registry.get_type_from_id(user_type)?;
@@ -461,7 +461,7 @@ impl SemanticVisitor {
                 );
                 return StaticReceiver::Rejected;
             }
-            self.add_constant(&Constant::Integer(i32::from(type_id), crate::ast::constant::NumberFormat::Default));
+            self.add_constant(&Constant::Integer(type_id as i32, crate::ast::constant::NumberFormat::Default));
             self.static_receiver_lookup.insert(span.start, type_id);
             return StaticReceiver::StaticMember(type_id);
         }

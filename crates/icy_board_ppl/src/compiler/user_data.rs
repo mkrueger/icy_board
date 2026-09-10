@@ -110,7 +110,7 @@ pub fn user_data_value<T: Send + Sync + 'static>(value: T, type_id: usize) -> Va
     VariableValue {
         data: VariableData::default(),
         generic_data: GenericVariableData::UserData(std::sync::Arc::new(value)),
-        vtype: VariableType::UserData(type_id as u8),
+        vtype: VariableType::UserData(type_id as u32),
     }
 }
 

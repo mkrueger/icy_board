@@ -129,7 +129,7 @@ impl SemanticVisitor {
                     CompilationErrorType::BuiltinNeedsRuntime("Checked enum operation".to_string(), 400),
                 );
             }
-            self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
+            self.add_constant(&Constant::Integer(id as i32, crate::ast::constant::NumberFormat::Default));
             if source_binary {
                 self.enum_binary_types.insert(binary.id, id);
             }
@@ -957,7 +957,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     CompilationErrorType::BuiltinNeedsRuntime("Checked enum conversion".to_string(), 400),
                 );
             }
-            self.add_constant(&Constant::Integer(i32::from(definition.id), crate::ast::constant::NumberFormat::Default));
+            self.add_constant(&Constant::Integer(definition.id as i32, crate::ast::constant::NumberFormat::Default));
             self.function_type_lookup.insert(CallId(call.id), SemanticInfo::EnumCast(definition.id));
             return VariableType::UserData(definition.id);
         }
@@ -1157,7 +1157,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     );
                 }
                 let VariableType::UserData(id) = receiver_type else { unreachable!() };
-                self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
+                self.add_constant(&Constant::Integer(id as i32, crate::ast::constant::NumberFormat::Default));
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::EnumHas(id));
                 return VariableType::Boolean;
             }
@@ -1640,7 +1640,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         0 => true,
                         1 => match &parameters[0] {
                             ParameterSpecifier::Variable(var) => {
-                                !var.is_var() && var.get_variable_type() == VariableType::UserData(crate::parser::ERROR_ID as u8)
+                                !var.is_var() && var.get_variable_type() == VariableType::UserData(crate::parser::ERROR_ID as u32)
                             }
                             ParameterSpecifier::Function(_) | ParameterSpecifier::Procedure(_) => false,
                         },
@@ -2283,11 +2283,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
                     self.check_arg_count(par_len, arg_count, call.get_identifier_token());
                     let arg_count = arg_count.min(par_len);
-                    let pass_flags = f.get_pass_flags();
                     self.check_arg_types(f.get_parameters(), call.get_arguments());
 
-                    for i in 0..arg_count.min(u16::BITS as usize) {
-                        if 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0) {
+                    for i in 0..arg_count {
+                        if f.get_parameters()[i].is_var() {
                             self.check_var_argument(i, &call.get_arguments()[i]);
                         }
                     }

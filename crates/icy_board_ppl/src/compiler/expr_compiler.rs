@@ -69,7 +69,7 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
             let type_id = self
                 .compiler
                 .lookup_table
-                .lookup_constant(&crate::ast::Constant::Integer(i32::from(*type_id), crate::ast::constant::NumberFormat::Default));
+                .lookup_constant(&crate::ast::Constant::Integer(*type_id as i32, crate::ast::constant::NumberFormat::Default));
             return HirExpr::predefined(FuncOpCode::StaticReceiver, vec![HirExpr::constant(type_id)]);
         }
         log::error!("Variable not found: {}", identifier.get_identifier());
@@ -118,7 +118,7 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
             let type_id = self
                 .compiler
                 .lookup_table
-                .lookup_constant(&Constant::Integer(i32::from(*id), NumberFormat::Default));
+                .lookup_constant(&Constant::Integer(*id as i32, NumberFormat::Default));
             let opcode = match bin_expr.get_op() {
                 crate::ast::BinOp::And => FuncOpCode::BAND,
                 crate::ast::BinOp::Or => FuncOpCode::BOR,
@@ -149,19 +149,13 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return HirExpr::Invalid;
                 };
-                let type_id = self
-                    .compiler
-                    .lookup_table
-                    .lookup_constant(&Constant::Integer(i32::from(id), NumberFormat::Default));
+                let type_id = self.compiler.lookup_table.lookup_constant(&Constant::Integer(id as i32, NumberFormat::Default));
                 let mut operands = vec![HirExpr::constant(type_id), member.get_expression().visit(self)];
                 operands.extend(arguments);
                 HirExpr::predefined(FuncOpCode::EnumHas, operands)
             }
             SemanticInfo::EnumCast(id) => {
-                let type_id = self
-                    .compiler
-                    .lookup_table
-                    .lookup_constant(&Constant::Integer(i32::from(id), NumberFormat::Default));
+                let type_id = self.compiler.lookup_table.lookup_constant(&Constant::Integer(id as i32, NumberFormat::Default));
                 let mut arguments = arguments;
                 arguments.insert(0, HirExpr::constant(type_id));
                 HirExpr::predefined(FuncOpCode::EnumCast, arguments)

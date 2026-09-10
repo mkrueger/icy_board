@@ -3385,7 +3385,7 @@ pub async fn session(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Var
 /// static member is only a registration and never reaches this.
 pub async fn static_receiver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let type_id = vm.eval_expr(&args[0]).await?.as_int();
-    let Ok(type_id) = u8::try_from(type_id) else {
+    let Ok(type_id) = u32::try_from(type_id) else {
         return Err(format!("invalid static receiver type {type_id}").into());
     };
     let Some(receiver) = vm.type_registry.get_type_from_id(type_id).and_then(|registry| registry.static_receiver) else {

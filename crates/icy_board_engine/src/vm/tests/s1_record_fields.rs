@@ -1,9 +1,9 @@
-//! Source-to-VM coverage for S1 layouts, without crossing the deferred C1/C2 PPE boundary.
+//! Source-to-VM and file roundtrip coverage for S1 layouts.
 
 use std::sync::Arc;
 
 use crate::{
-    executable::ExecutableError,
+    executable::Executable,
     icy_board::{conferences::Conference, message_area::AreaList, message_area::MessageArea},
 };
 
@@ -160,13 +160,13 @@ ENDFUNC
 }
 
 #[test]
-fn s1_in_memory_execution_does_not_fall_back_through_ppe_serialization() {
+fn s1_file_and_in_memory_execution_preserve_host_and_dynamic_defaults() {
     for (field, expression) in [("INTEGER Values[]", "value.Values.Len()"), ("AUDIO Sound", "value.Sound.Valid")] {
         let source = format!(";$LANGVERSION 400\nTYPE Item\n {field}\nENDTYPE\nItem value\nPRINTLN {expression}\n");
-        assert!(matches!(
-            compile_in_memory(&source).to_buffer(),
-            Err(ExecutableError::UnsupportedRecordFieldEncoding { type_id: 100, field_index: 0 })
-        ));
+        let loaded = Executable::from_buffer(&mut compile_in_memory(&source).to_buffer().unwrap(), false).unwrap();
+        let (success, text) = super::run_executable_collecting(loaded, |_| {}, &[], None, &[], false, false);
+        assert!(success);
+        assert_eq!(text.replace('\r', ""), "0\n");
         assert_eq!(run_ppl_in_memory(&source), "0\n", "{source}");
     }
 }

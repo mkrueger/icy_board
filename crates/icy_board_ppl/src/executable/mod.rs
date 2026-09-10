@@ -24,6 +24,11 @@ pub use variable_table::*;
 pub mod exec;
 pub use exec::*;
 
+mod code400;
+pub mod container;
+mod format400;
+pub mod imports400;
+
 pub mod output_visitor;
 pub use output_visitor::*;
 
@@ -165,7 +170,7 @@ impl VariableNameGenerator {
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum VMError {
     #[error("Value {1} has an incompatible representation for enum type {0}")]
-    InvalidEnumValue(u8, String),
+    InvalidEnumValue(u32, String),
 
     #[error("Array not initialized")]
     GenericDataNotSet,

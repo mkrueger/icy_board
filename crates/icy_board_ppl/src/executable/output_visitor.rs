@@ -50,7 +50,7 @@ impl PPEVisitor<()> for PPEOutputVisitor {
             self.output.push_str(format!("[{id:04X}]").as_str());
         }
     }
-    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) {
+    fn visit_record_literal(&mut self, type_id: u32, fields: &[(usize, PPEExpr)]) {
         let _ = write!(self.output, "TYPE{type_id} {{ ");
         for (index, (field_id, value)) in fields.iter().enumerate() {
             let _ = write!(self.output, "FIELD{field_id} = ");

@@ -38,19 +38,19 @@ pub enum VMError {
     NoUserTypeBase,
 
     #[error("Type not found in registry")]
-    TypeNotFoundInRegistry(u8),
+    TypeNotFoundInRegistry(u32),
 
     #[error("Object not found (internal VM error) ({0})")]
-    NoObjectFound(u8),
+    NoObjectFound(u32),
 
     #[error("Member {1} not found for user type {0}")]
-    InvalidMemberId(u8, usize),
+    InvalidMemberId(u32, usize),
 
     #[error("Member {1} of user type {0} is not a function")]
-    InvalidMemberFunction(u8, usize),
+    InvalidMemberFunction(u32, usize),
 
     #[error("Member {1} of user type {0} expected {2} arguments, got {3}")]
-    InvalidMemberArgumentCount(u8, usize, usize, usize),
+    InvalidMemberArgumentCount(u32, usize, usize, usize),
 
     #[error("Invalid array dimension count: {0}")]
     InvalidArrayDimensionCount(usize),

@@ -100,7 +100,7 @@ impl PplRegexMatch {
     }
 
     fn array_value(matches: Vec<Self>) -> VariableValue {
-        VariableValue::new_vector(VariableType::UserData(REGEX_MATCH_ID as u8), matches.into_iter().map(Self::value).collect())
+        VariableValue::new_vector(VariableType::UserData(REGEX_MATCH_ID as u32), matches.into_iter().map(Self::value).collect())
     }
 
     fn group(&self, index: i32) -> Option<&PplRegexGroup> {

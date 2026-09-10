@@ -197,15 +197,15 @@ impl VarHeader {
 }
 
 /// Initializes value fields recursively; the engine replaces host placeholders.
-pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Option<VariableValue> {
+pub fn create_record_value(type_id: u32, user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u32, Vec<i32>>) -> Option<VariableValue> {
     create_record_value_inner(type_id, user_types, enums, &mut Vec::new())
 }
 
 fn create_record_value_inner(
-    type_id: u8,
+    type_id: u32,
     user_types: &[Vec<RecordField>],
-    enums: &std::collections::BTreeMap<u8, Vec<i32>>,
-    visiting: &mut Vec<u8>,
+    enums: &std::collections::BTreeMap<u32, Vec<i32>>,
+    visiting: &mut Vec<u32>,
 ) -> Option<VariableValue> {
     if let Some(values) = enums.get(&type_id) {
         let default = *values.first()?;
@@ -259,7 +259,7 @@ fn create_record_value_inner(
             VariableValue {
                 vtype: field.variable_type,
                 data: enums
-                    .get(&u8::from(field.variable_type))
+                    .get(&u32::from(field.variable_type))
                     .and_then(|values| values.first())
                     .map_or_else(VariableData::default, |value| VariableData::from_int(*value)),
                 generic_data,
@@ -275,13 +275,14 @@ fn create_record_value_inner(
     })
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct FunctionValue {
-    pub parameters: u8,
-    pub local_variables: u8,
-    pub start_offset: u16,
-    pub first_var_id: i16,
-    pub return_var: i16,
+    pub parameters: u32,
+    pub local_variables: u32,
+    pub start_offset: u32,
+    pub first_var_id: i32,
+    pub return_var: i32,
 }
 
 impl fmt::Debug for FunctionValue {
@@ -294,13 +295,14 @@ impl fmt::Debug for FunctionValue {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct ProcedureValue {
-    pub parameters: u8,
-    pub local_variables: u8,
-    pub start_offset: u16,
-    pub first_var_id: i16,
-    pub pass_flags: u16,
+    pub parameters: u32,
+    pub local_variables: u32,
+    pub start_offset: u32,
+    pub first_var_id: i32,
+    pub pass_flags: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -334,24 +336,26 @@ impl FunctionValue {
     ///
     /// Panics if .
     pub fn from_bytes(cur_buf: &[u8]) -> Res<FunctionValue> {
-        if cur_buf.len() < 7 {
+        if cur_buf.len() < 8 {
             return Err(Box::new(ExecutableError::BufferTooShort(cur_buf.len())));
         }
         Ok(Self {
-            parameters: cur_buf[0],
-            local_variables: cur_buf[1],
-            start_offset: u16::from_le_bytes((cur_buf[2..=3]).try_into()?),
-            first_var_id: i16::from_le_bytes((cur_buf[4..=5]).try_into()?),
-            return_var: i16::from_le_bytes((cur_buf[6..=7]).try_into()?),
+            parameters: u32::from(cur_buf[0]),
+            local_variables: u32::from(cur_buf[1]),
+            start_offset: u32::from(u16::from_le_bytes((cur_buf[2..=3]).try_into()?)),
+            first_var_id: i32::from(i16::from_le_bytes((cur_buf[4..=5]).try_into()?)),
+            return_var: i32::from(i16::from_le_bytes((cur_buf[6..=7]).try_into()?)),
         })
     }
 
-    pub fn append(&self, buffer: &mut Vec<u8>) {
-        buffer.push(self.parameters);
-        buffer.push(self.local_variables);
-        buffer.extend(u16::to_le_bytes(self.start_offset));
-        buffer.extend(i16::to_le_bytes(self.first_var_id));
-        buffer.extend(i16::to_le_bytes(self.return_var));
+    pub fn append(&self, buffer: &mut Vec<u8>) -> Result<(), ExecutableError> {
+        let invalid = || ExecutableError::Format400("routine cannot be represented by a legacy PPE".into());
+        buffer.push(u8::try_from(self.parameters).map_err(|_| invalid())?);
+        buffer.push(u8::try_from(self.local_variables).map_err(|_| invalid())?);
+        buffer.extend(u16::try_from(self.start_offset).map_err(|_| invalid())?.to_le_bytes());
+        buffer.extend(i16::try_from(self.first_var_id).map_err(|_| invalid())?.to_le_bytes());
+        buffer.extend((self.return_var as u16).to_le_bytes());
+        Ok(())
     }
 
     pub fn to_data(self) -> VariableData {
@@ -440,7 +444,7 @@ impl TableEntry {
             buffer.push(self.header.variable_type.into());
             buffer.push(0);
             unsafe {
-                self.value.data.function_value.append(&mut buffer);
+                self.value.data.function_value.append(&mut buffer)?;
             }
             encrypt_chunks(&mut buffer[b..], version, false);
         } else if self.header.variable_type == VariableType::String {
@@ -499,12 +503,47 @@ pub struct VariableTable {
     entries: Vec<TableEntry>,
     has_user_vars: bool,
     /// Known integer values, in declaration order (the first value is the default).
-    pub enums: std::collections::BTreeMap<u8, Vec<i32>>,
+    pub enums: std::collections::BTreeMap<u32, Vec<i32>>,
     /// Rebuilt from layouts by `fill_in_records`; never serialized. Check before record I/O.
-    pub record_io_unsupported_types: std::collections::BTreeSet<u8>,
+    pub record_io_unsupported_types: std::collections::BTreeSet<u32>,
+    pub routine_modes: std::collections::BTreeMap<usize, Vec<bool>>,
+    pub host_catalog: Option<super::imports400::HostCatalog>,
 }
 
 impl VariableTable {
+    pub fn is_var_parameter(&self, routine: usize, parameter: usize) -> bool {
+        let routine = if let Some(entry) = self.try_get_entry(routine)
+            && entry.entry_type == EntryType::Parameter
+            && entry.header.variable_type == VariableType::Procedure
+        {
+            let assigned = unsafe { entry.value.data.procedure_value };
+            self.get_entries()
+                .iter()
+                .find(|candidate| {
+                    candidate.entry_type == EntryType::Procedure
+                        && unsafe {
+                            candidate.value.data.procedure_value.start_offset == assigned.start_offset
+                                && candidate.value.data.procedure_value.first_var_id == assigned.first_var_id
+                        }
+                })
+                .map_or(routine, |candidate| candidate.header.id)
+        } else {
+            routine
+        };
+        if let Some(modes) = self.routine_modes.get(&routine) {
+            return modes.get(parameter).copied().unwrap_or(false);
+        }
+        self.try_get_entry(routine).is_some_and(|entry| {
+            entry.header.variable_type == VariableType::Procedure
+                && 1u32
+                    .checked_shl(parameter as u32)
+                    .is_some_and(|mask| unsafe { entry.value.data.procedure_value.pass_flags } & mask != 0)
+        })
+    }
+
+    pub fn parameter_modes(&self, routine: usize, count: usize) -> Vec<bool> {
+        (0..count).map(|parameter| self.is_var_parameter(routine, parameter)).collect()
+    }
     /// Legacy array reads outside the bounds yield an empty value. For an
     /// enum that value must be its first member, never an untyped numeric zero.
     pub fn array_value(&self, array: &VariableValue, first: usize, second: usize, third: usize) -> VariableValue {
@@ -586,7 +625,7 @@ impl VariableTable {
         matches!(vtype, VariableType::UserData(id) if self.enums.contains_key(&id))
     }
 
-    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u8, u8>) {
+    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u32, u32>) {
         for entry in &mut self.entries {
             if let VariableType::UserData(type_id) = entry.header.variable_type
                 && let Some(new_id) = remap.get(&type_id)
@@ -633,6 +672,8 @@ impl VariableTable {
                     has_user_vars: false,
                     enums: Default::default(),
                     record_io_unsupported_types: Default::default(),
+                    routine_modes: Default::default(),
+                    host_catalog: None,
                 },
             ));
         }
@@ -900,6 +941,8 @@ impl VariableTable {
             has_user_vars: false,
             enums: Default::default(),
             record_io_unsupported_types: Default::default(),
+            routine_modes: Default::default(),
+            host_catalog: None,
         };
         table.analyze_locals();
         table.generate_names();
@@ -965,14 +1008,13 @@ impl VariableTable {
     }
     fn analyze_statement(&mut self, stmt: &super::PPECommand) {
         match stmt {
-            super::PPECommand::ProcedureCall(id, args) => unsafe {
-                let flags = self.get_value(*id).data.procedure_value.pass_flags;
+            super::PPECommand::ProcedureCall(id, args) => {
                 for (i, arg) in args.iter().enumerate() {
-                    if 1u16.checked_shl(i as u32).is_some_and(|mask| flags & mask != 0) {
+                    if self.is_var_parameter(*id, i) {
                         self.report_usage(arg);
                     }
                 }
-            },
+            }
             super::PPECommand::PredefinedCall(id, args) => match id.sig {
                 super::StatementSignature::Invalid => {}
                 super::StatementSignature::ArgumentsWithVariable(var_arg, _) | super::StatementSignature::VariableArguments(var_arg, _, _) => {
@@ -1255,7 +1297,7 @@ impl VariableTable {
     pub fn fill_in_records(&mut self, user_types: &[Vec<RecordField>]) {
         self.record_io_unsupported_types.clear();
         for (index, fields) in user_types.iter().enumerate() {
-            let type_id = (crate::parser::FIRST_USER_TYPE_ID + index) as u8;
+            let type_id = (crate::parser::FIRST_USER_TYPE_ID + index) as u32;
             let unsupported = fields.iter().any(|field| {
                 if field.is_dynamic || field.element_count().is_none() {
                     return true;

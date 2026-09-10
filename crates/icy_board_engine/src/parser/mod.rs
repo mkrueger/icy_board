@@ -23,7 +23,7 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     };
 
     fn bind<T: UserData>(registry: &mut UserTypeRegistry, id: usize) {
-        let members = registry.types.get_mut(&(id as u8)).expect("builtin metadata missing");
+        let members = registry.types.get_mut(&(id as u32)).expect("builtin metadata missing");
         members.static_receiver = T::STATIC_RECEIVER;
         members.empty_value = T::EMPTY_VALUE;
     }
@@ -47,7 +47,7 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     // These facades otherwise dispatch into the live session even without a handle.
     macro_rules! inert {
         ($($id:ident),+ $(,)?) => {$(
-            registry.types.get_mut(&($id as u8)).expect("builtin metadata missing").empty_value = Some(inert_value::<$id>);
+            registry.types.get_mut(&($id as u32)).expect("builtin metadata missing").empty_value = Some(inert_value::<$id>);
         )+};
     }
     inert!(TERM_INPUT_ID, TERMINAL_ID, GFX_ID, MARGINS_ID, PALETTE_ID, MACROS_ID, SESSION_ID, HTTP_ID);
@@ -95,7 +95,10 @@ impl<const ID: usize> InertHost<ID> {
 #[async_trait::async_trait(?Send)]
 impl<const ID: usize> crate::compiler::user_data::UserDataValue for InertHost<ID> {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>) -> crate::Res<crate::executable::VariableValue> {
-        let members = vm.type_registry.get_type_from_id(ID as u8).ok_or(crate::vm::VMError::NoObjectFound(ID as u8))?;
+        let members = vm
+            .type_registry
+            .get_type_from_id(ID as u32)
+            .ok_or(crate::vm::VMError::NoObjectFound(ID as u32))?;
         let vtype = members.fields.get(name).ok_or_else(|| format!("Unknown host property {ID}.{name}"))?;
         Self::empty(vm, *vtype, members.field_ranks.get(name).copied().unwrap_or_default())
     }
@@ -115,7 +118,10 @@ impl<const ID: usize> crate::compiler::user_data::UserDataValue for InertHost<ID
         name: &unicase::Ascii<String>,
         _arguments: &[crate::executable::VariableValue],
     ) -> crate::Res<crate::executable::VariableValue> {
-        let members = vm.type_registry.get_type_from_id(ID as u8).ok_or(crate::vm::VMError::NoObjectFound(ID as u8))?;
+        let members = vm
+            .type_registry
+            .get_type_from_id(ID as u32)
+            .ok_or(crate::vm::VMError::NoObjectFound(ID as u32))?;
         let function = members.functions.get(name).ok_or_else(|| format!("Unknown host function {ID}.{name}"))?;
         let value = Self::empty(vm, function.return_type, function.return_rank)?;
         Self::fail(vm, name);
@@ -128,7 +134,10 @@ impl<const ID: usize> crate::compiler::user_data::UserDataValue for InertHost<ID
         name: &unicase::Ascii<String>,
         _arguments: &[crate::executable::VariableValue],
     ) -> crate::Res<()> {
-        let members = vm.type_registry.get_type_from_id(ID as u8).ok_or(crate::vm::VMError::NoObjectFound(ID as u8))?;
+        let members = vm
+            .type_registry
+            .get_type_from_id(ID as u32)
+            .ok_or(crate::vm::VMError::NoObjectFound(ID as u32))?;
         if !members.procedures.contains_key(name) {
             return Err(format!("Unknown host method {ID}.{name}").into());
         }

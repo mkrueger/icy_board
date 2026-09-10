@@ -127,7 +127,8 @@ fn oversized_programs_report_the_format_limit_instead_of_panicking() {
     let source = format!("BEGIN\n{}END\nPROCEDURE Later()\nENDPROC\n", "PRINTLN 1\n".repeat(11_000));
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let workspace = Workspace::default();
+    let mut workspace = Workspace::default();
+    workspace.package.runtime = Some(340);
     let ast = parse_ast(PathBuf::from("oversized.pps"), errors.clone(), &source, &reg, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
 

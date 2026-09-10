@@ -48,13 +48,13 @@ ENDFUNC
         assert!(!executable.variable_table.enums[&EVENT_KIND_ENUM_ID].contains(&future_kind));
         for index in 1..=executable.variable_table.len() {
             let entry = executable.variable_table.get_var_entry_mut(index);
-            if entry.header.variable_type == VariableType::UserData(EVENT_ID as u8) {
+            if entry.header.variable_type == VariableType::UserData(EVENT_ID as u32) {
                 entry.value = PplEvent {
                     event_type: future_kind,
                     ..Default::default()
                 }
                 .value();
-            } else if entry.header.variable_type == VariableType::UserData(ERROR_ID as u8) {
+            } else if entry.header.variable_type == VariableType::UserData(ERROR_ID as u32) {
                 entry.value = PplError::new(91, 92, "future error").value();
             }
         }

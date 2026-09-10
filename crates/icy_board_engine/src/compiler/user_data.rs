@@ -44,7 +44,7 @@ pub trait UserDataValue: Send + Sync {
 }
 
 #[cfg(feature = "bbs")]
-pub(crate) fn runtime_object(object: &(dyn std::any::Any + Send + Sync), type_id: u8) -> crate::Res<&dyn UserDataValue> {
+pub(crate) fn runtime_object(object: &(dyn std::any::Any + Send + Sync), type_id: u32) -> crate::Res<&dyn UserDataValue> {
     let object = object.downcast_ref::<ResourceUserData>().map_or(object, |resource| resource.object.as_ref());
     object
         .downcast_ref::<RuntimeUserData>()

@@ -295,7 +295,7 @@ PRINTLN "done"
     let optimized = compile(source, true);
     let unoptimized = compile(source, false);
 
-    assert!(optimized.script_buffer.len() < unoptimized.script_buffer.len());
+    assert!(optimized.in_memory_script.as_ref().unwrap().statements.len() < unoptimized.in_memory_script.as_ref().unwrap().statements.len());
     assert_equivalent(source);
 }
 

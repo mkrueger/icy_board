@@ -1,17 +1,230 @@
 # The PPE file format
 
-A PPE is a compiled PPL program. This describes the container as IcyBoard reads
-and writes it, from the first byte to the last.
+A PPE is a compiled PPL program. There are two containers:
 
-All multi byte numbers are little endian. String literals use CP437 below
-runtime 400 and strict UTF-8 from runtime 400. The target PPE version selects
+* The **legacy container**, written for runtimes up to 3.40. It starts with the
+  text preamble `PCBoard Programming Language Executable` and is described from
+  [Legacy container](#legacy-container) on.
+* The **400 container**, written for runtime 400. It starts with the magic bytes
+  `ICYPPE\0\0` and is described in [Runtime 400 container](#runtime-400-container).
+
+The loader picks the container from these first bytes, not from a version field.
+Both are read into the same in-memory program, so the VM and the decompiler do
+not care which one a file came from.
+
+All multi byte numbers are little endian. String literals use CP437 in the legacy
+container and strict UTF-8 in the 400 container. The target PPE version selects
 the encoding, independently of the source language version.
 
 The authority for everything here is the code, not this page:
-[exec.rs](../crates/icy_board_ppl/src/executable/exec.rs) for the container,
-[variable_table.rs](../crates/icy_board_ppl/src/executable/variable_table.rs)
+[container.rs](../crates/icy_board_ppl/src/executable/container.rs) for the 400
+header and sections, [format400.rs](../crates/icy_board_ppl/src/executable/format400.rs)
+for its payloads, [code400.rs](../crates/icy_board_ppl/src/executable/code400.rs)
+for the 400 instruction encoding,
+[imports400.rs](../crates/icy_board_ppl/src/executable/imports400.rs) for the
+host ABI, [exec.rs](../crates/icy_board_ppl/src/executable/exec.rs) for the
+legacy container, [variable_table.rs](../crates/icy_board_ppl/src/executable/variable_table.rs)
 for the variable table and [crypt.rs](../crates/icy_board_ppl/src/crypt.rs)
-for encryption and packing.
+for legacy encryption and packing.
+
+## Runtime 400 container
+
+The 400 container is a header, a section directory and the section payloads.
+Every section is located by an explicit offset and length, so the file can be
+parsed without reading it end to end and a truncated file is rejected before any
+payload is interpreted.
+
+```text
++--------------------------------------+
+| header                     64 bytes  |
++--------------------------------------+
+| directory      48 bytes per section  |
++--------------------------------------+
+| section payloads                     |
++--------------------------------------+
+```
+
+### Header — 64 bytes
+
+| Offset | Size | Contents |
+| ---: | ---: | :--- |
+| 0 | 8 | `ICYPPE\0\0` |
+| 8 | 2 | container major version, currently 1 |
+| 10 | 2 | container minor version, currently 0 |
+| 12 | 4 | header size, must be 64 |
+| 16 | 4 | runtime, must be 400 |
+| 20 | 4 | bytecode version, currently 1 |
+| 24 | 8 | directory offset, must be 64 |
+| 32 | 4 | section count |
+| 36 | 4 | directory entry size, must be 48 |
+| 40 | 4 | entry routine id; 0 means the implicit main program |
+| 44 | 4 | reserved, must be zero |
+| 48 | 8 | total file size, must match the file exactly |
+| 56 | 8 | reserved, must be zero |
+
+The four version numbers are deliberately separate. The container version covers
+the header and directory, the bytecode version covers the instruction encoding,
+every section carries its own schema number, and the host ABI has its own version
+inside `IMPT`. A change to one of them does not force the others to move.
+
+### Directory entry — 48 bytes
+
+| Offset | Size | Contents |
+| ---: | ---: | :--- |
+| 0 | 4 | section kind, four ASCII bytes |
+| 4 | 2 | section schema, currently 1 |
+| 6 | 2 | flags; bit 0 marks the section as required |
+| 8 | 4 | compression: 0 none, 1 Zstd |
+| 12 | 4 | reserved, must be zero |
+| 16 | 8 | payload offset |
+| 24 | 8 | stored size |
+| 32 | 8 | decoded size |
+| 40 | 4 | entry count |
+| 44 | 4 | reserved, must be zero |
+
+A kind may appear only once. Payloads must lie behind the directory, inside the
+file, and must not overlap — including the payloads of sections the loader does
+not understand.
+
+### Sections
+
+| Kind | Required | Contents |
+| :--- | :--- | :--- |
+| `TYPE` | yes | record layouts and enum value lists |
+| `CONS` | yes | typed constant pool |
+| `VARS` | yes | variable table |
+| `ROUT` | yes | function and procedure descriptors |
+| `IMPT` | yes | host types and members the program uses |
+| `CODE` | yes | instructions |
+| `IDEN` | no | SHA-256 content identity |
+| `DBUG` | no | variable names |
+| `META` | no | reserved; recognised but carries no meaning yet |
+
+**Unknown data is not silently ignored.** An unknown kind, an unknown schema or
+an unknown compression value is skipped when the section is optional and rejected
+when it is required. A future writer can therefore add optional sections without
+breaking this loader, while a file that genuinely needs a newer loader is refused
+instead of running with parts of its meaning missing. `META` is reserved for such
+future metadata; today a required `META` is rejected and an optional one skipped.
+
+### Compression
+
+Compression is explicit per section, never inferred from a length mismatch. The
+compiler writes uncompressed sections unless `--compression zstd` is given; the
+header and directory are always plain so a file can be inspected without a
+decompressor.
+
+Zstd sections use one standard frame at level 3 with the content size and a
+checksum in the frame, no dictionary, no concatenated or trailing frames, and a
+window no larger than the loader's limit. A packed payload is only stored when it
+is actually smaller than the raw bytes. The decoded size in the directory must
+match what the frame produces.
+
+### Content identity
+
+`IDEN` holds a 32 byte SHA-256 digest over the runtime, the entry routine and
+every section except `IDEN` and `DBUG`, each with its kind, schema, flags, entry
+count and payload. Two files that differ only in compression or in stripped debug
+names therefore have the same identity. Encoding is deterministic: the same
+program and the same options produce the same bytes.
+
+This is an integrity and identity check, not authentication. The format carries
+no signature and no encryption, and a digest proves nothing about who wrote a file.
+
+### Debug data
+
+`DBUG` carries one UTF-8 name per variable and nothing else — no source paths, no
+source text, no line numbers. `pplc` omits it unless `--debug` is given. Without
+it the loader generates names the same way the decompiler always has.
+
+### Section payloads
+
+All counts and references are 32 bit. Text is length-framed UTF-8 without a NUL
+terminator, so a literal may contain embedded NUL bytes.
+
+`TYPE` — one record after another, then the enums:
+
+```text
+record: u32 kind = 1, u32 type id, u32 field count,
+        per field: u32 type, u32 rank, u32 dynamic, u32 vector, u32 matrix, u32 cube
+enum:   u32 kind = 2, u32 type id, u32 value count, i32 values...
+```
+
+Record ids are sequential from 100. A field may only name a primitive, an already
+declared record or an imported host type; forward and recursive references are
+rejected. The first enum value is its default; unknown values stay as they are.
+
+`CONS` — `u32 type`, `u32 tag`, `u32 length`, payload. Tag 1 is an eight byte
+scalar, tag 2 is UTF-8 text and tag 3 is a byte string.
+
+`VARS` — nine `u32` per entry: type, rank, flags, the three bounds, storage kind,
+function id and the one-based constant reference (0 for a default value).
+Variable ids are implied by position, starting at 1.
+
+`ROUT` — six `u32` per routine: variable id, parameter count, local count, start
+instruction, first frame variable and result variable; then one `u32` per
+parameter, 1 for `VAR` and 0 for by value. A start of `0xFFFFFFFF` marks a
+callback parameter, which has no body of its own and is bound at run time.
+
+The `VAR` modes are a per-parameter list, so runtime 400 is no longer limited to
+the legacy 16 bit pass mask.
+
+`IMPT` — `u32` ABI version, then per host type its id, kind, qualified name and
+the members the program actually uses, each with id, name, kind, static flag,
+result type, rank, required argument count and parameter types.
+
+**Host binding is by name and signature, not by stored number.** On load the file's
+host ids are matched against the current catalog by qualified name, and every used
+member must still exist with the same kind, static flag, required count, rank,
+result type and parameter types. Ids may be renumbered and the catalog may grow
+freely; a genuine signature change is rejected before the program runs. Enum value
+lists are not part of this contract, so new enum values do not invalidate old files.
+
+`CODE` — one length-framed record per instruction, each starting with a `u32`
+opcode. Jumps address instruction indices rather than byte offsets. Expressions
+are a `u32` tag and a `u32` operand followed by the operands the tag needs.
+Builtin calls are checked against their declared signature while decoding, so a
+malformed call is refused before the VM sees it.
+
+### Limits
+
+The wire format uses 32 bit counts and 64 bit offsets. The limits below are
+operating budgets that keep a corrupt or hostile file from allocating without
+bound; they are not the widths the format can express.
+
+| Limit | Value |
+| :--- | ---: |
+| File size | 64 MiB |
+| One decoded section | 32 MiB |
+| All decoded sections | 64 MiB |
+| Sections per file | 64 |
+| Zstd window | 2^25 |
+| Items in a section | 1,000,000 |
+| Expression nesting | 96 |
+| Records per program | 65,536 |
+| Fields per record | 4,096 |
+| Parameters per routine | 4,096 |
+| Locals per routine | 65,536 |
+
+### Validation before execution
+
+The loader checks the file before the VM runs a single instruction: header and
+reserved fields, section bounds and overlap, sizes against the limits, then the
+type graph, the constant representations, the variable and routine tables, and
+finally the code — every variable, routine and record reference, argument counts,
+array ranks, assignment targets and builtin signatures. A file that fails any of
+these is refused; it does not run half way and stop.
+
+### Compatibility
+
+Pre-400 PPEs keep their container, their encryption and their execution semantics
+unchanged. Unreleased beta 400 PPEs written in the old container are refused with
+a message asking for a recompile; that break was decided explicitly rather than
+guessed at from the file.
+
+## Legacy container
+
+Everything from here on describes the container used up to runtime 3.40.
 
 ## Layout
 
@@ -21,7 +234,7 @@ for encryption and packing.
 +--------------------------------------+
 | variable table             variable  |
 +--------------------------------------+
-| type table   (runtime 400 only)      |
+| type table   (unreachable today)     |
 +--------------------------------------+
 | code size                   2 bytes  |
 +--------------------------------------+
@@ -217,9 +430,11 @@ carry nothing and are only kept so old boards still read the file.
 
 ## Type table
 
-Runtime 400 and above only. Nothing is written for the PCBoard runtimes, and
-nothing is read - they shipped before records existed and have no type table at
-all.
+This table only ever existed in the unreleased 400 beta, which used the legacy
+container. Nothing is written for the PCBoard runtimes — they shipped before
+records existed — and runtime 400 now uses `TYPE` in the 400 container instead.
+The reader below is kept as documentation of that beta layout; a 400 file in the
+legacy container is refused before it is reached.
 
 ```text
 u8                  type-table format: 1 (records), 2 (records and enums)
@@ -379,21 +594,22 @@ must agree on this or every chunk after the first goes wrong.
 Note that the variable table is encrypted the same way, but always with the
 chunking rule for unpacked data, whatever the code section does.
 
-## Reading a PPE
+## Reading a legacy PPE
 
 1. Check the preamble; refuse the file if it is missing.
 2. Read the version out of the header digits.
-3. Skip to offset 48.
-4. Read the variable table entry count, then that many entries, highest id first.
-5. For runtime 400, read the type table and give every record variable its fields.
+3. Refuse version 400 — that is an obsolete beta and must be recompiled.
+4. Skip to offset 48.
+5. Read the variable table entry count, then that many entries, highest id first.
 6. Read the code size.
 7. Whatever is left is the code. If its length differs from the code size, it is packed.
 8. Decrypt, then unpack, then read the result as `i16`.
 
-## What the format does not carry
+## What the legacy container does not carry
 
 Worth stating plainly, because all of it has to be reconstructed or invented when
-decompiling:
+decompiling. The 400 container addresses the first three points with optional
+`DBUG` names, explicit section lengths and the `IDEN` digest.
 
 * No names — not for variables, routines, labels, types or fields.
 * No line numbers, no source file name, no comments.

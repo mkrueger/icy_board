@@ -113,10 +113,10 @@ async fn open_enums_wrong_type_dynamic_cast_does_not_publish_a_value() {
     let entries = vm.variable_table.get_entries();
     let value = entries.iter().find(|e| vm.variable_table.is_enum(e.header.variable_type)).unwrap();
     let value_id = value.header.id;
-    let enum_id = u8::from(value.header.variable_type);
+    let enum_id = i32::try_from(u32::from(value.header.variable_type)).unwrap();
     let type_constant = entries
         .iter()
-        .find(|e| e.value.vtype == VariableType::Integer && e.value.as_int() == i32::from(enum_id))
+        .find(|e| e.value.vtype == VariableType::Integer && e.value.as_int() == enum_id)
         .unwrap()
         .header
         .id;

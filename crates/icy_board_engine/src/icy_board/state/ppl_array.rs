@@ -9,7 +9,7 @@ use crate::{
 
 pub fn area_array_value(items: Arc<AreaList>) -> VariableValue {
     VariableValue::new_vector(
-        VariableType::UserData(MESSAGE_AREA_ID as u8),
+        VariableType::UserData(MESSAGE_AREA_ID as u32),
         items
             .iter()
             .enumerate()
@@ -25,7 +25,7 @@ pub fn area_array_value(items: Arc<AreaList>) -> VariableValue {
 
 pub fn directory_array_value(items: Arc<DirectoryList>) -> VariableValue {
     VariableValue::new_vector(
-        VariableType::UserData(FILE_DIRECTORY_ID as u8),
+        VariableType::UserData(FILE_DIRECTORY_ID as u32),
         items
             .iter()
             .enumerate()
@@ -41,7 +41,7 @@ pub fn directory_array_value(items: Arc<DirectoryList>) -> VariableValue {
 
 pub fn door_array_value(items: Arc<DoorList>) -> VariableValue {
     VariableValue::new_vector(
-        VariableType::UserData(DOOR_ID as u8),
+        VariableType::UserData(DOOR_ID as u32),
         items
             .iter()
             .enumerate()
@@ -57,7 +57,7 @@ pub fn door_array_value(items: Arc<DoorList>) -> VariableValue {
 
 pub fn conference_array_value(conferences: &[Conference]) -> VariableValue {
     VariableValue::new_vector(
-        VariableType::UserData(CONFERENCE_ID as u8),
+        VariableType::UserData(CONFERENCE_ID as u32),
         conferences
             .iter()
             .enumerate()

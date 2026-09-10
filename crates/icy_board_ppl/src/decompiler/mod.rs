@@ -58,9 +58,7 @@ fn user_field_name(index: usize) -> unicase::Ascii<String> {
     unicase::Ascii::new(format!("FIELD{:03}", index + 1))
 }
 
-/// Reuse builtin enums only when the complete ordered domain matches. Other
-/// domains get source ids allocated by the registry, not their PPE ids.
-fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, HashMap<u8, u8>, Vec<u8>), DeserializationError> {
+fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, HashMap<u32, u32>, Vec<u32>), DeserializationError> {
     let registry = UserTypeRegistry::icy_board_registry();
     let builtin_enums = registry.enums();
     let mut enum_ids = HashMap::new();
@@ -70,6 +68,15 @@ fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, Has
         span: 0..0,
     };
     for (&id, values) in executable.variable_table.enums.iter().rev() {
+        if let Some(import) = executable.variable_table.host_catalog.as_ref().and_then(|catalog| catalog.types.get(&id))
+            && import.kind == 3
+            && let Some(definition) = builtin_enums
+                .iter()
+                .find(|definition| import.name.eq_ignore_ascii_case(&format!("icy_board.{}", definition.name)))
+        {
+            enum_ids.insert(id, definition.id);
+            continue;
+        }
         if builtin_enums
             .iter()
             .find(|definition| definition.id == id)
@@ -127,8 +134,8 @@ pub struct Decompiler {
     issues: Vec<DecompilerIssue>,
     optimize_output: bool,
     type_registry: UserTypeRegistry,
-    enum_ids: HashMap<u8, u8>,
-    declared_enums: Vec<u8>,
+    enum_ids: HashMap<u32, u32>,
+    declared_enums: Vec<u32>,
 }
 
 impl Decompiler {
@@ -378,7 +385,7 @@ impl Decompiler {
         }
     }
 
-    fn type_name(&self, type_id: u8) -> Option<unicase::Ascii<String>> {
+    fn type_name(&self, type_id: u32) -> Option<unicase::Ascii<String>> {
         if let Some(definition) = self.type_registry.get_enum_from_id(type_id) {
             return Some(definition.name);
         }
@@ -392,7 +399,7 @@ impl Decompiler {
             .map(|(name, _)| name.clone())
     }
 
-    fn static_receiver_type(&self, expr: &PPEExpr) -> Option<u8> {
+    fn static_receiver_type(&self, expr: &PPEExpr) -> Option<u32> {
         let PPEExpr::PredefinedFunctionCall(definition, arguments) = expr else {
             return None;
         };
@@ -402,7 +409,7 @@ impl Decompiler {
         let PPEExpr::Value(constant_id) = arguments.first()? else {
             return None;
         };
-        u8::try_from(self.executable.variable_table.try_get_entry(*constant_id)?.value.as_int()).ok()
+        u32::try_from(self.executable.variable_table.try_get_entry(*constant_id)?.value.as_int()).ok()
     }
 
     /// The name and type of member `id` of whatever `base` evaluates to.
@@ -487,7 +494,7 @@ impl Decompiler {
         expected.map_or_else(|| self.decompile_expression(expression), |expected| self.decompile_as(expression, expected))
     }
 
-    fn enum_cast_type(&self, expression: &PPEExpr) -> Option<u8> {
+    fn enum_cast_type(&self, expression: &PPEExpr) -> Option<u32> {
         let PPEExpr::PredefinedFunctionCall(definition, arguments) = expression else {
             return None;
         };
@@ -497,14 +504,14 @@ impl Decompiler {
         let [PPEExpr::Value(id), _] = arguments.as_slice() else {
             return None;
         };
-        let id = u8::try_from(self.executable.variable_table.try_get_entry(*id)?.value.as_int()).ok()?;
+        let id = u32::try_from(self.executable.variable_table.try_get_entry(*id)?.value.as_int()).ok()?;
         let VariableType::UserData(id) = self.source_type(VariableType::UserData(id)) else {
             return None;
         };
         self.type_registry.get_enum_from_id(id).map(|_| id)
     }
 
-    fn is_enum_bit_operand(&self, expression: &PPEExpr, id: u8) -> bool {
+    fn is_enum_bit_operand(&self, expression: &PPEExpr, id: u32) -> bool {
         if self.expression_type(expression) == Some(VariableType::UserData(id)) {
             return true;
         }
@@ -748,7 +755,7 @@ impl Decompiler {
                 if f.opcode == FuncOpCode::EnumHas
                     && let [PPEExpr::Value(index), receiver, mask] = args.as_slice()
                     && let Some(entry) = self.executable.variable_table.try_get_entry(*index)
-                    && let Ok(id) = u8::try_from(entry.value.as_int())
+                    && let Ok(id) = u32::try_from(entry.value.as_int())
                 {
                     let typ = self.source_type(VariableType::UserData(id));
                     return FunctionCallExpression::create_empty_expression(
@@ -1210,16 +1217,13 @@ impl Decompiler {
             let mut parameters = Vec::new();
 
             let to;
-            let pass_flags;
             let first_var;
 
             if entry.header.variable_type == VariableType::Function {
                 to = entry.value.data.function_value.parameters as usize;
                 first_var = entry.value.data.function_value.first_var_id as usize;
-                pass_flags = 0;
             } else {
                 to = entry.value.data.procedure_value.parameters as usize;
-                pass_flags = entry.value.data.procedure_value.pass_flags;
                 first_var = entry.value.data.procedure_value.first_var_id as usize;
             }
 
@@ -1277,7 +1281,7 @@ impl Decompiler {
                     }
                     _ => {}
                 }
-                let is_var = 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0);
+                let is_var = self.executable.variable_table.is_var_parameter(entry.header.id, i);
                 let mut variable = VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions);
                 if self.executable.runtime >= 400 && param.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
                     *variable.get_dimensions_mut() = (0..param.header.dim).map(|_| crate::ast::DimensionSpecifier::dynamic()).collect();
@@ -1461,7 +1465,7 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
     }
 
     fn visit_value(&mut self, _id: usize) {}
-    fn visit_record_literal(&mut self, _type_id: u8, fields: &[(usize, PPEExpr)]) {
+    fn visit_record_literal(&mut self, _type_id: u32, fields: &[(usize, PPEExpr)]) {
         for (_, value) in fields {
             value.visit(self);
         }

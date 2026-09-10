@@ -68,6 +68,12 @@ impl<'a> DisassembleVisitor<'a> {
 
     pub fn print_disassembler(&mut self) {
         print_disassemble_header();
+        if let Some(script) = &self.ppe_file.in_memory_script {
+            for stmt in &script.statements {
+                self.print_statement(stmt);
+            }
+            return;
+        }
         for cmt in PPEScript::step_through(self.ppe_file) {
             match cmt {
                 CommandOrError::Command(stmt) => {
@@ -94,6 +100,18 @@ impl<'a> DisassembleVisitor<'a> {
     }
 
     pub fn print_script_buffer_dump(ppe_file: &super::Executable) {
+        if ppe_file.script_buffer.is_empty()
+            && let Some(script) = &ppe_file.in_memory_script
+        {
+            let _ = execute!(
+                stdout(),
+                Print("Instructions: ".to_string()),
+                SetAttribute(Attribute::Bold),
+                Print(format!("{}\n\n", script.statements.len())),
+                SetAttribute(Attribute::Reset)
+            );
+            return;
+        }
         let _ = execute!(
             stdout(),
             Print("Real uncompressed script buffer size: ".to_string()),
@@ -105,24 +123,28 @@ impl<'a> DisassembleVisitor<'a> {
     }
 
     fn print_statement(&mut self, stmt: &super::PPEStatement) {
+        // Runtime 400 has no word encoding to show; the span is an instruction index.
+        let legacy = self.ppe_file.in_memory_script.is_none();
         let mut vec = Vec::new();
-        let data: &[i16] = if self.generate_statement_data {
-            stmt.command.serialize(&mut vec);
-            &vec
-        } else {
-            &self.ppe_file.script_buffer[stmt.span.clone()]
-        };
-        let _ = execute!(stdout(), Print("       ["));
-        for (i, x) in data.iter().enumerate() {
-            if i > 0 && (i % 16) == 0 {
-                let _ = execute!(stdout(), Print("\n"));
+        if legacy {
+            let data: &[i16] = if self.generate_statement_data {
+                stmt.command.serialize(&mut vec);
+                &vec
+            } else {
+                &self.ppe_file.script_buffer[stmt.span.clone()]
+            };
+            let _ = execute!(stdout(), Print("       ["));
+            for (i, x) in data.iter().enumerate() {
+                if i > 0 && (i % 16) == 0 {
+                    let _ = execute!(stdout(), Print("\n"));
+                }
+                let _ = execute!(stdout(), Print(format!("{:04X} ", *x)));
             }
-            let _ = execute!(stdout(), Print(format!("{:04X} ", *x)));
+            let _ = execute!(stdout(), Print("]\n"));
         }
 
         let _ = execute!(
             stdout(),
-            Print("]\n"),
             SetForegroundColor(Color::Cyan),
             Print(format!("{:05X}: ", stmt.span.start * 2)),
             SetForegroundColor(Color::Reset),
@@ -153,7 +175,7 @@ impl PPEVisitor<()> for DisassembleVisitor<'_> {
             Print("]"),
         );
     }
-    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) {
+    fn visit_record_literal(&mut self, type_id: u32, fields: &[(usize, PPEExpr)]) {
         let _ = execute!(stdout(), Print(format!("TYPE{type_id} {{ ")));
         for (index, (field_id, value)) in fields.iter().enumerate() {
             let _ = execute!(stdout(), Print(format!("FIELD{field_id} = ")));

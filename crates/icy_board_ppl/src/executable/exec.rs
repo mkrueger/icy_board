@@ -68,13 +68,13 @@ pub enum ExecutableError {
     InvalidTypeFieldCount(usize, usize),
 
     #[error("Type {0} refers to type {1}, which has not been declared yet")]
-    InvalidTypeReference(usize, u8),
+    InvalidTypeReference(usize, u32),
 
     #[error("Type {0} contains board object {1}, which cannot be a record field")]
-    BoardObjectTypeField(usize, u8),
+    BoardObjectTypeField(usize, u32),
 
     #[error("Variable refers to type {0}, which is not in the type table")]
-    MissingTypeDefinition(u8),
+    MissingTypeDefinition(u32),
 
     #[error("Unsupported type table format: {0}")]
     UnsupportedTypeTableFormat(u8),
@@ -86,13 +86,16 @@ pub enum ExecutableError {
     ArrayAllocationTooLarge(usize, usize),
 
     #[error("Invalid enum definition for type {0}")]
-    InvalidEnumDefinition(u8),
+    InvalidEnumDefinition(u32),
 
     #[error("Type {type_id} field {field_index} uses a dynamic array or host type; these record layouts have no executable encoding")]
     UnsupportedRecordFieldEncoding { type_id: usize, field_index: usize },
 
     #[error("Short-circuit expressions have no executable encoding yet")]
     UnsupportedShortCircuitEncoding,
+
+    #[error("PPE 400 format error: {0}")]
+    Format400(String),
 }
 
 #[derive(Clone)]
@@ -111,7 +114,11 @@ static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
 const HEADER_SIZE: usize = 48;
 
 impl Executable {
-    fn validate_user_types(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Result<(), ExecutableError> {
+    pub fn from_container_with_registry(buffer: &[u8], limits: &super::container::LoadLimits, registry: &crate::parser::UserTypeRegistry) -> Res<Self> {
+        super::format400::decode_with_registry(buffer, limits, registry).map_err(Into::into)
+    }
+
+    fn validate_user_types(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u32, Vec<i32>>) -> Result<(), ExecutableError> {
         for (&id, values) in enums {
             if (id as usize) < FIRST_USER_TYPE_ID + user_types.len() || values.is_empty() || values.len() > u16::MAX as usize {
                 return Err(ExecutableError::InvalidEnumDefinition(id));
@@ -147,7 +154,7 @@ impl Executable {
 
     /// How many values one instance of each record type allocates, so a corrupt type
     /// table cannot ask a loaded file for an unbounded amount of memory.
-    fn record_footprints(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Result<Vec<usize>, ExecutableError> {
+    fn record_footprints(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u32, Vec<i32>>) -> Result<Vec<usize>, ExecutableError> {
         let mut footprints: Vec<usize> = Vec::with_capacity(user_types.len());
         for (index, fields) in user_types.iter().enumerate() {
             let type_id = FIRST_USER_TYPE_ID + index;
@@ -233,6 +240,9 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn from_buffer(buffer: &mut [u8], print_header_information: bool) -> Res<Executable> {
+        if buffer.starts_with(super::container::MAGIC) {
+            return super::format400::decode(buffer, &super::container::LoadLimits::default()).map_err(Into::into);
+        }
         if buffer.len() < HEADER_SIZE {
             return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
         }
@@ -243,6 +253,9 @@ impl Executable {
 
         if version > LAST_PPE_RUNTIME {
             return Err(Box::new(ExecutableError::UnsupporrtedVersion(version)));
+        }
+        if version == 400 {
+            return Err(ExecutableError::Format400("obsolete beta PPE 400; recompile the source with the current compiler".into()).into());
         }
 
         let buffer = &mut buffer[HEADER_SIZE..];
@@ -295,7 +308,7 @@ impl Executable {
                 i += 1;
                 for _ in 0..count {
                     let header = buffer.get(i..i + 3).ok_or(ExecutableError::BufferTooShort(buffer.len()))?;
-                    let id = header[0];
+                    let id = u32::from(header[0]);
                     let count = u16::from_le_bytes([header[1], header[2]]) as usize;
                     i += 3;
                     let bytes = buffer.get(i..i + count * 4).ok_or(ExecutableError::BufferTooShort(buffer.len()))?;
@@ -385,6 +398,21 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn to_buffer(&self) -> Result<Vec<u8>, ExecutableError> {
+        self.to_buffer_with_compression(super::container::Compression::None)
+    }
+
+    pub fn to_buffer_with_compression(&self, compression: super::container::Compression) -> Result<Vec<u8>, ExecutableError> {
+        self.to_buffer_with_options(compression, true)
+    }
+
+    pub fn to_buffer_with_options(&self, compression: super::container::Compression, debug_names: bool) -> Result<Vec<u8>, ExecutableError> {
+        if self.runtime == 400 {
+            return super::format400::encode(self, compression, debug_names, &super::container::LoadLimits::default())
+                .map_err(|error| ExecutableError::Format400(error.to_string()));
+        }
+        if compression != super::container::Compression::None {
+            return Err(ExecutableError::Format400("section compression requires runtime 400".into()));
+        }
         if self.in_memory_script.is_some() {
             return Err(ExecutableError::UnsupportedShortCircuitEncoding);
         }
@@ -439,7 +467,7 @@ impl Executable {
             if !self.variable_table.enums.is_empty() {
                 buffer.push(self.variable_table.enums.len() as u8);
                 for (&id, values) in &self.variable_table.enums {
-                    buffer.push(id);
+                    buffer.push(u8::try_from(id).map_err(|_| ExecutableError::InvalidEnumDefinition(id))?);
                     buffer.extend_from_slice(&(values.len() as u16).to_le_bytes());
                     for value in values {
                         buffer.extend_from_slice(&value.to_le_bytes());
@@ -514,7 +542,14 @@ mod tests {
             };
 
             assert_eq!(runtime, reloaded.runtime, "runtime {runtime} changed");
-            assert_eq!(script_buffer, reloaded.script_buffer, "runtime {runtime} lost its script");
+            if runtime < 400 {
+                assert_eq!(script_buffer, reloaded.script_buffer, "runtime {runtime} lost its script");
+            } else {
+                let script = super::super::PPEScript::from_ppe_file(&reloaded).unwrap();
+                assert_eq!(2048, script.statements.len());
+                assert!(script.statements.iter().all(|statement| statement.command == super::super::PPECommand::End));
+                assert_eq!(bytes, reloaded.to_buffer().unwrap());
+            }
         }
     }
 }

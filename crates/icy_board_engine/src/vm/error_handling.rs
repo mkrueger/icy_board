@@ -137,7 +137,7 @@ impl VirtualMachine<'_> {
         let valid_parameter = parameters == 0
             || (parameters == 1
                 && pass_flags == 0
-                && self.variable_table.get_var_entry(first).header.variable_type == VariableType::UserData(crate::parser::ERROR_ID as u8));
+                && self.variable_table.get_var_entry(first).header.variable_type == VariableType::UserData(crate::parser::ERROR_ID as u32));
         if !valid_parameter {
             return Err(VMError::ErrorInFunctionCall("ON ERROR".to_string(), "invalid handler signature".to_string()).into());
         }

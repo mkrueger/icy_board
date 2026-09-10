@@ -415,7 +415,7 @@ impl PPECompiler {
                         continue;
                     };
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset =
-                        u16::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
+                        u32::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
 
                     self.lookup_table.start_compile_function_body(proc.get_identifier());
                     self.compile_statement_sequence(proc.get_statements());
@@ -430,7 +430,7 @@ impl PPECompiler {
                         continue;
                     };
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset =
-                        u16::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
+                        u32::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
                     self.lookup_table.start_compile_function_body(func.get_identifier());
                     self.compile_statement_sequence(func.get_statements());
                     self.lookup_table.end_compile_function_body();
@@ -680,15 +680,11 @@ impl PPECompiler {
                     return None;
                 };
                 let decl = self.lookup_table.variable_table.get_var_entry(decl_idx).clone();
-                let pass_flags = if decl.header.variable_type == VariableType::Procedure {
-                    unsafe { decl.value.data.procedure_value.pass_flags }
-                } else {
-                    0
-                };
+                let pass_modes = self.lookup_table.variable_table.parameter_modes(decl_idx, call_stmt.get_arguments().len());
                 let mut arguments = Vec::new();
                 for (index, arg) in call_stmt.get_arguments().iter().enumerate() {
                     let expr_buffer = self.resolve_expr(arg);
-                    arguments.push(if 1u16.checked_shl(index as u32).is_some_and(|mask| pass_flags & mask != 0) {
+                    arguments.push(if pass_modes[index] {
                         Self::lower_variable_argument(expr_buffer)
                     } else {
                         expr_buffer
@@ -757,8 +753,9 @@ impl PPECompiler {
                 command_index: error.command_index,
                 reason: error.reason,
             })?;
-        if declaration_count > i16::MAX as usize {
-            return Err(CompilationErrorType::TooManyDeclarations(declaration_count, i16::MAX as usize));
+        let declaration_limit = if self.runtime >= 400 { 1_000_000 } else { i16::MAX as usize };
+        if declaration_count > declaration_limit {
+            return Err(CompilationErrorType::TooManyDeclarations(declaration_count, declaration_limit));
         }
         let script_size = self
             .commands
@@ -767,11 +764,15 @@ impl PPECompiler {
             .map(|statement| statement.command.get_size())
             .sum::<usize>()
             .saturating_mul(2);
-        if script_size > i16::MAX as usize {
-            return Err(CompilationErrorType::ProgramTooLarge(script_size, i16::MAX as usize));
+        let code_limit = if self.runtime >= 400 { 32 * 1024 * 1024 } else { i16::MAX as usize };
+        if script_size > code_limit {
+            return Err(CompilationErrorType::ProgramTooLarge(script_size, code_limit));
         }
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
+        if self.runtime >= 400 {
+            variable_table.host_catalog = Some(crate::executable::imports400::HostCatalog::from_registry(&self.semantic_visitor.type_registry));
+        }
         let definitions = self.semantic_visitor.type_registry.user_types();
         let mut used_types = HashSet::new();
         for entry in variable_table.get_entries() {
@@ -787,7 +788,7 @@ impl PPECompiler {
         loop {
             let previous = used_types.len();
             for definition in &definitions {
-                if !used_types.contains(&(definition.id as u8)) {
+                if !used_types.contains(&(definition.id as u32)) {
                     continue;
                 }
                 for (_, field) in &definition.fields {
@@ -802,16 +803,16 @@ impl PPECompiler {
                 break;
             }
         }
-        let remap: HashMap<u8, u8> = definitions
+        let remap: HashMap<u32, u32> = definitions
             .iter()
-            .filter(|definition| used_types.contains(&(definition.id as u8)))
+            .filter(|definition| used_types.contains(&(definition.id as u32)))
             .enumerate()
-            .map(|(index, definition)| (definition.id as u8, (crate::parser::FIRST_USER_TYPE_ID + index) as u8))
+            .map(|(index, definition)| (definition.id as u32, (crate::parser::FIRST_USER_TYPE_ID + index) as u32))
             .collect();
         variable_table.remap_user_types(&remap);
         let user_types: Vec<Vec<RecordField>> = definitions
             .iter()
-            .filter(|definition| used_types.contains(&(definition.id as u8)))
+            .filter(|definition| used_types.contains(&(definition.id as u32)))
             .map(|definition| {
                 definition
                     .fields
@@ -859,9 +860,10 @@ impl PPECompiler {
                 .collect();
         }
         variable_table.fill_in_records(&user_types);
-        let in_memory_script = if self.commands.statements.iter().any(|statement| statement.command.contains_short_circuit()) {
+        let in_memory_script = if self.runtime >= 400 || self.commands.statements.iter().any(|statement| statement.command.contains_short_circuit()) {
             let mut script = self.commands.clone();
             for statement in &mut script.statements {
+                statement.command.normalize_control();
                 statement.command.remap_user_types(&remap);
             }
             Some(script)

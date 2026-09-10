@@ -61,6 +61,12 @@ struct Cli {
     #[arg(long, value_name = "lang-version", help = cli_text("lang-version"))]
     lang_version: Option<u16>,
 
+    #[arg(long, value_parser = ["none", "zstd"], default_value = "none", help = cli_text("compression"))]
+    compression: String,
+
+    #[arg(long, help = cli_text("debug"))]
+    debug: bool,
+
     // SetTrue supplies Some(false) when absent, which would disable autodetection.
     // A zero-argument Set preserves argh's None / Some(true) switch semantics.
     #[arg(long, action = clap::ArgAction::Set, num_args = 0, default_missing_value = "true", overrides_with = "cp437", help = cli_text("cp437"))]
@@ -802,7 +808,11 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                 return Ok(());
             }
 
-            let bin = executable.to_buffer()?;
+            let compression = match arguments.compression.as_str() {
+                "zstd" => icy_board_ppl::executable::container::Compression::Zstd,
+                _ => icy_board_ppl::executable::container::Compression::None,
+            };
+            let bin = executable.to_buffer_with_options(compression, arguments.debug)?;
             //let len = bin.len();
             write_atomic(out_file_name, &bin)?;
             //let lines = src.lines().count();

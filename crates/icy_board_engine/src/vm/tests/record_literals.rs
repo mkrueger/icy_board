@@ -11,7 +11,7 @@ fn ppl400_string_record_fields_use_dynamic_storage() {
     assert_eq!(VariableType::UnboundedString, executable.user_types[0][1].variable_type);
     assert_eq!(1, executable.user_types[0][1].dim);
     let direct = crate::executable::create_record_value(
-        crate::parser::FIRST_USER_TYPE_ID as u8,
+        crate::parser::FIRST_USER_TYPE_ID as u32,
         &executable.user_types,
         &executable.variable_table.enums,
     )
@@ -24,7 +24,7 @@ fn ppl400_string_record_fields_use_dynamic_storage() {
         .variable_table
         .get_entries()
         .iter()
-        .find(|entry| entry.header.variable_type == VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8))
+        .find(|entry| entry.header.variable_type == VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u32))
         .unwrap();
     let GenericVariableData::Record(fields) = &record.value.generic_data else {
         panic!("record fields were not initialized");

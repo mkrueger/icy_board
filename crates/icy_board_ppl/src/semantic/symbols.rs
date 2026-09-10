@@ -84,8 +84,8 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SemanticInfo {
-    EnumCast(u8),
-    EnumHas(u8),
+    EnumCast(u32),
+    EnumHas(u32),
     PredefinedFunc(FuncOpCode),
     MemberFunctionCall(usize),
     MemberSetterCall(usize),

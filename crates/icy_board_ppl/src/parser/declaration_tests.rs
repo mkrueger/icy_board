@@ -274,7 +274,7 @@ fn board_object_type_ids_are_compact() {
 #[test]
 fn error_member_ids_are_compact() {
     let registry = UserTypeRegistry::icy_board_registry();
-    let error = &registry.types[&(super::ERROR_ID as u8)];
+    let error = &registry.types[&(super::ERROR_ID as u32)];
     for (name, id) in [("OK", 0), ("KIND", 1), ("CODE", 2), ("MESSAGE", 3), ("CHANNEL", 4)] {
         assert_eq!(error.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id), "ERROR.{name} moved");
     }
@@ -312,7 +312,7 @@ fn ppl400_api_uses_unbounded_strings_exclusively() {
         }
     }
 
-    let contact = registry.get_record_type_from_id(super::CONTACT_ID as u8).unwrap();
+    let contact = registry.get_record_type_from_id(super::CONTACT_ID as u32).unwrap();
     for (name, field) in &contact.fields {
         assert!(!legacy_string(field.variable_type), "CONTACT field {name} uses {}", field.variable_type);
     }
@@ -321,7 +321,7 @@ fn ppl400_api_uses_unbounded_strings_exclusively() {
 /// A builtin enum takes a fixed id at the top of the space and a program's own enums
 /// grow down from below them, so adding one in the middle would move every id after it.
 #[test]
-fn builtin_enum_ids_are_compact() {
+fn builtin_enum_ids_leave_room_for_wide_record_ids() {
     let registry = UserTypeRegistry::icy_board_registry();
     let expected = [
         ("EventKind", 255),
@@ -344,7 +344,7 @@ fn builtin_enum_ids_are_compact() {
         let definition = registry
             .get_enum(&unicase::Ascii::new(name.to_string()))
             .unwrap_or_else(|| panic!("{name} is not registered"));
-        assert_eq!(definition.id, id, "{name} moved");
+        assert_eq!(definition.id, i32::MAX as u32 - (255 - id), "{name} moved");
     }
     assert_eq!(registry.enums().len(), expected.len(), "a builtin enum was added without freezing its id");
 }
@@ -357,7 +357,7 @@ fn a_program_enum_starts_below_the_builtin_ones() {
         .declare_enum(unicase::Ascii::new("Mine".to_string()), vec![(unicase::Ascii::new("One".to_string()), 1)])
         .expect("a program enum should still fit");
 
-    assert_eq!(id, 241);
+    assert_eq!(id, i32::MAX as u32 - super::BUILTIN_ENUM_COUNT as u32);
 }
 
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {
@@ -393,7 +393,7 @@ fn test_type_declaration() {
     assert_eq!(Some(0), def.field_index(&unicase::Ascii::new("name".to_string())));
     assert_eq!(Some(VariableType::UnboundedString), def.field_type(0));
     assert_eq!(Some(VariableType::Integer), def.field_type(2));
-    assert_eq!(Some(def.clone()), reg.get_user_type_from_id(def.id as u8));
+    assert_eq!(Some(def.clone()), reg.get_user_type_from_id(def.id as u32));
 }
 
 #[test]
@@ -405,7 +405,7 @@ fn test_type_is_usable_as_a_variable_type() {
     let AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(decl)) = &nodes[1] else {
         panic!("expected a variable declaration, got {:?}", nodes[1]);
     };
-    assert_eq!(VariableType::UserData(id as u8), decl.get_variable_type());
+    assert_eq!(VariableType::UserData(id as u32), decl.get_variable_type());
 }
 
 #[test]
@@ -443,7 +443,7 @@ fn test_a_record_field_can_name_an_earlier_record() {
     let (_, reg, errors) = parse_types("TYPE Inner\n  INTEGER X\nENDTYPE\nTYPE Outer\n  Inner Value\nENDTYPE\n");
     assert!(errors.lock().unwrap().errors.is_empty());
     let outer = reg.get_user_type(&unicase::Ascii::new("outer".to_string())).unwrap();
-    assert_eq!(Some(VariableType::UserData(super::FIRST_USER_TYPE_ID as u8)), outer.field_type(0));
+    assert_eq!(Some(VariableType::UserData(super::FIRST_USER_TYPE_ID as u32)), outer.field_type(0));
 }
 
 #[test]
@@ -513,7 +513,7 @@ fn test_all_reserved_custom_type_ids_are_available() {
     assert!(errors.lock().unwrap().errors.is_empty());
     assert_eq!(super::MAX_USER_TYPES, nodes.len());
     assert_eq!(
-        u8::MAX as usize - super::BUILTIN_ENUM_COUNT,
+        super::FIRST_USER_TYPE_ID + super::MAX_USER_TYPES - 1,
         registry
             .get_user_type(&unicase::Ascii::new(format!("Type{:03}", super::MAX_USER_TYPES - 1)))
             .unwrap()

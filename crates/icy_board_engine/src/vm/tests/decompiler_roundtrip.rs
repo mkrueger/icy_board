@@ -157,7 +157,7 @@ fn execute(executable: &Executable, limit: usize) -> (Outcome, usize) {
             "test-only instruction meter",
             VarHeader {
                 id: meter_id,
-                variable_type: VariableType::UserData(METER_TYPE as u8),
+                variable_type: VariableType::UserData(METER_TYPE as u32),
                 ..Default::default()
             },
             user_data_value(

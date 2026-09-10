@@ -787,7 +787,7 @@ impl VirtualMachine<'_> {
                     && (self.variable_table.get_var_entry(return_var_id).header.dim > 0
                         || matches!(self.variable_table.get_value(return_var_id).generic_data, GenericVariableData::Record(_))))
                 .then(|| self.variable_table.get_value(return_var_id).clone());
-                self.prepare_call(locals, parameters, first, arguments, 0).await?;
+                self.prepare_call(locals, parameters, first, arguments, &[]).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
                 self.goto(proc_offset)?;
@@ -1040,7 +1040,6 @@ impl VirtualMachine<'_> {
                         let first;
                         let parameters;
                         let return_var_id;
-                        let pass_flags;
                         let is_func;
                         unsafe {
                             let proc = &self.variable_table.get_var_entry(proc_id);
@@ -1050,34 +1049,34 @@ impl VirtualMachine<'_> {
                             if proc.header.variable_type == VariableType::Function {
                                 is_func = true;
                                 return_var_id = proc.value.data.function_value.return_var as usize;
-                                pass_flags = 0;
                             } else {
                                 is_func = false;
                                 return_var_id = 0;
-                                pass_flags = proc.value.data.procedure_value.pass_flags;
                             }
                         }
 
+                        let pass_modes = self.variable_table.parameter_modes(proc_id, parameters);
+                        let pass_count = pass_modes.iter().filter(|mode| **mode).count();
                         let legacy_copy_out = self.variable_table.get_version() < 400;
                         if legacy_copy_out {
                             for parameter in (0..parameters).rev() {
-                                if 1u16.checked_shl(parameter as u32).is_some_and(|mask| mask & pass_flags != 0) {
+                                if pass_modes[parameter] {
                                     let value = self.call_parameter_value(first + parameter);
                                     let target = self.write_back_stack.pop().ok_or(VMError::WriteBackStackEmpty)?;
                                     self.set_write_back_target(&target, value).await?;
                                 }
                             }
                         }
-                        let single_pass_value = if !legacy_copy_out && pass_flags.count_ones() == 1 {
-                            let parameter = pass_flags.trailing_zeros() as usize;
+                        let single_pass_value = if !legacy_copy_out && pass_count == 1 {
+                            let parameter = pass_modes.iter().position(|mode| *mode).unwrap();
                             (parameter < parameters).then(|| self.call_parameter_value(first + parameter))
                         } else {
                             None
                         };
                         let mut pass_values = Vec::new();
-                        if !legacy_copy_out && pass_flags > 0 && single_pass_value.is_none() {
+                        if !legacy_copy_out && pass_count > 0 && single_pass_value.is_none() {
                             for i in 0..parameters {
-                                if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
+                                if pass_modes[i] {
                                     let id = first + i;
                                     let val = self.call_parameter_value(id);
                                     pass_values.push(val);
@@ -1111,9 +1110,9 @@ impl VirtualMachine<'_> {
                             } else {
                                 return Err(VMError::WriteBackStackEmpty.into());
                             }
-                        } else if !legacy_copy_out && pass_flags > 0 {
+                        } else if !legacy_copy_out && pass_count > 0 {
                             for i in (0..parameters).rev() {
-                                if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
+                                if pass_modes[i] {
                                     let Some(val) = pass_values.pop() else {
                                         return Err(VMError::PassValueStackEmpty.into());
                                     };
@@ -1151,7 +1150,6 @@ impl VirtualMachine<'_> {
                 let locals;
                 let parameters;
                 let first;
-                let pass_flags;
 
                 unsafe {
                     let proc = &self.variable_table.get_var_entry(*proc_id);
@@ -1159,9 +1157,9 @@ impl VirtualMachine<'_> {
                     first = (proc.value.data.procedure_value.first_var_id + 1) as usize;
                     locals = proc.value.data.procedure_value.local_variables as usize;
                     parameters = proc.value.data.procedure_value.parameters as usize;
-                    pass_flags = proc.value.data.procedure_value.pass_flags;
                 }
-                self.prepare_call(locals, parameters, first, arguments, pass_flags).await?;
+                let pass_modes = self.variable_table.parameter_modes(*proc_id, parameters);
+                self.prepare_call(locals, parameters, first, arguments, &pass_modes).await?;
 
                 if self.push_return_address(ReturnAddress::func_call(self.cur_ptr, *proc_id))? {
                     self.goto(proc_offset)?;
@@ -1257,7 +1255,7 @@ impl VirtualMachine<'_> {
         Ok(())
     }
 
-    fn record_field_layout(&self, type_id: u8, field_id: usize) -> Res<crate::executable::RecordField> {
+    fn record_field_layout(&self, type_id: u32, field_id: usize) -> Res<crate::executable::RecordField> {
         if type_id as usize == crate::parser::CONTACT_ID && field_id < 2 {
             return Ok(crate::executable::RecordField::scalar(VariableType::UnboundedString));
         }
@@ -1269,7 +1267,7 @@ impl VirtualMachine<'_> {
             .ok_or_else(|| VMError::InvalidMemberId(type_id, field_id).into())
     }
 
-    fn check_record_field_value(&self, type_id: u8, field_id: usize, value: &VariableValue) -> Res<()> {
+    fn check_record_field_value(&self, type_id: u32, field_id: usize, value: &VariableValue) -> Res<()> {
         self.check_record_value(self.record_field_layout(type_id, field_id)?, value)
     }
 
@@ -1495,7 +1493,7 @@ mod followup_invariants {
         .await
     }
 
-    fn s1_record(type_id: u8, fields: Vec<VariableValue>) -> VariableValue {
+    fn s1_record(type_id: u32, fields: Vec<VariableValue>) -> VariableValue {
         VariableValue {
             vtype: VariableType::UserData(type_id),
             data: VariableData::default(),
@@ -1812,7 +1810,7 @@ mod followup_invariants {
         let file = directory.path().join("record.dat");
         let bytes = b"1234\n5678\n";
         for field in [
-            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u8)),
+            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u32)),
             RecordField::scalar(VariableType::UserData(30)),
             RecordField {
                 dim: 1,

@@ -14,6 +14,19 @@ fn field(variable_type: VariableType) -> RecordField {
     RecordField::scalar(variable_type)
 }
 
+fn mutate_types(executable: &Executable, mutate: impl FnOnce(&mut icy_board_engine::executable::container::Section)) -> Vec<u8> {
+    use icy_board_engine::executable::container::{Compression, Container, LoadLimits};
+    let limits = LoadLimits::default();
+    let mut container = Container::decode(&executable.to_buffer().unwrap(), &limits).unwrap();
+    container.sections.retain(|section| section.kind != *b"IDEN");
+    mutate(container.sections.iter_mut().find(|section| section.kind == *b"TYPE").unwrap());
+    container.encode(Compression::None, &limits).unwrap()
+}
+
+fn format_error(message: &str) -> ExecutableError {
+    ExecutableError::Format400(format!("Invalid PPE 400 container: {message}"))
+}
+
 fn compile(source: &str) -> Executable {
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -234,7 +247,7 @@ fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
         ..Executable::default()
     };
     assert_eq!(
-        ExecutableError::TypeCountExceedsMaximum(MAX_USER_TYPES + 1, MAX_USER_TYPES),
+        ExecutableError::Format400("PPE 400 resource limit exceeded: record count".into()),
         too_many_types.to_buffer().unwrap_err()
     );
 
@@ -243,7 +256,7 @@ fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
         ..Executable::default()
     };
     assert_eq!(
-        ExecutableError::InvalidTypeFieldCount(100, MAX_TYPE_FIELDS + 1),
+        ExecutableError::Format400("PPE 400 resource limit exceeded: record fields".into()),
         too_many_fields.to_buffer().unwrap_err()
     );
 }
@@ -254,17 +267,17 @@ fn the_serializer_rejects_recursive_or_forward_type_references() {
         user_types: vec![vec![field(VariableType::UserData(100))]],
         ..Executable::default()
     };
-    assert_eq!(ExecutableError::InvalidTypeReference(100, 100), self_reference.to_buffer().unwrap_err());
+    assert_eq!(format_error("recursive or forward record"), self_reference.to_buffer().unwrap_err());
 
     let forward_reference = Executable {
         user_types: vec![vec![field(VariableType::UserData(101))], vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
-    assert_eq!(ExecutableError::InvalidTypeReference(100, 101), forward_reference.to_buffer().unwrap_err());
+    assert_eq!(format_error("recursive or forward record"), forward_reference.to_buffer().unwrap_err());
 }
 
 #[test]
-fn accepted_host_and_dynamic_fields_have_no_ppe_encoding() {
+fn accepted_host_and_dynamic_fields_survive_ppe_encoding() {
     for declaration in [
         "CONFERENCE Conf",
         "CONTACT Person",
@@ -274,26 +287,24 @@ fn accepted_host_and_dynamic_fields_have_no_ppe_encoding() {
     ] {
         let executable = compile(&format!("TYPE Holder\n {declaration}\nENDTYPE\nHolder item\nHolder target\ntarget = item\n"));
         assert_eq!(1, executable.user_types.len(), "{declaration}");
-        assert_eq!(
-            ExecutableError::UnsupportedRecordFieldEncoding { type_id: 100, field_index: 0 },
-            executable.to_buffer().unwrap_err(),
-            "{declaration}"
-        );
+        let mut bytes = executable.to_buffer().unwrap();
+        let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
+        assert_eq!(executable.user_types, loaded.user_types, "{declaration}");
+        assert_eq!(bytes, loaded.to_buffer().unwrap());
     }
 }
 
 #[test]
-fn the_loader_still_rejects_a_board_object_field() {
+fn the_loader_rejects_an_unimported_host_field() {
     let executable = Executable {
         user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
-    let mut bytes = executable.to_buffer().unwrap();
-    bytes[53] = 30;
-    assert!(matches!(
-        Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string() == ExecutableError::BoardObjectTypeField(100, 30).to_string()
-    ));
+    let mut bytes = mutate_types(&executable, |section| section.data[12..16].copy_from_slice(&99u32.to_le_bytes()));
+    assert_eq!(
+        Executable::from_buffer(&mut bytes, false).err().unwrap().to_string(),
+        "Invalid PPE 400 container: field type"
+    );
 }
 
 #[test]
@@ -304,7 +315,7 @@ fn the_serializer_rejects_a_variable_whose_type_is_missing() {
     entry.header.variable_type = VariableType::UserData(100);
     executable.variable_table.push(entry);
 
-    assert_eq!(ExecutableError::MissingTypeDefinition(100), executable.to_buffer().unwrap_err());
+    assert_eq!(format_error("variable type"), executable.to_buffer().unwrap_err());
 }
 
 #[test]
@@ -313,35 +324,30 @@ fn the_loader_rejects_a_recursive_type_table() {
         user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
-    let mut bytes = executable.to_buffer().unwrap();
-    // Header (48), empty variable table count (2), format, type count, field count, descriptor.
-    bytes[53] = 100;
-    assert!(matches!(
-        Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string() == "Type 100 refers to type 100, which has not been declared yet"
-    ));
+    let mut bytes = mutate_types(&executable, |section| section.data[12..16].copy_from_slice(&100u32.to_le_bytes()));
+    assert_eq!(
+        Executable::from_buffer(&mut bytes, false).err().unwrap().to_string(),
+        "Invalid PPE 400 container: recursive or forward record"
+    );
 }
 
 #[test]
 fn the_loader_rejects_a_truncated_type_table() {
     let executable = Executable::default();
-    let mut bytes = executable.to_buffer().unwrap();
-    bytes[51] = 1;
-    bytes.truncate(52);
-    assert!(matches!(
-        Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string().starts_with("Buffer too short")
-    ));
+    let mut bytes = mutate_types(&executable, |section| section.entries = 1);
+    assert_eq!(
+        Executable::from_buffer(&mut bytes, false).err().unwrap().to_string(),
+        "Invalid PPE 400 container: truncated section record"
+    );
 }
 
 #[test]
 fn the_loader_rejects_an_unknown_type_table_format() {
     let executable = Executable::default();
-    let mut bytes = executable.to_buffer().unwrap();
-    bytes[50] = 3;
+    let mut bytes = mutate_types(&executable, |section| section.schema = 3);
     assert!(matches!(
         Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string() == "Unsupported type table format: 3"
+        Err(error) if error.to_string().contains("schema 3")
     ));
 }
 
@@ -351,10 +357,9 @@ fn the_loader_rejects_invalid_field_dimensions() {
         user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
-    let mut bytes = executable.to_buffer().unwrap();
-    bytes[54] = 4;
-    assert!(matches!(
-        Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string() == "Type 100 field 0 has invalid array dimensions"
-    ));
+    let mut bytes = mutate_types(&executable, |section| section.data[16..20].copy_from_slice(&4u32.to_le_bytes()));
+    assert_eq!(
+        Executable::from_buffer(&mut bytes, false).err().unwrap().to_string(),
+        "Invalid PPE 400 container: field shape"
+    );
 }

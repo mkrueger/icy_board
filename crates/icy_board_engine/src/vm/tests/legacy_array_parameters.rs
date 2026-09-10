@@ -318,7 +318,7 @@ async fn legacy_bytecode_and_vm_supplied_values_save_only_zero_even_with_static_
                 .set_array_value(3, 0, 0, VariableValue::new_int(tail))
                 .unwrap();
         }
-        vm.prepare_call(0, 1, 2, &[PPEExpr::Value(3)], 1).await.unwrap();
+        vm.prepare_call(0, 1, 2, &[PPEExpr::Value(3)], &[true]).await.unwrap();
         assert_eq!(21, vm.variable_table.get_value(2).get_array_value(0, 0, 0).as_int());
         assert_eq!(12, vm.variable_table.get_value(2).get_array_value(3, 0, 0).as_int());
         assert_eq!(0, vm.call_local_value_stack[0].get_dimensions());

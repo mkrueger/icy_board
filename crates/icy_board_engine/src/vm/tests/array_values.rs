@@ -441,7 +441,7 @@ async fn classic_static_flags_and_bare_array_decay_survive_dynamic_storage_chang
         );
 
         for depth in 1..=2 {
-            vm.prepare_call(2, 0, 2, &[], 0).await.unwrap();
+            vm.prepare_call(2, 0, 2, &[], &[]).await.unwrap();
             assert_eq!(depth, vm.call_local_value_stack.len());
             assert_eq!(21, vm.variable_table.get_value(2).get_array_value(0, 0, 0).as_int());
             assert_eq!(

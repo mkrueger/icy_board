@@ -186,6 +186,21 @@ impl OnErrorTarget {
 }
 
 impl PPECommand {
+    pub(crate) fn normalize_control(&mut self) {
+        if let Self::PredefinedCall(definition, arguments) = self
+            && arguments.is_empty()
+        {
+            *self = match definition.opcode {
+                super::OpCode::END => Self::End,
+                super::OpCode::RETURN => Self::Return,
+                super::OpCode::FEND => Self::EndFunc,
+                super::OpCode::FPCLR => Self::EndProc,
+                super::OpCode::STOP => Self::Stop,
+                _ => return,
+            };
+        }
+    }
+
     pub(crate) fn contains_short_circuit(&self) -> bool {
         match self {
             Self::IfNot(expression, _) | Self::MemberCall(expression) | Self::ForEach(_, expression, _) => expression.contains_short_circuit(),
@@ -195,7 +210,7 @@ impl PPECommand {
         }
     }
 
-    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
+    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u32>) {
         match self {
             PPECommand::IfNot(expression, _) | PPECommand::MemberCall(expression) | PPECommand::ForEach(_, expression, _) => {
                 expression.collect_user_types(types);
@@ -221,7 +236,7 @@ impl PPECommand {
         }
     }
 
-    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u8, u8>) {
+    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u32, u32>) {
         match self {
             PPECommand::IfNot(expression, _) | PPECommand::MemberCall(expression) | PPECommand::ForEach(_, expression, _) => expression.remap_user_types(remap),
             PPECommand::ProcedureCall(_, arguments) | PPECommand::PredefinedCall(_, arguments) => {
@@ -451,7 +466,7 @@ pub enum PPEExpr {
     Invalid,
     Value(usize),
     RoutineReference(usize),
-    RecordLiteral(u8, Vec<(usize, PPEExpr)>),
+    RecordLiteral(u32, Vec<(usize, PPEExpr)>),
     Member(Box<PPEExpr>, usize),
     IndexedMember(Box<PPEExpr>, usize, Vec<PPEExpr>),
     UnaryExpression(UnaryOp, Box<PPEExpr>),
@@ -487,7 +502,7 @@ impl PPEExpr {
         }
     }
 
-    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
+    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u32>) {
         match self {
             PPEExpr::RecordLiteral(type_id, fields) => {
                 types.insert(*type_id);
@@ -515,7 +530,7 @@ impl PPEExpr {
         }
     }
 
-    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u8, u8>) {
+    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u32, u32>) {
         match self {
             PPEExpr::RecordLiteral(type_id, fields) => {
                 if let Some(new_id) = remap.get(type_id) {
@@ -731,7 +746,7 @@ pub trait PPEVisitor<T>: Sized {
     fn visit_routine_reference(&mut self, id: usize) -> T {
         self.visit_value(id)
     }
-    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) -> T;
+    fn visit_record_literal(&mut self, type_id: u32, fields: &[(usize, PPEExpr)]) -> T;
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> T;
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> T;
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> T;
@@ -764,7 +779,7 @@ pub trait PPEVisitorMut: Sized {
     fn visit_routine_reference(&mut self, id: usize) -> PPEExpr {
         PPEExpr::RoutineReference(id)
     }
-    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) -> PPEExpr {
+    fn visit_record_literal(&mut self, type_id: u32, fields: &[(usize, PPEExpr)]) -> PPEExpr {
         PPEExpr::RecordLiteral(type_id, fields.iter().map(|(id, value)| (*id, value.visit_mut(self))).collect())
     }
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> PPEExpr {
@@ -816,7 +831,7 @@ impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_>
     fn visit_value(&mut self, id: usize) -> Result<VariableValue, PPEError> {
         Ok(self.executable.variable_table.get_value(id).clone())
     }
-    fn visit_record_literal(&mut self, _type_id: u8, _fields: &[(usize, PPEExpr)]) -> Result<VariableValue, PPEError> {
+    fn visit_record_literal(&mut self, _type_id: u32, _fields: &[(usize, PPEExpr)]) -> Result<VariableValue, PPEError> {
         Err(PPEError::RecordLiteralIsNotConstant)
     }
 

@@ -81,3 +81,14 @@ fn cli_help_is_a_successful_early_exit() {
     assert!(help.contains("--lang-version <lang-version>"), "{help}");
     assert!(help.contains("[file]"), "{help}");
 }
+
+#[test]
+fn cli_compression_is_explicit_and_debug_is_optional() {
+    let defaults = parse(&[]);
+    assert_eq!("none", defaults.compression);
+    assert!(!defaults.debug);
+    let options = parse(&["--compression", "zstd", "--debug", "source.pps"]);
+    assert_eq!("zstd", options.compression);
+    assert!(options.debug);
+    assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["pplc", "--compression", "rle"]).is_err());
+}

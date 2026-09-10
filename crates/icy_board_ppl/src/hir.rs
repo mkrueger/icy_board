@@ -40,7 +40,7 @@ pub struct MemberId(pub usize);
 
 /// Registry type identity before executable type-table compaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct UserTypeId(pub u8);
+pub struct UserTypeId(pub u32);
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HirProgram {

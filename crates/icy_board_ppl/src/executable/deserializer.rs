@@ -402,7 +402,7 @@ impl PPEDeserializer {
                         values.push((field_id, value));
                     }
                     values.reverse();
-                    self.push_expr(PPEExpr::RecordLiteral(type_id as u8, values));
+                    self.push_expr(PPEExpr::RecordLiteral(type_id as u32, values));
                     continue;
                 }
                 if id == FuncOpCode::MemberReference as i16 {

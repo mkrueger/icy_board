@@ -105,7 +105,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             }
             registry.add_property(n("EditorMode"), V::UserData(EDITOR_MODE_ENUM_ID), true);
             registry.add_array_property(n("Notes"), V::UnboundedString, 1);
-            registry.add_array_property(n("Contacts"), V::UserData(CONTACT_ID as u8), 1);
+            registry.add_array_property(n("Contacts"), V::UserData(CONTACT_ID as u32), 1);
             registry.add_named_function(n("SetPassword"), vec![("password", V::UnboundedString)], V::Boolean);
             registry.add_named_function(
                 n("AddContact"),
@@ -131,16 +131,16 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             registry.add_function(n("Text"), Vec::new(), V::UnboundedString);
         }
         HTTP_ID => {
-            registry.add_named_static_function(n("Get"), vec![("url", V::UnboundedString)], V::UserData(HTTP_RESPONSE_ID as u8));
+            registry.add_named_static_function(n("Get"), vec![("url", V::UnboundedString)], V::UserData(HTTP_RESPONSE_ID as u32));
             registry.add_named_static_function(
                 n("New"),
                 vec![("method", V::UserData(HTTP_METHOD_ENUM_ID)), ("url", V::UnboundedString)],
-                V::UserData(HTTP_REQUEST_ID as u8),
+                V::UserData(HTTP_REQUEST_ID as u32),
             );
             registry.add_named_static_function(
                 n("Download"),
                 vec![("url", V::UnboundedString), ("file", V::UnboundedString)],
-                V::UserData(HTTP_RESPONSE_ID as u8),
+                V::UserData(HTTP_RESPONSE_ID as u32),
             );
             for name in ["UrlEncode", "UrlDecode", "FormEncode", "FormDecode"] {
                 registry.add_named_static_function(n(name), vec![("text", V::UnboundedString)], V::UnboundedString);
@@ -160,7 +160,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             );
             registry.add_named_function_with(n("SetBytes"), vec![("data", V::Bytes), ("contentType", V::UnboundedString)], 1, V::Boolean);
             registry.add_named_function(n("SetForm"), vec![("name", V::UnboundedString), ("value", V::UnboundedString)], V::Boolean);
-            registry.add_function(n("Send"), Vec::new(), V::UserData(HTTP_RESPONSE_ID as u8));
+            registry.add_function(n("Send"), Vec::new(), V::UserData(HTTP_RESPONSE_ID as u32));
         }
         HTTP_RESPONSE_ID => {
             registry.add_property(n("Valid"), V::Boolean, false);
@@ -181,7 +181,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
                 n("Compile"),
                 vec![("pattern", V::UnboundedString), ("options", V::UserData(REGEX_OPTIONS_ENUM_ID))],
                 1,
-                V::UserData(REGEX_ID as u8),
+                V::UserData(REGEX_ID as u32),
             );
             registry.add_named_static_function(n("Escape"), vec![("text", V::UnboundedString)], V::UnboundedString);
             registry.add_named_static_function_with(
@@ -195,13 +195,13 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
                 n("Find"),
                 vec![("text", V::UnboundedString), ("start", V::Integer)],
                 1,
-                V::UserData(REGEX_MATCH_ID as u8),
+                V::UserData(REGEX_MATCH_ID as u32),
             );
             registry.add_named_array_function_with(
                 n("FindAll"),
                 vec![("text", V::UnboundedString), ("start", V::Integer), ("limit", V::Integer)],
                 1,
-                V::UserData(REGEX_MATCH_ID as u8),
+                V::UserData(REGEX_MATCH_ID as u32),
                 1,
             );
             registry.add_named_function_with(
@@ -257,8 +257,8 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
             }
         }
         TERM_INPUT_ID => {
-            registry.add_function(n("Poll"), Vec::new(), V::UserData(EVENT_ID as u8));
-            registry.add_named_function(n("Wait"), vec![("timeoutMs", V::Integer)], V::UserData(EVENT_ID as u8));
+            registry.add_function(n("Poll"), Vec::new(), V::UserData(EVENT_ID as u32));
+            registry.add_named_function(n("Wait"), vec![("timeoutMs", V::Integer)], V::UserData(EVENT_ID as u32));
             registry.add_named_function_with(
                 n("MouseOn"),
                 vec![("mode", V::UserData(MOUSE_MODE_ENUM_ID)), ("tracking", V::UserData(MOUSE_TRACKING_ENUM_ID))],
@@ -279,7 +279,7 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
                 ("Palette", PALETTE_ID),
                 ("Macros", MACROS_ID),
             ] {
-                registry.add_property(n(name), V::UserData(id as u8), false);
+                registry.add_property(n(name), V::UserData(id as u32), false);
             }
             registry.add_function(n("BeginUpdate"), Vec::new(), V::Boolean);
             registry.add_function(n("EndUpdate"), Vec::new(), V::Boolean);
@@ -323,8 +323,8 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
                 registry.add_property(n(name), V::UnboundedString, false);
             }
             registry.add_property(n("NodeCount"), V::Integer, false);
-            registry.add_array_property(n("Conferences"), V::UserData(CONFERENCE_ID as u8), 1);
-            registry.add_array_property(n("Users"), V::UserData(USER_ID as u8), 1);
+            registry.add_array_property(n("Conferences"), V::UserData(CONFERENCE_ID as u32), 1);
+            registry.add_array_property(n("Users"), V::UserData(USER_ID as u32), 1);
         }
         SESSION_ID => {
             for (name, id) in [
@@ -333,7 +333,7 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
                 ("Area", MESSAGE_AREA_ID),
                 ("Directory", FILE_DIRECTORY_ID),
             ] {
-                registry.add_property(n(name), V::UserData(id as u8), false);
+                registry.add_property(n(name), V::UserData(id as u32), false);
             }
             for name in ["UserName", "AliasName", "Language"] {
                 registry.add_property(n(name), V::UnboundedString, false);
@@ -360,9 +360,9 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
                 registry.add_property(n(name), V::Boolean, false);
             }
             registry.add_property(n("Password"), V::Password, false);
-            registry.add_array_property(n("Directories"), V::UserData(FILE_DIRECTORY_ID as u8), 1);
-            registry.add_array_property(n("Areas"), V::UserData(MESSAGE_AREA_ID as u8), 1);
-            registry.add_array_property(n("Doors"), V::UserData(DOOR_ID as u8), 1);
+            registry.add_array_property(n("Directories"), V::UserData(FILE_DIRECTORY_ID as u32), 1);
+            registry.add_array_property(n("Areas"), V::UserData(MESSAGE_AREA_ID as u32), 1);
+            registry.add_array_property(n("Doors"), V::UserData(DOOR_ID as u32), 1);
             for name in ["HasAccess", "CanPost", "CanAttach"] {
                 registry.add_function(n(name), Vec::new(), V::Boolean);
             }
@@ -382,7 +382,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             for name in ["HighMsg", "LowMsg"] {
                 registry.add_function(n(name), Vec::new(), V::Long);
             }
-            registry.add_named_function(n("Read"), vec![("messageNumber", V::Long)], V::UserData(MSG_ID as u8));
+            registry.add_named_function(n("Read"), vec![("messageNumber", V::Long)], V::UserData(MSG_ID as u32));
             registry.add_named_function_with(
                 n("Find"),
                 vec![
@@ -391,7 +391,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
                     ("startMessage", V::Long),
                 ],
                 2,
-                V::UserData(MSG_ID as u8),
+                V::UserData(MSG_ID as u32),
             );
         }
         FILE_DIRECTORY_ID => {
@@ -415,7 +415,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_function(n("HasAccess"), Vec::new(), V::Boolean);
         }
         SURFACE_ID => {
-            let surface = V::UserData(SURFACE_ID as u8);
+            let surface = V::UserData(SURFACE_ID as u32);
             registry.add_property(n("Width"), V::Integer, false);
             registry.add_property(n("Height"), V::Integer, false);
             registry.add_property(n("Valid"), V::Boolean, false);
@@ -507,7 +507,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_function(n("Stop"), Vec::new(), V::Boolean);
             registry.add_named_function(n("Fade"), vec![("durationMs", V::Integer), ("targetVolume", V::Integer)], V::Boolean);
             registry.add_function(n("Free"), Vec::new(), V::Boolean);
-            registry.add_named_static_function(n("Load"), vec![("file", V::UnboundedString)], V::UserData(AUDIO_ID as u8));
+            registry.add_named_static_function(n("Load"), vec![("file", V::UnboundedString)], V::UserData(AUDIO_ID as u32));
             registry.add_static_function(n("StopAll"), Vec::new(), V::Boolean);
         }
         ERROR_ID => {
@@ -516,7 +516,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_property(n("Code"), V::UserData(ERR_CODE_ENUM_ID), false);
             registry.add_property(n("Message"), V::UnboundedString, false);
             registry.add_property(n("Channel"), V::Integer, false);
-            registry.add_static_function(n("Last"), Vec::new(), V::UserData(ERROR_ID as u8));
+            registry.add_static_function(n("Last"), Vec::new(), V::UserData(ERROR_ID as u32));
             registry.add_static_function(n("Clear"), Vec::new(), V::Boolean);
         }
         _ => register_remaining_members(id, registry),

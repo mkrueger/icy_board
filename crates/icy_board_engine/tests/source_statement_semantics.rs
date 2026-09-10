@@ -176,7 +176,7 @@ fn compound_member_setters_check_rhs_and_keep_receiver_and_call_metadata() {
         visitor.function_type_lookup.get(&CallId(receiver.id)),
         Some(SemanticInfo::FunctionReference(_))
     ));
-    assert_eq!(Some(&(USER_ID as u8)), visitor.user_type_lookup.get(&source.find("SecurityLevel").unwrap()));
+    assert_eq!(Some(&(USER_ID as u32)), visitor.user_type_lookup.get(&source.find("SecurityLevel").unwrap()));
     assert_eq!(Some(&VariableType::Integer), visitor.compound_target_types.get(&0));
     assert!(
         !ids.iter()
@@ -199,7 +199,7 @@ fn compound_member_setters_check_rhs_and_keep_receiver_and_call_metadata() {
         visitor.function_type_lookup.get(&CallId(setter.id)),
         Some(SemanticInfo::MemberSetterCall(_))
     ));
-    assert_eq!(Some(&(USER_ID as u8)), visitor.user_type_lookup.get(&source.find("SecurityLevel").unwrap()));
+    assert_eq!(Some(&(USER_ID as u32)), visitor.user_type_lookup.get(&source.find("SecurityLevel").unwrap()));
     let errors = rejects(&format!("{ENUM}Receiver().SecurityLevel += Choice.One{suffix}"));
     assert!(errors.iter().any(|error| error.contains("not defined for custom types")), "{errors:?}");
     rejects(&format!("{RECORD}Item value\nReceiver().SecurityLevel += value{suffix}"));

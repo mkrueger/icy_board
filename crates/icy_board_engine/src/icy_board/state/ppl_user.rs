@@ -148,7 +148,7 @@ impl PplUser {
 /// A `CONTACT` record: the service a user can be reached on, and the account.
 fn contact_value(contact: &UserContact) -> VariableValue {
     VariableValue {
-        vtype: VariableType::UserData(CONTACT_ID as u8),
+        vtype: VariableType::UserData(CONTACT_ID as u32),
         data: crate::executable::VariableData::default(),
         generic_data: crate::executable::GenericVariableData::Record(std::sync::Arc::new(vec![
             VariableValue::new_unbounded_string(contact.service.clone()),
@@ -165,7 +165,7 @@ fn normalize_service(service: &str) -> String {
 
 pub fn user_array_value(users: &[User]) -> VariableValue {
     VariableValue::new_vector(
-        VariableType::UserData(USER_ID as u8),
+        VariableType::UserData(USER_ID as u32),
         users
             .iter()
             .cloned()
@@ -307,7 +307,7 @@ impl UserDataValue for PplUser {
         } else if *name == *MINUTES_TODAY {
             VariableValue::new_int(i32::from(user.stats.minutes_today))
         } else if *name == *CONTACTS {
-            VariableValue::new_vector(VariableType::UserData(CONTACT_ID as u8), user.contacts.iter().map(contact_value).collect())
+            VariableValue::new_vector(VariableType::UserData(CONTACT_ID as u32), user.contacts.iter().map(contact_value).collect())
         } else if *name == *UPLOAD_BYTES {
             VariableValue::new_ulong(user.stats.total_upld_bytes)
         } else if *name == *DOWNLOAD_BYTES {

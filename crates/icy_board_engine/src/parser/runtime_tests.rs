@@ -37,8 +37,8 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (REGEX_ID, 10),
         (REGEX_MATCH_ID, 13),
     ] {
-        let actual = runtime.get_type_from_id(id as u8).unwrap();
-        let expected = metadata.get_type_from_id(id as u8).unwrap();
+        let actual = runtime.get_type_from_id(id as u32).unwrap();
+        let expected = metadata.get_type_from_id(id as u32).unwrap();
         assert_eq!(actual.id_table.len(), count, "type {id}");
         assert_eq!(actual.member_id_lookup, expected.member_id_lookup);
         assert_eq!(actual.fields, expected.fields);
@@ -83,8 +83,8 @@ fn bridge_rejects_foreign_payloads_without_panicking() {
     let GenericVariableData::UserData(object) = value.generic_data else {
         unreachable!()
     };
-    let error = runtime_object(object.as_ref(), SURFACE_ID as u8).err().unwrap();
-    assert!(matches!(error.downcast_ref::<crate::vm::VMError>(), Some(crate::vm::VMError::NoObjectFound(id)) if *id == SURFACE_ID as u8));
+    let error = runtime_object(object.as_ref(), SURFACE_ID as u32).err().unwrap();
+    assert!(matches!(error.downcast_ref::<crate::vm::VMError>(), Some(crate::vm::VMError::NoObjectFound(id)) if *id == SURFACE_ID as u32));
 }
 
 #[test]
@@ -99,6 +99,6 @@ fn resource_handles_survive_the_runtime_wrapper() {
         let GenericVariableData::UserData(object) = value.generic_data else {
             unreachable!()
         };
-        assert!(runtime_object(object.as_ref(), id as u8).is_ok());
+        assert!(runtime_object(object.as_ref(), id as u32).is_ok());
     }
 }

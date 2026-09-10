@@ -241,9 +241,7 @@ fn decode_text_scalar(template: &VariableValue, text: &str, table: &VariableTabl
         VariableType::SByte => VariableData {
             sbyte_value: text.parse().map_err(|_| invalid())?,
         },
-        VariableType::Word | VariableType::Date | VariableType::EDate => VariableData {
-            word_value: text.parse().map_err(|_| invalid())?,
-        },
+        VariableType::Word | VariableType::Date | VariableType::EDate => VariableData::from_int(i32::from(text.parse::<u16>().map_err(|_| invalid())?)),
         VariableType::SWord => VariableData {
             sword_value: text.parse().map_err(|_| invalid())?,
         },
@@ -344,9 +342,7 @@ fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>, tab
         VariableType::SByte => VariableData {
             sbyte_value: read_exact::<1>(input)?[0] as i8,
         },
-        VariableType::Word | VariableType::Date | VariableType::EDate => VariableData {
-            word_value: u16::from_le_bytes(read_exact(input)?),
-        },
+        VariableType::Word | VariableType::Date | VariableType::EDate => VariableData::from_int(i32::from(u16::from_le_bytes(read_exact(input)?))),
         VariableType::SWord => VariableData {
             sword_value: i16::from_le_bytes(read_exact(input)?),
         },
@@ -410,7 +406,7 @@ mod tests {
     use super::*;
 
     fn enum_record() -> (VariableTable, VariableValue) {
-        let record_id = crate::parser::FIRST_USER_TYPE_ID as u8;
+        let record_id = crate::parser::FIRST_USER_TYPE_ID as u32;
         let enum_id = record_id + 1;
         let mut table = VariableTable::default();
         table.enums.insert(enum_id, vec![7, -3, 7]);
@@ -475,7 +471,7 @@ mod tests {
         let template = VariableValue::new_msg_id(0, 0);
         let value = VariableValue::new_msg_id(2, 3);
         let record = |field| VariableValue {
-            vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8),
+            vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u32),
             data: VariableData::default(),
             generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![field])),
         };
@@ -502,7 +498,7 @@ mod tests {
         use crate::executable::{RecordField, create_record_value};
 
         for field in [
-            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u8)),
+            RecordField::scalar(VariableType::UserData(crate::parser::CONTACT_ID as u32)),
             RecordField::scalar(VariableType::UserData(30)),
             RecordField {
                 dim: 1,
@@ -546,7 +542,7 @@ mod tests {
     #[test]
     fn binary_booleans_accept_only_zero_or_one() {
         let template = VariableValue {
-            vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8),
+            vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u32),
             data: VariableData::default(),
             generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![VariableValue::new_bool(false)])),
         };

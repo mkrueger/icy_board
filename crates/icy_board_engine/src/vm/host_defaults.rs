@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(24, TYPES.len());
         for &(id, name, _) in TYPES {
             for rank in 1..=3 {
-                let placeholder = VariableType::UserData(id as u8).create_empty_value();
+                let placeholder = VariableType::UserData(id as u32).create_empty_value();
                 let mut array = VariableValue {
                     vtype: placeholder.vtype,
                     data: VariableData::default(),
@@ -217,8 +217,8 @@ mod tests {
                 bind_host_defaults(&mut array, &registry).unwrap();
                 let first = array.get_array_value(0, 0, 0);
                 let second = array.get_array_value(1, 0, 0);
-                assert_eq!(VariableType::UserData(id as u8), first.vtype, "{name}");
-                assert!(runtime_object(object(&first).as_ref(), id as u8).is_ok(), "{name}");
+                assert_eq!(VariableType::UserData(id as u32), first.vtype, "{name}");
+                assert!(runtime_object(object(&first).as_ref(), id as u32).is_ok(), "{name}");
                 assert!(!Arc::ptr_eq(object(&first), object(&second)), "{name} rank {rank}");
                 let original = array.clone();
                 bind_host_defaults(&mut array, &registry).unwrap();
@@ -239,7 +239,7 @@ mod tests {
         for rank in 1..=3 {
             vm.user_types = vec![
                 vec![
-                    RecordField::scalar(VariableType::UserData(parser::AUDIO_ID as u8)),
+                    RecordField::scalar(VariableType::UserData(parser::AUDIO_ID as u32)),
                     RecordField {
                         dim: rank,
                         is_dynamic: true,
@@ -274,7 +274,7 @@ mod tests {
             assert_eq!(inner[0], vm.type_default(inner[0].vtype).unwrap());
             assert_eq!(4, length(&fields(&fields(vm.variable_table.get_value(id))[0])[1]));
         }
-        let contact = vm.type_default(VariableType::UserData(parser::CONTACT_ID as u8)).unwrap();
+        let contact = vm.type_default(VariableType::UserData(parser::CONTACT_ID as u32)).unwrap();
         assert_eq!(2, fields(&contact).len());
         assert!(
             fields(&contact)
@@ -295,7 +295,7 @@ mod tests {
         vm.user_types = vec![vec![RecordField {
             dim: 2,
             vector_size: 1,
-            ..RecordField::scalar(VariableType::UserData(parser::HTTP_REQUEST_ID as u8))
+            ..RecordField::scalar(VariableType::UserData(parser::HTTP_REQUEST_ID as u32))
         }]];
         let array = vm.array_default(VariableType::UserData(100), 1, [1, 0, 0]).unwrap();
         let first = array.get_array_value(0, 0, 0);
@@ -310,7 +310,7 @@ mod tests {
         assert_eq!(2, fields(&missing)[0].get_dimensions());
         assert_eq!(2, length(&fields(&missing)[0]));
         assert_eq!(0, fields(&missing)[0].get_matrix_size());
-        assert!(runtime_object(object(&fields(&missing)[0].get_array_value(0, 0, 0)).as_ref(), parser::HTTP_REQUEST_ID as u8).is_ok());
+        assert!(runtime_object(object(&fields(&missing)[0].get_array_value(0, 0, 0)).as_ref(), parser::HTTP_REQUEST_ID as u32).is_ok());
     }
 
     #[tokio::test]
@@ -321,7 +321,7 @@ mod tests {
         let mut vm = VirtualMachine::new("read-defaults.ppe".into(), &registry, &mut io, &mut state);
         vm.variable_table.set_version(400);
         for &(id, name, _) in TYPES {
-            let vtype = VariableType::UserData(id as u8);
+            let vtype = VariableType::UserData(id as u32);
             for rank in 1..=3 {
                 let array = vm.array_default(vtype, rank, [0; 3]).unwrap();
                 let stored = array.get_array_value(0, 0, 0);
@@ -330,7 +330,7 @@ mod tests {
                 let first_missing = vm.read_array_element(&array, 1, 1, 1).unwrap();
                 let second_missing = vm.read_array_element(&array, 1, 1, 1).unwrap();
                 assert_eq!(first_missing.vtype, vtype);
-                assert!(runtime_object(object(&first_missing).as_ref(), id as u8).is_ok());
+                assert!(runtime_object(object(&first_missing).as_ref(), id as u32).is_ok());
                 assert!(!Arc::ptr_eq(object(&stored), object(&first_missing)), "{name} rank {rank}");
                 assert!(!Arc::ptr_eq(object(&first_missing), object(&second_missing)), "{name} rank {rank}");
             }
@@ -355,7 +355,7 @@ mod tests {
                 assert_eq!(vm.read_array_element(&array, 1, 1, 1).unwrap(), vm.variable_table.array_value(&array, 1, 1, 1));
             }
             vm.variable_table.set_version(340);
-            let array = vm.array_default(VariableType::UserData(parser::SURFACE_ID as u8), rank, [0; 3]).unwrap();
+            let array = vm.array_default(VariableType::UserData(parser::SURFACE_ID as u32), rank, [0; 3]).unwrap();
             let missing = vm.read_array_element(&array, 1, 1, 1).unwrap();
             assert!(matches!(missing.generic_data, GenericVariableData::None));
         }
@@ -412,9 +412,9 @@ mod tests {
         let sentinel = PplError::new(ERR_KIND_FILE, ERR_INVALID, "earlier failure");
         vm.set_error(sentinel.clone());
         for &(id, type_name, _) in TYPES {
-            let value = vm.type_default(VariableType::UserData(id as u8)).unwrap();
-            let receiver = runtime_object(object(&value).as_ref(), id as u8).unwrap();
-            let members = registry.get_type_from_id(id as u8).unwrap();
+            let value = vm.type_default(VariableType::UserData(id as u32)).unwrap();
+            let receiver = runtime_object(object(&value).as_ref(), id as u32).unwrap();
+            let members = registry.get_type_from_id(id as u32).unwrap();
             for (name, &vtype) in &members.fields {
                 let property = receiver.get_property_value(&vm, name).unwrap();
                 let property = vm.variable_table.checked_enum_value(vtype, property).unwrap();
@@ -456,9 +456,9 @@ mod tests {
             (parser::SESSION_ID, ERR_KIND_USER),
             (parser::HTTP_ID, ERR_KIND_NET),
         ] {
-            let value = vm.type_default(VariableType::UserData(id as u8)).unwrap();
-            let receiver = runtime_object(object(&value).as_ref(), id as u8).unwrap();
-            for (name, function) in &registry.get_type_from_id(id as u8).unwrap().functions {
+            let value = vm.type_default(VariableType::UserData(id as u32)).unwrap();
+            let receiver = runtime_object(object(&value).as_ref(), id as u32).unwrap();
+            for (name, function) in &registry.get_type_from_id(id as u32).unwrap().functions {
                 vm.clear_error();
                 let result = receiver.call_function(&mut vm, name, &[]).await.unwrap();
                 assert_eq!(function.return_type, result.vtype, "{id}.{name}");
@@ -493,9 +493,9 @@ mod tests {
         let mut io = DiskIO::new(".", None);
         let mut vm = VirtualMachine::new("defaults.ppe".into(), &registry, &mut io, &mut state);
         for id in [parser::CONFERENCE_ID, parser::MESSAGE_AREA_ID, parser::FILE_DIRECTORY_ID, parser::DOOR_ID] {
-            let value = vm.type_default(VariableType::UserData(id as u8)).unwrap();
-            let receiver = runtime_object(object(&value).as_ref(), id as u8).unwrap();
-            for (name, function) in &registry.get_type_from_id(id as u8).unwrap().functions {
+            let value = vm.type_default(VariableType::UserData(id as u32)).unwrap();
+            let receiver = runtime_object(object(&value).as_ref(), id as u32).unwrap();
+            for (name, function) in &registry.get_type_from_id(id as u32).unwrap().functions {
                 let result = receiver.call_function(&mut vm, name, &[]).await.unwrap();
                 if function.return_type == VariableType::Boolean {
                     assert!(!result.as_bool(), "{id}.{name}");

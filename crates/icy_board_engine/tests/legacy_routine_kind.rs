@@ -37,9 +37,13 @@ fn compile(sources: &[(&str, &str)], language: u16, runtime: u16) -> Result<Exec
             let executable = Executable::from_buffer(&mut bytes, false).unwrap();
             let script = PPEScript::from_ppe_file(&executable).expect("emitted commands must decode, without opcode-zero corruption");
             assert!(script.bugged_offsets.is_empty(), "{:?}", script.bugged_offsets);
-            assert_eq!(executable.script_buffer, script.serialize());
-            for statement in &script.statements {
-                assert_ne!(0, executable.script_buffer[statement.span.start], "{:?}", statement.command);
+            if runtime < 400 {
+                assert_eq!(executable.script_buffer, script.serialize());
+                for statement in &script.statements {
+                    assert_ne!(0, executable.script_buffer[statement.span.start], "{:?}", statement.command);
+                }
+            } else {
+                assert_eq!(bytes, executable.to_buffer().unwrap());
             }
             return Ok(executable);
         }
@@ -149,7 +153,7 @@ async fn implementation_controls_var_modes_even_with_function_keyword() {
                     .iter()
                     .find(|entry| entry.header.variable_type == VariableType::Procedure)
                     .unwrap();
-                assert_eq!(u16::from(implemented_var), unsafe { procedure.value.data.procedure_value.pass_flags });
+                assert_eq!(u32::from(implemented_var), unsafe { procedure.value.data.procedure_value.pass_flags });
                 assert_eq!(if implemented_var { "9\n" } else { "1\n" }, run(&executable).await);
             }
         }
@@ -369,10 +373,16 @@ ENDFUNC
             **target = PPEExpr::Value(destination);
             **value = PPEExpr::RoutineReference(source);
         }
-        assert_eq!(statement.span.len(), statement.command.get_size());
+        if executable.runtime < 400 {
+            assert_eq!(statement.span.len(), statement.command.get_size());
+        }
     }
     assert!(assignments.next().is_none());
-    executable.script_buffer = script.serialize();
+    if executable.runtime < 400 {
+        executable.script_buffer = script.serialize();
+    } else {
+        executable.in_memory_script = Some(script);
+    }
     let mut bytes = executable.to_buffer().unwrap();
     let executable = Executable::from_buffer(&mut bytes, false).unwrap();
     PPEScript::from_ppe_file(&executable).unwrap();

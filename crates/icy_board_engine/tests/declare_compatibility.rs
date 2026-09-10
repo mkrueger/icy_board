@@ -56,11 +56,11 @@ struct Signature {
     kind: VariableType,
     parameters: Vec<Shape>,
     // Function descriptors contain a result ID, not procedure VAR flags.
-    pass_flags: Option<u16>,
+    pass_flags: Option<u32>,
     result: Option<Shape>,
 }
 
-fn procedure(parameters: &[Shape], pass_flags: u16) -> Signature {
+fn procedure(parameters: &[Shape], pass_flags: u32) -> Signature {
     Signature {
         kind: VariableType::Procedure,
         parameters: parameters.to_vec(),
@@ -180,7 +180,7 @@ fn signatures(executable: &Executable) -> Vec<Signature> {
             let first = usize::try_from(first).unwrap();
             Some(Signature {
                 kind: entry.header.variable_type,
-                parameters: entries[first..first + usize::from(count)]
+                parameters: entries[first..first + count as usize]
                     .iter()
                     .map(|entry| Shape::header(&entry.header))
                     .collect(),

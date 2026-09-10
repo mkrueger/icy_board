@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     compiler::{CompilationErrorType, PPECompiler, workspace::Workspace},
-    executable::{Executable, ExecutableError, GenericVariableData, RecordField, VariableType, VariableValue, create_record_value},
+    executable::{Executable, GenericVariableData, RecordField, VariableType, VariableValue, create_record_value},
     parser::{
         CONTACT_ID, Encoding, ErrorReporter, FIRST_USER_TYPE_ID, UserTypeRegistry, board_catalog, parse_ast, parse_ast_with_predeclared_types,
         preparse_type_declarations,
@@ -65,6 +65,13 @@ fn fields(value: &VariableValue) -> &[VariableValue] {
     fields
 }
 
+fn assert_container_roundtrip(executable: &Executable) {
+    let mut bytes = executable.to_buffer().unwrap();
+    let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
+    assert_eq!(executable.user_types, loaded.user_types);
+    assert_eq!(bytes, loaded.to_buffer().unwrap());
+}
+
 fn assert_var_storage_paths(executable: &Executable, expected: usize) {
     use crate::executable::{PPECommand, PPEExpr, PPEScript};
 
@@ -77,13 +84,13 @@ fn assert_var_storage_paths(executable: &Executable, expected: usize) {
     }
 
     let script = PPEScript::from_ppe_file(executable).unwrap();
-    assert_eq!(script.serialize(), executable.script_buffer);
+    assert_container_roundtrip(executable);
     let mut count = 0;
     for statement in &script.statements {
         if let PPECommand::ProcedureCall(id, arguments) = &statement.command {
             let flags = unsafe { executable.variable_table.get_var_entry(*id).value.data.procedure_value.pass_flags };
             for (index, argument) in arguments.iter().enumerate() {
-                if 1u16.checked_shl(index as u32).is_some_and(|mask| flags & mask != 0) {
+                if 1u32.checked_shl(index as u32).is_some_and(|mask| flags & mask != 0) {
                     check_path(argument);
                     count += 1;
                 }
@@ -105,7 +112,7 @@ fn assert_record_redim_storage_path(executable: &Executable, rank: u8) -> (crate
     }
 
     let script = PPEScript::from_ppe_file(executable).expect("REDIM script must decode before execution");
-    assert_eq!(script.serialize(), executable.script_buffer);
+    assert_container_roundtrip(executable);
     let resizes: Vec<_> = script
         .statements
         .iter()
@@ -161,13 +168,13 @@ fn all_host_types_are_source_fields_in_both_parser_passes() {
         for (index, &(id, _, _)) in board_catalog::TYPES.iter().enumerate() {
             for (offset, rank, dynamic) in [(0, 0, false), (1, 1, false), (2, 1, true), (3, 2, true), (4, 3, true)] {
                 let field = layout[1 + index * 5 + offset];
-                assert_eq!(field.variable_type, VariableType::UserData(id as u8));
+                assert_eq!(field.variable_type, VariableType::UserData(id as u32));
                 assert_eq!((field.dim, field.is_dynamic), (rank, dynamic));
                 assert_eq!(field.element_count(), Some(if dynamic { 0 } else { 1 }));
                 assert_eq!((field.vector_size, field.matrix_size, field.cube_size), (0, 0, 0));
             }
         }
-        assert!(matches!(executable.to_buffer(), Err(ExecutableError::UnsupportedRecordFieldEncoding { .. })));
+        assert_container_roundtrip(&executable);
     }
 }
 
@@ -189,7 +196,7 @@ fn recursive_source_records_are_rejected_including_dynamic_edges() {
 
 #[test]
 fn recursive_internal_layouts_cannot_recurse_through_empty_arrays() {
-    let first = FIRST_USER_TYPE_ID as u8;
+    let first = FIRST_USER_TYPE_ID as u32;
     for dynamic in [false, true] {
         let field = RecordField {
             dim: u8::from(dynamic),
@@ -213,7 +220,7 @@ fn defaults_distinguish_empty_dynamic_arrays_fixed_zero_bounds_and_contact_value
     let value = create_record_value(101, &executable.user_types, &executable.variable_table.enums).unwrap();
     let outer = fields(&value);
     let inner = fields(&outer[0]);
-    assert_eq!(inner[0].vtype, VariableType::UserData(CONTACT_ID as u8));
+    assert_eq!(inner[0].vtype, VariableType::UserData(CONTACT_ID as u32));
     assert_eq!(fields(&inner[0]).len(), 2);
     assert!(fields(&inner[0]).iter().all(|value| value.as_string().is_empty()));
     assert!(matches!(inner[1].generic_data, GenericVariableData::None));
@@ -291,8 +298,7 @@ PROCEDURE Consume(INTEGER values[])
 ENDPROC
 "#,
     );
-    let script = crate::executable::PPEScript::from_ppe_file(&executable).unwrap();
-    assert_eq!(script.serialize(), executable.script_buffer);
+    assert_container_roundtrip(&executable);
 }
 
 #[test]
@@ -866,47 +872,37 @@ fn record_io_rejects_dynamic_and_host_fields_before_execution() {
 }
 
 #[test]
-fn new_layouts_are_refused_explicitly_even_without_variables() {
+fn new_layouts_roundtrip_even_without_variables() {
     for field in [
         RecordField {
             dim: 1,
             is_dynamic: true,
             ..RecordField::scalar(VariableType::Integer)
         },
-        RecordField::scalar(VariableType::UserData(CONTACT_ID as u8)),
-        RecordField::scalar(VariableType::UserData(crate::parser::AUDIO_ID as u8)),
+        RecordField::scalar(VariableType::UserData(CONTACT_ID as u32)),
+        RecordField::scalar(VariableType::UserData(crate::parser::AUDIO_ID as u32)),
     ] {
         let executable = Executable {
             runtime: 400,
             user_types: vec![vec![field]],
             ..Default::default()
         };
-        let error = executable.to_buffer().unwrap_err();
-        assert_eq!(error, ExecutableError::UnsupportedRecordFieldEncoding { type_id: 100, field_index: 0 });
-        assert!(error.to_string().contains("no executable encoding"));
+        assert_container_roundtrip(&executable);
     }
 }
 
 #[test]
-fn old_loader_still_rejects_host_field_bytes_and_legacy_has_no_type_section() {
-    let executable = Executable {
-        runtime: 400,
-        user_types: vec![vec![RecordField::scalar(VariableType::Integer)]],
+fn beta_400_is_rejected_and_legacy_has_no_type_section() {
+    let mut beta = Executable {
+        runtime: 340,
         ..Default::default()
-    };
-    let bytes = executable.to_buffer().unwrap();
-    assert_eq!(&bytes[50..61], &[1, 1, 1, 4, 0, 0, 0, 0, 0, 0, 0]);
-    for &(id, _, _) in board_catalog::TYPES {
-        let mut changed = bytes.clone();
-        changed[53] = id as u8;
-        let error = Executable::from_buffer(&mut changed, false)
-            .err()
-            .expect("old encoding cannot contain host fields");
-        assert!(matches!(
-            error.downcast_ref::<ExecutableError>(),
-            Some(ExecutableError::BoardObjectTypeField(100, _))
-        ));
     }
+    .to_buffer()
+    .unwrap();
+    beta[41] = b'4';
+    beta[43] = b'0';
+    beta[44] = b'0';
+    assert!(Executable::from_buffer(&mut beta, false).err().unwrap().to_string().contains("recompile"));
     for runtime in [100, 200, 300, 310, 320, 330, 340] {
         let executable = Executable { runtime, ..Default::default() };
         let bytes = executable.to_buffer().unwrap();

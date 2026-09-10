@@ -394,60 +394,126 @@ S7 sowie C1/übriges C2 bleiben eigene Freigabeschritte.
 
 ### C1 — PPE-400-Formatentscheidung (F1/F2/F3)
 
-Status: offen; **keine Umsetzung ohne eigene Besprechung und Freigabe**.
-Einzige bereits freigegebene Ausnahme ist die UTF-8-Literalkodierung ab Runtime
-400 aus S5; die bestehende Bytelänge bleibt dabei unverändert.
+Status: am 2026-09-10 besprochen und ausdrücklich freigegeben. Die Umsetzung
+erfolgt in C2.
 
-**Zentrale Frage:** Welche Änderungen sind für die beschlossene Sprache und
-langfristige PPE-Nutzung wirklich erforderlich, und welche wären unnötiger Umbau?
+**Entscheidung: Alternative 3** — ein eigener sektionierter 400-Container mit
+tatsächlich breiteren Operanden und Deskriptoren. Ein neuer Header allein hebt
+die Grenzen aus F2 nicht auf; die internen Typ-, Routine- und Referenzbreiten
+mussten mitwachsen. Bestehende PCBoard-PPEs behalten Container, Verschlüsselung
+und Ausführungssemantik unverändert.
 
-**Zu vergleichen:**
+**Beschlossener Vertrag:**
 
-1. Bestehendes Format mit klar versionierten Erweiterungen behalten.
-2. Sektionierten 400-Container einführen, aber VM und wesentliche Bytecodes behalten.
-3. Container plus ausgewählte Operanden/Routinedeskriptoren modernisieren, wenn
-   ein neuer Header allein die erforderlichen Grenzen nicht aufhebt.
+- Dateiendung `.ppe` bleibt; der Container wird an neuen Magic-Bytes erkannt,
+  nicht an einer Versionsnummer. Beide Container laden in dieselbe interne
+  Ausführungsdarstellung.
+- Little-Endian; 64-Bit-Dateioffsets und Sektionslängen, 32-Bit-IDs und
+  Codeadressen.
+- Container-, Bytecode-, Sektionsschema- und Host-ABI-Version sind getrennt
+  versioniert und bewegen sich unabhängig voneinander.
+- Kein Sprachprofil in der Datei. Sprachsemantik wird in ausdrückliche
+  Ausführungsoperationen übersetzt.
+- Unbekannte optionale Sektionen werden übersprungen, unbekannte Pflichtdaten
+  vor der Ausführung abgelehnt. `META` ist für spätere Metadaten reserviert.
+- Laufzeitlayouts und optionale Beschreibungen sind getrennt. Verhaltensrelevante
+  Angaben sind kein Debug und überleben das Entfernen der Debugdaten.
+- Host-Bindung über stabile qualifizierte Namen und erwartete Signaturen statt
+  kompakter IDs und vollständiger Enum-Wertelisten (F3).
+- Typisierte, längengerahmte UTF-8- und Binärkonstanten ohne NUL-Terminator (F1).
+- Erweiterbare Typarten; nominale Identität getrennt vom Layout; Member- und
+  Routinereferenzen unabhängig voneinander.
+- Kompression ausdrücklich angegeben, nie aus Längendifferenzen erschlossen.
+  Gewählt wurde Zstd, per Sektion, standardmäßig aus, über ein Compilerflag
+  steuerbar.
+- Deterministische Kodierung und eine Inhaltsidentität. Ausdrücklich **keine**
+  Signatur- oder Verschlüsselungsfunktion und kein Archivdateisystem.
+- Betriebsbudgets sind von den Wertebereichen des Formats zu unterscheiden;
+  16 MiB war eine unbelegte Zahl und ist kein Formatlimit.
+- Unveröffentlichte Beta-400-PPEs müssen neu kompiliert werden. Das ist als
+  ausdrückliche Ablehnung mit Hinweis implementiert, nicht als stille Fehlfunktion.
+- TRY wird bei Einführung in bestehende Operationen übersetzt; keine eigene
+  Sektion und kein eigener Opcode auf Vorrat.
+- Ausdrücklich nicht Bestandteil: echte Objektorientierung, Record- und
+  Methodenattribute sowie externe Serialisierungsnamen. Der Container ist so
+  geschnitten, dass diese später additiv ergänzt werden können.
 
-**Entscheidungspunkte:**
+**Nicht übernommen:** ein Format, das sich am Dekompiler ausrichtet. Der
+Dekompiler ist Konsument des Formats, nicht sein Maßstab.
 
-- UTF-8-Konstanten mit expliziter Länge, Binärkonstanten und eingebettete NULs.
-- Zielgrößen für Code, Deklarationen, Sprungziele, Typen, Felder und Routinen.
-- Bestehende API-IDs versus Import-/Bindungstabelle mit stabiler Host-Identität.
-- Darstellung der neuen Record-/Array-/Enum-Verträge.
-- Sektionen, Längen, Pflicht-/optionale Daten und unbekannte Erweiterungen.
-- Explizite Kompressionsangabe und strikte Loader-Validierung.
-- Formatversion, Sprachversion und Mindest-API-Anforderungen getrennt behandeln.
-- Optionale Debug-Daten; keine Pflicht zur Veröffentlichung von Source-Namen.
-- Grenzen für Datei-, Speicher- und Laufzeitressourcen.
-- Legacy-Loader beibehalten und beide Formate nach Möglichkeit in dieselbe
-  interne Ausführungsdarstellung überführen.
-
-**Abnahme:** Schriftliche Entscheidung mit Alternativen, genauem Umfang,
-Kompatibilitätsmatrix, Aufwand und Testfällen. Kein Komplettumbau allein wegen
-des Wunsches nach einem „modernen Format“.
-
-**Terminregel:** Ist die freigegebene Lösung im Zeitfenster nicht belastbar
-umsetzbar, Releaseumfang oder Termin ausdrücklich neu besprechen. Nicht still
-eine provisorische Binärschnittstelle als langfristig stabil veröffentlichen.
+**Abnahme:** erfüllt durch diesen Abschnitt, den Formatvertrag in
+[ppe_format.md](ppe_format.md) und die Testergebnisse in C2.
 
 ### C2 — Freigegebenes Format implementieren und absichern
 
-Status: übriger Umfang offen; eigener Freigabepunkt nach C1. Die ausdrücklich
-vorgezogene UTF-8-Literalkodierung ist mit S5 implementiert und in EN/DE abgenommen.
+Status: am 2026-09-10 umgesetzt und validiert. Die vorgezogene
+UTF-8-Literalkodierung aus S5 ist darin aufgegangen.
 
-**Arbeit:** Ausschließlich die in C1 beschlossene Lösung implementieren;
-Compiler, Serializer, Loader und Decompiler gemeinsam aktualisieren.
+**Implementiert:**
 
-**Abnahme:**
+- Neuer Container mit 64-Byte-Header, 48-Byte-Verzeichniseinträgen und den
+  Sektionen `TYPE`, `CONS`, `VARS`, `ROUT`, `IMPT`, `CODE` sowie optional
+  `IDEN` und `DBUG`. Genaue Wireformate in [ppe_format.md](ppe_format.md).
+- Interne Breiten mitgewachsen: Typreferenzen und Routinedeskriptoren sind
+  32-bittig, `VAR`-Modi sind eine Liste je Parameter statt der 16-Bit-Maske.
+- Eigene Codekodierung: Sprungziele sind Anweisungsindizes; Kurzschlussoperatoren
+  und Record-Literale haben endlich eine Dateidarstellung (S1/S2).
+- Host-ABI `IMPT`: Bindung über qualifizierte Namen und Signaturen, mit
+  Umnummerierung der Typ- und Member-IDs beim Laden.
+- Zstd je Sektion über `pplc --compression`, Debugnamen über `pplc --debug`;
+  beide Voreinstellungen sind aus.
+- `IDEN` als SHA-256 über Laufzeit, Einstiegsroutine und alle Sektionen außer
+  `IDEN` und `DBUG`.
+- Strikte Ladevalidierung vor der ersten VM-Anweisung: Header, Sektionsgrenzen
+  und Überlappung, Budgets, Typgraph, Konstantenrepräsentation, Variablen- und
+  Routinetabellen sowie sämtliche Codereferenzen, Argumentzahlen, Ränge,
+  Zuweisungsziele und Builtin-Signaturen.
+- Beta-400-PPEs im alten Container werden mit Neukompilierungshinweis abgelehnt.
 
-- F1: Quelle → PPE-Datei → Loader → VM → passende Terminalausgabe erhält Unicode.
-- F2: Programme jenseits der alten Codegrenze funktionieren; neue Grenzen haben
-  eindeutige Diagnosen und Tests unmittelbar unter, auf und über der Grenze.
-- F3: Alte/neue Host-Enum- und API-Profile verhalten sich wie beschlossen.
-- Die durch S1–S6 benötigten Konstrukte überleben echte Datei-Roundtrips.
-- Beschädigte, abgeschnittene, übergroße oder unbekannte Pflichtdaten werden
-  kontrolliert zurückgewiesen; optionale Erweiterungen gemäß Vertrag behandelt.
-- Bestehende Legacy-PPEs behalten ihre Ausführung.
+**Ausgeführte Abnahme:**
+
+- F1: Quelle → PPE-Datei → Loader → VM erhält `€`, CJK, kombinierende und
+  Nicht-BMP-Zeichen; zusätzlich ein 20.000-fach wiederholtes Literal mit
+  eingebettetem NUL über beide Kompressionsmodi.
+- F2: ein Programm mit 6.000 Anweisungen, 300 `VAR`-Parametern und einem
+  Callback, der diese 300 Parameter weiterreicht, läuft als echte Datei in
+  beiden Kompressionsmodi. Die alten Grenzen 255/254/16/32767 sind weiterhin
+  getestet, jetzt ausdrücklich gegen Runtime 340.
+- F3: Enum- und Host-Rundläufe bestehen, einschließlich Dekompilieren und
+  Neuübersetzen. Host-Enums werden über die Importidentität erkannt statt über
+  die vollständige Werteliste; ein Unit-Test vertauscht Typ- und Member-IDs
+  sowie Signaturtypen und prüft, dass unveränderte Dateibytes weiterhin binden
+  und eine echte Signaturänderung abgelehnt wird.
+- S1/S2: Record- und Kurzschlussprogramme überstehen jetzt echte Datei-Roundtrips
+  statt an der Serialisierungsgrenze abgewiesen zu werden.
+- S6: Kontrollbefehle werden beim Erzeugen normalisiert, weil das früher erst der
+  alte Decoder tat. Fehler-, Cleanup- und Ressourcentests bleiben unverändert grün.
+- Beschädigte, abgeschnittene, übergroße, überlappende und unbekannte
+  Pflichtdaten werden kontrolliert abgelehnt; unbekannte optionale Sektionen
+  werden übersprungen.
+- Legacy-PPEs behalten ihre Ausführung; Legacy-Fixtures laufen unverändert.
+
+**Gesamtvalidierung:** `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine
+-p icy_board_ppl -p pplc -p ppld -p ppl-lsp --no-fail-fast --quiet` in getrennten
+EN- und DE-Prozessen: jeweils **2.900 bestanden, 0 fehlgeschlagen, 6 ignoriert**
+über 68 ungefilterte Testziele. All-Target-Check der fünf Pakete und Engine ohne
+Default-Features bestanden. Formatierung der berührten Rust-Dateien und
+`git diff --check` ohne Befund.
+
+**Offen und bewusst vertagt:**
+
+- `META` ist reserviert, aber ohne Semantik. Unbekannte optionale Sektionen
+  werden übersprungen und gehen beim Neuschreiben verloren; eine Erhaltungs- und
+  Identitätsregel dafür fehlt noch.
+- Debugdaten enthalten nur Variablennamen. Typ- und Feldnamen, Quellpositionen
+  und eine getrennte Debugdatei sind nicht umgesetzt.
+- Das Codebudget des Compilers rechnet weiterhin in alten logischen Einheiten;
+  die tatsächliche Sektionsgrenze greift zusätzlich im Container.
+- Recordfeldgrenzen sind intern weiterhin 16-bittig, obwohl das Wireformat
+  32 Bit vorsieht.
+- `read_file` liest die Datei vor der Größenprüfung vollständig ein.
+- Zstd ist nur unter Linux gebaut und getestet; Windows und macOS stehen aus.
+- Keine Fuzz-Abnahme des neuen Loaders.
 
 ### S7 — Sprachentscheidungen zusammenführen
 
@@ -641,10 +707,10 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 
 - [x] P0 abgeschlossen; stabiler Build und reproduzierbare Baseline.
 - [x] S1–S6 jeweils einzeln besprochen; freigegebene Änderungen umgesetzt.
-- [ ] C1 separat entschieden, C2 umgesetzt; anschließend S7 abgeschlossen.
+- [x] C1 separat entschieden, C2 umgesetzt; anschließend S7 abgeschlossen. — C1/C2 erledigt, S7 offen.
 - [x] F1: Unicode-Datei-Roundtrip nachgewiesen (S5, vorgezogener UTF-8-Literalteil).
-- [ ] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
-- [ ] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.
+- [x] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
+- [x] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.
 - [x] F4: Stale Handles bleiben auch nach Wiederverwendung ungültig.
 - [ ] F5: `Fade`-Vertrag einschließlich realer Ausgabe konsistent.
 - [ ] F6: Metadatenzugriff skaliert unabhängig von vollständigen User-Snapshots.

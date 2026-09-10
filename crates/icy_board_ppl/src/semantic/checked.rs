@@ -19,10 +19,10 @@ use super::SemanticVisitor;
 
 #[derive(Default)]
 pub(crate) struct SourceAnnotations {
-    pub user_types: HashMap<usize, u8>,
+    pub user_types: HashMap<usize, u32>,
     pub receiver_types: HashMap<usize, VariableType>,
     pub instance_providers: HashMap<usize, FuncOpCode>,
-    pub static_receivers: HashMap<usize, u8>,
+    pub static_receivers: HashMap<usize, u32>,
     pub compound_targets: HashMap<usize, VariableType>,
     routine_references: HashSet<usize>,
     function_results: HashSet<usize>,

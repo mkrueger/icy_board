@@ -91,7 +91,7 @@ pub enum VariableType {
     /// Unbounded Unicode text used by PPL 4.00 STRING declarations.
     UnboundedString,
 
-    UserData(u8),
+    UserData(u32),
 }
 
 impl From<u8> for VariableType {
@@ -102,6 +102,15 @@ impl From<u8> for VariableType {
 
 impl From<VariableType> for u8 {
     fn from(b: VariableType) -> u8 {
+        match b {
+            VariableType::None => 255,
+            _ => u8::try_from(u32::from(b)).expect("type cannot be represented by a legacy PPE"),
+        }
+    }
+}
+
+impl From<VariableType> for u32 {
+    fn from(b: VariableType) -> u32 {
         match b {
             VariableType::Boolean => 0,
             VariableType::Unsigned => 1,
@@ -129,7 +138,7 @@ impl From<VariableType> for u8 {
             VariableType::Bytes => 23,
             VariableType::UnboundedString => 24,
             VariableType::UserData(b) => b,
-            VariableType::None => 255,
+            VariableType::None => u32::MAX,
         }
     }
 }
@@ -180,7 +189,7 @@ impl VariableType {
             22 => VariableType::ULong,
             23 => VariableType::Bytes,
             24 => VariableType::UnboundedString,
-            _ => VariableType::UserData(b),
+            _ => VariableType::UserData(u32::from(b)),
         }
     }
 
@@ -1070,7 +1079,7 @@ impl Neg for VariableValue {
 
 #[allow(clippy::needless_pass_by_value)]
 impl VariableValue {
-    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u8, u8>) {
+    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u32, u32>) {
         if let VariableType::UserData(type_id) = self.vtype
             && let Some(new_id) = remap.get(&type_id)
         {
@@ -2342,7 +2351,9 @@ mod tests {
 
     #[test]
     fn check_variable_size() {
-        assert_eq!(8, std::mem::size_of::<VariableData>());
+        assert_eq!(24, std::mem::size_of::<VariableData>());
+        assert_eq!(20, std::mem::size_of::<crate::executable::FunctionValue>());
+        assert_eq!(20, std::mem::size_of::<crate::executable::ProcedureValue>());
     }
 
     #[test]

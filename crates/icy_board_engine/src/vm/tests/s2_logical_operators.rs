@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     compiler::{PPECompiler, workspace::Workspace},
-    executable::{Executable, ExecutableError},
+    executable::Executable,
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 
@@ -31,12 +31,7 @@ fn compile(source: &str, language: u16, runtime: u16, optimize: bool) -> Executa
 }
 
 fn output(executable: Executable) -> String {
-    let executable = if executable.in_memory_script.is_some() {
-        assert_eq!(executable.to_buffer().unwrap_err(), ExecutableError::UnsupportedShortCircuitEncoding);
-        executable
-    } else {
-        Executable::from_buffer(&mut executable.to_buffer().unwrap(), false).unwrap()
-    };
+    let executable = Executable::from_buffer(&mut executable.to_buffer().unwrap(), false).unwrap();
     let (success, text) = super::run_executable_collecting(executable, |_| {}, &[], None, &[], false, false);
     assert!(success, "{text}");
     text.replace('\r', "")

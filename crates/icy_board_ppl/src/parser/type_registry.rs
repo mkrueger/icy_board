@@ -16,7 +16,7 @@ pub struct UserTypeDefinition {
 /// An open, nominal integer type. The first declared member is its default.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDefinition {
-    pub id: u8,
+    pub id: u32,
     pub name: unicase::Ascii<String>,
     pub variants: Vec<(unicase::Ascii<String>, i32)>,
     /// Ordered known numeric values retained for the existing PPE metadata.
@@ -52,8 +52,8 @@ impl UserTypeDefinition {
 #[derive(Default)]
 pub struct UserTypeRegistry {
     pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
-    pub types: HashMap<u8, UserDataRegistry>,
-    built_in_records: HashMap<u8, UserTypeDefinition>,
+    pub types: HashMap<u32, UserDataRegistry>,
+    built_in_records: HashMap<u32, UserTypeDefinition>,
     /// Records the compiled program declares. Shared across every file of a
     /// compilation so a type declared in one is visible in the next.
     user_types: RwLock<Vec<UserTypeDefinition>>,
@@ -89,20 +89,20 @@ pub const REGEX_MATCH_ID: usize = 54;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them. Their current compact order is what a PPE stores.
-pub const EVENT_KIND_ENUM_ID: u8 = 255;
-pub const MOUSE_ACTION_ENUM_ID: u8 = 254;
-pub const MOUSE_BUTTON_ENUM_ID: u8 = 253;
-pub const MOUSE_MODE_ENUM_ID: u8 = 252;
-pub const MOUSE_TRACKING_ENUM_ID: u8 = 251;
-pub const GFX_BACKEND_ENUM_ID: u8 = 250;
-pub const ERR_KIND_ENUM_ID: u8 = 249;
-pub const ERR_CODE_ENUM_ID: u8 = 248;
-pub const EDITOR_MODE_ENUM_ID: u8 = 247;
-pub const MSG_FIELD_ENUM_ID: u8 = 246;
-pub const HTTP_METHOD_ENUM_ID: u8 = 245;
-pub const REGEX_OPTIONS_ENUM_ID: u8 = 244;
-pub const STRING_COMPARISON_ENUM_ID: u8 = 243;
-pub const CHECKSUM_ENUM_ID: u8 = 242;
+pub const EVENT_KIND_ENUM_ID: u32 = i32::MAX as u32;
+pub const MOUSE_ACTION_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 1;
+pub const MOUSE_BUTTON_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 2;
+pub const MOUSE_MODE_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 3;
+pub const MOUSE_TRACKING_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 4;
+pub const GFX_BACKEND_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 5;
+pub const ERR_KIND_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 6;
+pub const ERR_CODE_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 7;
+pub const EDITOR_MODE_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 8;
+pub const MSG_FIELD_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 9;
+pub const HTTP_METHOD_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 10;
+pub const REGEX_OPTIONS_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 11;
+pub const STRING_COMPARISON_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 12;
+pub const CHECKSUM_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 13;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -125,13 +125,13 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 pub const BUILTIN_ENUM_COUNT: usize = 14;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
-pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
+pub const MAX_USER_TYPES: usize = 65_536;
 
 /// How many fields one record may hold - the PPE stores the count in a byte.
-pub const MAX_TYPE_FIELDS: usize = u8::MAX as usize;
+pub const MAX_TYPE_FIELDS: usize = 4_096;
 
 /// True for a type a program declared rather than one the board provides.
-pub fn is_user_declared_type(id: u8) -> bool {
+pub fn is_user_declared_type(id: u32) -> bool {
     id as usize >= FIRST_USER_TYPE_ID
 }
 
@@ -148,8 +148,8 @@ impl UserTypeRegistry {
             super::board_catalog::register_members(id, &mut members);
             registry
                 .registered_types
-                .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u8));
-            registry.types.insert(id as u8, members);
+                .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u32));
+            registry.types.insert(id as u32, members);
         }
         registry.register_record(
             CONTACT_ID,
@@ -178,7 +178,7 @@ impl UserTypeRegistry {
     /// A record or an enum the program declared for itself.
     pub fn get_declared_type(&self, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
         self.get_user_type(identifier)
-            .map(|definition| VariableType::UserData(definition.id as u8))
+            .map(|definition| VariableType::UserData(definition.id as u32))
             .or_else(|| self.get_enum(identifier).map(|definition| VariableType::UserData(definition.id)))
     }
 
@@ -198,7 +198,7 @@ impl UserTypeRegistry {
             .cloned()
     }
 
-    pub fn get_user_type_from_id(&self, id: u8) -> Option<UserTypeDefinition> {
+    pub fn get_user_type_from_id(&self, id: u32) -> Option<UserTypeDefinition> {
         let id = id as usize;
         if id < FIRST_USER_TYPE_ID {
             return None;
@@ -206,11 +206,11 @@ impl UserTypeRegistry {
         self.user_types.read().unwrap().get(id - FIRST_USER_TYPE_ID).cloned()
     }
 
-    pub fn get_record_type_from_id(&self, id: u8) -> Option<UserTypeDefinition> {
+    pub fn get_record_type_from_id(&self, id: u32) -> Option<UserTypeDefinition> {
         self.built_in_records.get(&id).cloned().or_else(|| self.get_user_type_from_id(id))
     }
 
-    pub fn is_record_type(&self, id: u8) -> bool {
+    pub fn is_record_type(&self, id: u32) -> bool {
         self.built_in_records.contains_key(&id) || is_user_declared_type(id)
     }
 
@@ -226,7 +226,7 @@ impl UserTypeRegistry {
         self.enums.read().unwrap().clone()
     }
 
-    pub fn get_enum_from_id(&self, id: u8) -> Option<EnumDefinition> {
+    pub fn get_enum_from_id(&self, id: u32) -> Option<EnumDefinition> {
         self.enums.read().unwrap().iter().find(|definition| definition.id == id).cloned()
     }
 
@@ -236,7 +236,7 @@ impl UserTypeRegistry {
 
     /// Array fields inherit their element type's equality contract, even when empty.
     pub fn is_equality_comparable(&self, variable_type: VariableType) -> bool {
-        fn visit(registry: &UserTypeRegistry, variable_type: VariableType, visiting: &mut Vec<u8>) -> bool {
+        fn visit(registry: &UserTypeRegistry, variable_type: VariableType, visiting: &mut Vec<u32>) -> bool {
             let VariableType::UserData(id) = variable_type else {
                 return !matches!(
                     variable_type,
@@ -262,29 +262,29 @@ impl UserTypeRegistry {
 
     /// Records grow upward from 100, enums downward from 255; neither kind is
     /// serialized under the other's representation.
-    pub fn declare_enum(&self, name: unicase::Ascii<String>, variants: Vec<(unicase::Ascii<String>, i32)>) -> Option<u8> {
+    pub fn declare_enum(&self, name: unicase::Ascii<String>, variants: Vec<(unicase::Ascii<String>, i32)>) -> Option<u32> {
         let mut enums = self.enums.write().unwrap();
-        let id = u8::MAX as usize - enums.len();
+        let id = EVENT_KIND_ENUM_ID as usize - enums.len();
         let next_record = FIRST_USER_TYPE_ID + self.user_types.read().unwrap().len();
         if id < next_record {
             return None;
         }
         let domain = variants.iter().map(|(_, value)| *value).collect();
         enums.push(EnumDefinition {
-            id: id as u8,
+            id: id as u32,
             name,
             variants,
             domain,
         });
-        Some(id as u8)
+        Some(id as u32)
     }
 
     /// Claims one of the fixed ids at the top of the space for an enum the board provides.
-    fn register_enum(&self, id: u8, name: &str, variants: &[(&str, i32)]) {
+    fn register_enum(&self, id: u32, name: &str, variants: &[(&str, i32)]) {
         let mut enums = self.enums.write().unwrap();
         assert_eq!(
             id as usize,
-            u8::MAX as usize - enums.len(),
+            EVENT_KIND_ENUM_ID as usize - enums.len(),
             "builtin enum '{name}' wants id {id}, which is not the next one free"
         );
         enums.push(EnumDefinition {
@@ -391,7 +391,7 @@ impl UserTypeRegistry {
     }
 
     /// Retain the existing builtin metadata without inventing member names.
-    fn set_enum_domain(&self, id: u8, domain: Vec<i32>) {
+    fn set_enum_domain(&self, id: u32, domain: Vec<i32>) {
         let mut enums = self.enums.write().unwrap();
         let definition = enums.iter_mut().find(|definition| definition.id == id).expect("registered enum");
         assert_eq!(domain.first(), definition.variants.first().map(|(_, value)| value));
@@ -401,7 +401,7 @@ impl UserTypeRegistry {
 
     /// The position of a field inside a record, which doubles
     /// as its member id in the generated code.
-    pub fn record_field_index(&self, id: u8, field: &unicase::Ascii<String>) -> Option<usize> {
+    pub fn record_field_index(&self, id: u32, field: &unicase::Ascii<String>) -> Option<usize> {
         self.get_record_type_from_id(id)?.field_index(field)
     }
 
@@ -414,8 +414,8 @@ impl UserTypeRegistry {
             .read()
             .unwrap()
             .last()
-            .map_or(u8::MAX as usize + 1, |definition| definition.id as usize);
-        if id >= lowest_enum {
+            .map_or(EVENT_KIND_ENUM_ID as usize + 1, |definition| definition.id as usize);
+        if user_types.len() >= MAX_USER_TYPES || id >= lowest_enum {
             return None;
         }
         user_types.push(UserTypeDefinition { id, name, fields });
@@ -429,7 +429,7 @@ impl UserTypeRegistry {
             "board object '{name}' wants id {id}, which is outside the board object range"
         );
         assert!(
-            !self.types.contains_key(&(id as u8)) && !self.built_in_records.contains_key(&(id as u8)),
+            !self.types.contains_key(&(id as u32)) && !self.built_in_records.contains_key(&(id as u32)),
             "board object '{name}' wants id {id}, which is already taken"
         );
     }
@@ -444,16 +444,16 @@ impl UserTypeRegistry {
         };
         T::register_members(&mut registry);
         self.registered_types
-            .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData(id as u8));
-        self.types.insert(id as u8, registry);
+            .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData(id as u32));
+        self.types.insert(id as u32, registry);
     }
 
     fn register_record(&mut self, id: usize, name: &str, fields: Vec<(unicase::Ascii<String>, VariableType)>) {
         self.claim_id(id, name);
         self.registered_types
-            .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u8));
+            .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u32));
         self.built_in_records.insert(
-            id as u8,
+            id as u32,
             UserTypeDefinition {
                 id,
                 name: unicase::Ascii::new(name.to_string()),
@@ -465,7 +465,7 @@ impl UserTypeRegistry {
         );
     }
 
-    pub fn get_type_from_id(&self, id: u8) -> Option<&UserDataRegistry> {
+    pub fn get_type_from_id(&self, id: u32) -> Option<&UserDataRegistry> {
         self.types.get(&id)
     }
 }

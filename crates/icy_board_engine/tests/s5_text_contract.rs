@@ -108,6 +108,27 @@ fn s5_literal_file_roundtrip_uses_runtime_not_language() {
 }
 
 #[test]
+fn c2_wide_code_parameters_and_composed_records_survive_files() {
+    use icy_board_engine::executable::container::Compression;
+    let parameters = (0..300).map(|index| format!("VAR INTEGER arg{index}")).collect::<Vec<_>>().join(", ");
+    let arguments = (0..300).map(|index| format!("values[{index}]")).collect::<Vec<_>>().join(", ");
+    let mut source = format!("DECLARE PROCEDURE Wide({parameters})\nINTEGER counter\nINTEGER values[299]\n");
+    source.push_str("TYPE Item\nSURFACE image\nINTEGER values[]\nENDTYPE\nItem item\nREDIM item.values, 2\nitem.values[2] = 17\n");
+    source.push_str(&"counter += 1\n".repeat(6000));
+    source.push_str(&format!("Wide({arguments})\nPRINTLN counter, \"|\", values[299], \"|\", item.values[2], \"|\", FALSE && (1 / 0)\nPROCEDURE Wide({parameters})\narg299 = 42\nENDPROC\n"));
+    source = source.replace(&format!("Wide({arguments})\nPRINTLN"), "Apply(Wide)\nPRINTLN");
+    source.push_str(&format!("PROCEDURE Apply(PROCEDURE callback({parameters}))\ncallback({arguments})\nENDPROC\n"));
+    let executable = compile(&source, 400, 400);
+    for compression in [Compression::None, Compression::Zstd] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("wide.ppe");
+        std::fs::write(&path, executable.to_buffer_with_compression(compression).unwrap()).unwrap();
+        let loaded = Executable::read_file(&path, false).unwrap();
+        assert_eq!("6000|42|17|0\n", run(&loaded));
+    }
+}
+
+#[test]
 fn s5_unicode_positions_bytes_and_transformations_survive_files() {
     let source = format!(
         r#"
