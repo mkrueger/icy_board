@@ -18,7 +18,8 @@ fn mutate_types(executable: &Executable, mutate: impl FnOnce(&mut icy_board_engi
     use icy_board_engine::executable::container::{Compression, Container, LoadLimits};
     let limits = LoadLimits::default();
     let mut container = Container::decode(&executable.to_buffer().unwrap(), &limits).unwrap();
-    container.sections.retain(|section| section.kind != *b"IDEN");
+    // Identity and debug names describe the intact program, not the corrupted one.
+    container.sections.retain(|section| section.kind != *b"IDEN" && section.kind != *b"DBUG");
     mutate(container.sections.iter_mut().find(|section| section.kind == *b"TYPE").unwrap());
     container.encode(Compression::None, &limits).unwrap()
 }
@@ -83,6 +84,18 @@ fn custom_type_layouts_survive_the_ppe_round_trip() {
     let mut bytes = executable.to_buffer().unwrap();
     let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
     assert_eq!(executable.user_types, loaded.user_types);
+}
+
+#[test]
+fn a_field_bound_beyond_the_legacy_word_survives_a_file() {
+    let executable = compile("TYPE Item\n INTEGER Values(70000)\nENDTYPE\nItem box\nbox.Values(70000) = 7\nPRINT box.Values(70000)\n");
+    assert_eq!(executable.user_types[0][0].vector_size, 70_000);
+
+    let mut bytes = executable.to_buffer().unwrap();
+    let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
+
+    assert_eq!(loaded.user_types[0][0].vector_size, 70_000);
+    assert_eq!(bytes, loaded.to_buffer().unwrap());
 }
 
 #[test]

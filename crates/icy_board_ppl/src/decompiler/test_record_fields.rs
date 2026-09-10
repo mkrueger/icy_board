@@ -99,13 +99,13 @@ Payload item
 PRINTLN item.Scalar
 "#,
         &[
-            "INTEGER FIELD001",
-            "INTEGER FIELD002[]",
-            "STRING FIELD003[,]",
-            "INTEGER FIELD004[,,]",
-            "INTEGER FIELD005[0]",
-            "INTEGER FIELD006[2,3]",
-            "INTEGER FIELD007[1,2,3]",
+            "INTEGER Scalar",
+            "INTEGER Values[]",
+            "STRING Grid[,]",
+            "INTEGER Cube[,,]",
+            "INTEGER Zero[0]",
+            "INTEGER FixedGrid[2,3]",
+            "INTEGER FixedCube[1,2,3]",
         ],
     );
 }
@@ -134,18 +134,18 @@ Envelope item
 PRINTLN item.Value.Scalar
 "#,
         &[
-            "Surface FIELD002",
-            "User FIELD003",
-            "Audio FIELD004[]",
-            "User FIELD005[,]",
-            "Surface FIELD006[,,]",
-            "CONTACT FIELD007",
-            "Surface FIELD008[0]",
-            "TYPE001 FIELD001",
-            "TYPE001 FIELD002[]",
-            "TYPE001 FIELD003[,]",
-            "TYPE001 FIELD004[,,]",
-            "TYPE001 FIELD005[0]",
+            "Surface Image",
+            "User Owner",
+            "Audio Clips[]",
+            "User Grid[,]",
+            "Surface Cube[,,]",
+            "CONTACT Person",
+            "Surface Fixed[0]",
+            "Payload Value",
+            "Payload Values[]",
+            "Payload Grid[,]",
+            "Payload Cube[,,]",
+            "Payload Fixed[0]",
         ],
     );
 }

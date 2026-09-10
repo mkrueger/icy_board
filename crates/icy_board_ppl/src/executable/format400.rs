@@ -15,6 +15,9 @@ fn invalid(message: &'static str) -> ContainerError {
     ContainerError::Invalid(message)
 }
 
+/// The sections that make up the executable program itself.
+const REQUIRED_SECTIONS: [[u8; 4]; 6] = [*b"TYPE", *b"CONS", *b"VARS", *b"ROUT", *b"IMPT", *b"CODE"];
+
 fn variable_type(id: u32) -> Result<VariableType> {
     match id {
         0..=24 => Ok(VariableType::from(id as u8)),
@@ -194,6 +197,29 @@ pub(super) fn encode(executable: &Executable, compression: Compression, debug_na
         }
         blob(&mut debug, entry.name.as_bytes())?;
     }
+    let names = executable.debug_info.clone().unwrap_or_default();
+    // Structure always matches the program; only the names themselves are optional.
+    word(&mut debug, executable.user_types.len())?;
+    for (index, fields) in executable.user_types.iter().enumerate() {
+        let record = names.records.get(index);
+        blob(&mut debug, record.map_or("", |(name, _)| name.as_str()).as_bytes())?;
+        word(&mut debug, fields.len())?;
+        for field in 0..fields.len() {
+            let name = record.and_then(|(_, names)| names.get(field)).map_or("", String::as_str);
+            blob(&mut debug, name.as_bytes())?;
+        }
+    }
+    word(&mut debug, executable.variable_table.enums.len())?;
+    for (id, values) in &executable.variable_table.enums {
+        let definition = names.enums.get(id);
+        word(&mut debug, *id as usize)?;
+        blob(&mut debug, definition.map_or("", |(name, _)| name.as_str()).as_bytes())?;
+        word(&mut debug, values.len())?;
+        for member in 0..values.len() {
+            let name = definition.and_then(|(_, names)| names.get(member)).map_or("", String::as_str);
+            blob(&mut debug, name.as_bytes())?;
+        }
+    }
     let mut debug = Section::new(*b"DBUG", executable.variable_table.len() as u32, debug);
     debug.flags = 0;
     let mut container = Container {
@@ -211,6 +237,12 @@ pub(super) fn encode(executable: &Executable, compression: Compression, debug_na
     let mut identity = Section::new(*b"IDEN", 1, content_identity(&container).to_vec());
     identity.flags = 0;
     container.sections.push(identity);
+    for section in &executable.extra_sections {
+        if REQUIRED_SECTIONS.contains(&section.kind) || section.kind == *b"IDEN" || section.kind == *b"DBUG" {
+            return Err(invalid("preserved section kind"));
+        }
+        container.sections.push(section.clone());
+    }
     if debug_names {
         container.sections.push(debug);
     }
@@ -223,11 +255,9 @@ fn content_identity(container: &Container) -> [u8; 32] {
     let mut digest = Sha256::new();
     digest.update(container.runtime.to_le_bytes());
     digest.update(container.entry_routine.to_le_bytes());
-    let mut sections: Vec<_> = container
-        .sections
-        .iter()
-        .filter(|section| section.kind != *b"IDEN" && section.kind != *b"DBUG")
-        .collect();
+    // The identity covers the program. Optional sections stay outside it so that
+    // stripping debug data, repacking or adding a future section keeps it valid.
+    let mut sections: Vec<_> = container.sections.iter().filter(|section| REQUIRED_SECTIONS.contains(&section.kind)).collect();
     sections.sort_by_key(|section| section.kind);
     for section in sections {
         digest.update(section.kind);
@@ -262,13 +292,19 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
             .ok_or(invalid("missing required section"))
     };
     for item in &container.sections {
-        if item.flags & REQUIRED != 0 && ![*b"TYPE", *b"CONS", *b"VARS", *b"ROUT", *b"IMPT", *b"CODE"].contains(&item.kind) {
+        if item.flags & REQUIRED != 0 && !REQUIRED_SECTIONS.contains(&item.kind) {
             return Err(invalid("unsupported required section semantics"));
         }
         if item.entries as usize > MAX_ITEMS {
             return Err(ContainerError::Limit("section entries"));
         }
     }
+    let extra_sections: Vec<_> = container
+        .sections
+        .iter()
+        .filter(|section| !REQUIRED_SECTIONS.contains(&section.kind) && section.kind != *b"IDEN" && section.kind != *b"DBUG")
+        .cloned()
+        .collect();
     let mut table = VariableTable::default();
     table.set_version(400);
     let imports = HostCatalog::decode(section(b"IMPT")?)?;
@@ -305,9 +341,9 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
                         variable_type,
                         dim,
                         is_dynamic: flags == 1,
-                        vector_size: input.word()?.try_into().map_err(|_| ContainerError::Limit("field bound"))?,
-                        matrix_size: input.word()?.try_into().map_err(|_| ContainerError::Limit("field bound"))?,
-                        cube_size: input.word()?.try_into().map_err(|_| ContainerError::Limit("field bound"))?,
+                        vector_size: input.word()? as usize,
+                        matrix_size: input.word()? as usize,
+                        cube_size: input.word()? as usize,
                     };
                     if field.element_count().is_none() {
                         return Err(invalid("field shape"));
@@ -539,6 +575,7 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
     }
     validate_code(&script, &table, &user_types)?;
     table.generate_names();
+    let mut debug_info = None;
     if let Some(debug) = container.sections.iter().find(|section| section.kind == *b"DBUG") {
         if debug.entries as usize != table.len() {
             return Err(invalid("debug variable count"));
@@ -547,7 +584,34 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
         for id in 1..=table.len() {
             table.get_var_entry_mut(id).name = input.text()?;
         }
+        let mut names = super::DebugInfo::default();
+        let records = input.count(8)?;
+        if records != user_types.len() {
+            return Err(invalid("debug record count"));
+        }
+        for fields in &user_types {
+            let name = input.text()?;
+            let count = input.count(4)?;
+            if count != fields.len() {
+                return Err(invalid("debug field count"));
+            }
+            names.records.push((name, (0..count).map(|_| input.text()).collect::<Result<Vec<_>>>()?));
+        }
+        let enums = input.count(12)?;
+        if enums != table.enums.len() {
+            return Err(invalid("debug enum count"));
+        }
+        for _ in 0..enums {
+            let id = input.word()?;
+            let name = input.text()?;
+            let count = input.count(4)?;
+            if table.enums.get(&id).is_none_or(|values| values.len() != count) {
+                return Err(invalid("debug enum members"));
+            }
+            names.enums.insert(id, (name, (0..count).map(|_| input.text()).collect::<Result<Vec<_>>>()?));
+        }
         input.finish()?;
+        debug_info = Some(names);
     }
     let mut next_enum = crate::parser::EVENT_KIND_ENUM_ID - crate::parser::BUILTIN_ENUM_COUNT as u32;
     for &id in table.enums.keys() {
@@ -569,6 +633,12 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
         .into_iter()
         .map(|(id, values)| (type_remap.get(&id).copied().unwrap_or(id), values))
         .collect();
+    if let Some(names) = &mut debug_info {
+        names.enums = std::mem::take(&mut names.enums)
+            .into_iter()
+            .map(|(id, entry)| (type_remap.get(&id).copied().unwrap_or(id), entry))
+            .collect();
+    }
     for fields in &mut user_types {
         for field in fields {
             if let VariableType::UserData(id) = &mut field.variable_type {
@@ -599,6 +669,8 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
         user_types,
         script_buffer: Vec::new(),
         in_memory_script: Some(script),
+        extra_sections,
+        debug_info,
     })
 }
 
@@ -751,6 +823,82 @@ mod tests {
             });
             assert!(executable.to_buffer().is_err());
         }
+    }
+
+    #[test]
+    fn a_future_optional_section_loads_and_survives_a_rewrite() {
+        let mut executable = Executable::default();
+        executable.variable_table.push(TableEntry::new(
+            "value",
+            VarHeader {
+                id: 1,
+                variable_type: VariableType::Integer,
+                ..Default::default()
+            },
+            VariableValue::new_int(1),
+            EntryType::Constant,
+        ));
+        executable.in_memory_script = Some(PPEScript {
+            statements: vec![PPEStatement {
+                span: 0..1,
+                command: PPECommand::End,
+            }],
+            ..Default::default()
+        });
+
+        let limits = LoadLimits::default();
+        let mut container = Container::decode(&executable.to_buffer().unwrap(), &limits).unwrap();
+        let mut future = Section::new(*b"FUTR", 3, b"written by a newer compiler".to_vec());
+        future.flags = 0;
+        container.sections.push(future.clone());
+        let bytes = container.encode(Compression::None, &limits).unwrap();
+
+        // The identity covers the program, so adding an optional section keeps it valid.
+        let loaded = Executable::from_buffer(&mut bytes.clone(), false).unwrap();
+        assert_eq!(loaded.extra_sections, vec![future]);
+        let rewritten = Container::decode(&loaded.to_buffer().unwrap(), &limits).unwrap();
+        assert!(rewritten.sections.iter().any(|section| section.kind == *b"FUTR"));
+
+        let mut required = Container::decode(&bytes, &limits).unwrap();
+        required.sections.last_mut().unwrap().flags = REQUIRED;
+        let bytes = required.encode(Compression::None, &limits).unwrap();
+        assert!(Executable::from_buffer(&mut bytes.clone(), false).is_err());
+    }
+
+    #[test]
+    fn the_code_budget_is_measured_in_stored_bytes() {
+        let mut executable = Executable::default();
+        executable.variable_table.push(TableEntry::new(
+            "value",
+            VarHeader {
+                id: 1,
+                variable_type: VariableType::Integer,
+                ..Default::default()
+            },
+            VariableValue::new_int(1),
+            EntryType::Constant,
+        ));
+        let statements = (0..64)
+            .map(|index| PPEStatement {
+                span: index..index + 1,
+                command: PPECommand::Goto((index + 1) * 2),
+            })
+            .chain(std::iter::once(PPEStatement {
+                span: 64..65,
+                command: PPECommand::End,
+            }))
+            .collect();
+        executable.in_memory_script = Some(PPEScript {
+            statements,
+            ..Default::default()
+        });
+
+        let script = executable.in_memory_script.clone().unwrap();
+        let bytes = executable.to_buffer().unwrap();
+        let container = Container::decode(&bytes, &LoadLimits::default()).unwrap();
+        let stored = container.sections.iter().find(|section| section.kind == *b"CODE").unwrap().data.len();
+
+        assert_eq!(super::super::code400::encoded_size(&script).unwrap(), stored);
     }
 
     #[test]

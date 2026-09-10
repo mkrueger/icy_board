@@ -216,6 +216,16 @@ fn read_expr(input: &mut Reader<'_>, depth: usize) -> Result<PPEExpr> {
     })
 }
 
+/// Byte size of the `CODE` section a program would occupy, so the compiler can
+/// report an oversized program in the unit the container actually stores.
+pub(crate) fn encoded_size(script: &PPEScript) -> Result<usize> {
+    let mut normalized = script.clone();
+    for statement in &mut normalized.statements {
+        statement.command.normalize_control();
+    }
+    Ok(encode(&normalized)?.0.data.len())
+}
+
 pub(super) fn encode(script: &PPEScript) -> Result<(Section, BTreeMap<usize, u32>)> {
     if !script.bugged_offsets.is_empty() || script.statements.len() > MAX_ITEMS {
         return Err(ContainerError::Invalid("invalid script"));

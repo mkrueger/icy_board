@@ -397,6 +397,51 @@ S7 sowie C1/übriges C2 bleiben eigene Freigabeschritte.
 Status: am 2026-09-10 besprochen und ausdrücklich freigegeben. Die Umsetzung
 erfolgt in C2.
 
+**Vergleich auf einen Blick:**
+
+| Bereich | Alter PCBoard-Container (bis Runtime 3.40) | Neuer PPE-400-Container | Warum der neue Vertrag besser passt |
+| :--- | :--- | :--- | :--- |
+| Erkennung und Aufbau | Textpräambel mit einer gekoppelten Runtime-Version; 48-Byte-Header, danach Tabellen und Code weitgehend nacheinander | Eigene Magic-Bytes `ICYPPE\0\0`; 64-Byte-Header, Sektionsverzeichnis und explizit adressierte Sektionen | Eindeutige Formaterkennung und unabhängig prüfbare, erweiterbare Bestandteile |
+| Größen und Referenzen | 16-Bit-Codegröße, 16-Bit-IDs und -Grenzen sowie bytebreite Typ- und Parameterzahlen begrenzen wachsende Programme | 64-Bit-Dateioffsets und Sektionslängen; 32-Bit-Zähler, IDs, Typreferenzen und Codeadressen | Formatbreiten bilden große Programme direkt ab; engere Betriebsbudgets bleiben davon getrennt |
+| `VAR`-Parameter | Eine 16-Bit-Bitmaske im Prozedurdeskriptor | Ein eigener 32-Bit-Moduswert je Parameter | Mehr als 16 Referenzparameter sind darstellbar und weitere Parametermodi bleiben ergänzbar |
+| Text und Konstanten | CP437-Text, NUL-Terminierung und typabhängige kompakte Nutzdaten | Typisierte, längengerahmte UTF-8- und Binärkonstanten; eingebettete NUL-Bytes erlaubt | Unicode und Binärdaten überstehen Quelle, Datei und VM verlustfrei |
+| Codekodierung | Historische Wortkodierung; Sprünge und Routinen verwenden schmale Codeoffsets | Längengerahmte Anweisungen mit 32-Bit-Operanden; Sprünge adressieren Anweisungsindizes | Neue Ausdrücke wie Kurzschlussoperatoren und Record-Literale haben eine eindeutige Dateidarstellung |
+| Typen und Records | Bytebreite Typ-IDs und kompakte Typ-/Enumtabellen; neue Layoutmerkmale passen nicht zuverlässig hinein | Eigene `TYPE`-Sektion mit 32-Bit-Typen, Feldangaben und erweiterbaren Typarten | Nominale Typidentität und Laufzeitlayout können unabhängig wachsen |
+| Host-API-Bindung | Kompakte gespeicherte IDs und vollständige Enum-Wertelisten koppeln PPEs an den damaligen Katalog | `IMPT` bindet qualifizierte Namen und erwartete Signaturen; IDs werden beim Laden umgesetzt | Katalog-IDs dürfen sich ändern und APIs oder Enums dürfen wachsen, ohne alte PPEs ungültig zu machen |
+| Versionierung | Eine Runtime-Version steuert zugleich Layout, Kodierung und Entschlüsselung | Container, Bytecode, Sektionsschema und Host-ABI sind getrennt versioniert | Änderungen bleiben auf die tatsächlich betroffene Schicht begrenzt |
+| Erweiterbarkeit | Kein Sektionsmodell; neue Daten verändern das sequentielle Layout | Bekannte Pflichtsektionen werden verlangt; unbekannte optionale Sektionen werden übersprungen | Additive Erweiterungen sind möglich, während fehlende notwendige Semantik vor der Ausführung abgelehnt wird |
+| Kompression und Verschlüsselung | Historische Codekomprimierung und -verschlüsselung sind an die Runtime gekoppelt | Explizites Zstd je Sektion, standardmäßig aus; bewusst keine Verschlüsselung | Kompression ist lokal, prüfbar und austauschbar; Verschlüsselung wird nicht mit Integrität verwechselt |
+| Identität und Reproduzierbarkeit | Keine formatdefinierte Inhaltsidentität | Deterministische Kodierung und optionale `IDEN`-SHA-256 über den laufzeitrelevanten Inhalt | Gleicher Programminhalt bleibt trotz Kompression oder entfernter Debugnamen identifizierbar |
+| Debugdaten | Keine getrennte, abstreifbare Debugsektion | Optionale `DBUG`-Sektion, derzeit mit Variablennamen | Laufzeitvertrag und Diagnoseinformationen sind sauber getrennt |
+| Laden beschädigter Dateien | Grenzen ergeben sich teilweise erst beim sequentiellen Dekodieren | Größen, Überlappungen, Typgraph, Tabellen, Referenzen und Signaturen werden vor der ersten VM-Anweisung validiert | Fehlerhafte oder nicht unterstützte Dateien laufen nicht teilweise an |
+| Rückwärtskompatibilität | Vertrag für bestehende PCBoard-PPEs | Eigener Container nur für Runtime 400; beide Formate werden in dieselbe interne Darstellung geladen | Alte PPEs behalten Format, Verschlüsselung und Semantik; Runtime 400 muss keine alten Grenzen mitschleppen |
+
+**Größengrenzen im Vergleich:**
+
+Die alten Werte sind harte Grenzen der Kodierung: Ein Zähler in einem Byte oder
+eine 16-Bit-Bitmaske lässt sich nicht vergrößern, ohne das Format zu brechen.
+Die 400-Werte sind überwiegend Betriebsbudgets gegen beschädigte oder bösartige
+Dateien; das Wireformat selbst rechnet mit 32-Bit-Zählern und 64-Bit-Offsets.
+
+| Größe | Alter Container (bis Runtime 3.40) | Neuer PPE-400-Container |
+| :--- | ---: | ---: |
+| Code je Programm | 32.767 Bytes, 16-Bit-Codegrößenfeld | 32 MiB je `CODE`-Sektion |
+| Deklarationen der Variablentabelle | 32.767, 16-Bit-Tabellenzähler | 1.000.000 |
+| Parameter je Routine | 255 | 4.096 |
+| davon `VAR`-Parameter | 16, Position der Bitmaske | alle Parameter, eigener Modus je Parameter |
+| Lokale Variablen je Routine | 254 | 65.536 |
+| Records und Enums je Programm | 156 gemeinsame IDs 100–255, davon 14 Builtin-Enums | 65.536 Records, 32-Bit-Typreferenzen |
+| Felder je Record | 255, Zähler in einem Byte | 4.096 |
+| Stringliteral | 65.534 Bytes einschließlich Terminator | 32-Bit-Länge, praktisch durch Sektions- und Dateibudget begrenzt |
+| Ausdrucksverschachtelung beim Laden | 64 | 96 |
+| Dateigröße | keine formatdefinierte Grenze | 64 MiB |
+| Sektionen je Datei | kein Sektionsmodell | 64, alle dekodierten Sektionen zusammen 64 MiB |
+
+Der neue Container ist damit kein Ersatz für ein Archiv-, Signatur- oder
+Rechtesystem. Er löst gezielt die Skalierungs-, Unicode-, Erweiterungs- und
+ABI-Stabilitätsprobleme des alten ausführbaren Formats. Die vollständige
+Wirebeschreibung steht in [ppe_format.md](ppe_format.md).
+
 **Entscheidung: Alternative 3** — ein eigener sektionierter 400-Container mit
 tatsächlich breiteren Operanden und Deskriptoren. Ein neuer Header allein hebt
 die Grenzen aus F2 nicht auf; die internen Typ-, Routine- und Referenzbreiten
@@ -502,29 +547,45 @@ Default-Features bestanden. Formatierung der berührten Rust-Dateien und
 
 **Offen und bewusst vertagt:**
 
-- `META` ist reserviert, aber ohne Semantik. Unbekannte optionale Sektionen
-  werden übersprungen und gehen beim Neuschreiben verloren; eine Erhaltungs- und
-  Identitätsregel dafür fehlt noch.
-- Debugdaten enthalten nur Variablennamen. Typ- und Feldnamen, Quellpositionen
-  und eine getrennte Debugdatei sind nicht umgesetzt.
-- Das Codebudget des Compilers rechnet weiterhin in alten logischen Einheiten;
-  die tatsächliche Sektionsgrenze greift zusätzlich im Container.
-- Recordfeldgrenzen sind intern weiterhin 16-bittig, obwohl das Wireformat
-  32 Bit vorsieht.
 - `read_file` liest die Datei vor der Größenprüfung vollständig ein.
 - Zstd ist nur unter Linux gebaut und getestet; Windows und macOS stehen aus.
 - Keine Fuzz-Abnahme des neuen Loaders.
+- Debugdaten enthalten keine Quellpositionen und keine getrennte Debugdatei.
+
+**Am 2026-09-10 nachträglich geschlossen** (ursprünglich vertagt):
+
+- Unbekannte optionale Sektionen werden erhalten statt verworfen. Die
+  Inhaltsidentität deckt nur noch die sechs Programmsektionen ab, damit eine
+  zukünftige Zusatzsektion die Prüfung nicht ungültig macht — das war ein echter
+  Vorwärtskompatibilitätsfehler, nicht nur eine fehlende Bequemlichkeit.
+  Unbekannte Kompressionscodes gelten jetzt als fehlerhaft statt als überspringbar.
+- Debugdaten tragen zusätzlich Record-, Feld- und Enum-Namen; der Dekompiler gibt
+  sie aus, statt `TYPE001`/`FIELD001` zu erfinden.
+- Das Codebudget misst die tatsächlich erzeugte `CODE`-Sektion statt alter
+  logischer Worteinheiten.
+- Recordfeldgrenzen sind intern 32-bittig wie im Wireformat.
 
 ### S7 — Sprachentscheidungen zusammenführen
 
-Status: offen; am 2026-09-10 ausdrücklich hinter C1 und C2 verschoben.
+Status: am 2026-09-10 umgesetzt, nachdem C1 und C2 abgeschlossen waren.
 
-**Besprechen:** Zusammenspiel der Sprach- und Formatänderungen, offen gebliebene
-Entscheidungen, verbleibende Abnahmelücken und realistische Restzeit.
+**Gemeinsame Abnahme:** Ein Programm führt die Verträge aus S1–S6 zusammen —
+Record mit Host-, dynamischem und Enum-Feld (S1), Kurzschlussoperator (S2), zwei
+`VAR`-Parameter mit Rückschreibung (S3), nominaler Enum-Cast (S4), Unicode-Text
+mit Codepoint-Länge (S5) und ein `ON ERROR`-Handler nach fehlgeschlagenem
+Dateizugriff (S6). Es wird als echte Datei in beiden Kompressionsmodi
+geschrieben, geladen, ausgeführt, dekompiliert und neu übersetzt; die Ausgabe ist
+jedes Mal identisch und die deklarierten Namen bleiben erhalten.
 
-**Abnahme:** Die freigegebenen Sprach- und Formatänderungen sind gemeinsam
-getestet. Noch offene und bewusst vertagte Anforderungen sind ausdrücklich
-aufgelistet. Kein erneuter Format- oder Sprachumbau ohne eigene Freigabe.
+Zusätzlich wurde von Hand geprüft, dass ein Programm mit 18 `VAR`-Parametern
+— jenseits der alten 16-Bit-Maske — samt Records und Enums über `pplc` und `ppld`
+den vollständigen Weg Quelle → PPE → Quelle → PPE fehlerfrei durchläuft.
+
+**Noch offene und bewusst vertagte Anforderungen:** F5 (`Fade`-Vertrag, R2),
+F6 (Skalierung des Board-/Benutzerzugriffs, A3), A1–A6, die drei Abnahme-PPEs
+E1–E3 samt Client-Matrix sowie die unter C2 genannten Restpunkte.
+
+**Kein erneuter Format- oder Sprachumbau ohne eigene Freigabe.**
 
 ## Runtime- und API-Arbeitspakete
 
@@ -707,7 +768,7 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 
 - [x] P0 abgeschlossen; stabiler Build und reproduzierbare Baseline.
 - [x] S1–S6 jeweils einzeln besprochen; freigegebene Änderungen umgesetzt.
-- [x] C1 separat entschieden, C2 umgesetzt; anschließend S7 abgeschlossen. — C1/C2 erledigt, S7 offen.
+- [x] C1 separat entschieden, C2 umgesetzt; anschließend S7 abgeschlossen.
 - [x] F1: Unicode-Datei-Roundtrip nachgewiesen (S5, vorgezogener UTF-8-Literalteil).
 - [x] F2: Beschlossenes Größen-/Limitkonzept umgesetzt und an Grenzen getestet.
 - [x] F3: Host-Enum- und API-Evolution mit alten PPE-Dateien nachgewiesen.

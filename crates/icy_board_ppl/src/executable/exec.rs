@@ -107,6 +107,21 @@ pub struct Executable {
     pub user_types: Vec<Vec<RecordField>>,
     pub script_buffer: Vec<i16>,
     pub in_memory_script: Option<super::PPEScript>,
+    /// Optional sections this loader does not interpret, kept so writing the file
+    /// back does not silently drop a future writer's data.
+    pub extra_sections: Vec<super::container::Section>,
+    /// Declared names, present only when the program was built with debug data.
+    pub debug_info: Option<DebugInfo>,
+}
+
+/// Names the runtime does not need. Stripping them changes no behaviour and
+/// leaves the content identity untouched.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DebugInfo {
+    /// Record name and field names, in `user_types` order.
+    pub records: Vec<(String, Vec<String>)>,
+    /// Enum name and member names, keyed by type id.
+    pub enums: std::collections::BTreeMap<u32, (String, Vec<String>)>,
 }
 
 static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
@@ -295,9 +310,9 @@ impl Executable {
                         variable_type: VariableType::from(field[0]),
                         dim: field[1],
                         is_dynamic: false,
-                        vector_size: u16::from_le_bytes(field[2..4].try_into()?),
-                        matrix_size: u16::from_le_bytes(field[4..6].try_into()?),
-                        cube_size: u16::from_le_bytes(field[6..8].try_into()?),
+                        vector_size: u16::from_le_bytes(field[2..4].try_into()?) as usize,
+                        matrix_size: u16::from_le_bytes(field[4..6].try_into()?) as usize,
+                        cube_size: u16::from_le_bytes(field[6..8].try_into()?) as usize,
                     });
                 }
                 i += field_count * RECORD_FIELD_SIZE;
@@ -389,6 +404,8 @@ impl Executable {
             user_types,
             script_buffer,
             in_memory_script: None,
+            extra_sections: Vec::new(),
+            debug_info: None,
         })
     }
 
@@ -454,14 +471,16 @@ impl Executable {
                 ENUM_TYPE_TABLE_FORMAT
             });
             buffer.push(self.user_types.len() as u8);
-            for fields in &self.user_types {
+            for (index, fields) in self.user_types.iter().enumerate() {
+                let type_id = FIRST_USER_TYPE_ID + index;
                 buffer.push(fields.len() as u8);
-                for field in fields {
+                for (field_index, field) in fields.iter().enumerate() {
                     buffer.push(field.variable_type.into());
                     buffer.push(field.dim);
-                    buffer.extend_from_slice(&field.vector_size.to_le_bytes());
-                    buffer.extend_from_slice(&field.matrix_size.to_le_bytes());
-                    buffer.extend_from_slice(&field.cube_size.to_le_bytes());
+                    for bound in [field.vector_size, field.matrix_size, field.cube_size] {
+                        let bound = u16::try_from(bound).map_err(|_| ExecutableError::InvalidTypeFieldDimensions(type_id, field_index))?;
+                        buffer.extend_from_slice(&bound.to_le_bytes());
+                    }
                 }
             }
             if !self.variable_table.enums.is_empty() {
@@ -512,6 +531,8 @@ impl Default for Executable {
             user_types: Vec::new(),
             script_buffer: Vec::new(),
             in_memory_script: None,
+            extra_sections: Vec::new(),
+            debug_info: None,
         }
     }
 }

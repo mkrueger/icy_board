@@ -757,16 +757,17 @@ impl PPECompiler {
         if declaration_count > declaration_limit {
             return Err(CompilationErrorType::TooManyDeclarations(declaration_count, declaration_limit));
         }
-        let script_size = self
-            .commands
-            .statements
-            .iter()
-            .map(|statement| statement.command.get_size())
-            .sum::<usize>()
-            .saturating_mul(2);
-        let code_limit = if self.runtime >= 400 { 32 * 1024 * 1024 } else { i16::MAX as usize };
-        if script_size > code_limit {
-            return Err(CompilationErrorType::ProgramTooLarge(script_size, code_limit));
+        if self.runtime < 400 {
+            let script_size = self
+                .commands
+                .statements
+                .iter()
+                .map(|statement| statement.command.get_size())
+                .sum::<usize>()
+                .saturating_mul(2);
+            if script_size > i16::MAX as usize {
+                return Err(CompilationErrorType::ProgramTooLarge(script_size, i16::MAX as usize));
+            }
         }
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
@@ -870,6 +871,18 @@ impl PPECompiler {
         } else {
             None
         };
+        if let Some(script) = &in_memory_script
+            && self.runtime >= 400
+        {
+            let limit = crate::executable::container::LoadLimits::default().section_bytes as usize;
+            let size = crate::executable::code400::encoded_size(script).map_err(|error| CompilationErrorType::InvalidLoweredProgram {
+                command_index: 0,
+                reason: error.to_string(),
+            })?;
+            if size > limit {
+                return Err(CompilationErrorType::ProgramTooLarge(size, limit));
+            }
+        }
         let script_buffer = if in_memory_script.is_some() {
             for id in 1..=variable_table.len() {
                 let entry = variable_table.get_var_entry_mut(id);
@@ -895,12 +908,40 @@ impl PPECompiler {
             }
             script_buffer
         };
+        let debug_info = (self.runtime >= 400).then(|| crate::executable::DebugInfo {
+            records: definitions
+                .iter()
+                .filter(|definition| used_types.contains(&(definition.id as u32)))
+                .map(|definition| {
+                    (
+                        definition.name.to_string(),
+                        definition.fields.iter().map(|(name, _)| name.to_string()).collect(),
+                    )
+                })
+                .collect(),
+            enums: variable_table
+                .enums
+                .keys()
+                .filter_map(|id| {
+                    let definition = self.semantic_visitor.type_registry.get_enum_from_id(*id)?;
+                    // Positional: aliases share a value but keep their own name.
+                    let members = definition
+                        .domain
+                        .iter()
+                        .enumerate()
+                        .map(|(index, _)| definition.variants.get(index).map_or_else(String::new, |(name, _)| name.to_string()));
+                    Some((*id, (definition.name.to_string(), members.collect())))
+                })
+                .collect(),
+        });
         Ok(Executable {
             runtime: self.runtime,
             variable_table,
             user_types,
             script_buffer,
             in_memory_script,
+            extra_sections: Vec::new(),
+            debug_info,
         })
     }
 

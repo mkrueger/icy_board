@@ -48,14 +48,22 @@ pub struct DecompilerIssue {
     pub bug: DeserializationErrorType,
 }
 
-/// The name a record gets in the output. The PPE stores field types only, so
-/// every name here is made up.
+/// The name a record gets in the output. Without debug data the PPE stores field
+/// types only, so every name here is made up.
 fn user_type_name(index: usize) -> unicase::Ascii<String> {
     unicase::Ascii::new(format!("TYPE{:03}", index + 1))
 }
 
 fn user_field_name(index: usize) -> unicase::Ascii<String> {
     unicase::Ascii::new(format!("FIELD{:03}", index + 1))
+}
+
+/// A stored name is only usable when it can be written back as an identifier.
+fn stored_name(name: &str) -> Option<unicase::Ascii<String>> {
+    let mut characters = name.chars();
+    let valid = characters.next().is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+        && characters.all(|character| character.is_ascii_alphanumeric() || character == '_');
+    valid.then(|| unicase::Ascii::new(name.to_string()))
 }
 
 fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, HashMap<u32, u32>, Vec<u32>), DeserializationError> {
@@ -85,17 +93,27 @@ fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, Has
             enum_ids.insert(id, id);
             continue;
         }
-        let name = unicase::Ascii::new(format!("ENUM{id:03}"));
+        let debug = executable.debug_info.as_ref().and_then(|names| names.enums.get(&id));
+        let name = debug
+            .and_then(|(name, _)| stored_name(name))
+            .unwrap_or_else(|| unicase::Ascii::new(format!("ENUM{id:03}")));
         let variants = values
             .iter()
             .enumerate()
-            .map(|(index, value)| (unicase::Ascii::new(format!("MEMBER{:03}", index + 1)), *value))
+            .map(|(index, value)| {
+                let member = debug
+                    .and_then(|(_, members)| members.get(index))
+                    .and_then(|member| stored_name(member))
+                    .unwrap_or_else(|| unicase::Ascii::new(format!("MEMBER{:03}", index + 1)));
+                (member, *value)
+            })
             .collect();
         let source_id = registry.declare_enum(name, variants).ok_or_else(no_room)?;
         enum_ids.insert(id, source_id);
         declared_enums.push(source_id);
     }
     for (i, fields) in executable.user_types.iter().enumerate() {
+        let debug = executable.debug_info.as_ref().and_then(|names| names.records.get(i));
         let fields = fields
             .iter()
             .enumerate()
@@ -106,10 +124,15 @@ fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, Has
                 {
                     field.variable_type = VariableType::UserData(*source_id);
                 }
-                (user_field_name(j), field)
+                let name = debug
+                    .and_then(|(_, names)| names.get(j))
+                    .and_then(|name| stored_name(name))
+                    .unwrap_or_else(|| user_field_name(j));
+                (name, field)
             })
             .collect();
-        registry.declare_user_type(user_type_name(i), fields).ok_or_else(no_room)?;
+        let name = debug.and_then(|(name, _)| stored_name(name)).unwrap_or_else(|| user_type_name(i));
+        registry.declare_user_type(name, fields).ok_or_else(no_room)?;
     }
     Ok((registry, enum_ids, declared_enums))
 }
@@ -328,6 +351,7 @@ impl Decompiler {
             )));
         }
         for (i, fields) in self.executable.user_types.iter().enumerate() {
+            let type_id = (crate::parser::FIRST_USER_TYPE_ID + i) as u32;
             let fields = fields
                 .iter()
                 .enumerate()
@@ -335,9 +359,8 @@ impl Decompiler {
                     let dimensions = [field.vector_size, field.matrix_size, field.cube_size]
                         .into_iter()
                         .take(field.dim as usize)
-                        .map(usize::from)
                         .collect();
-                    let mut variable = VariableSpecifier::empty(user_field_name(j), dimensions);
+                    let mut variable = VariableSpecifier::empty(self.field_name(type_id, j), dimensions);
                     if field.is_dynamic {
                         *variable.get_dimensions_mut() = vec![crate::ast::DimensionSpecifier::dynamic(); field.dim as usize];
                     }
@@ -350,7 +373,7 @@ impl Decompiler {
                 .collect();
             ast.nodes.push(AstNode::TypeDeclaration(TypeDeclarationAstNode::new(
                 Spanned::create_empty(Token::Type),
-                Spanned::create_empty(Token::Identifier(user_type_name(i))),
+                Spanned::create_empty(Token::Identifier(self.type_name(type_id).unwrap_or_else(|| user_type_name(i)))),
                 fields,
                 Spanned::create_empty(Token::EndType),
             )));
@@ -383,6 +406,14 @@ impl Decompiler {
         } else {
             VariableType::BigStr
         }
+    }
+
+    /// Declared field name when the PPE carried debug data, a made up one otherwise.
+    fn field_name(&self, type_id: u32, index: usize) -> unicase::Ascii<String> {
+        self.type_registry
+            .get_record_type_from_id(type_id)
+            .and_then(|record| record.fields.get(index).map(|(name, _)| name.clone()))
+            .unwrap_or_else(|| user_field_name(index))
     }
 
     fn type_name(&self, type_id: u32) -> Option<unicase::Ascii<String>> {
@@ -675,7 +706,7 @@ impl Decompiler {
                     .iter()
                     .map(|(field_id, value)| {
                         crate::ast::RecordLiteralField::new(
-                            Spanned::create_empty(Token::Identifier(user_field_name(*field_id))),
+                            Spanned::create_empty(Token::Identifier(self.field_name(*type_id, *field_id))),
                             self.type_registry
                                 .get_record_type_from_id(*type_id)
                                 .and_then(|record| record.field_type(*field_id))

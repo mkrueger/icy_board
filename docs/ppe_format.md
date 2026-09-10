@@ -100,12 +100,12 @@ not understand.
 | `DBUG` | no | variable names |
 | `META` | no | reserved; recognised but carries no meaning yet |
 
-**Unknown data is not silently ignored.** An unknown kind, an unknown schema or
-an unknown compression value is skipped when the section is optional and rejected
-when it is required. A future writer can therefore add optional sections without
-breaking this loader, while a file that genuinely needs a newer loader is refused
-instead of running with parts of its meaning missing. `META` is reserved for such
-future metadata; today a required `META` is rejected and an optional one skipped.
+**Unknown data is not silently dropped.** An unknown kind or an unknown schema is
+rejected when the section is required, and kept verbatim when it is optional, so
+writing the file back does not lose a future writer's data. An unknown
+compression value is not a future section but a malformed one: compression is a
+container-version-1 mechanic, so the whole file is rejected. `META` is reserved
+for future metadata and is treated like any other optional section today.
 
 ### Compression
 
@@ -122,20 +122,29 @@ match what the frame produces.
 
 ### Content identity
 
-`IDEN` holds a 32 byte SHA-256 digest over the runtime, the entry routine and
-every section except `IDEN` and `DBUG`, each with its kind, schema, flags, entry
-count and payload. Two files that differ only in compression or in stripped debug
-names therefore have the same identity. Encoding is deterministic: the same
-program and the same options produce the same bytes.
+`IDEN` holds a 32 byte SHA-256 digest over the runtime, the entry routine and the
+six program sections, each with its kind, schema, flags, entry count and payload.
+
+The digest deliberately covers the program and nothing else. Repacking a file,
+stripping its debug names or adding an optional section therefore leaves the
+identity valid, which is what makes those operations safe for a reader that only
+knows this version of the format.
 
 This is an integrity and identity check, not authentication. The format carries
 no signature and no encryption, and a digest proves nothing about who wrote a file.
 
 ### Debug data
 
-`DBUG` carries one UTF-8 name per variable and nothing else — no source paths, no
-source text, no line numbers. `pplc` omits it unless `--debug` is given. Without
-it the loader generates names the same way the decompiler always has.
+`DBUG` carries the names the runtime does not need: one per variable, then the
+record and field names, then the enum and member names. It holds no source paths,
+no source text and no line numbers.
+
+Its structure always matches the program even when a name is unknown, in which
+case the name is empty and the reader falls back to a generated one. `pplc` omits
+the whole section unless `--debug` is given; a stripped and an unstripped build of
+the same program have the same content identity and behave identically. With the
+names present the decompiler reproduces the declared record, field and enum names
+instead of inventing `TYPE001`.
 
 ### Section payloads
 
@@ -205,6 +214,11 @@ bound; they are not the widths the format can express.
 | Fields per record | 4,096 |
 | Parameters per routine | 4,096 |
 | Locals per routine | 65,536 |
+
+Record field bounds are stored and held in memory as 32 bit values; only the
+abandoned legacy type table was limited to 16 bit. The compiler measures a
+program against the `CODE` section it actually produces, not against the byte
+count of the old word encoding.
 
 ### Validation before execution
 
@@ -509,6 +523,22 @@ The table stores field **layouts** and ordered enum domains, not source names:
   this is the first declared member, not necessarily zero.
 
 The table is written plain. It is not encrypted and not packed.
+
+## Legacy limits
+
+Unlike the 400 limits, these are not budgets a loader picked. They follow from
+the field widths above and cannot be raised without changing the format.
+
+| Limit | Value | Where it comes from |
+| :--- | ---: | :--- |
+| Code per program | 32,767 bytes | 16 bit code size field |
+| Variable table entries | 32,767 | 16 bit entry count |
+| Parameters per routine | 255 | one byte parameter count |
+| `VAR` parameters per procedure | 16 | 16 bit pass mask |
+| Locals per routine | 254 | one byte local count |
+| Records and enums per program | 156 shared ids, 100 to 255 | one byte type id |
+| Fields per record | 255 | one byte field count |
+| String literal | 65,534 bytes plus terminator | 16 bit payload length |
 
 ## Code
 

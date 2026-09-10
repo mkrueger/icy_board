@@ -307,11 +307,11 @@ fn records_survive_decompilation() {
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
     let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
 
-    assert!(text.contains("TYPE TYPE001"), "no type declaration in:\n{text}");
-    assert!(text.contains("INTEGER FIELD001"), "no first field in:\n{text}");
-    assert!(text.contains("STRING FIELD002"), "no second field in:\n{text}");
+    assert!(text.contains("TYPE Point"), "no type declaration in:\n{text}");
+    assert!(text.contains("INTEGER X"), "no first field in:\n{text}");
+    assert!(text.contains("STRING Label"), "no second field in:\n{text}");
     assert!(text.contains("ENDTYPE"), "type block not closed in:\n{text}");
-    assert!(text.contains(".FIELD001 = 42"), "no member assignment in:\n{text}");
+    assert!(text.contains(".X = 42"), "no member assignment in:\n{text}");
 
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
@@ -333,7 +333,7 @@ fn unbounded_string_storage_decompiles_as_string_in_ppl400() {
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
 
     let modern = decompile_to_text(executable.clone(), LAST_PPL_LANGUAGE_VERSION);
-    assert!(modern.contains("STRING FIELD001"), "record field leaked storage type:\n{modern}");
+    assert!(modern.contains("STRING Text"), "record field leaked storage type:\n{modern}");
     assert!(modern.contains("STRING STR001"), "global leaked storage type:\n{modern}");
     assert!(
         modern.contains("FUNCTION FUNC001(STRING PAR001) STRING"),
@@ -359,9 +359,9 @@ fn array_fields_survive_decompilation() {
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
     let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
 
-    assert!(text.contains("INTEGER FIELD001[10]"), "no vector field in:\n{text}");
-    assert!(text.contains("STRING FIELD002[2,3]"), "no matrix field in:\n{text}");
-    assert!(text.contains(".FIELD001(4) = 42"), "no indexed assignment in:\n{text}");
+    assert!(text.contains("INTEGER Values[10]"), "no vector field in:\n{text}");
+    assert!(text.contains("STRING Grid[2,3]"), "no matrix field in:\n{text}");
+    assert!(text.contains(".Values(4) = 42"), "no indexed assignment in:\n{text}");
 
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
@@ -485,7 +485,7 @@ fn record_literals_survive_decompilation() {
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
     let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
 
-    assert!(text.contains("TYPE001 { FIELD002 = 2, FIELD001 = 1 }"), "record literal lost in:\n{text}");
+    assert!(text.contains("Point { Y = 2, X = 1 }"), "record literal lost in:\n{text}");
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|error| panic!("does not compile again:\n{text}\n{error}"));
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
 }

@@ -482,9 +482,13 @@ fn test_record_field_arrays_keep_their_dimensions() {
 
 #[test]
 fn test_a_record_field_dimension_must_fit_the_runtime_format() {
-    let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Values(65536)\nENDTYPE\n");
-    let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
-    assert_eq!(vec!["Record field 'Values' has a dimension above 65535"], errors);
+    let (_, registry, errors) = parse_types("TYPE Rec\n  INTEGER Wide(65536)\nENDTYPE\n");
+    assert!(errors.lock().unwrap().errors.is_empty(), "the sectioned container stores 32 bit bounds");
+    let record = registry.get_user_type(&unicase::Ascii::new("Rec".to_string())).unwrap();
+    assert_eq!(
+        Some((1, 65536, 0, 0)),
+        record.field(0).map(|field| (field.dim, field.vector_size, field.matrix_size, field.cube_size))
+    );
 }
 
 #[test]

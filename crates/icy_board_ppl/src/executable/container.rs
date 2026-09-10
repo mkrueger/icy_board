@@ -205,14 +205,16 @@ impl Container {
             if stored > 0 {
                 ranges.push((offset, range_end));
             }
-            if !SECTION_KINDS.contains(&kind) || schema != 1 || compression > 1 {
-                if flags & REQUIRED != 0 {
-                    return Err(ContainerError::Unsupported(format!(
-                        "section {:?}, schema {schema}, compression {compression}",
-                        String::from_utf8_lossy(&kind)
-                    )));
-                }
-                continue;
+            // Compression is a container-version-1 mechanic, so an unknown code is
+            // malformed rather than a section this loader may skip.
+            if compression > 1 {
+                return Err(ContainerError::Invalid("section compression"));
+            }
+            if (!SECTION_KINDS.contains(&kind) || schema != 1) && flags & REQUIRED != 0 {
+                return Err(ContainerError::Unsupported(format!(
+                    "section {:?}, schema {schema}",
+                    String::from_utf8_lossy(&kind)
+                )));
             }
             total = total.checked_add(decoded).ok_or(ContainerError::Limit("decoded bytes"))?;
             if decoded > limits.section_bytes || total > limits.decoded_bytes {
@@ -295,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn unknown_optional_is_skipped_but_required_is_rejected() {
+    fn unknown_optional_is_preserved_but_required_is_rejected() {
         let limits = LoadLimits::default();
         let mut program = sample();
         let mut extension = Section::new(*b"FUTR", 1, vec![42]);
@@ -303,7 +305,7 @@ mod tests {
         program.sections.push(extension);
         assert_eq!(
             Container::decode(&program.encode(Compression::None, &limits).unwrap(), &limits).unwrap(),
-            sample()
+            program
         );
         program.sections.last_mut().unwrap().flags = REQUIRED;
         assert!(matches!(

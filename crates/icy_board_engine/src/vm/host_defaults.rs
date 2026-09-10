@@ -248,8 +248,8 @@ mod tests {
                     RecordField {
                         dim: rank,
                         vector_size: 1,
-                        matrix_size: u16::from(rank >= 2),
-                        cube_size: u16::from(rank >= 3),
+                        matrix_size: usize::from(rank >= 2),
+                        cube_size: usize::from(rank >= 3),
                         ..RecordField::scalar(VariableType::UserData(102))
                     },
                 ],

@@ -24,7 +24,7 @@ pub use variable_table::*;
 pub mod exec;
 pub use exec::*;
 
-mod code400;
+pub(crate) mod code400;
 pub mod container;
 mod format400;
 pub mod imports400;

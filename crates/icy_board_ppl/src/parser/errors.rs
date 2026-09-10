@@ -180,7 +180,7 @@ pub enum ParserErrorType {
     #[error("A type can't hold a field of its own type ('{0}')")]
     TypeUsedInItself(unicase::Ascii<String>),
 
-    #[error("Record field '{0}' has a dimension above 65535")]
+    #[error("Record field '{0}' has a dimension the PPE format cannot store")]
     TypeFieldDimensionTooLarge(unicase::Ascii<String>),
 
     #[error("Record field '{0}' cannot have an initializer")]

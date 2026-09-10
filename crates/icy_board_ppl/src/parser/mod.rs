@@ -394,7 +394,7 @@ impl<'a> Parser<'a> {
             };
             while let Some(specifier) = self.parse_var_info(false) {
                 let field_name = specifier.get_identifier().clone();
-                if specifier.get_dimensions().iter().any(|dimension| dimension.get_dimension() > u16::MAX as usize) {
+                if specifier.get_dimensions().iter().any(|dimension| dimension.get_dimension() > u32::MAX as usize) {
                     self.error_reporter.lock().unwrap().report_error(
                         specifier.get_identifier_token().span.clone(),
                         ParserErrorType::TypeFieldDimensionTooLarge(field_name.clone()),
@@ -451,9 +451,9 @@ impl<'a> Parser<'a> {
                         variable_type: field.get_variable_type(),
                         dim: dimensions.len() as u8,
                         is_dynamic,
-                        vector_size: if is_dynamic { 0 } else { field.get_specifier().get_vector_size() as u16 },
-                        matrix_size: if is_dynamic { 0 } else { field.get_specifier().get_matrix_size() as u16 },
-                        cube_size: if is_dynamic { 0 } else { field.get_specifier().get_cube_size() as u16 },
+                        vector_size: if is_dynamic { 0 } else { field.get_specifier().get_vector_size() },
+                        matrix_size: if is_dynamic { 0 } else { field.get_specifier().get_matrix_size() },
+                        cube_size: if is_dynamic { 0 } else { field.get_specifier().get_cube_size() },
                     },
                 )
             })

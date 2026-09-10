@@ -107,6 +107,73 @@ fn s5_literal_file_roundtrip_uses_runtime_not_language() {
     );
 }
 
+/// S7: the language contracts decided in S1-S6 have to hold together in one
+/// program that is written, loaded, decompiled and rebuilt as a real file.
+#[test]
+fn s7_language_contracts_hold_together_in_one_file() {
+    use icy_board_engine::executable::container::Compression;
+    let source = format!(
+        r#";$LANGVERSION 400
+ENUM Shade
+ First = 7
+ Second = -3
+ENDENUM
+TYPE Item
+ SURFACE image
+ INTEGER values[]
+ Shade tone
+ STRING label
+ENDTYPE
+DECLARE PROCEDURE Fill(VAR INTEGER slot, VAR STRING text)
+Item box
+INTEGER numbers(3)
+STRING word
+BOOLEAN guard
+ON ERROR GOTO Failed
+REDIM box.values, 2
+box.values[2] = 17
+box.tone = Shade(TOINTEGER(Shade.Second))
+box.label = "{TEXT}"
+guard = FALSE && (1 / 0)
+Fill(numbers(3), word)
+PRINTLN box.values[2], "|", box.tone, "|", box.label.Len(), "|", numbers(3), "|", word, "|", guard
+FOPEN 1, "missing.dat", O_RD, S_DN
+PRINTLN "not reached"
+EXIT
+:Failed
+PRINTLN "handler"
+PROCEDURE Fill(VAR INTEGER slot, VAR STRING text)
+ slot = 42
+ text = "done"
+ENDPROC
+"#
+    );
+    let expected = "17|-3|5|42|done|0\nhandler\n";
+    let executable = compile(&source, 400, 400);
+
+    for compression in [Compression::None, Compression::Zstd] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("s7.ppe");
+        std::fs::write(&path, executable.to_buffer_with_compression(compression).unwrap()).unwrap();
+        let loaded = Executable::read_file(&path, false).unwrap();
+        assert_eq!(run(&loaded), expected, "compression {compression:?}");
+
+        // Declared names survive, and the rebuilt program behaves the same.
+        let (ast, issues) = decompile(loaded, false, 400).unwrap();
+        assert!(issues.is_empty(), "{} decompiler issues", issues.len());
+        let mut visitor = OutputVisitor::default();
+        visitor.version = 400;
+        ast.visit(&mut visitor);
+        assert!(
+            visitor.output.contains("TYPE Item") && visitor.output.contains("Shade tone"),
+            "{}",
+            visitor.output
+        );
+        assert!(visitor.output.contains("ENUM Shade"), "{}", visitor.output);
+        assert_eq!(run(&reload(&compile(&visitor.output, 400, 400))), expected, "{}", visitor.output);
+    }
+}
+
 #[test]
 fn c2_wide_code_parameters_and_composed_records_survive_files() {
     use icy_board_engine::executable::container::Compression;

@@ -86,6 +86,48 @@ fn integer_bit_helpers_inside_casts_do_not_gain_invalid_operand_casts() {
     }
 }
 
+#[test]
+fn debug_data_carries_declared_type_field_and_member_names() {
+    let source = format!("{DOMAIN}TYPE Paint\n Shade Tone\nENDTYPE\nPaint paint\npaint.Tone = Shade.Second\nPRINT paint.Tone\n");
+    let executable = compile(&source, 400);
+
+    let named = Executable::from_buffer(&mut executable.to_buffer().unwrap(), false).unwrap();
+    let debug = named.debug_info.as_ref().expect("debug data is written by default");
+    assert_eq!(debug.records, vec![("Paint".to_string(), vec!["Tone".to_string()])]);
+    assert!(
+        debug
+            .enums
+            .values()
+            .any(|(name, members)| name == "Shade" && members.contains(&"Second".to_string()))
+    );
+
+    let (ast, issues) = decompile(named.clone(), false, 400).unwrap();
+    assert!(issues.is_empty());
+    let text = source_text(&ast, 400);
+    assert!(text.contains("TYPE Paint") && text.contains("Shade Tone"), "{text}");
+    assert!(text.contains("ENUM Shade") && text.contains("Shade.Second"), "{text}");
+    assert_eq!("-3", run(&reload(&compile(&text, 400))).unwrap());
+
+    // Stripping the names changes neither behaviour nor the content identity.
+    let stripped = executable
+        .to_buffer_with_options(icy_board_engine::executable::container::Compression::None, false)
+        .unwrap();
+    let loaded = Executable::from_buffer(&mut stripped.clone(), false).unwrap();
+    assert!(loaded.debug_info.is_none());
+    assert_eq!("-3", run(&loaded).unwrap());
+    let identity = |bytes: &[u8]| {
+        icy_board_engine::executable::container::Container::decode(bytes, &Default::default())
+            .unwrap()
+            .sections
+            .iter()
+            .find(|section| section.kind == *b"IDEN")
+            .unwrap()
+            .data
+            .clone()
+    };
+    assert_eq!(identity(&executable.to_buffer().unwrap()), identity(&stripped));
+}
+
 fn compile(source: &str, language: u16) -> Executable {
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -104,8 +146,13 @@ fn compile(source: &str, language: u16) -> Executable {
     compiler.create_executable().unwrap()
 }
 
+/// These tests prove nominal identity survives without any declared names, so
+/// they deliberately strip the optional debug section.
 fn reload(executable: &Executable) -> Executable {
-    Executable::from_buffer(&mut executable.to_buffer().unwrap(), false).unwrap()
+    let mut bytes = executable
+        .to_buffer_with_options(icy_board_engine::executable::container::Compression::None, false)
+        .unwrap();
+    Executable::from_buffer(&mut bytes, false).unwrap()
 }
 
 fn source_text(ast: &Ast, language: u16) -> String {

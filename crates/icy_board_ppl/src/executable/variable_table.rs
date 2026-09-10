@@ -29,9 +29,9 @@ pub struct RecordField {
     pub dim: u8,
     /// In-memory only; dynamic fields have rank 1..=3 and zero stored bounds.
     pub is_dynamic: bool,
-    pub vector_size: u16,
-    pub matrix_size: u16,
-    pub cube_size: u16,
+    pub vector_size: usize,
+    pub matrix_size: usize,
+    pub cube_size: usize,
 }
 
 impl RecordField {
@@ -56,7 +56,7 @@ impl RecordField {
         let bounds = [self.vector_size, self.matrix_size, self.cube_size];
         bounds[..self.dim as usize]
             .iter()
-            .try_fold(1usize, |count, bound| count.checked_mul(*bound as usize + 1))
+            .try_fold(1usize, |count, bound| count.checked_mul(*bound + 1))
             .filter(|count| *count <= super::variable_value::MAX_ARRAY_SIZE)
     }
 

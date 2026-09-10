@@ -1309,7 +1309,7 @@ impl VirtualMachine<'_> {
         if field.dim > 0 && !compatible_element_type(value.vtype) {
             return Err(VMError::AssignmentTypeMismatch(expected, value.vtype).into());
         }
-        let bounds = [field.vector_size as usize + 1, field.matrix_size as usize + 1, field.cube_size as usize + 1];
+        let bounds = [field.vector_size + 1, field.matrix_size + 1, field.cube_size + 1];
         match &value.generic_data {
             GenericVariableData::Dim1(values) => {
                 if !field.is_dynamic && values.len() != bounds[0] {
