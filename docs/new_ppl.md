@@ -1717,13 +1717,34 @@ X00.EXE E
 ICEEDIT.EXE /D:C:\DOOR /N:1
 ```
 
-Set ICE Edit's **Errorlevels** option to **Yes**. This is an interoperability
-test configuration, not a claim of complete ICE support: ICE Edit 2.35 with
-X00 1.24 starts using DORINFO alone and passes a rendered 80x25 metadata and
-inactivity-abort check. The save test still fails because injected remote keys
-do not appear in the editor; it times out instead. Both burst and paced input
-were tested. The cause in the ICE/X00/native-emulator interaction remains open.
-The existing EXITINFO binary layout has not been independently verified.
+Set ICE Edit's **Errorlevels** option to **Yes**. With X00 1.24, ICE Edit 2.35
+requires the locally tested native-x86 UART fix that acknowledges THRE
+interrupts. The pinned dependency does not yet include that fix. Using the
+local override, DORINFO alone passes rendered 80x25 metadata, visible input,
+save and confirmed user-abort checks. However, opening ICE's quote window in
+the complete LiQUiD Read reply test produces excessive space output and
+times out. Complete ICE compatibility is therefore not established.
+The EXITINFO binary layout has not been independently verified.
+
+GEdit 2.10 has a verified direct-COM configuration that needs no X00 and works
+with the pinned emulator dependency:
+
+```bat
+@ECHO OFF
+SET GEDIT=BBS:DORINFO
+GEDIT.EXE 1 57600 30 15 -N1 -A1 -R25
+```
+
+Use DOS mode, this startup batch as the command, and `DorInfo` as the dropfile.
+The arguments above are the tested one-node, 25-row configuration. Both ICE
+and GEdit treat incoming MSGTMP as a quote source, not an automatically loaded
+draft. In GEdit, Ctrl-Q opens the quote window, Enter copies a line, and Ctrl-K
+closes it. Ctrl-Z saves; the tested installation then asks about spell checking,
+answered with N and Enter. Ctrl-O, A, Y, Enter confirms an abort. The real
+LiQUiD Read PPE passed reply/save/abort checks including rendered input, quoted
+original text, JAM persistence, privacy, threading and return to the list.
+This does not establish arbitrary existing-message editing parity. GEdit's
+DORINFO start screen does not display all MSGINF header fields.
 
 ### The session and the user are not the same thing
 

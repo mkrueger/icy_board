@@ -450,4 +450,44 @@ mod tests {
         let error = validate_simple_command(directory.path(), "BRE.BAT").unwrap_err();
         assert!(error.to_string().contains("Install/configure the door"));
     }
+
+    #[tokio::test]
+    #[ignore = "requires ICB_DOS_ASSETS; probes the pinned emulator UART"]
+    async fn freedos_uart_thre_interrupt_is_acknowledged() {
+        let assets = std::path::PathBuf::from(std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS"));
+        let root = tempfile::tempdir().unwrap();
+        let image = root.path().join("uart.img");
+        std::fs::copy(assets.join("freedos.img"), &image).unwrap();
+        // Disable interrupts, enable THRE, read IIR twice, disable THRE, print both results.
+        let program = vec![
+            0xfa, 0xba, 0xfb, 0x03, 0xb0, 0x03, 0xee, 0xba, 0xfa, 0x03, 0x30, 0xc0, 0xee, 0xba, 0xf9, 0x03, 0xb0, 0x02, 0xee, 0x42, 0xec, 0x88, 0xc3, 0xec,
+            0x88, 0xc7, 0x4a, 0x30, 0xc0, 0xee, 0xfb, 0x80, 0xc3, 0x30, 0x80, 0xc7, 0x30, 0xba, 0xf8, 0x03, 0x88, 0xd8, 0xee, 0x88, 0xf8, 0xee, 0xb8, 0x00,
+            0x4c, 0xcd, 0x21,
+        ];
+        inject_session_files(&image, &[("UART.COM".into(), program)], "@ECHO OFF\nC:\\DOOR\\UART.COM").unwrap();
+        let mut session = start_session(
+            &image,
+            &assets.join("seabios.bin"),
+            &assets.join("vgabios.bin"),
+            8,
+            std::time::Duration::from_secs(15),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        loop {
+            tokio::select! {
+                packet = session.output.recv() => {
+                    if let Some(packet) = packet { output.extend(packet); }
+                    else { break; }
+                },
+                result = &mut session.finished => {
+                    result.unwrap().unwrap();
+                    while let Ok(packet) = session.output.try_recv() { output.extend(packet); }
+                    break;
+                },
+            }
+        }
+        let output = String::from_utf8_lossy(&output);
+        assert!(output.contains("21"), "THRE must clear after IIR acknowledgement, serial={output:?}");
+    }
 }

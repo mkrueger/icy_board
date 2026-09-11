@@ -567,6 +567,300 @@ EXIT
 }
 
 #[tokio::test]
+#[ignore = "requires ICB_LIQUID_READ_PPE pointing to the compiled reader package"]
+async fn message_api_liquid_read_real_package() {
+    use icy_engine::TextPane;
+    use icy_net::Connection;
+
+    let path = std::path::PathBuf::from(std::env::var_os("ICB_LIQUID_READ_PPE").expect("ICB_LIQUID_READ_PPE is required"));
+    let executable = crate::executable::Executable::read_file(&path, false).unwrap();
+    let editor_kind = std::env::var("ICB_LIQUID_READ_EDITOR").unwrap_or_else(|_| "ppe".into());
+    assert!(
+        matches!(editor_kind.as_str(), "ppe" | "internal" | "iceedit" | "gedit"),
+        "unknown editor: {editor_kind}"
+    );
+    let dos_editor = matches!(editor_kind.as_str(), "iceedit" | "gedit");
+    for abort in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, mut peer) = fixture(root.path(), "", abort).await;
+        if editor_kind == "internal" {
+            state.session.fse_mode = FSEMode::No;
+            state.get_board().await.config.message.external_editor.mode = ExternalEditorMode::Internal;
+        }
+        if dos_editor {
+            let source_variable = if editor_kind == "gedit" { "ICB_GEDIT_SOURCE" } else { "ICB_ICEEDIT_SOURCE" };
+            let source = std::env::var_os(source_variable).expect(source_variable);
+            let installation = root.path().join("dos-editor");
+            std::fs::create_dir(&installation).unwrap();
+            for entry in std::fs::read_dir(source).unwrap() {
+                let entry = entry.unwrap();
+                if entry.file_type().unwrap().is_file() {
+                    std::fs::copy(entry.path(), installation.join(entry.file_name())).unwrap();
+                }
+            }
+            let driver = std::env::var_os("ICB_FOSSIL_DRIVER");
+            if let Some(driver) = &driver {
+                std::fs::copy(driver, installation.join("X00.EXE")).unwrap();
+            }
+            let command = if editor_kind == "gedit" {
+                "SET GEDIT=BBS:DORINFO\r\nGEDIT.EXE 1 57600 30 15 -N1 -A1 -R25"
+            } else {
+                "ICEEDIT.EXE /D:C:\\DOOR /N:1 /T:30 /K:15"
+            };
+            std::fs::write(
+                installation.join("ICBSTART.BAT"),
+                format!("@ECHO OFF\r\n{}{command}\r\n", if driver.is_some() { "X00.EXE E\r\n" } else { "" }),
+            )
+            .unwrap();
+            let assets = std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS");
+            std::fs::create_dir_all(root.path().join("assets/dos")).unwrap();
+            for name in ["freedos.img", "seabios.bin", "vgabios.bin"] {
+                std::fs::copy(Path::new(&assets).join(name), root.path().join("assets/dos").join(name)).unwrap();
+            }
+            state.get_board().await.config.message.external_editor = ExternalEditorConfig {
+                mode: ExternalEditorMode::Dos,
+                path: installation.to_string_lossy().into(),
+                arguments: "ICBSTART.BAT".into(),
+                drop_file: DropFile::DorInfo,
+                timeout_seconds: 40,
+                ..Default::default()
+            };
+        }
+        state.set_terminal_size(80, 25);
+        state.session.disp_options.grapics_mode = crate::icy_board::state::GraphicsMode::Graphics;
+        state.session.term_caps.is_utf8 = true;
+        let mut io = DiskIO::new(root.path().to_str().unwrap(), None);
+        let mut inputs = ["\r", "r", "\r", "\r", "\r"].map(String::from).to_vec();
+        if editor_kind == "internal" {
+            inputs.truncate(2);
+            inputs.extend(["ICB reader reply\r", "\r"].map(String::from));
+            inputs.extend(if abort { ["A\r", "Y\r"] } else { ["Q 1 1\r", "S\r"] }.map(String::from));
+        }
+        if dos_editor {
+            let default_keys = match (editor_kind.as_str(), abort) {
+                ("gedit", true) => "ICB reader reply\r\x0fay\r",
+                ("iceedit", true) => "ICB reader reply\r\x01y\r",
+                ("gedit", false) => "\x11\r\x0bICB reader reply\r\x1an\r",
+                _ => "\x11\r\x11ICB reader reply\r\x1a",
+            };
+            let keys = std::env::var("ICB_LIQUID_READ_KEYS").unwrap_or_else(|_| default_keys.into());
+            inputs.extend(keys.chars().map(|character| character.to_string()));
+            inputs.push("\r".into());
+        }
+        let editor_input_end = inputs.len();
+        inputs.extend(["\x1b".into(), "\x1b".into()]);
+        let mut typed_text_visible = false;
+        let mut transcript = Vec::new();
+        let drive = async {
+            let trigger = if editor_kind == "gedit" { "[ ^Q=Quote ]" } else { "\x1b[5;1H" };
+            let mut screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
+            for (index, input) in inputs.iter().enumerate() {
+                let deadline = tokio::time::Instant::now() + Duration::from_millis(500);
+                loop {
+                    if dos_editor && index > 5 && index < editor_input_end && tokio::time::Instant::now() >= deadline {
+                        peer.send(input.as_bytes()).await.unwrap();
+                        break;
+                    }
+                    let mut packet = [0; 4096];
+                    // InKey waits 100 ms for a possible ANSI suffix after Escape.
+                    match tokio::time::timeout(Duration::from_millis(150), peer.read(&mut packet)).await {
+                        Ok(read) => {
+                            let count = read.unwrap();
+                            assert_ne!(count, 0);
+                            transcript.extend_from_slice(&packet[..count]);
+                            screen.write_bytes(&packet[..count]);
+                            typed_text_visible |= (0..25).any(|row| {
+                                (0..80)
+                                    .map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                    .collect::<String>()
+                                    .contains("ICB reader reply")
+                            });
+                        }
+                        Err(_) if dos_editor && index == 5 && !String::from_utf8_lossy(&transcript).contains(trigger) => {}
+                        Err(_) => {
+                            peer.send(input.as_bytes()).await.unwrap();
+                            break;
+                        }
+                    }
+                }
+            }
+            std::future::pending::<()>().await;
+        };
+        let result = tokio::time::timeout(Duration::from_secs(if dos_editor { 60 } else { 5 }), async {
+            tokio::select! {
+                result = run(&path, &executable, &mut io, &mut state) => result,
+                () = drive => unreachable!(),
+            }
+        })
+        .await;
+        if let Some(path) = std::env::var_os("ICB_LIQUID_READ_TRANSCRIPT") {
+            std::fs::write(path, &transcript).unwrap();
+        }
+        let screen = (0..25)
+            .map(|row| {
+                (0..80)
+                    .map(|column| state.user_screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            result.is_ok(),
+            "LiQUiD Read did not return; editor={editor_kind}, abort={abort}, buffered={}\n{screen}",
+            state.char_buffer.len()
+        );
+        assert!(result.unwrap().unwrap());
+        assert!(screen.contains("Original subject"), "reader did not restore its list:\n{screen}");
+        let rows = screen.lines().collect::<Vec<_>>();
+        assert_eq!(rows[3].chars().skip(7).take(16).collect::<String>(), "Original subject", "{screen}");
+        assert_eq!(rows[12].chars().skip(2).take(13).collect::<String>(), "Original body", "{screen}");
+        assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
+        let base = JamMessageBase::open(root.path().join("area0")).unwrap();
+        assert_eq!(base.highest_message_number(), if abort { 1 } else { 2 }, "abort={abort}\n{screen}");
+        if editor_kind != "ppe" {
+            assert!(typed_text_visible, "editor input was not rendered; editor={editor_kind}, abort={abort}");
+            assert!(!state.session.request_logoff);
+        }
+        if !abort {
+            let reply = base.read_message(2).unwrap();
+            assert_eq!(reply.header().reply_to, 1);
+            assert!(reply.header().is_private());
+            assert!(reply.text().to_string().contains("Original body"), "saved body: {:?}", reply.text());
+            if editor_kind != "ppe" {
+                assert!(reply.text().to_string().contains("ICB reader reply"));
+                assert_eq!(rows[4].chars().skip(7).take(16).collect::<String>(), "Original subject", "{screen}");
+            } else {
+                assert!(screen.contains("Final subject"), "saved reply missing from refreshed list:\n{screen}");
+            }
+        }
+        assert_eq!(state.session.last_msg_read, 1);
+        assert_eq!(state.session.current_conference_number, 0);
+        assert_eq!(state.session.current_message_area, 0);
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires ICB_LIQUID_READ_PPE pointing to the compiled reader package"]
+async fn message_api_liquid_read_empty_filtered_and_reopened() {
+    use icy_engine::TextPane;
+    use icy_net::Connection;
+
+    let path = std::path::PathBuf::from(std::env::var_os("ICB_LIQUID_READ_PPE").expect("ICB_LIQUID_READ_PPE is required"));
+    let executable = crate::executable::Executable::read_file(&path, false).unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let base_path = root.path().join("reader-cases");
+    let mut base = JamMessageBase::create(&base_path).unwrap();
+    for phase in 0..3 {
+        if phase == 1 {
+            for (subject, recipient, flags, password) in [
+                ("Visible first", "ALL", 0, false),
+                ("Hidden private", "OTHER", attributes::MSG_PRIVATE, false),
+                ("Hidden deleted", "ALL", attributes::MSG_DELETED, false),
+                ("Hidden password", "READER", 0, true),
+                ("Visible alias", "ALT READER", attributes::MSG_PRIVATE, false),
+            ] {
+                let mut message = JamMessage::default()
+                    .with_from("WRITER".into())
+                    .with_to(recipient.into())
+                    .with_subject(subject.into())
+                    .with_text(format!("{subject} body").into())
+                    .with_attributes(flags);
+                if password {
+                    message = message.with_password(&"secret".into());
+                }
+                base.write_message(&message).unwrap();
+            }
+        }
+        let session_root = tempfile::tempdir().unwrap();
+        let (mut state, mut peer) = fixture(session_root.path(), "", false).await;
+        let mut conference = state.session.current_conference.clone();
+        conference.areas = Some(Arc::new(AreaList::new(vec![MessageArea {
+            path: base_path.clone(),
+            name: "Reader cases".into(),
+            ..Default::default()
+        }])));
+        state.get_board().await.conferences[0] = conference.clone();
+        state.session.current_conference = conference;
+        state.session.alias_name = "ALT READER".into();
+        state.set_terminal_size(80, 25);
+        state.session.disp_options.grapics_mode = crate::icy_board::state::GraphicsMode::Graphics;
+        state.session.term_caps.is_utf8 = true;
+        let last_read = r#"
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, U_LMR(AreaId(Session.Conference.Number, Session.Area.Number))
+FCLOSE 1
+EXIT
+"#;
+        assert_eq!(execute(&mut state, session_root.path(), last_read).await, if phase == 2 { "5" } else { "0" });
+        let inputs: &[&str] = match phase {
+            0 => &["\r", "\x1b"],
+            1 => &["\r", "\x1b", "\x1b[B", "\r", "\x1b", "\x1b"],
+            _ => &["\r", "\x1b", "\x1b"],
+        };
+        let drive = async {
+            let mut screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
+            for input in inputs {
+                loop {
+                    let mut packet = [0; 4096];
+                    match tokio::time::timeout(Duration::from_millis(150), peer.read(&mut packet)).await {
+                        Ok(read) => {
+                            let count = read.unwrap();
+                            assert_ne!(count, 0);
+                            screen.write_bytes(&packet[..count]);
+                            let rendered = (0..25)
+                                .map(|row| {
+                                    (0..80)
+                                        .map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                        .collect::<String>()
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            for hidden in ["Hidden private", "Hidden deleted", "Hidden password"] {
+                                assert!(!rendered.contains(hidden), "leaked {hidden}:\n{rendered}");
+                            }
+                        }
+                        Err(_) => {
+                            peer.send(input.as_bytes()).await.unwrap();
+                            break;
+                        }
+                    }
+                }
+            }
+            std::future::pending::<()>().await;
+        };
+        let mut io = DiskIO::new(session_root.path().to_str().unwrap(), None);
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::select! {
+                result = run(&path, &executable, &mut io, &mut state) => result,
+                () = drive => unreachable!(),
+            }
+        })
+        .await
+        .expect("reader case timed out");
+        assert!(result.unwrap());
+        let rows = (0..25)
+            .map(|row| {
+                (0..80)
+                    .map(|column| state.user_screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
+        if phase == 0 {
+            assert_eq!(rows[12].chars().skip(2).take(16).collect::<String>(), "No valid message");
+        } else {
+            assert_eq!(rows[3].chars().skip(7).take(13).collect::<String>(), "Visible first");
+            assert_eq!(rows[4].chars().skip(7).take(13).collect::<String>(), "Visible alias");
+            assert_eq!(rows[4].chars().nth(5), Some('5'));
+            let preview = if phase == 1 { "Visible alias body" } else { "Visible first body" };
+            assert_eq!(rows[12].chars().skip(2).take(preview.len()).collect::<String>(), preview);
+        }
+        assert_eq!(execute(&mut state, session_root.path(), last_read).await, if phase == 0 { "0" } else { "5" });
+        assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
+        assert!(!state.session.request_logoff);
+    }
+}
+
+#[tokio::test]
 async fn message_api_empty_answers_keep_supplied_post_defaults() {
     let root = tempfile::tempdir().unwrap();
     let (mut state, _peer) = fixture(root.path(), "\r\r\r\r", false).await;

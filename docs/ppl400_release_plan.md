@@ -833,12 +833,82 @@ implementiert, die echte DOS-Editor-Abnahme bleibt teilweise offen:
   Kompilierte PPE-Tests decken neue Nachrichten, editierbare Textvorgaben,
   Antworten in der Herkunfts-Area, Bearbeitung, Abbruch und Fehlerfälle ab.
   Siehe [Nachrichten-API und Konfiguration](new_ppl.md#composing-and-editing-messages).
-- **Offen: ICE-Edit-Speichertest.** ICE Edit 2.35 aus der konfigurierten
-  RA-Installation startet mit X00 1.24 und DORINFO1.DEF auch ohne EXITINFO.BBS.
-  Gerenderte Metadaten bei 80x25 und Inaktivitätsabbruch sind geprüft. Gesendete
-  Tastatureingaben erscheinen jedoch nicht, auch nicht zeichenweise; der
-  Speichertest endet im Abbruch. Damit ist vollständige ICE-Kompatibilität
-  noch nicht belegt. LiQUiD Read verwendet den neuen Editoraufruf noch nicht.
+- **DOS-Editoren geprüft (2026-09-11), ICE nur teilweise.** Die fehlende
+  Eingabe mit X00 1.24 wurde auf einen nicht quittierbaren THRE-Interrupt im
+  nativen x86-UART zurückgeführt. Eine unabhängige FreeDOS-Registerprobe liest
+  ohne Fix zweimal Interrupt-ID 2 statt 2 und anschließend 1. Der freigegebene
+  lokale Fix im separaten x86-Repository besteht zwei UART-Unit-Tests und
+  diese DOS-Probe. ICE Edit 2.35 und GEdit 2.10 bestehen damit jeweils sichtbare
+  Texteingabe bei 80x25, Speichern samt zurückgegebenem MSGTMP und bestätigten
+  Benutzerabbruch ohne Logoff. ICE zeigt auch die MSGINF-Metadaten korrekt an;
+  GEdits DORINFO-Startansicht zeigt diese nicht. Die versionierte x86-Abhängigkeit
+  wurde nicht geändert; X00-Ergebnisse gelten bislang nur mit lokalem Override.
+- **GEdit vollständig im Antwortablauf geprüft.** GEdit funktioniert auch
+  ohne X00 direkt über COM1 mit der versionierten Emulator-Abhängigkeit.
+  Der echte Reader-Test übernimmt eine Zitatzeile mit Ctrl-Q, Enter, Ctrl-K,
+  schreibt Antworttext und speichert mit Ctrl-Z. Die anschließende
+  Rechtschreibprüfungsfrage wird mit N und Enter beantwortet. JAM enthält
+  Zitat, Antwort, Privatstatus und Thread-Verknüpfung; nach Benutzerabbruch
+  entsteht keine Nachricht. Der Reader kehrt zur aktualisierten Liste zurück.
+- **Offen: ICE-Quote-Funktion.** Der vollständige Reader-Test mit
+  `ICB_LIQUID_READ_EDITOR=iceedit` bleibt rot: Ctrl-Q zeigt die korrekte
+  Zitatquelle, danach entstehen etwa 2,6 MB Ausgabe überwiegend aus Leerzeichen
+  bis zum Timeout. Begrenztes Warten zwischen Tasten und ein versuchsweiser
+  CRLF-Abschluss von MSGTMP beheben dies nicht. Die CRLF-Probe wurde entfernt.
+  Ursache und vollständige ICE-Kompatibilität bleiben offen; erfolgreiche
+  Eingabe-/Speicher-Einzeltests ersetzen diesen fehlenden Zitatnachweis nicht.
+
+**E2-Zwischenstand (2026-09-11, noch nicht abgenommen).** Der bestehende
+LiQUiD-Read-Port wurde als `956bbc4` gepusht. Die anschließende, noch nicht
+committete Umstellung verwendet `Session.ReplyMessage` statt eines eigenen
+Editors und erfasst `Error.Last()` unmittelbar nach dem Aufruf. Listenaufbau,
+Lesemarkierung und erneute Zugriffsprüfung wurden angepasst. Das Paket
+kompiliert für Runtime 400 mit null Fehlern und zehn Warnungen.
+Der opt-in Test `message_api_liquid_read_real_package` lädt die echte PPE über
+`ICB_LIQUID_READ_PPE` auf einer isolierten In-Memory-Test-BBS mit temporärer
+JAM-Base. Zwei Ursachen des zunächst fehlgeschlagenen Laufs sind nachgewiesen:
+
+- `TOKENIZE` hängt an die vorhandenen Session-Tokens an. Ein Aufruftoken vor
+  den Layoutwerten verschob deshalb die Koordinaten in beiden Reader-Ansichten.
+  Die Konfigurationsloader verwenden jetzt lokale String-Arrays. Der unveränderte
+  Test zeigte danach korrekte Kopfzeilen und Vorschau, aber noch den Timeout.
+- `InKey()` wartet nach Escape bis zu 100 ms auf eine ANSI-Fortsetzung. Der
+  Test sendete das zweite Escape schon nach 30 ms; es wurde beim ersten Aufruf
+  mitverbraucht. Mit 150 ms Eingabeabstand kehrt die PPE zurück. Eine Änderung
+  an Compiler, Runtime oder Nachrichten-API war hierfür nicht nötig.
+
+Der verstärkte Test besteht in getrennten EN-/DE-Prozessen mit kontrolliertem
+PPE-Editor jeweils für Speichern und Abbruch. Er prüft die persistierte Antwort
+samt Thread-Verknüpfung, Privatstatus und zitiertem Originaltext, die aktualisierte
+Liste, exakte Betreff-/Vorschaupositionen bei 80x25, unveränderte Aufruftokens,
+den Sitzungs-Lesestand und die Rückkehr zur ursprünglichen Konferenz/Area.
+Beide Prozesse verwenden die englischen Standard-Board-Texte; eine deutsche
+Dialog-/Reader-Lokalisierung ist damit nicht abgenommen.
+
+Die erweiterte Abnahme besteht ebenfalls mit internem Zeileneditor und echtem
+GEdit, jeweils für Speichern und Abbruch. `ICB_LIQUID_READ_EDITOR` wählt
+`ppe` (Standard), `internal`, `gedit` oder den noch fehlschlagenden ICE-Fall.
+`message_api_liquid_read_empty_filtered_and_reopened` prüft die leere Area,
+sichtbare Nummern 1 und 5 bei ausgeblendeten privaten/gelöschten/geschützten
+Einträgen 2 bis 4, private Aliaszustellung und exakte Vorschaupositionen.
+Verbotene Inhalte dürfen auch während der Bildschirmaktualisierungen nicht
+erscheinen. Eine frische Sitzung liest den persistierten Lesestand 5; erneutes
+Lesen von Nachricht 1 setzt ihn nicht zurück. Dies ist kein BBS-Prozessneustart.
+
+**Ausgeführte Abschlussprüfungen:** `cargo test-low -p icy_board_engine --lib`
+mit Filter `external_editor_ -- --include-ignored --test-threads=1`: 13 Tests
+je EN/DE mit lokalem x86-Pfadoverride. Filter `message_api_liquid_read`
+mit `--ignored`: beide Tests je EN/DE für PPE-, internen und GEdit-Editor.
+Filter `message_api_ -- --include-ignored --test-threads=1`: 21 Tests je EN/DE
+ohne Override und mit GEdit ohne X00. Die Sprachprozesse sind getrennt;
+Board- und DOS-Dialoge bleiben englisch. Die Opt-in-Tests verwenden ausschließlich
+temporäre Installationskopien und Diskimages, keine Änderungen an DOS-Originalen.
+
+Konferenz-/Area-Auswahl, echte Löcher im JAM-Index, parallele Änderungen mit
+Header-/Body-Konsistenz, langer Text/Scrollgrenzen, interner Vollbildeditor und
+deutsche Dialoge bleiben für diese Reader-Abnahme offen. Für ICE fehlt der
+Zitatablauf. E2 ist weiterhin nicht vollständig abgenommen; kein neuer
+Release-Plan-Schritt wurde damit freigegeben.
 
 Ungeprüft geblieben ist, warum `Session.IsSysop` bei einem über `--runppe`
 angemeldeten SYSOP `FALSE` meldet.

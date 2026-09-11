@@ -521,11 +521,43 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires ICB_ICEEDIT_SOURCE and ICB_DOS_ASSETS"]
     async fn external_editor_real_iceedit() {
+        real_dos_editor(false, false).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[ignore = "requires ICB_GEDIT_SOURCE and ICB_DOS_ASSETS"]
+    async fn external_editor_real_gedit() {
+        real_dos_editor(true, false).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[ignore = "requires ICB_ICEEDIT_SOURCE and ICB_DOS_ASSETS"]
+    async fn external_editor_real_iceedit_user_abort() {
+        real_dos_editor(false, true).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[ignore = "requires ICB_GEDIT_SOURCE and ICB_DOS_ASSETS"]
+    async fn external_editor_real_gedit_user_abort() {
+        real_dos_editor(true, true).await;
+    }
+
+    #[cfg(unix)]
+    async fn real_dos_editor(gedit: bool, user_abort: bool) {
         use crate::icy_board::{IcyBoard, bbs::BBS, doors::DropFile, state::GraphicsMode, user_base::User};
         use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
         use std::sync::Arc;
         let root = tempfile::tempdir().unwrap();
-        let source = std::path::PathBuf::from(std::env::var_os("ICB_ICEEDIT_SOURCE").expect("ICB_ICEEDIT_SOURCE"));
+        let source_variable = if gedit { "ICB_GEDIT_SOURCE" } else { "ICB_ICEEDIT_SOURCE" };
+        let source = std::path::PathBuf::from(std::env::var_os(source_variable).expect(source_variable));
+        let editor_command = if gedit {
+            "SET GEDIT=BBS:DORINFO\r\nGEDIT.EXE 1 57600 30 15 -N1 -A1 -R25"
+        } else {
+            "ICEEDIT.EXE /D:C:\\DOOR /N:1 /T:30 /K:15"
+        };
         let installation = root.path().join("iceedit");
         std::fs::create_dir(&installation).unwrap();
         for entry in std::fs::read_dir(&source).unwrap() {
@@ -534,14 +566,15 @@ mod tests {
                 std::fs::copy(entry.path(), installation.join(entry.file_name())).unwrap();
             }
         }
-        if let Some(driver) = std::env::var_os("ICB_FOSSIL_DRIVER") {
+        let driver = std::env::var_os("ICB_FOSSIL_DRIVER");
+        if let Some(driver) = &driver {
             std::fs::copy(driver, installation.join("X00.EXE")).unwrap();
-            std::fs::write(
-                installation.join("ICBSTART.BAT"),
-                b"@ECHO OFF\r\nX00.EXE E\r\nICEEDIT.EXE /D:C:\\DOOR /N:1 /T:30 /K:15\r\n",
-            )
-            .unwrap();
         }
+        std::fs::write(
+            installation.join("ICBSTART.BAT"),
+            format!("@ECHO OFF\r\n{}{editor_command}\r\n", if driver.is_some() { "X00.EXE E\r\n" } else { "" }),
+        )
+        .unwrap();
         let assets = std::path::PathBuf::from(std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS"));
         std::fs::create_dir_all(root.path().join("assets")).unwrap();
         std::os::unix::fs::symlink(assets, root.path().join("assets/dos")).unwrap();
@@ -566,7 +599,7 @@ mod tests {
         let config = ExternalEditorConfig {
             mode: ExternalEditorMode::Dos,
             path: installation.to_string_lossy().to_string(),
-            arguments: std::env::var("ICB_ICEEDIT_COMMAND").unwrap_or_else(|_| "ICEEDIT.EXE /D:C:\\DOOR /N:1 /T:30 /K:15".into()),
+            arguments: std::env::var("ICB_ICEEDIT_COMMAND").unwrap_or_else(|_| "ICBSTART.BAT".into()),
             drop_file: if std::env::var_os("ICB_ICEEDIT_EXITINFO").is_some() {
                 DropFile::ExitInfoBBS
             } else {
@@ -583,16 +616,27 @@ mod tests {
             max_line_length: 79,
             ..Default::default()
         };
-        let abort = std::env::var_os("ICB_ICEEDIT_ABORT").is_some();
+        let idle_abort = std::env::var_os("ICB_ICEEDIT_ABORT").is_some();
+        let abort = idle_abort || user_abort;
         let mut transcript = Vec::new();
         let mut buffer = vec![0; 32768];
-        let trigger = std::env::var("ICB_ICEEDIT_TRIGGER").unwrap_or_else(|_| "\x1b[5;1H".into());
-        let keys = if abort {
+        let trigger = std::env::var("ICB_ICEEDIT_TRIGGER").unwrap_or_else(|_| if gedit { "[ ^Q=Quote ]" } else { "\x1b[5;1H" }.into());
+        let keys = if idle_abort {
             String::new()
         } else {
-            std::env::var("ICB_ICEEDIT_KEYS").unwrap_or_else(|_| "ICB editor roundtrip\r\x1a".into())
+            std::env::var("ICB_ICEEDIT_KEYS").unwrap_or_else(|_| {
+                match (gedit, user_abort) {
+                    (true, true) => "ICB editor roundtrip\r\x0fay\r",
+                    (false, true) => "ICB editor roundtrip\r\x01y\r",
+                    (true, false) => "ICB editor roundtrip\r\x1an\r",
+                    (false, false) => "ICB editor roundtrip\r\x1a",
+                }
+                .into()
+            })
         };
         let mut sent = false;
+        let mut typed_text_visible = false;
+        let mut live_screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
         let mut pending_keys = std::collections::VecDeque::new();
         let mut key_clock = tokio::time::interval(Duration::from_millis(20));
         let result = {
@@ -608,15 +652,24 @@ mod tests {
                         let count = read.unwrap();
                         if count == 0 { panic!("editor connection closed"); }
                         transcript.extend_from_slice(&buffer[..count]);
+                        live_screen.write_bytes(&buffer[..count]);
+                        if !typed_text_visible {
+                            use icy_engine::TextPane;
+                            typed_text_visible = (0..25).any(|row| {
+                                (0..80).map(|column| live_screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                    .collect::<String>().contains("ICB editor roundtrip")
+                            });
+                        }
                         if !sent && String::from_utf8_lossy(&transcript).contains(&trigger) {
                             use icy_engine::TextPane;
                             let mut screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
                             screen.write_bytes(&transcript);
                             assert_eq!((screen.buffer.width(), screen.buffer.height()), (80, 25));
                             let rendered = (0..25).map(|row| (0..80).map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch).collect::<String>()).collect::<Vec<_>>().join("\n");
-                            for text in ["Editor Tester", "Recipient", "ICE editor test", "General"] { assert!(rendered.contains(text), "missing {text}: {rendered}"); }
+                            let expected: &[&str] = if gedit { &["GEdit"] } else { &["Editor Tester", "Recipient", "ICE editor test", "General"] };
+                            for text in expected { assert!(rendered.contains(text), "missing {text}: {rendered}"); }
                             if let Some(path) = std::env::var_os("ICB_ICEEDIT_SCREEN") { std::fs::write(path, &rendered).unwrap(); }
-                            eprintln!("ICE Edit input triggered: {} bytes", keys.len());
+                            eprintln!("{} input triggered: {} bytes", if gedit { "GEdit" } else { "ICE Edit" }, keys.len());
                             pending_keys.extend(keys.bytes());
                             sent = true;
                         }
@@ -627,13 +680,18 @@ mod tests {
         if let Some(path) = std::env::var_os("ICB_ICEEDIT_TRANSCRIPT") {
             std::fs::write(path, &transcript).unwrap();
         }
-        eprintln!("ICE Edit result: {result:?}; screen checked: {sent}");
+        eprintln!("{} result: {result:?}; screen checked: {sent}", if gedit { "GEdit" } else { "ICE Edit" });
         assert!(sent, "editor screen did not become ready");
         assert_eq!(result.unwrap(), if abort { EditResult::Abort } else { EditResult::SendMessage });
         if abort {
             assert!(editor.msg.is_empty());
+            assert_eq!(editor.subj, "ICE editor test");
         } else {
             assert!(editor.msg.join("\n").contains("ICB editor roundtrip"), "unexpected text: {:?}", editor.msg);
+        }
+        if !idle_abort {
+            assert!(typed_text_visible, "typed text never appeared in the rendered terminal");
+            assert!(!state.session.request_logoff, "editor requested a disconnect");
         }
     }
 
