@@ -1050,6 +1050,31 @@ Weitere Transportquellen, Pixelgeometrie, sichere Text-/Layout-APIs und die
 manuelle Remote-Client-Matrix bleiben separat; weiterhin keine vollständige
 A5-/E3-Abnahme.
 
+**STRIPATX-Originalabgleich und freigegebene Korrektur (2026-09-11):**
+`PPL/VAR.CPP::cVARVAL::stripatx` und der ältere Pfad über
+`MAIN/SCRIPT.C::removecodes` entfernen nur vollständige `@Xhh`-Farbcodes.
+Der Benutzer verlangt ausdrücklich Originalkompatibilität. Der klassische
+IcyBoard-Scanner beschädigte dagegen unvollständige/ungültige Tokens; die bisher
+absichtlich konservierten Fehlererwartungen wurden deshalb ersetzt. Beide
+Opcodes verwenden jetzt denselben Scanner, ohne ihre Signaturen oder
+String-Speicherregeln zu verändern. Allgemeine Makros und ANSI-Sequenzen bleiben
+wie im Original erhalten; dieser Schritt führt keine neue Terminal-API ein.
+
+Der neue Regressionstest scheiterte vor der Korrektur und besteht danach über
+serialisierte PPEs mit Sprache/Runtime 340/340, 350/350, 350/400 und 400/400.
+Er prüft unvollständige, ungültige und überlappende Tokens, alle 484 Kombinationen
+gültiger Hexziffern, unveränderte Makro-/ANSI-Texte und bestehende String-Limits.
+Der moderne Unicode-Test besteht ebenfalls. Referenz ist der Originalquelltext;
+ein neuer DOS-Referenzlauf wurde für diese Korrektur nicht durchgeführt.
+Abschließend bestanden alle acht `ppl400_followup_api`-Tests und 15
+String-Regressionen; Diagnosen und `git diff --check` waren ohne Befund.
+
+**Vertagung durch den Benutzer (2026-09-11):** `Terminal.WriteText` wird als
+sinnvolle spätere Erweiterung betrachtet, ist derzeit aber nicht erforderlich.
+Keine Implementierung und kein Beta-Abnahmeblocker; vorhandene PPE-Schutzroutinen
+bleiben bestehen. Textbreite, zellgenaues Kürzen und Pixelverträge sind damit
+noch nicht entschieden oder zur Umsetzung freigegeben.
+
 **Besprechen:** Connection-Fähigkeiten versus aktuelle Größe; Resize-Ereignisse;
 Zell-/Pixelkoordinaten; sichtbare Textbreite; ANSI-/ATX-bewusstes Layout;
 sichere Ausgabe fremder Texte ohne Steuersequenzinterpretation.

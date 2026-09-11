@@ -900,9 +900,10 @@ pub async fn stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 /// `str.StripATX()`: the PPL 400 member form of `STRIPATX`.
 pub async fn string_stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    // PCBoard VAR.CPP cVARVAL::stripatx removes only complete @Xhh tokens.
-    // Keep the released classic opcode's scanner separate from this modern one.
-    // Copy untouched spans, preserving malformed tokens and UTF-8 byte-for-byte.
+    Ok(VariableValue::new_unbounded_string(strip_atx_codes(text)))
+}
+
+fn strip_atx_codes(text: String) -> String {
     let bytes = text.as_bytes();
     let mut result = String::with_capacity(text.len());
     let mut copied = 0;
@@ -917,56 +918,7 @@ pub async fn string_stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> R
         }
     }
     result.push_str(&text[copied..]);
-    Ok(VariableValue::new_unbounded_string(result))
-}
-
-fn strip_atx_codes(str: String) -> String {
-    let mut res = String::new();
-    let mut state = 0;
-    let mut ch1 = 'A';
-    for c in str.chars() {
-        match state {
-            0 => {
-                if c == '@' {
-                    state = 1;
-                } else {
-                    res.push(c);
-                }
-            }
-            1 => {
-                if c == 'X' {
-                    state = 2;
-                } else {
-                    res.push('@');
-                    res.push(c);
-                    state = 0;
-                }
-            }
-            2 => {
-                if c.is_ascii_hexdigit() {
-                    state = 3;
-                } else {
-                    res.push('@');
-                    res.push('X');
-                    res.push(c);
-                    ch1 = c;
-                    state = 0;
-                }
-            }
-            3 => {
-                state = 0;
-                if !c.is_ascii_hexdigit() {
-                    res.push('@');
-                    res.push(ch1);
-                    res.push(c);
-                }
-            }
-            _ => {
-                state = 0;
-            }
-        }
-    }
-    res
+    result
 }
 
 pub async fn replacestr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

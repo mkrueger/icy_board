@@ -1,8 +1,8 @@
 //! F9/F10/F11 follow-up: serialized PPE, private harness (no shared helper edits).
 //! Classic evidence: PCBoard PPL/VAR.CPP cVARVAL::stripatx and MAIN/SCRIPT.C
 //! removecodes delete only complete uppercase @X plus two hex digits. This is
-//! source evidence, NOT a fresh DOS runtime oracle capture. The already separate
-//! runtime-400 StringStripAtx opcode is fixed; released STRIPATX stays unchanged.
+//! source evidence, NOT a fresh DOS runtime oracle capture. Both the classic
+//! STRIPATX and runtime-400 StringStripAtx opcodes must follow that contract.
 //! Error policy: pure/default/explicit Ordinal comparisons preserve old errors;
 //! fallible IgnoreCase comparisons clear old errors on success, never same-statement
 //! failures. Invalid modes and regex resource failures still publish errors.
@@ -222,20 +222,47 @@ fn modern_stripatx_preserves_literal_bytes_and_removes_only_complete_controls() 
 }
 
 #[test]
-fn released_classic_stripatx_scanner_and_string_storage_are_unchanged() {
-    // Characterize current released Icy behavior, not PCBoard oracle expectations.
+fn classic_stripatx_matches_pcboard_and_preserves_string_storage() {
+    let cases = [
+        ("", ""),
+        ("@", "@"),
+        ("@@", "@@"),
+        ("email@", "email@"),
+        ("@X", "@X"),
+        ("@X1", "@X1"),
+        ("a@X1Zb", "a@X1Zb"),
+        ("@XZ1", "@XZ1"),
+        ("@x1F", "@x1F"),
+        ("@@X0F", "@"),
+        ("@X@X0F", "@X"),
+        ("@X1@X0F", "@X1"),
+        ("@X@X0F07", "@X07"),
+        ("@X0@X0F7", "@X07"),
+        ("@X0Fhello@X07 world", "hello world"),
+        ("@Xaf@XAF@X00@X99", ""),
+        ("@USER@ @CLS@", "@USER@ @CLS@"),
+    ];
+    let mut color_codes = String::new();
+    for first in "0123456789ABCDEFabcdef".chars() {
+        for second in "0123456789ABCDEFabcdef".chars() {
+            color_codes.push_str(&format!("@X{first}{second}"));
+        }
+    }
     for (language, runtime) in [(340, 340), (350, 350), (350, 400), (400, 400)] {
+        let mut source = String::new();
+        for (input, expected) in cases {
+            source.push_str(&format!("PRINT STRIPATX(\"{input}\") = \"{expected}\"\n"));
+        }
+        source.push_str(&format!("PRINT STRIPATX(\"{color_codes}\") = \"\"\n"));
+        source.push_str("PRINT STRIPATX(CHR(27) + \"[31m\") = CHR(27) + \"[31m\"\n");
+        source.push_str(&format!(
+            "PRINT LEN(STRIPATX(\"{0}\")) = 300\nSTRING stored\nstored = STRIPATX(\"{0}\")\nPRINT LEN(stored) = {1}\n",
+            "a".repeat(300),
+            if language < 400 { 256 } else { 300 }
+        ));
         assert_eq!(
-            "111111",
-            run(
-                &format!(
-                    "PRINT STRIPATX(\"email@\") = \"email\"\nPRINT STRIPATX(\"a@X1Zb\") = \"a@AZb\"\nPRINT STRIPATX(\"@X0Fok\") = \"ok\"\nPRINT STRIPATX(\"@x0F\") = \"@x0F\"\nPRINT LEN(STRIPATX(\"{0}\")) = 300\nSTRING stored\nstored = STRIPATX(\"{0}\")\nPRINT LEN(stored) = {1}\n",
-                    "a".repeat(300),
-                    if language < 400 { 256 } else { 300 }
-                ),
-                language,
-                runtime
-            ),
+            "1".repeat(cases.len() + 4),
+            run(&source, language, runtime),
             "language={language}, runtime={runtime}"
         );
     }

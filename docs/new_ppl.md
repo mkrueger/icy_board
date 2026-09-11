@@ -575,9 +575,13 @@ first string.
 Operations that transform text return `STRING`. A language 400 `STRING` has no
 length limit, so member chains do not truncate.
 
-`StripATX()` removes only complete uppercase `@X` followed by two ASCII hex
-digits. Incomplete or malformed tokens and other `@` text are preserved. This
-is the modern member's rule; the classic `STRIPATX` opcode remains unchanged.
+Both `text.StripATX()` and classic `STRIPATX(text)` follow the PCBoard rule:
+remove only uppercase `@X` followed by two ASCII hex digits (`0-9`, `A-F`,
+`a-f`). Incomplete or malformed tokens and other `@` text are preserved.
+The classic scanner previously damaged inputs such as `email@` and `a@X1Zb`;
+these now remain unchanged, matching the original source. Opcode signatures
+and string-storage limits are unchanged. Neither form removes general macros
+such as `@CLS@` or ANSI escape sequences; this is not a safe-output filter.
 
 The `STRING` type name also provides operations that do not belong to one value:
 
