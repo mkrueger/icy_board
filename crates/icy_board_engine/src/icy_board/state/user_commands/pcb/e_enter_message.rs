@@ -57,6 +57,21 @@ fn soundex_name(name: &str) -> Vec<String> {
 
 impl IcyBoardState {
     pub async fn enter_message(&mut self) -> Res<()> {
+        if let Err(error) = self.enter_message_with_defaults(None, "", &mut None).await {
+            if error.is::<super::message_attachment::MessageCreditDenied>() { return Ok(()); }
+            if error.is::<super::message_attachment::MessagePersistedError>() { return Err(error); }
+            self.press_enter().await?;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn enter_message_with_defaults(
+        &mut self,
+        header: Option<&crate::icy_board::state::ppl_message::MessageHeader>,
+        initial_text: &str,
+        saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
+    ) -> Res<()> {
         if self.session.current_conference.is_read_only {
             self.display_text(
                 IceText::ConferenceIsReadOnly,
@@ -79,6 +94,9 @@ impl IcyBoardState {
             if !self.check_sec("E", &area.req_level_to_enter).await? { return Ok(()); }
         }
         self.set_activity(NodeStatus::EnterMessage).await;
+        let from = if let Some(header) = header { self.get_message_sender(&header.from).await? }
+            else { self.session.get_username_or_alias() };
+        if self.session.request_logoff { return Ok(()); }
 
         // PCBoard joins the arguments into the recipient field and then still
         // asks the question with that name pre-filled. Consuming the token
@@ -92,6 +110,7 @@ impl IcyBoardState {
             to.push_str(&token);
         }
         to = to.chars().take(25).collect();
+        if let Some(header) = header { to = header.to.clone(); }
         let default_to = if to.trim().is_empty() { "ALL".to_string() } else { to.trim().to_string() };
 
         let Some(mut to) = self.get_message_recipient(IceText::MessageTo, default_to, false).await? else {
@@ -119,7 +138,7 @@ impl IcyBoardState {
                 54,
                 &MASK_ASCII,
                 "",
-                None,
+                header.map(|header| header.subject.clone()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::HIGHASCII,
             )
             .await?;
@@ -129,22 +148,42 @@ impl IcyBoardState {
         }
 
         let to_all = to.eq_ignore_ascii_case("ALL");
-        let mut options = self.get_message_options(to_all, !carbon_fields.is_empty()).await?;
+        let mut options = if let Some(header) = header {
+            self.get_message_options_with_default(to_all, !carbon_fields.is_empty(), Some(header.is_private)).await?
+        } else {
+            self.get_message_options(to_all, !carbon_fields.is_empty()).await?
+        };
         options.sub_fields.extend(carbon_fields);
 
-        self.write_message(
-            self.session.current_conference_number as i32,
-            self.session.current_message_area as i32,
-            &to,
-            &subject,
-            options.attributes,
-            options.password,
-            options.packout_date,
-            options.sub_fields,
-            IceText::SavingMessage,
-        )
-        .await?;
+        let mut message = jamjam::jam::JamMessage::default()
+            .with_from(from.into()).with_to(to.clone().into()).with_subject(subject.into())
+            .with_text(initial_text.into()).with_date_time(Utc::now()).with_attributes(options.attributes | attributes::MSG_LOCAL);
+        if let Some(password) = options.password { message = message.with_password(&password.into()); }
+        if let Some(date) = options.packout_date { message = message.with_packout_date(date); }
+        for field in options.sub_fields { message = message.with_sub_field(field); }
+        if to.contains('@') && !to.eq_ignore_ascii_case("@LIST@")
+            && !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD) {
+            message = message.with_sub_field(MessageSubfield::new(SubfieldType::AddressD, to.into()));
+        }
+        self.write_message_with_result(self.session.current_conference_number as i32, self.session.current_message_area as i32,
+            message, Vec::new(), IceText::SavingMessage, true, saved).await?;
         Ok(())
+    }
+
+    pub(crate) async fn get_message_sender(&mut self, default: &str) -> Res<String> {
+        let mut from = if default.is_empty() { self.session.get_username_or_alias() } else { default.to_string() };
+        if self.get_board().await.config.sysop_command_level.edit_message_headers.session_can_access(&self.session) {
+            // EDIT HEADER shows the current sender before asking for its replacement.
+            self.display_text(IceText::From, display_flags::LFBEFORE).await?;
+            self.println(crate::vm::TerminalTarget::Both, &from).await?;
+            from = self.input_field(IceText::NewInfo, 25, &MASK_ASCII, "", Some(from),
+                display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE).await?;
+            if from.is_empty() { from = self.session.get_username_or_alias(); }
+        }
+        if from.to_ascii_uppercase().contains("@USER@") || from.chars().any(char::is_control) {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid message sender").into());
+        }
+        Ok(from)
     }
 
     pub(crate) async fn get_message_recipient(&mut self, prompt: IceText, mut default_to: String, empty_ends: bool) -> Res<Option<String>> {
@@ -255,6 +294,10 @@ impl IcyBoardState {
     /// Prompts for message security, return receipt and echo flag, mirroring the
     /// original `PCBoard` flow.
     pub(super) async fn get_message_options(&mut self, to_all: bool, force_private: bool) -> Res<MessageOptions> {
+        self.get_message_options_with_default(to_all, force_private, None).await
+    }
+
+    pub(super) async fn get_message_options_with_default(&mut self, to_all: bool, force_private: bool, default_private: Option<bool>) -> Res<MessageOptions> {
         let mut options = MessageOptions {
             attributes: 0,
             password: None,
@@ -270,7 +313,7 @@ impl IcyBoardState {
         } else if self.session.current_conference.disallow_private_msgs {
             false
         } else {
-            self.get_message_security(to_all, &mut options).await?
+            self.get_message_security(to_all, &mut options, default_private).await?
         };
 
         if receiver_only {
@@ -370,7 +413,7 @@ impl IcyBoardState {
     }
 
     /// Returns `true` when the message is "receiver only" (private).
-    async fn get_message_security(&mut self, to_all: bool, options: &mut MessageOptions) -> Res<bool> {
+    async fn get_message_security(&mut self, to_all: bool, options: &mut MessageOptions, default_private: Option<bool>) -> Res<bool> {
         let may_set_date = self.get_board().await.config.sysop_command_level.set_pack_out_date_on_messages.session_can_access(&self.session);
         loop {
             let input = self
@@ -379,7 +422,7 @@ impl IcyBoardState {
                     1,
                     if may_set_date { "GNRSDgnrsd" } else { "GNRSgnrs" },
                     "",
-                    None,
+                    default_private.map(|private| if private && !to_all { "R" } else { "N" }.to_string()),
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN,
                 )
                 .await?;

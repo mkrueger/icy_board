@@ -1818,6 +1818,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[mM][sS][gG][hH][eE][aA][dD][eE][rR]"
+            }
+          },
+          "named": false,
+          "value": "MSGHEADER"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[pP][aA][lL][eE][tT][tT][eE]"
             }
           },

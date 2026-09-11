@@ -7,7 +7,7 @@ use crate::{
     parser::{CONFERENCE_ID, DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
-pub fn area_array_value(items: Arc<AreaList>) -> VariableValue {
+pub fn area_array_value(items: Arc<AreaList>, conference: usize) -> VariableValue {
     VariableValue::new_vector(
         VariableType::UserData(MESSAGE_AREA_ID as u32),
         items
@@ -16,6 +16,7 @@ pub fn area_array_value(items: Arc<AreaList>) -> VariableValue {
             .map(|(number, item)| {
                 let mut item = item.clone();
                 item.number = number;
+                item.conference_number = conference;
                 item.valid = true;
                 user_data_value(item, MESSAGE_AREA_ID)
             })

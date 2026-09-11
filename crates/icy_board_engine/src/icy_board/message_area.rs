@@ -37,6 +37,9 @@ pub struct MessageArea {
     pub number: usize,
 
     #[serde(skip)]
+    pub conference_number: usize,
+
+    #[serde(skip)]
     pub valid: bool,
 
     #[serde(default)]
@@ -115,7 +118,9 @@ impl MessageArea {
         match header {
             Ok(Some(header)) => {
                 vm.operation_succeeded();
-                PplMessage::from_header(&self.path, &header).value()
+                PplMessage::from_header(&self.path, &header)
+                    .in_area(self.conference_number, self.number)
+                    .value()
             }
             Ok(None) => {
                 vm.operation_succeeded();
@@ -160,7 +165,9 @@ impl MessageArea {
         match found {
             Ok(Some(header)) => {
                 vm.operation_succeeded();
-                PplMessage::from_header(&self.path, &header).value()
+                PplMessage::from_header(&self.path, &header)
+                    .in_area(self.conference_number, self.number)
+                    .value()
             }
             Ok(None) => {
                 vm.operation_succeeded();

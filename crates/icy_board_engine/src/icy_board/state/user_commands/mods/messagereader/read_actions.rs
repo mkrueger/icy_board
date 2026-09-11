@@ -137,6 +137,10 @@ fn same_message_base(source: &Path, target: &Path) -> bool {
 /// number. Hold JAM's exclusive transaction across text append and raw header
 /// replacement; a failed replacement leaves the original index/body intact.
 fn replace_message(base: &mut JamMessageBase, number: u32, original: &JamMessage, draft: &JamMessage) -> Res<()> {
+    replace_message_with_result(base, number, original, draft).map(|_| ())
+}
+
+fn replace_message_with_result(base: &mut JamMessageBase, number: u32, original: &JamMessage, draft: &JamMessage) -> Res<JamMessageHeader> {
     base.transaction(|base| {
         compare_message(base, number, original)?;
         let mut text_file = std::fs::OpenOptions::new().append(true).open(base.path().with_extension("jdt"))?;
@@ -158,7 +162,7 @@ fn replace_message(base: &mut JamMessageBase, number: u32, original: &JamMessage
                 log::error!("Could not reclaim failed EDIT text append: {error}");
             }
         }
-        result
+        result.map(|()| header)
     }).map_err(Into::into)
 }
 
@@ -308,7 +312,7 @@ impl IcyBoardState {
         Ok(self.read_action_message(base, number).await?.map(|message| message.header().clone()))
     }
 
-    fn action_conference_access(&self, number: u16, conference: &crate::icy_board::conferences::Conference) -> bool {
+    pub(crate) fn action_conference_access(&self, number: u16, conference: &crate::icy_board::conferences::Conference) -> bool {
         let registered = self.session.current_user.as_ref()
             .and_then(|user| user.conference_flags.get(&(number as usize)))
             .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
@@ -322,7 +326,7 @@ impl IcyBoardState {
 
     /// Bounds and authorization are checked before send_message's indexing, in
     /// the source session context (never grant the destination's security bonus).
-    async fn read_action_target(&mut self, conference: u16, area: usize) -> Res<Option<PathBuf>> {
+    pub(crate) async fn read_action_target(&mut self, conference: u16, area: usize) -> Res<Option<PathBuf>> {
         let target = self.get_board().await.conferences.get(conference as usize).cloned();
         let Some(target) = target else { return Ok(None) };
         let Some(message_area) = target.areas.as_ref().and_then(|areas| areas.get(area)) else { return Ok(None) };
@@ -385,6 +389,70 @@ impl IcyBoardState {
         attachments.commit();
         // SC edits this message only; EDIT must not create carbon-copy mail.
         Ok(after_existing_edit(result))
+    }
+
+    pub(crate) async fn edit_message_snapshot(
+        &mut self,
+        source: &crate::icy_board::state::ppl_message::PplMessage,
+        defaults: Option<&crate::icy_board::state::ppl_message::MessageHeader>,
+        saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
+    ) -> Res<()> {
+        if !self.session.user_command_level.edit_own_messages.session_can_access(&self.session) {
+            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Editing messages is not permitted").into());
+        }
+        let Some(original) = self.authorized_message_snapshot(source).await? else { return Ok(()); };
+        let header = original.header();
+        let own = header.from().is_some_and(|from| from.to_string().eq_ignore_ascii_case(&self.session.user_name)
+            || (!self.session.alias_name.is_empty() && from.to_string().eq_ignore_ascii_case(&self.session.alias_name)));
+        if !own && !self.get_board().await.config.sysop_command_level.edit_any_message.session_can_access(&self.session) {
+            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Editing another author's message is not permitted").into());
+        }
+        let mut header = header.clone();
+        if let Some(defaults) = defaults {
+            let mut edited = defaults.clone();
+            if self.session.user_command_level.cmd_e.session_can_access(&self.session) {
+                edited.from = self.get_message_sender(&edited.from).await?;
+                if self.session.request_logoff { return Ok(()); }
+                let Some(to) = self.get_message_recipient(IceText::MessageTo, edited.to, false).await? else { return Ok(()); };
+                edited.to = to;
+                edited.subject = self.input_field(IceText::NewSubject, 60, &MASK_ASCII, "", Some(edited.subject),
+                    display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE | display_flags::LFBEFORE).await?;
+                if self.session.request_logoff { return Ok(()); }
+                // Password protected messages keep their security; only E HEADER manages it.
+                let can_edit_privacy = !header.needs_password()
+                    && self.get_board().await.config.sysop_command_level.protect_unprotect_messages.session_can_access(&self.session);
+                if can_edit_privacy {
+                    let privacy = self.input_field(IceText::MessageSecurity, 1, "NR", "hlpsec",
+                        Some(if edited.is_private { "R" } else { "N" }.to_string()),
+                        display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE).await?;
+                    edited.is_private = privacy == "R";
+                }
+            }
+            if self.session.request_logoff { return Ok(()); }
+            if edited.from.to_ascii_uppercase().contains("@USER@")
+                || [&edited.from, &edited.to, &edited.subject].iter().any(|field| field.chars().any(char::is_control)) {
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid message header").into());
+            }
+            if (edited.is_private != header.is_private() || edited.to != header.to().map(ToString::to_string).unwrap_or_default())
+                && (edited.is_private && (self.session.current_conference.disallow_private_msgs || edited.to.eq_ignore_ascii_case("ALL"))
+                    || !edited.is_private && (self.session.current_conference.private_msgs
+                        || self.session.current_conference.conference_type == crate::icy_board::conferences::ConferenceType::InternetEmail)) {
+                return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message privacy conflicts with the target area").into());
+            }
+            edited.apply(&mut header);
+        }
+        let mut draft = JamMessage::from_stored(header, original.text().clone());
+        let mut attachments = self.message_attachment_cleanup(&original);
+        let result = self.edit_message_context(&mut draft, original.text().to_string().lines().map(str::to_string).collect()).await;
+        attachments.track(&draft)?;
+        if result? == EditResult::Abort || self.session.request_logoff { return Ok(()); }
+        let mut base = JamMessageBase::open(&source.path)?;
+        let header = replace_message_with_result(&mut base, source.number, &original, &draft)?;
+        attachments.commit();
+        let mut snapshot = crate::icy_board::state::ppl_message::PplMessage::from_header(&source.path, &header);
+        snapshot.area = source.area;
+        *saved = Some(snapshot);
+        Ok(())
     }
 
     /// PCBoard FORWARD asks for a recipient, not a new body. The author, date,

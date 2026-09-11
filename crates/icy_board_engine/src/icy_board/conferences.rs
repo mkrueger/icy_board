@@ -274,6 +274,7 @@ impl ConferenceBase {
             let d = &add_conferences[i];
             let general_area: MessageArea = MessageArea {
                 number: 0,
+                conference_number: i,
                 valid: false,
                 name: "General".to_string(),
                 path: PathBuf::from(&c.message_file),
@@ -450,7 +451,7 @@ impl UserDataValue for Conference {
             return Ok(directory_array_value(self.directories.clone().unwrap_or_default()));
         }
         if *name == *MESSAGE_AREAS {
-            return Ok(area_array_value(self.areas.clone().unwrap_or_default()));
+            return Ok(area_array_value(self.areas.clone().unwrap_or_default(), self.number));
         }
         if *name == *DOORS {
             return Ok(door_array_value(self.doors.clone().unwrap_or_default()));

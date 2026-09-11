@@ -255,6 +255,7 @@ fn board_object_type_ids_are_compact() {
         ("HTTPRESPONSE", 52),
         ("REGEX", 53),
         ("REGEXMATCH", 54),
+        ("MSGHEADER", 55),
     ];
 
     for (name, id) in expected {

@@ -739,6 +739,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `USER` | Live write-through view from `Session.User`; snapshot from `Board.Users` | Session user is writable where documented; board snapshots are read-only |
 | `CONTACT` | Value record copied in contact-array snapshots | Record fields are writable on the local copy |
 | `MSG` | Header snapshot; `Text()` loads the current stored body on demand | Read-only |
+| `MSGHEADER` | Local header value; `MSG.Header` returns an independent copy | Writable fields; no write-through |
 | `TERMINAL` | Live root for the caller's terminal | Read-only properties; methods change terminal state |
 | `TERMINFO` | Connection-time snapshot | Read-only |
 | `TERMINPUT` | PPE-owned input controller, released at cleanup | Mutable through methods |
@@ -1426,8 +1427,9 @@ ENDWHILE
 constants, so naming one is a way of writing the number.
 
 A `MSG` is a read-only snapshot of what the area holds. `GETMSGHDR`,
-`SETMSGHDR`, `SCANMSGHDR` and the `MESSAGE` statement are unchanged, and writing
-a message is still theirs.
+`SETMSGHDR`, `SCANMSGHDR` and the `MESSAGE` statement are unchanged.
+For interactive entry, replies and editing, use the `Session` message methods
+below. `msg.Header` returns a mutable `MSGHEADER` copy without changing storage.
 
 > The type is called `MSG` rather than `MESSAGE` because `MESSAGE` has been a
 > statement since PPL 1.00 and keeps that meaning.
@@ -1533,6 +1535,10 @@ kept in a variable still answers with what the session became:
 | `Language` | `STRING` | Selected language |
 | `IsLocal`, `IsSysop` | `BOOLEAN` | How the caller got on |
 | `RequestPasswordRecovery(userName)` | `BOOLEAN` | Request recovery mail for a login name or alias |
+| `PostMessage(area [, header [, initialText]])` | `MSG` | Compose and save a new message in the given area |
+| `ReplyMessage(original [, header [, initialText]])` | `MSG` | Compose and save a reply in the original message's area |
+| `EditMessage(original [, header])` | `MSG` | Edit and replace the same stored message |
+| `ReplyHeader(original)` | `MSGHEADER` | Obtain the normal reply defaults without opening the editor |
 
 ```PPL
 PRINTLN "Node ", Session.Node, ", ", Session.MinutesLeft, " minutes left"
@@ -1562,6 +1568,162 @@ Temporary-password verification and the mandatory password change remain in the
 native login. A successful normal-password login cancels that account's pending
 recovery, so a login PPE should end the connection after its confirmation when
 requesting recovery for the caller.
+
+### Composing and editing messages
+
+These language/runtime 400 methods run the board's interactive message workflow,
+including access checks, editor selection and persistence. The PPE does not
+create temporary editor files. `PostMessage` uses its explicit area;
+`ReplyMessage` and `EditMessage` use the original `MSG`'s area. Caller tokens and
+the current conference/area are restored after the call, without granting the
+target conference's security bonus.
+
+`MSGHEADER` is a local value with four writable fields:
+
+| Field | Type | Default |
+| :--- | :--- | :--- |
+| `From` | `STRING` | Empty; uses the caller's normal session identity when passed |
+| `To` | `STRING` | Empty; new-message entry defaults to `ALL` |
+| `Subject` | `STRING` | Empty |
+| `IsPrivate` | `BOOLEAN` | `FALSE` |
+
+Header arguments are complete defaults, not patches, and are passed by value.
+Use `original.Header` for edits and `Session.ReplyHeader(original)` for replies.
+Changing a header never writes immediately; final values come from the returned
+`MSG`. Sender changes require the board's header-edit permission. Area privacy,
+recipient validation and other security rules still apply. Changing the privacy
+of an existing message additionally requires the native protect/unprotect
+permission; unchanged private metadata is preserved.
+
+With a header argument, the board offers its recipient and subject defaults in
+the dialogue before opening the body editor. Sender editing is offered only to
+callers with header-edit permission. For existing messages, the privacy prompt
+requires protect/unprotect permission and the header dialogue requires message
+entry permission. `EditMessage(original)` without a header opens only the normal
+text editor. Header changes remain part of the draft until it is saved.
+
+```PPL
+AREA area = Session.Area
+MSG posted = Session.PostMessage(area)
+MSG original = area.Read(42)
+MSG reply = Session.ReplyMessage(original)
+MSG edited = Session.EditMessage(original)
+```
+
+```PPL
+MSGHEADER header
+header.To = "ALL"
+header.Subject = "Status report"
+MSG report = Session.PostMessage(Session.Area, header, preparedText)
+
+MSGHEADER replyHeader = Session.ReplyHeader(original)
+replyHeader.Subject = "Another topic"
+MSG response = Session.ReplyMessage(original, replyHeader, preparedText)
+```
+
+`initialText` is an editable body, not a protected prefix. Replies retain the
+original as an authorized quote source and derive numeric/network reply links
+from it. Reply defaults account for private/netmail messages and replies to the
+caller's own message. `ReplyHeader` performs read/password checks but opens no
+editor and saves nothing.
+
+Editing preserves the message number and unexposed JAM metadata, including
+attachments. Stale originals are rejected; edits compare the stored header and
+body again inside the replacement transaction, so concurrent changes are not
+overwritten. Read a fresh `MSG` before starting another operation on a message
+whose header has changed.
+
+Successful calls return a valid saved `MSG`. Ordinary abort or disconnect before
+saving returns an invalid `MSG`. Operational errors set `Error.Last()` with
+`ErrKind.Msg` and support `ON ERROR`; save the `ERROR` value before another I/O
+operation replaces it. `ReplyHeader` returns an empty header on failure, so
+check `Error.Last()` before using it.
+
+The return snapshot is captured at the write, without a fallible post-save
+reload. If accounting, output, reply bookkeeping or a later carbon copy fails
+after the first message was saved, the result still identifies that saved
+message and `Error.Last()` reports the failure. Do not retry blindly. For carbon
+lists the result identifies the first saved recipient copy. `ON ERROR` may
+transfer control before the receiving assignment completes; a handler must not
+assume that an error means nothing was saved.
+
+#### External editor protocol
+
+Icy Board creates an isolated exchange directory and owns these RA-style files:
+
+| File | Contents |
+| :--- | :--- |
+| `MSGINF` | Six lines: from, to, subject, constant `1`, area name, private `YES`/`NO` |
+| `MSGTMP` | Initial text or already prepared quotes; replaced by the saved body |
+| `RESULT.ED` | Optional output: anonymous flag (ignored), changed subject, editor identity/version |
+
+Missing `RESULT.ED` or an empty subject preserves the original subject. The
+editor cannot change the sender, recipient, private flag, or other JAM header
+fields through these files. Board composition retains existing thread and
+attachment metadata and records the editor identity as a JAM PID subfield.
+The board enforces its message line limit and existing escape-code policy.
+
+Native/DOS editors use CP437 files and CRLF. Byte 141 in a non-BOM body is
+treated as a legacy soft return. PPE editors receive UTF-8 with a BOM; the
+importer also recognizes the BOM written by `FPUTLN`. Successful
+editor output is imported into the draft before the board saves it. Aborts and
+invalid output do not replace the stored message. RA has no separate quote-source
+file: an empty reply body is prefilled with prepared quotes; with `initialText`,
+the external editor receives that body. The internal editor retains the separate
+quote source for insertion.
+
+#### Configuring the editor
+
+In `icbsetup`, open **Configuration Options > External message editor**.
+The default is `Internal`, preserving the existing line/full-screen editor
+selection. An external editor replaces the full-screen choice for board
+composition, including the `Session` message methods.
+
+| Setting | Meaning |
+| :--- | :--- |
+| Mode | `Internal`, `Program`, `Script`, `Dos`, or `Ppe` |
+| Path | Executable/script/PPE path, or the DOS installation directory; relative to the board root |
+| Arguments | Native/PPE arguments, or one DOS command line including its executable/batch filename |
+| Dropfile | Existing board dropfile format for native/DOS editors; PPE editors need none |
+| Timeout | Maximum runtime in seconds, also bounded by the caller's remaining session time |
+| DOS memory | Emulated RAM in MiB |
+
+Native `Program` runs directly; `Script` runs with `sh`. Arguments use shell-style
+quoting but are not evaluated as shell commands. Both communicate through
+CP437 stdin/stdout pipes, not a PTY. The board translates UTF-8 callers at this
+boundary. `{work}`, `{node}`, `{baud}`, and `{time}` expand in native/DOS
+arguments; node is the board's zero-based node index and time is remaining whole
+minutes rounded up. The native process also receives `ICB_EDITOR_DIR`.
+
+PPE editors receive the isolated exchange directory as their first `GETTOKEN`,
+followed by the configured arguments. Use `EXIT` for normal completion and
+`STOP` to cancel. Only a saved body is imported; execution errors do not send
+anything. Native/DOS status `0` means saved, `1` aborted/empty, `2` time or
+inactivity expiry (disconnect), and other statuses mean failure.
+
+DOS requires the assets installed by `icbsetup dos-image`. Each invocation uses
+a temporary copy of the installation and fresh exchange files in `C:\DOOR`.
+Only the message result is read back: editor preferences and other installation
+changes are not persisted. DOS execution is serialized with other native DOS
+doors. `DorInfo` supplies `DORINFO1.DEF` as well as the node-specific filename;
+`ExitInfoBBS` also supplies DORINFO for editors needing both.
+
+For an ICE Edit installation containing `X00.EXE`, a configured startup batch
+can contain:
+
+```bat
+@ECHO OFF
+X00.EXE E
+ICEEDIT.EXE /D:C:\DOOR /N:1
+```
+
+Set ICE Edit's **Errorlevels** option to **Yes**. This is an interoperability
+test configuration, not a claim of complete ICE support: ICE Edit 2.35 with
+X00 1.24 starts using DORINFO alone and passes a rendered 80x25 metadata and
+inactivity-abort check. The save test still fails because injected remote keys
+do not appear in the editor; it times out instead. Both burst and paced input
+were tested. The cause in the ICE/X00/native-emulator interaction remains open.
+The existing EXITINFO binary layout has not been independently verified.
 
 ### The session and the user are not the same thing
 

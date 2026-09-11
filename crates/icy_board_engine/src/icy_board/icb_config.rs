@@ -633,6 +633,9 @@ pub struct NewUserSettings {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MessageOptions {
+    #[serde(default)]
+    pub external_editor: ExternalEditorConfig,
+
     /// max number of lines in a message
     pub max_msg_lines: u16,
     pub scan_all_mail_at_login: bool,
@@ -656,6 +659,40 @@ pub struct MessageOptions {
 
 fn default_true() -> bool {
     true
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumString, strum_macros::EnumIter)]
+pub enum ExternalEditorMode {
+    #[default]
+    Internal,
+    Program,
+    Script,
+    Dos,
+    Ppe,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExternalEditorConfig {
+    pub mode: ExternalEditorMode,
+    pub path: String,
+    pub arguments: String,
+    pub drop_file: super::doors::DropFile,
+    pub timeout_seconds: u32,
+    pub dos_memory_mb: u32,
+}
+
+impl Default for ExternalEditorConfig {
+    fn default() -> Self {
+        Self {
+            mode: ExternalEditorMode::Internal,
+            path: String::new(),
+            arguments: String::new(),
+            drop_file: super::doors::DropFile::DorInfo,
+            timeout_seconds: 3600,
+            dos_memory_mb: 64,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1378,6 +1415,7 @@ impl IcbConfig {
                 auto_register_conferences: true,
             },
             message: MessageOptions {
+                external_editor: ExternalEditorConfig::default(),
                 max_msg_lines: 100,
                 scan_all_mail_at_login: true,
                 prompt_to_read_mail: true,

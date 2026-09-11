@@ -71,16 +71,22 @@ fn dos_output_for_terminal(bytes: &[u8], utf8: bool) -> Vec<u8> {
 }
 
 fn append_cp437(output: &mut Vec<u8>, text: &str) {
-    output.extend(text.chars().map(|ch| codepages::tables::UNICODE_TO_CP437.get(&ch).copied().unwrap_or(b'.')));
+    output.extend(text.chars().map(|ch| {
+        if ch.is_ascii() {
+            ch as u8
+        } else {
+            codepages::tables::UNICODE_TO_CP437.get(&ch).copied().unwrap_or(b'.')
+        }
+    }));
 }
 
 #[derive(Default)]
-struct DosInputEncoder {
+pub(crate) struct DosInputEncoder {
     pending_utf8: Vec<u8>,
 }
 
 impl DosInputEncoder {
-    fn encode(&mut self, bytes: &[u8], utf8: bool) -> Vec<u8> {
+    pub(crate) fn encode(&mut self, bytes: &[u8], utf8: bool) -> Vec<u8> {
         if !utf8 {
             return bytes.to_vec();
         }
@@ -525,6 +531,133 @@ impl IcyBoardState {
         Ok(())
     }
 
+    pub(crate) async fn send_editor_output(&mut self, bytes: &[u8]) -> Res<()> {
+        let output = dos_output_for_terminal(bytes, self.session.term_caps.is_utf8);
+        self.connection.send(&output).await?;
+        {
+            let mut nodes = self.node_state.lock().await;
+            if let Some(node) = nodes.get_mut(self.node).and_then(Option::as_mut)
+                && let Some(connection) = &mut node.sysop_connection
+            {
+                if connection.send(bytes).await.is_err() {
+                    node.sysop_connection = None;
+                }
+            }
+        }
+        self.track_door_output(bytes);
+        Ok(())
+    }
+
+    pub(crate) async fn run_dos_editor(
+        &mut self,
+        config: &crate::icy_board::icb_config::ExternalEditorConfig,
+        directory: &std::path::Path,
+        remaining: Duration,
+    ) -> Res<bool> {
+        use crate::icy_board::doors::dos;
+        let started = std::time::Instant::now();
+        let _machine_guard = tokio::time::timeout(remaining, DOS_MACHINE_LOCK.lock())
+            .await
+            .map_err(|_| "DOS editor is busy")?;
+        let source = self.resolve_path(&config.path).canonicalize()?;
+        if !source.is_dir() {
+            return Err("DOS editor path must be its installation directory".into());
+        }
+        if config.arguments.trim().is_empty() || config.arguments.contains(['\r', '\n']) {
+            return Err("DOS editor arguments must contain one command line".into());
+        }
+        let assets = self.resolve_path(&"assets/dos");
+        let image = directory.join("editor.img");
+        dos::create_door_image(&assets.join("freedos.img"), &image, &source)?;
+        let command = config
+            .arguments
+            .replace("{work}", "C:\\DOOR")
+            .replace("{node}", &self.node.to_string())
+            .replace("{baud}", "57600")
+            .replace("{time}", &remaining.as_secs().div_ceil(60).to_string());
+        let mut files = Vec::new();
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            if entry.path() != image && entry.file_type()?.is_file() {
+                files.push((entry.file_name().to_string_lossy().to_string(), std::fs::read(entry.path())?));
+            }
+        }
+        files.push(("RESULT.ED".into(), Vec::new()));
+        files.push(("ICBEDIT.RC".into(), Vec::new()));
+        dos::inject_session_files(&image, &files, &dos::editor_run_batch(&command))?;
+        let remaining = remaining.saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            return Err("DOS editor timed out preparing its image".into());
+        }
+        let mut session = dos::start_session(
+            &image,
+            &assets.join("seabios.bin"),
+            &assets.join("vgabios.bin"),
+            config.dos_memory_mb.max(1),
+            remaining,
+        )?;
+        let mut input = vec![0; 4096];
+        let mut encoder = DosInputEncoder::default();
+        let mut output_open = true;
+        let mut finished = false;
+        let timeout = tokio::time::sleep(remaining);
+        tokio::pin!(timeout);
+        let result: Res<bool> = async {
+            loop {
+                tokio::select! {
+                    output = session.output.recv(), if output_open => {
+                        if let Some(output) = output {
+                            self.send_editor_output(&output).await?;
+                        } else { output_open = false; }
+                    },
+                    read = self.connection.read(&mut input) => {
+                        let count = read?;
+                        if count == 0 { self.session.request_logoff = true; return Ok(false); }
+                        let bytes = encoder.encode(&input[..count], self.session.term_caps.is_utf8);
+                        if !bytes.is_empty() { session.input.send(bytes).map_err(|_| "DOS editor input closed")?; }
+                    },
+                    result = &mut session.finished => {
+                        finished = true;
+                        result.map_err(|_| "DOS editor worker failed")??;
+                        return Ok(true);
+                    },
+                    _ = &mut timeout => { self.check_time_left().await; return Err("DOS editor timed out".into()); }
+                }
+            }
+        }
+        .await;
+        if !finished && !session.stop().await {
+            return Err("DOS editor worker did not stop".into());
+        }
+        if !result? {
+            return Ok(false);
+        }
+        let status = dos::read_editor_file(&image, "ICBEDIT.RC", 32)?;
+        match String::from_utf8(status)?.trim() {
+            "0" => {
+                let limit = self.get_board().await.config.message.max_msg_lines.max(1) as usize * 80 * 4 + 3;
+                for (name, limit) in [("MSGTMP", limit), ("RESULT.ED", 4096)] {
+                    match dos::read_editor_file(&image, name, limit) {
+                        Ok(bytes) => std::fs::write(directory.join(name), bytes)?,
+                        Err(error)
+                            if name == "RESULT.ED"
+                                && error
+                                    .downcast_ref::<std::io::Error>()
+                                    .is_some_and(|error| error.kind() == std::io::ErrorKind::NotFound) => {}
+                        Err(error) => return Err(error),
+                    }
+                }
+                Ok(true)
+            }
+            "1" => Ok(false),
+            "2" => {
+                self.session.request_logoff = true;
+                Ok(false)
+            }
+            status => Err(format!("DOS editor failed or did not return a status: {status}").into()),
+        }
+    }
+
     pub async fn run_bbslink_door(&mut self, bbslink: &BBSLink, door: &Door) -> Res<()> {
         // Keep direct callers on the same gates and billing path as OPEN.
         let list = DoorList {
@@ -743,6 +876,8 @@ mod test {
         assert_eq!(encoder.encode(&[0xBC, 0xE2, 0x94], true), vec![0x81]);
         assert_eq!(encoder.encode(&[0x80], true), vec![0xC4]);
         assert_eq!(encoder.encode("€".as_bytes(), true), b".");
+        let controls: Vec<u8> = (0..32).collect();
+        assert_eq!(encoder.encode(&controls, true), controls);
     }
 
     #[test]

@@ -673,6 +673,7 @@ impl PCBoardImporter {
                 auto_register_conferences: self.data.auto_reg_conf,
             },
             message: MessageOptions {
+                external_editor: Default::default(),
                 max_msg_lines: self.data.max_msg_lines as u16,
                 scan_all_mail_at_login: self.data.scan_all,
                 prompt_to_read_mail: self.data.prompt_to_read_mail,

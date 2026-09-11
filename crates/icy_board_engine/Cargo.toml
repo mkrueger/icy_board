@@ -58,6 +58,7 @@ bbs = [
 	"dep:base64",
 	"dep:sha2",
 	"dep:fatfs",
+	"dep:shell-words",
 	"dep:x86-native",
 	"dep:windows-sys",
 ]
@@ -120,6 +121,7 @@ fs4 = { version = "1", optional = true }
 base64 = { version = "0.22.1", optional = true }
 sha2 = { workspace = true, optional = true }
 fatfs = { workspace = true, optional = true }
+shell-words = { version = "1.1", optional = true }
 x86-native = { workspace = true, optional = true }
 
 [dev-dependencies]

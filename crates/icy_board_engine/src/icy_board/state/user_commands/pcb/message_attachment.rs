@@ -475,6 +475,7 @@ impl IcyBoardState {
     }
 
     /// Adopt attachments at the actual append, before accounting or UI can fail.
+    #[cfg(test)]
     pub(crate) async fn send_message_with_attachment_cleanup(
         &mut self,
         conf: i32,
@@ -483,10 +484,19 @@ impl IcyBoardState {
         text: IceText,
         cleanup: &mut MessageAttachmentCleanup,
     ) -> Res<()> {
-        if cleanup.files.is_empty() {
-            return self.send_accounted_message(conf, area, message, text).await;
-        }
-        if conf >= 0 {
+        self.send_message_with_result(conf, area, message, text, cleanup, &mut None).await
+    }
+
+    pub(crate) async fn send_message_with_result(
+        &mut self,
+        conf: i32,
+        area: i32,
+        message: JamMessage,
+        text: IceText,
+        cleanup: &mut MessageAttachmentCleanup,
+        saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
+    ) -> Res<()> {
+        if !cleanup.files.is_empty() && conf >= 0 {
             let board = self.get_board().await;
             let target = board
                 .conferences
@@ -507,7 +517,10 @@ impl IcyBoardState {
         }
         let charge = self.preflight_message_write(conf, &message).await?;
         let mut base = self.open_accounted_message_base(conf, area, &message).await?;
-        let number = base.write_message(&message)?;
+        let mut snapshot = crate::icy_board::state::ppl_message::PplMessage::append(&mut base, &message)?;
+        let number = snapshot.number;
+        if conf >= 0 { snapshot = snapshot.in_area(conf as usize, area as usize); }
+        if saved.is_none() { *saved = Some(snapshot); }
         cleanup.commit();
         self.finish_accounted_message(&mut base, charge, &message, number, text).await
     }

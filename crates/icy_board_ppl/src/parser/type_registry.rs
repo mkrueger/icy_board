@@ -86,6 +86,7 @@ pub const HTTP_REQUEST_ID: usize = 51;
 pub const HTTP_RESPONSE_ID: usize = 52;
 pub const REGEX_ID: usize = 53;
 pub const REGEX_MATCH_ID: usize = 54;
+pub const MSG_HEADER_ID: usize = 55;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them. Their current compact order is what a PPE stores.
@@ -157,6 +158,16 @@ impl UserTypeRegistry {
             vec![
                 (unicase::Ascii::new("Service".to_string()), VariableType::UnboundedString),
                 (unicase::Ascii::new("Account".to_string()), VariableType::UnboundedString),
+            ],
+        );
+        registry.register_record(
+            MSG_HEADER_ID,
+            "MSGHEADER",
+            vec![
+                (unicase::Ascii::new("From".to_string()), VariableType::UnboundedString),
+                (unicase::Ascii::new("To".to_string()), VariableType::UnboundedString),
+                (unicase::Ascii::new("Subject".to_string()), VariableType::UnboundedString),
+                (unicase::Ascii::new("IsPrivate".to_string()), VariableType::Boolean),
             ],
         );
         registry

@@ -799,6 +799,50 @@ bedeutet nicht automatisch fehlende Gesamtfunktionalität.
 **Abnahme:** Die realen PPEs nutzen öffentliche BBS-APIs und keine selbst
 geschriebenen Parser für interne TOML-, JAM- oder Filebase-Strukturen.
 
+**Befunde aus E2 (2026-09-10).** Der Nachrichtenteil wurde nicht entworfen,
+sondern beim Portieren von [LiQUiD Read](https://github.com/mkrueger/liquid_read)
+gemessen. Lesen, Filtern und Antworten sind mit der heutigen API vollständig
+möglich. Zwei dabei gefundene Fehler wurden behoben; der Editoranschluss ist
+implementiert, die echte DOS-Editor-Abnahme bleibt teilweise offen:
+
+- **Behoben: der Last-read-Zeiger war schreibbar, aber nicht lesbar.** `SETLMR`
+  schrieb korrekt in die JAM-Base — die zuvor gemeldete fehlende Lesemarkierung
+  war ein Suchfehler. `U_LMR(conf)` ignorierte jedoch sein Argument und lieferte
+  `session.last_msg_read`, einen Wert, den nur der interaktive Leser füllte:
+  gemessen `setlmr|8|err=0`, unmittelbar danach `lmr-after-set|0`. `U_LMR` liest
+  den Zeiger jetzt dort, wo `SETLMR` ihn hinschreibt, und `SETLMR` hält den
+  Sitzungswert mit. Auf der Test-BBS liest ein Programmlauf jetzt den Stand des
+  vorherigen (`lmr-at-start|8`).
+- **Behoben: `MESSAGE` stellte dem Nachrichtentext ein BOM voran.** `FPUTLN`
+  beginnt eine neue Datei mit einem UTF-8-BOM, und `message()` las sie mit
+  `read_to_string` samt Markierung in den Text. Der Body wird jetzt wie bei
+  `FGET` über `read_with_encoding_detection` gelesen, womit auch die
+  CP437-Erkennung übereinstimmt.
+- **Implementiert: Nachrichten-API mit lokalem Header-Wert.**
+  `MSGHEADER` und `MSG.Header` liefern veränderbare Kopien ohne Write-through.
+  `Session.PostMessage`, `ReplyMessage`, `EditMessage` und `ReplyHeader` verwenden
+  die Board-Abläufe samt Zugriffsprüfung, Editor und Speicherung. Die Rückgabe
+  entsteht direkt beim Speichern; bestehende Nachrichten werden mit Konfliktprüfung
+  ersetzt. MSGINF/MSGTMP sind ausschließlich intern verwaltete Editor-Dateien.
+  `icbsetup` bietet Internal, Program,
+  Script, DOS und PPE samt Dropfile, Argumenten und Laufzeitgrenze. Ein Editor-PPE
+  erhält das Austauschverzeichnis per GETTOKEN; EXIT speichert, STOP bricht ab.
+  Script-/PPE-Tests prüfen Speichern, Abbruch, Fehler, Timeout, Token-Rückgabe
+  und die Erhaltung privater Nachrichten- und Thread-/Attachment-Metadaten.
+  Die DOS-Rückgabecodes 0 bis 3 und fehlende RESULT.ED wurden mit FreeDOS geprüft.
+  Kompilierte PPE-Tests decken neue Nachrichten, editierbare Textvorgaben,
+  Antworten in der Herkunfts-Area, Bearbeitung, Abbruch und Fehlerfälle ab.
+  Siehe [Nachrichten-API und Konfiguration](new_ppl.md#composing-and-editing-messages).
+- **Offen: ICE-Edit-Speichertest.** ICE Edit 2.35 aus der konfigurierten
+  RA-Installation startet mit X00 1.24 und DORINFO1.DEF auch ohne EXITINFO.BBS.
+  Gerenderte Metadaten bei 80x25 und Inaktivitätsabbruch sind geprüft. Gesendete
+  Tastatureingaben erscheinen jedoch nicht, auch nicht zeichenweise; der
+  Speichertest endet im Abbruch. Damit ist vollständige ICE-Kompatibilität
+  noch nicht belegt. LiQUiD Read verwendet den neuen Editoraufruf noch nicht.
+
+Ungeprüft geblieben ist, warum `Session.IsSysop` bei einem über `--runppe`
+angemeldeten SYSOP `FALSE` meldet.
+
 ### A5 — Terminal-Layout und aktuelle Geometrie
 
 **Besprechen:** Connection-Fähigkeiten versus aktuelle Größe; Resize-Ereignisse;

@@ -170,6 +170,9 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == ERROR_ID as u32 => get_sig_hint(Signature::new("ERROR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-error")),
         VariableType::UserData(id) if id == EVENT_ID as u32 => get_sig_hint(Signature::new("EVENT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-event")),
         VariableType::UserData(id) if id == MSG_ID as u32 => get_sig_hint(Signature::new("MSG".to_string()), fl!(LANGUAGE_LOADER, "hint-type-msg")),
+        VariableType::UserData(id) if id == icy_board_ppl::parser::MSG_HEADER_ID as u32 => {
+            get_sig_hint(Signature::new("MSGHEADER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-msgheader"))
+        }
         VariableType::UserData(id) if id == CONFERENCE_ID as u32 => {
             get_sig_hint(Signature::new("CONFERENCE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-conference"))
         }
@@ -412,6 +415,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "date" | "time" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-written")),
             "isprivate" | "isread" | "isdeleted" | "isecho" | "needspassword" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-flags")),
             "text" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-text")),
+            "header" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-header-value")),
             _ => None,
         };
     }
@@ -419,6 +423,12 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         return match member.to_ascii_lowercase().as_str() {
             "service" => Some(fl!(LANGUAGE_LOADER, "hint-member-contact-service")),
             "account" => Some(fl!(LANGUAGE_LOADER, "hint-member-contact-account")),
+            _ => None,
+        };
+    }
+    if id == icy_board_ppl::parser::MSG_HEADER_ID as u32 {
+        return match member.to_ascii_lowercase().as_str() {
+            "from" | "to" | "subject" | "isprivate" => Some(fl!(LANGUAGE_LOADER, "hint-member-msgheader-field")),
             _ => None,
         };
     }
@@ -472,6 +482,10 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     if id == SESSION_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
             "requestpasswordrecovery" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-request-password-recovery")),
+            "editmessage" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-edit-message")),
+            "postmessage" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-post-message")),
+            "replymessage" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-reply-message")),
+            "replyheader" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-reply-header")),
             "conference" | "area" | "directory" | "user" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-context")),
             "username" | "aliasname" | "securitylevel" | "node" | "minutesleft" | "pagelength" | "language" | "islocal" | "issysop" => {
                 Some(fl!(LANGUAGE_LOADER, "hint-member-session-value"))
@@ -648,6 +662,10 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
 /// hover and completion so the three views cannot drift apart.
 pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
+        "area" => "hint-param-message-area",
+        "original" => "hint-param-message-original",
+        "header" => "hint-param-message-header",
+        "initialtext" => "hint-param-message-initial-text",
         "backend" => "hint-param-backend",
         "fullscreen" => "hint-param-fullscreen",
         "enabled" => "hint-param-enabled",

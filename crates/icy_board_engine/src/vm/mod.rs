@@ -51,7 +51,7 @@ pub mod dbase;
 pub use self::io::*;
 
 pub mod errors;
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 #[path = "tests/user_snapshots.rs"]
 mod user_snapshots;
@@ -1259,6 +1259,13 @@ impl VirtualMachine<'_> {
         if type_id as usize == crate::parser::CONTACT_ID && field_id < 2 {
             return Ok(crate::executable::RecordField::scalar(VariableType::UnboundedString));
         }
+        if type_id as usize == crate::parser::MSG_HEADER_ID && field_id < 4 {
+            return Ok(crate::executable::RecordField::scalar(if field_id == 3 {
+                VariableType::Boolean
+            } else {
+                VariableType::UnboundedString
+            }));
+        }
         (type_id as usize)
             .checked_sub(crate::parser::FIRST_USER_TYPE_ID)
             .and_then(|index| self.user_types.get(index))
@@ -1359,7 +1366,11 @@ impl VirtualMachine<'_> {
             }
             _ => {
                 let record_type = match expected {
-                    VariableType::UserData(id) if !is_enum && (crate::parser::is_user_declared_type(id) || id as usize == crate::parser::CONTACT_ID) => {
+                    VariableType::UserData(id)
+                        if !is_enum
+                            && (crate::parser::is_user_declared_type(id)
+                                || matches!(id as usize, crate::parser::CONTACT_ID | crate::parser::MSG_HEADER_ID)) =>
+                    {
                         Some(id)
                     }
                     _ => None,
@@ -1367,6 +1378,8 @@ impl VirtualMachine<'_> {
                 if let Some(type_id) = record_type {
                     let field_count = if type_id as usize == crate::parser::CONTACT_ID {
                         2
+                    } else if type_id as usize == crate::parser::MSG_HEADER_ID {
+                        4
                     } else {
                         self.user_types
                             .get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)

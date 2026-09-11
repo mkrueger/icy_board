@@ -1559,7 +1559,9 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         .with_subject(BString::from(subject))
         .with_date_time(Utc::now())
         .with_attributes(attributes)
-        .with_text(BString::from(fs::read_to_string(file)?));
+        // Read the body the way FGET does: a PPE writing it with FPUTLN leaves a
+        // UTF-8 BOM behind, and that must not become part of the message.
+        .with_text(BString::from(icy_board_ppl::io::read_with_encoding_detection(&file)?));
     if pack_out_date > 0 {
         message = message.with_packout_date(IcbDate::from_pcboard(pack_out_date).to_utc_date_time());
     }
@@ -2382,6 +2384,10 @@ pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     last_read.last_read_msg = number;
     last_read.high_read_msg = last_read.high_read_msg.max(number);
     base.write_last_read(&last_read)?;
+    // Keep the session in step, so a later U_LMR and the interactive reader
+    // agree with what was just written.
+    vm.icy_board_state.session.last_msg_read = number;
+    vm.icy_board_state.session.highest_msg_read = vm.icy_board_state.session.highest_msg_read.max(number);
     Ok(())
 }
 

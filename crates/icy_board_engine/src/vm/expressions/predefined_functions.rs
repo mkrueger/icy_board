@@ -1157,8 +1157,36 @@ pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         VariableData::from_int(IcbDate::from_utc(&vm.user.date_last_dir_read).to_pcboard_date()),
     ))
 }
+/// `U_LMR(conf)`
+///
+/// The caller's last-message-read pointer for that message base. It is read
+/// where `SETLMR` writes it, so a PPE sees its own mark again on a later call
+/// and does not depend on the interactive reader having run first.
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.last_msg_read as i32))
+    let cached = vm.icy_board_state.session.last_msg_read;
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let Some(msg_base) = vm.message_base_path(conference, area).await else {
+        return Ok(VariableValue::new_int(cached as i32));
+    };
+    let stored = match JamMessageBase::open(&msg_base) {
+        Ok(base) => {
+            let crc = JamMessageBase::crc(&BString::from(vm.icy_board_state.session.user_name.to_lowercase()));
+            let user_id = vm.icy_board_state.session.cur_user_id as u32;
+            match base.find_last_read(crc, user_id) {
+                Ok(Some(last_read)) => last_read.last_read_msg,
+                Ok(None) => 0,
+                Err(err) => {
+                    log::error!("U_LMR can't read the pointer in {conference}:{area}: {err}");
+                    return Ok(VariableValue::new_int(cached as i32));
+                }
+            }
+        }
+        Err(err) => {
+            log::error!("U_LMR can't open message base {conference}:{area}: {err}");
+            return Ok(VariableValue::new_int(cached as i32));
+        }
+    };
+    Ok(VariableValue::new_int(stored as i32))
 }
 pub async fn u_logons(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.user.stats.num_times_on as i32))

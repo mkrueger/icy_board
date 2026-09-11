@@ -14,6 +14,7 @@ use crate::{
 use chrono::Local;
 use icy_engine::Position;
 
+pub(crate) mod external;
 mod operations;
 mod upload;
 
@@ -25,6 +26,8 @@ pub struct EditState {
     pub from: String,
     pub to: String,
     pub subj: String,
+
+    pub editor_details: Option<String>,
 
     pub msg: Vec<String>,
 

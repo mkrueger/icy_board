@@ -223,6 +223,12 @@ fn create_record_value_inner(
             RecordField::scalar(VariableType::UnboundedString),
             RecordField::scalar(VariableType::UnboundedString),
         ]),
+        crate::parser::MSG_HEADER_ID => Some(vec![
+            RecordField::scalar(VariableType::UnboundedString),
+            RecordField::scalar(VariableType::UnboundedString),
+            RecordField::scalar(VariableType::UnboundedString),
+            RecordField::scalar(VariableType::Boolean),
+        ]),
         _ => None,
     };
     let fields = if let Some(fields) = built_in_fields.as_ref() {
@@ -1316,7 +1322,7 @@ impl VariableTable {
             let VariableType::UserData(type_id) = entry.header.variable_type else {
                 continue;
             };
-            if !crate::parser::is_user_declared_type(type_id) && type_id as usize != crate::parser::CONTACT_ID {
+            if !crate::parser::is_user_declared_type(type_id) && !matches!(type_id as usize, crate::parser::CONTACT_ID | crate::parser::MSG_HEADER_ID) {
                 continue;
             }
             let Some(value) = create_record_value(type_id, user_types, &self.enums) else {

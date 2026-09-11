@@ -192,6 +192,21 @@ pub fn copy_file_into_image(image: &Path, source: &Path, destination: &str) -> R
     Ok(())
 }
 
+pub(crate) fn read_editor_file(image: &Path, name: &str, limit: usize) -> Res<Vec<u8>> {
+    let partition = PartitionFile::open(image)?;
+    let file_system = FileSystem::new(partition, FsOptions::new())?;
+    let mut bytes = Vec::new();
+    {
+        let root = file_system.root_dir();
+        root.open_file(&format!("DOOR/{name}"))?.take(limit as u64 + 1).read_to_end(&mut bytes)?;
+    }
+    file_system.unmount()?;
+    if bytes.len() > limit {
+        return Err("DOS editor output exceeds the configured limit".into());
+    }
+    Ok(bytes)
+}
+
 pub fn create_door_image(base_image: &Path, door_image: &Path, source_directory: &Path) -> Res<bool> {
     if door_image.exists() {
         return Ok(false);
@@ -273,6 +288,12 @@ pub fn validate_simple_command(source_directory: &Path, command: &str) -> Res<()
         )
         .into())
     }
+}
+
+pub(crate) fn editor_run_batch(command: &str) -> String {
+    format!(
+        "@ECHO OFF\nCD C:\\DOOR\nCALL {command}\nIF ERRORLEVEL 3 GOTO ICBERR\nIF ERRORLEVEL 2 GOTO ICBTIME\nIF ERRORLEVEL 1 GOTO ICBABORT\nECHO 0>C:\\DOOR\\ICBEDIT.RC\nGOTO ICBEND\n:ICBABORT\nECHO 1>C:\\DOOR\\ICBEDIT.RC\nGOTO ICBEND\n:ICBTIME\nECHO 2>C:\\DOOR\\ICBEDIT.RC\nGOTO ICBEND\n:ICBERR\nECHO 3>C:\\DOOR\\ICBEDIT.RC\n:ICBEND\n"
+    )
 }
 
 pub fn start_session(image_path: &Path, bios_path: &Path, vga_bios_path: &Path, memory_mb: u32, max_runtime: std::time::Duration) -> Res<DosSession> {

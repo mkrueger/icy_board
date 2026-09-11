@@ -14,6 +14,7 @@ use ratatui::{Frame, layout::Rect};
 
 mod colors;
 mod config_switches;
+mod external_editor;
 mod file_transfer;
 mod function_keys;
 mod limits;
@@ -41,6 +42,7 @@ impl ConfigurationOptions {
                 MenuItem::new(6, 'G', get_text("configuration_options_func_keys")),
                 MenuItem::new(7, 'H', get_text("configuration_options_ppl_http")),
                 MenuItem::new(8, 'I', get_text("configuration_options_upload_processing")),
+                MenuItem::new(9, 'J', get_text("external_editor_title")),
             ]))
             .with_center_title(get_text("configuration_options_title")),
             icy_board,
@@ -73,6 +75,7 @@ impl Page for ConfigurationOptions {
                 6 => PageMessage::OpenSubPage(Box::new(function_keys::FunctionKeys::new(self.icy_board.clone()))),
                 7 => PageMessage::OpenSubPage(Box::new(ppl_http::PplHttp::new(self.icy_board.clone()))),
                 8 => PageMessage::OpenSubPage(Box::new(upload_processing::UploadProcessing::new(self.icy_board.clone()))),
+                9 => PageMessage::OpenSubPage(Box::new(external_editor::ExternalEditor::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }

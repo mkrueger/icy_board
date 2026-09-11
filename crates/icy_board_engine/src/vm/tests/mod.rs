@@ -112,7 +112,7 @@ pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
 }
 
 /// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
-pub(super) fn compile(source: &str) -> crate::executable::Executable {
+pub(crate) fn compile(source: &str) -> crate::executable::Executable {
     let executable = compile_source(source);
     // Keep the real PPE storage boundary for all existing callers.
     let mut bytes = executable.to_buffer().expect("the snippet does not serialize");

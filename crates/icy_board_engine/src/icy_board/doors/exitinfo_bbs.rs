@@ -34,6 +34,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     }
     // extra space
     contents.extend([0; 92].iter());
+    drop(board);
 
     // OldTIMELOGrecord
     contents.extend(state.session.login_date.format("%m-%d-%y").to_string().as_bytes());

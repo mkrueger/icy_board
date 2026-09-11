@@ -9,8 +9,66 @@ const MESSAGES: &[(&str, &str, &str)] = &[
 ];
 
 #[test]
+fn message_header_is_an_independent_writable_value() {
+    assert_eq!(
+        super::run_ppl(
+            r#"
+MSGHEADER original
+original.From = "SYSOP"
+original.To = "ALL"
+original.Subject = "Original"
+MSGHEADER changed = original
+changed.Subject = "Changed"
+changed.IsPrivate = TRUE
+PRINT original.Subject, ":", original.IsPrivate, "|", changed.Subject, ":", changed.IsPrivate
+"#,
+        ),
+        "Original:0|Changed:1"
+    );
+}
+
+#[test]
+fn message_api_invalid_values_report_errors_without_posting() {
+    assert_eq!(
+        super::run_ppl(
+            r#"
+AREA area
+MSG original
+MSG posted = Session.PostMessage(area)
+PRINT posted.Valid, ":", Error.Last().Kind = ErrKind.Msg, ":", Error.Last().Code = ErrCode.Invalid, "|"
+MSG reply = Session.ReplyMessage(original)
+PRINT reply.Valid, ":", Error.Last().Code = ErrCode.Invalid, "|"
+MSG edited = Session.EditMessage(original)
+PRINT edited.Valid, ":", Error.Last().Code = ErrCode.Invalid, "|"
+MSGHEADER header = Session.ReplyHeader(original)
+PRINT header.Subject, ":", Error.Last().Code = ErrCode.Invalid
+"#
+        ),
+        "0:1:1|0:1|0:1|:1"
+    );
+}
+
+#[test]
 fn test_scanmsghdr_finds_the_first_message_addressed_to_someone() {
     assert_eq!(run_ppl_with_messages(r#"PRINT SCANMSGHDR(0, 1, HDR_TO, "STAN")"#, MESSAGES), "1");
+}
+
+#[test]
+fn message_header_snapshot_does_not_write_through() {
+    assert_eq!(
+        run_ppl_with_messages(
+            r#"
+MSG message = Board.Conferences[0].Areas[0].Read(1)
+MSGHEADER header = message.Header
+header.Subject = "Changed"
+header.IsPrivate = TRUE
+MSG fresh = Board.Conferences[0].Areas[0].Read(1)
+PRINT message.Subject, "|", fresh.Subject, "|", header.Subject, ":", header.IsPrivate
+"#,
+            MESSAGES,
+        ),
+        "Welcome aboard|Welcome aboard|Changed:1"
+    );
 }
 
 #[test]
@@ -322,4 +380,53 @@ fn test_opencap_captures_what_the_caller_sees() {
 #[test]
 fn test_stackabort_can_be_turned_off_and_on_again() {
     assert_eq!(run_ppl_on("STACKABORT FALSE\nSTACKABORT TRUE\nPRINT STACKERR()", |_| {}), "0");
+}
+
+/// A PPE writes its body with FPUTLN, which starts a fresh file with a UTF-8
+/// BOM. That marker belongs to the file, not to the message.
+#[test]
+fn a_message_body_does_not_start_with_the_byte_order_mark() {
+    let output = run_ppl_with_messages(
+        r#"
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "first line"
+        FPUTLN 1, "second line"
+        FCLOSE 1
+        MESSAGE 0, "SOMEONE", "ME", "Body check", "N", 0, FALSE, FALSE, "body.txt"
+        STRING body = Board.Conferences[0].Areas[0].Read(4).Text()
+        PRINT "[", body.Left(5), "]", TOBYTES(body.Left(1)).ToHex()
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[first]66"), "the body still carries a BOM: {output:?}");
+}
+
+/// SETLMR stores the pointer, so U_LMR has to answer with it rather than with
+/// whatever the interactive reader happened to leave in the session.
+#[test]
+fn the_last_read_pointer_survives_being_written_and_read_back() {
+    let output = run_ppl_with_messages(
+        r#"
+        PRINT "[", U_LMR(0), "|"
+        SETLMR 0, 2
+        PRINT U_LMR(0), "|"
+        SETLMR 0, 1
+        PRINT U_LMR(0), "]"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[0|2|1]"), "unexpected pointer sequence: {output:?}");
+}
+
+/// A number past the end clamps, and the clamped value is what comes back.
+#[test]
+fn the_last_read_pointer_clamps_to_the_highest_message() {
+    let output = run_ppl_with_messages(
+        r#"
+        SETLMR 0, 9999
+        PRINT "[", U_LMR(0), "]"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[3]"), "unexpected clamped pointer: {output:?}");
 }

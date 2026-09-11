@@ -129,6 +129,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
                 registry.add_property(n(name), V::Boolean, false);
             }
             registry.add_function(n("Text"), Vec::new(), V::UnboundedString);
+            registry.add_property(n("Header"), V::UserData(super::MSG_HEADER_ID as u32), false);
         }
         HTTP_ID => {
             registry.add_named_static_function(n("Get"), vec![("url", V::UnboundedString)], V::UserData(HTTP_RESPONSE_ID as u32));
@@ -345,6 +346,37 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
                 registry.add_property(n(name), V::Boolean, false);
             }
             registry.add_named_function(n("RequestPasswordRecovery"), vec![("userName", V::UnboundedString)], V::Boolean);
+            registry.add_named_function_with(
+                n("EditMessage"),
+                vec![("original", V::UserData(MSG_ID as u32)), ("header", V::UserData(super::MSG_HEADER_ID as u32))],
+                1,
+                V::UserData(MSG_ID as u32),
+            );
+            registry.add_named_function_with(
+                n("PostMessage"),
+                vec![
+                    ("area", V::UserData(MESSAGE_AREA_ID as u32)),
+                    ("header", V::UserData(super::MSG_HEADER_ID as u32)),
+                    ("initialText", V::UnboundedString),
+                ],
+                1,
+                V::UserData(MSG_ID as u32),
+            );
+            registry.add_named_function_with(
+                n("ReplyMessage"),
+                vec![
+                    ("original", V::UserData(MSG_ID as u32)),
+                    ("header", V::UserData(super::MSG_HEADER_ID as u32)),
+                    ("initialText", V::UnboundedString),
+                ],
+                1,
+                V::UserData(MSG_ID as u32),
+            );
+            registry.add_named_function(
+                n("ReplyHeader"),
+                vec![("original", V::UserData(MSG_ID as u32))],
+                V::UserData(super::MSG_HEADER_ID as u32),
+            );
         }
         _ => register_data_members(id, registry),
     }

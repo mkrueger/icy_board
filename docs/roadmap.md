@@ -15,6 +15,10 @@ tracks the larger remaining directions; it is not a release-date promise.
   the [options audit](../compat/OPTIONS_AUDIT.md).
 - Complete the English and German operator documentation and help files.
 - Continue compatibility testing against the PCBoard source and DOSBox oracle.
+- Finish real external-editor interoperability. The interactive
+  [message API](new_ppl.md#composing-and-editing-messages) and setup options are
+  implemented; ICE Edit 2.35/X00 starts and aborts correctly, but remote input
+  and saving in the native DOS emulator remain unverified by a successful run.
 - Harden [accounting](accounting.md) reconciliation and crash recovery; add
   per-file NoTime/FSEC monetary time refunds when transfer metadata supports
   them, and configurable currency formatting. Charging and setup are already

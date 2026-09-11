@@ -21,7 +21,7 @@ pub fn resource_user_data_value<T: UserDataValue + 'static>(value: T, type_id: u
 
 #[cfg(feature = "bbs")]
 #[async_trait::async_trait(?Send)]
-pub trait UserDataValue: Send + Sync {
+pub trait UserDataValue: Send + Sync + std::any::Any {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<crate::executable::VariableValue>;
     async fn set_property_value(
         &self,

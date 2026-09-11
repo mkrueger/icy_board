@@ -39,7 +39,7 @@ fn reply_details(header: &JamMessageHeader) -> (String, String, u32, Vec<Message
 // A number/CRC alone is not an identity: pack can reuse the number, and legacy
 // messages need not have a MsgID. Be conservative about edits/relocations, while
 // allowing recipient read status and counters to change during composition.
-fn same_reply_source(fresh: &JamMessageHeader, original: &JamMessageHeader) -> bool {
+pub(crate) fn same_reply_source(fresh: &JamMessageHeader, original: &JamMessageHeader) -> bool {
     !fresh.is_deleted()
         && fresh.message_number == original.message_number
         && fresh.msgid_crc == original.msgid_crc
@@ -113,6 +113,39 @@ fn record_reply_date(base: &mut JamMessageBase, source: &JamMessageHeader, body:
 }
 
 impl IcyBoardState {
+    pub(crate) fn message_reply_defaults(&self, header: &JamMessageHeader) -> crate::icy_board::state::ppl_message::MessageHeader {
+        let (mut to, subject, attributes, _) = reply_details(header);
+        if to.eq_ignore_ascii_case(&self.session.user_name) || (!self.session.alias_name.is_empty() && to.eq_ignore_ascii_case(&self.session.alias_name)) {
+            to = header.to().map(ToString::to_string).unwrap_or_default();
+        }
+        crate::icy_board::state::ppl_message::MessageHeader {
+            from: self.session.get_username_or_alias(), to, subject, is_private: attributes & attributes::MSG_PRIVATE != 0,
+        }
+    }
+
+    pub(crate) async fn authorized_message_snapshot(&mut self, source: &crate::icy_board::state::ppl_message::PplMessage) -> Res<Option<JamMessage>> {
+        let expected = source.stored_header.as_ref().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid MSG"))?;
+        let mut base = JamMessageBase::open(&source.path)?;
+        let header = base.read_transaction(|base| base.read_header(source.number))?;
+        if !same_reply_source(&header, expected) {
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Message changed since it was read").into());
+        }
+        let read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
+        if !authorized_reply_header(&header, &self.session.user_name, &self.session.alias_name, read_all) {
+            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message access denied").into());
+        }
+        if requires_read_password(&header, read_all)
+            && !self.check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password)).await? {
+            if self.session.request_logoff { return Ok(None); }
+            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message password denied").into());
+        }
+        if self.session.request_logoff { return Ok(None); }
+        let Some((header, body)) = read_authorized_reply(&mut base, &header, &self.session.user_name, &self.session.alias_name, read_all)? else {
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Message changed during authorization").into());
+        };
+        Ok(Some(JamMessage::from_stored(header, body)))
+    }
+
     pub async fn get_ret_receipt(&mut self) -> Res<bool> {
         let input = self
             .input_field(
@@ -195,6 +228,24 @@ impl IcyBoardState {
         ask_other: bool,
         email: bool,
     ) -> Res<EditResult> {
+        let mut saved = None;
+        match self.reply_from_base_with_defaults(base_path, number, ask_other, email, None, "", None, &mut saved).await {
+            Err(error) if saved.is_none() && error.is::<super::message_attachment::MessageCreditDenied>() => Ok(EditResult::Abort),
+            result => result,
+        }
+    }
+
+    pub(crate) async fn reply_from_base_with_defaults(
+        &mut self,
+        base_path: &std::path::Path,
+        number: u32,
+        ask_other: bool,
+        email: bool,
+        defaults: Option<&crate::icy_board::state::ppl_message::MessageHeader>,
+        initial_text: &str,
+        expected: Option<&JamMessageHeader>,
+        saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
+    ) -> Res<EditResult> {
         let conference = self.session.current_conference.clone();
         if !email && conference.is_read_only {
             self.display_text(IceText::ConferenceIsReadOnly, display_flags::NEWLINE | display_flags::BELL).await?;
@@ -223,7 +274,8 @@ impl IcyBoardState {
         let may_read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
         let mut base = match JamMessageBase::open(base_path) {
             Ok(base) => base,
-            Err(_) => {
+            Err(error) => {
+                if expected.is_some() { return Err(error.into()); }
                 self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
                 return Ok(EditResult::Abort);
             }
@@ -233,15 +285,21 @@ impl IcyBoardState {
                 authorized_reply_header(header, &self.session.user_name, &self.session.alias_name, may_read_all)))
         })?;
         let Some(header) = header else {
+            if expected.is_some() { return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message unavailable or access denied").into()); }
             self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
             return Ok(EditResult::Abort);
         };
+        if expected.is_some_and(|expected| !same_reply_source(&header, expected)) {
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Reply source changed since it was read").into());
+        }
         if requires_read_password(&header, may_read_all)
             && !self.check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password)).await? {
+            if expected.is_some() && !self.session.request_logoff { return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message password denied").into()); }
             return Ok(EditResult::Abort);
         }
         if self.session.request_logoff { return Ok(EditResult::Abort); }
         let Some((header, body)) = read_authorized_reply(&mut base, &header, &self.session.user_name, &self.session.alias_name, may_read_all)? else {
+            if expected.is_some() { return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Reply source changed during authorization").into()); }
             self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
             return Ok(EditResult::Abort);
         };
@@ -249,6 +307,9 @@ impl IcyBoardState {
         let source_generation = base.mod_counter();
         let numeric_link = reply_link(base_path, &destination_path, number);
         drop(base);
+        let from = if let Some(defaults) = defaults { self.get_message_sender(&defaults.from).await? }
+            else { self.session.get_username_or_alias() };
+        if self.session.request_logoff { return Ok(EditResult::Abort); }
         let (mut to, mut subject, inherited_attributes, mut fields) = reply_details(&header);
         let own = to.eq_ignore_ascii_case(&self.session.user_name)
             || (!self.session.alias_name.is_empty() && to.eq_ignore_ascii_case(&self.session.alias_name));
@@ -259,7 +320,15 @@ impl IcyBoardState {
                 fields.push(address.clone());
             }
         }
-        if ask_other {
+        if let Some(defaults) = defaults {
+            if defaults.to != to {
+                fields.retain(|field| field.field_type() != SubfieldType::AddressD);
+                if defaults.to.contains('@') { fields.push(MessageSubfield::new(SubfieldType::AddressD, defaults.to.clone().into())); }
+            }
+            to = defaults.to.clone();
+            subject = defaults.subject.clone();
+        }
+        if ask_other || defaults.is_some() {
             let old_to = to.clone();
             let Some(recipient) = self.get_message_recipient(IceText::MessageTo, to, false).await? else { return Ok(EditResult::Abort) };
             to = recipient;
@@ -273,25 +342,26 @@ impl IcyBoardState {
                 return Ok(EditResult::Abort);
             }
         }
-        if !conference.long_to_names || ask_other {
+        if !conference.long_to_names || ask_other || defaults.is_some() {
             let answer = self.input_field(IceText::NewSubject, if subject.chars().count() > 60 { 120 } else { 60 }, &MASK_ASCII, "", Some(subject.clone()),
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN).await?;
             if !answer.is_empty() { subject = answer; }
         }
         let group_password = header.needs_password() && requires_read_password(&header, false) && !ask_other;
         let mut options = if group_password {
-            let mut options = MessageOptions { attributes: if email { attributes::MSG_PRIVATE } else { 0 }, password: None, packout_date: None, sub_fields: Vec::new() };
-            self.get_message_delivery_options(to.eq_ignore_ascii_case("ALL"), email, &mut options).await?;
+            let private = email || defaults.is_some_and(|header| header.is_private && !to.eq_ignore_ascii_case("ALL") && !conference.disallow_private_msgs);
+            let mut options = MessageOptions { attributes: if private { attributes::MSG_PRIVATE } else { 0 }, password: None, packout_date: None, sub_fields: Vec::new() };
+            self.get_message_delivery_options(to.eq_ignore_ascii_case("ALL"), private, &mut options).await?;
             options
         } else {
-            self.get_message_options(to.eq_ignore_ascii_case("ALL"), email || (!ask_other && inherited_attributes & attributes::MSG_PRIVATE != 0)).await?
+            self.get_message_options_with_default(to.eq_ignore_ascii_case("ALL"), email || (defaults.is_none() && !ask_other && inherited_attributes & attributes::MSG_PRIVATE != 0), defaults.map(|header| header.is_private)).await?
         };
         if options.sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD) {
             fields.retain(|field| field.field_type() != SubfieldType::AddressD);
         }
         fields.append(&mut options.sub_fields);
         let mut message = JamMessage::default()
-            .with_from(BString::from(self.session.get_username_or_alias()))
+            .with_from(BString::from(from))
             .with_to(BString::from(to))
             .with_subject(BString::from(subject))
             .with_reply_to(numeric_link)
@@ -308,9 +378,10 @@ impl IcyBoardState {
             reply_header.password_crc = header.password_crc;
             message = JamMessage::from_stored(reply_header, BString::default());
         }
+        message = message.with_text(initial_text.into());
         self.set_activity(NodeStatus::EnterMessage).await;
-        let result = self.write_message_context(destination_conf, destination_area,
-            message, body.to_string().replace("\r\n", "\n").replace('\r', "\n").lines().map(str::to_string).collect(), IceText::SavingMessage, true).await?;
+        let result = self.write_message_with_result(destination_conf, destination_area,
+            message, body.to_string().replace("\r\n", "\n").replace('\r', "\n").lines().map(str::to_string).collect(), IceText::SavingMessage, true, saved).await?;
         if result == EditResult::SendKill {
             // SK saves one ordinary reply: send_message writes the JAM base
             // header once for append and once explicitly. Successful attachment

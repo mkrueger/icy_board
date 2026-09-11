@@ -190,6 +190,7 @@ impl IcyBoardState {
             from: message.from().map(ToString::to_string).unwrap_or_default(),
             to: message.to().map(ToString::to_string).unwrap_or_default(),
             subj: message.header().subject().map(ToString::to_string).unwrap_or_default(),
+            editor_details: None,
             msg: message.text().to_string().lines().map(str::to_string).collect(),
             quote_text,
             cursor: Position::new(0, 0),
@@ -200,14 +201,25 @@ impl IcyBoardState {
             max_lines: self.get_board().await.config.message.max_msg_lines.max(1) as usize,
         };
 
+        let external = self.get_board().await.config.message.external_editor.clone();
         loop {
-            let result = editor.edit_message(self).await?;
+            let result = if use_fse && external.mode != crate::icy_board::icb_config::ExternalEditorMode::Internal {
+                let area = self.session.current_conference.areas.as_ref()
+                    .and_then(|areas| areas.get(self.session.current_message_area as usize)).map(|area| area.name.clone()).unwrap_or_default();
+                self.run_external_editor(&external, &mut editor, &area, message.header().attributes & attributes::MSG_PRIVATE != 0).await?
+            } else {
+                editor.edit_message(self).await?
+            };
             if result != EditResult::Abort {
                 let body = message_text(&editor.msg, self.get_board().await.config.message.allow_esc_codes);
                 let mut header = message.header().clone();
                 header.set_from(BString::from(editor.from.clone()));
                 header.set_to(BString::from(editor.to.clone()));
                 header.set_subject(BString::from(editor.subj.clone()));
+                if let Some(details) = &editor.editor_details {
+                    header.sub_fields.retain(|field| field.field_type() != SubfieldType::PID);
+                    header.sub_fields.push(MessageSubfield::new(SubfieldType::PID, BString::from(details.clone())));
+                }
                 *message = JamMessage::from_stored(header, BString::from(body));
             }
             if result != EditResult::AttachFile { return Ok(result); }
@@ -225,12 +237,32 @@ impl IcyBoardState {
         &mut self,
         conf: i32,
         area: i32,
-        mut message: JamMessage,
+        message: JamMessage,
         quote_text: Vec<String>,
         text: IceText,
         allow_carbon_copy: bool,
     ) -> Res<EditResult> {
-        if !self.message_write_allowed(conf, &message).await? { return Ok(EditResult::Abort); }
+        let mut saved = None;
+        match self.write_message_with_result(conf, area, message, quote_text, text, allow_carbon_copy, &mut saved).await {
+            Err(error) if saved.is_none() && error.is::<super::message_attachment::MessageCreditDenied>() => Ok(EditResult::Abort),
+            result => result,
+        }
+    }
+
+    pub(crate) async fn write_message_with_result(
+        &mut self,
+        conf: i32,
+        area: i32,
+        mut message: JamMessage,
+        quote_text: Vec<String>,
+        text: IceText,
+        allow_carbon_copy: bool,
+        saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
+    ) -> Res<EditResult> {
+        if !self.message_write_allowed(conf, &message).await? {
+            if self.session.request_logoff { return Ok(EditResult::Abort); }
+            return Err(super::message_attachment::MessageCreditDenied.into());
+        }
         let mut attachments = self.message_attachment_cleanup(&message);
         let result = self.edit_message_context(&mut message, quote_text).await?;
         attachments.track(&message)?;
@@ -260,16 +292,16 @@ impl IcyBoardState {
                 return Ok(EditResult::Abort);
             }
             for to in list.into_iter().take(self.session.current_conference.carbon_list_limit as usize) {
-                self.send_message_with_attachment_cleanup(conf, area, carbon_copy(&message, &to), text, &mut attachments).await?;
+                self.send_message_with_result(conf, area, carbon_copy(&message, &to), text, &mut attachments, saved).await?;
             }
         } else {
             let original = JamMessage::from_stored(message.header().clone(), message.text().clone());
-            self.send_message_with_attachment_cleanup(conf, area, original, text, &mut attachments).await?;
+            self.send_message_with_result(conf, area, original, text, &mut attachments, saved).await?;
         }
         if copies {
             while let Some(recipient) = self.get_message_recipient(IceText::CarbonCopyTo, String::new(), true).await? {
                 let copy = carbon_copy(&message, &recipient);
-                self.send_message_with_attachment_cleanup(conf, area, copy, text, &mut attachments).await?;
+                self.send_message_with_result(conf, area, copy, text, &mut attachments, saved).await?;
                 if recipient.chars().count() > 25 { break; }
             }
         }
