@@ -622,9 +622,9 @@ impl IfStatement {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ElseIfBlock {
     elseif_token: Spanned<Token>,
-    leftpar_token: Spanned<Token>,
+    leftpar_token: Option<Spanned<Token>>,
     cond: Box<Expression>,
-    rightpar_token: Spanned<Token>,
+    rightpar_token: Option<Spanned<Token>>,
     then_token: Option<Spanned<Token>>,
     statements: Vec<Statement>,
 }
@@ -632,9 +632,9 @@ pub struct ElseIfBlock {
 impl ElseIfBlock {
     pub fn new(
         elseif_token: Spanned<Token>,
-        leftpar_token: Spanned<Token>,
+        leftpar_token: Option<Spanned<Token>>,
         cond: Expression,
-        rightpar_token: Spanned<Token>,
+        rightpar_token: Option<Spanned<Token>>,
         then_token: Option<Spanned<Token>>,
         statements: Vec<Statement>,
     ) -> Self {
@@ -651,9 +651,9 @@ impl ElseIfBlock {
     pub fn empty(cond: Expression, statements: Vec<Statement>) -> Self {
         Self {
             elseif_token: Spanned::create_empty(Token::ElseIf),
-            leftpar_token: Spanned::create_empty(Token::LPar),
+            leftpar_token: Some(Spanned::create_empty(Token::LPar)),
             cond: Box::new(cond),
-            rightpar_token: Spanned::create_empty(Token::RPar),
+            rightpar_token: Some(Spanned::create_empty(Token::RPar)),
             then_token: None,
             statements,
         }
@@ -663,7 +663,7 @@ impl ElseIfBlock {
         &self.elseif_token
     }
 
-    pub fn get_leftpar_token(&self) -> &Spanned<Token> {
+    pub fn get_leftpar_token(&self) -> &Option<Spanned<Token>> {
         &self.leftpar_token
     }
 
@@ -675,7 +675,7 @@ impl ElseIfBlock {
         &mut self.cond
     }
 
-    pub fn get_rightpar_token(&self) -> &Spanned<Token> {
+    pub fn get_rightpar_token(&self) -> &Option<Spanned<Token>> {
         &self.rightpar_token
     }
 

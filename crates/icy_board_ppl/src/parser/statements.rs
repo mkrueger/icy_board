@@ -428,26 +428,35 @@ impl Parser<'_> {
 
             self.next_token();
 
-            if self.get_cur_token() != Some(Token::LPar) {
+            let mut else_if_lpar_token = None;
+            if self.lang_version < 350 && self.get_cur_token() != Some(Token::LPar) {
+                self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
+                return None;
+            } else if self.get_cur_token() == Some(Token::LPar) {
+                else_if_lpar_token = Some(self.save_spanned_token());
+                self.next_token();
+            }
+
+            if else_if_lpar_token.is_none() && is_do_then(&self.cur_token) {
                 self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
                 return None;
             }
-            let else_if_lpar_token = self.save_spanned_token();
 
-            self.next_token();
             let Some(cond) = self.parse_expression() else {
                 self.report_error(self.lex.span(), ParserErrorType::IfWhileConditionNotFound);
 
                 return None;
             };
 
-            if self.get_cur_token() != Some(Token::RPar) {
-                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
-
-                return None;
+            let mut else_if_rightpar_token = None;
+            if else_if_lpar_token.is_some() {
+                if self.get_cur_token() != Some(Token::RPar) {
+                    self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                    return None;
+                }
+                else_if_rightpar_token = Some(self.save_spanned_token());
+                self.next_token();
             }
-            let else_if_rightpar_token = self.save_spanned_token();
-            self.next_token();
             let then_token = if is_do_then(&self.cur_token) { Some(self.save_spanned_token()) } else { None };
             if then_token.is_some() {
                 if !is_do_then(&self.cur_token) && self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {

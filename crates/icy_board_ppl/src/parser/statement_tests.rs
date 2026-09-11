@@ -306,6 +306,77 @@ fn test_if_then_ifelse_withoutthen_statement() {
 }
 
 #[test]
+fn elseif_parentheses_follow_language_version() {
+    for version in [340, 350, 400] {
+        for keyword in ["ELSEIF", "ELSE IF"] {
+            for condition in ["!details", "keyEvent.Text.ToUpper() = \"R\"", "ready & !busy"] {
+                if version < 400 && condition.contains('.') {
+                    continue;
+                }
+                for parenthesized in [false, true] {
+                    for suffix in [" THEN", " DO", ""] {
+                        let condition = if parenthesized { format!("({condition})") } else { condition.into() };
+                        let source = format!("IF (FALSE) THEN\n{keyword} {condition}{suffix}\nPRINTLN 1\nELSE\nPRINTLN 2\nENDIF");
+                        let registry = UserTypeRegistry::default();
+                        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                        let mut workspace = Workspace::default();
+                        workspace.set_default_language_version(Some(version));
+                        let mut parser = Parser::new(PathBuf::from("elseif.pps"), errors.clone(), &registry, &source, Encoding::Utf8, &workspace);
+                        parser.next_token();
+                        let statement = parser.parse_statement();
+                        let reporter = errors.lock().unwrap();
+                        if version < 350 && !parenthesized {
+                            assert!(reporter.has_errors(), "language {version}: {source}");
+                            assert!(statement.is_none(), "language {version}: {source}");
+                        } else {
+                            assert!(
+                                !reporter.has_errors(),
+                                "language {version}: {source}\n{:?}",
+                                reporter.errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>()
+                            );
+                            let Some(Statement::IfThen(statement)) = statement else {
+                                panic!("language {version}: {source}");
+                            };
+                            assert_eq!(statement.get_else_if_blocks().len(), 1);
+                            let block = &statement.get_else_if_blocks()[0];
+                            assert_eq!(block.get_leftpar_token().is_some(), parenthesized);
+                            assert_eq!(block.get_rightpar_token().is_some(), parenthesized);
+                            assert_eq!(block.get_then_token().is_some(), !suffix.is_empty());
+                            assert_eq!(block.get_statements().len(), 1);
+                            assert_eq!(statement.get_else_block().as_ref().unwrap().get_statements().len(), 1);
+                            if let (Some(left), Some(right)) = (block.get_leftpar_token(), block.get_rightpar_token()) {
+                                assert_eq!(&source[left.span.clone()], "(");
+                                assert_eq!(&source[right.span.clone()], ")");
+                            }
+                            assert!(parser.get_cur_token().is_none(), "language {version}: {source}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn elseif_rejects_missing_conditions_and_unbalanced_parentheses() {
+    for version in [340, 350, 400] {
+        for keyword in ["ELSEIF", "ELSE IF"] {
+            for condition in ["", "()", "(ready", "ready)"] {
+                let source = format!("IF (FALSE) THEN\n{keyword} {condition} THEN\nPRINTLN 1\nENDIF");
+                let registry = UserTypeRegistry::default();
+                let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                let mut workspace = Workspace::default();
+                workspace.set_default_language_version(Some(version));
+                let mut parser = Parser::new(PathBuf::from("elseif.pps"), errors.clone(), &registry, &source, Encoding::Utf8, &workspace);
+                parser.next_token();
+                parser.parse_statement();
+                assert!(errors.lock().unwrap().has_errors(), "language {version}: {source}");
+            }
+        }
+    }
+}
+
+#[test]
 fn test_if_then_ifelse_else_statement() {
     check_statement(
         r"if (A) THEN

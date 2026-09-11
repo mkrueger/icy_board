@@ -65,6 +65,41 @@ fn test_an_elseif_chain_falls_through_to_the_else() {
 }
 
 #[test]
+fn elseif_without_parentheses_executes_like_parenthesized_conditions() {
+    for parenthesized in [false, true] {
+        let condition = "!skip & Matches(number, 1)";
+        let condition = if parenthesized { format!("({condition})") } else { condition.into() };
+        let source = format!(
+            r#"
+;$LANGVERSION 400
+DECLARE FUNCTION Matches(INTEGER value, INTEGER expected) BOOLEAN
+INTEGER number, evaluations = 0
+BOOLEAN skip = FALSE
+FOR number = 0 TO 3
+    IF number = 0 THEN
+        PRINT "zero;"
+    ELSEIF {condition} THEN
+        PRINT "one;"
+    ELSE IF STRING(number).ToUpper() = "2" THEN
+        PRINT "two;"
+    ELSE
+        PRINT "other;"
+    ENDIF
+NEXT
+PRINT evaluations
+EXIT
+
+FUNCTION Matches(INTEGER value, INTEGER expected) BOOLEAN
+    evaluations += 1
+    RETURN value = expected
+ENDFUNC
+"#
+        );
+        assert_eq!(run_ppl(&source), "zero;one;two;other;3", "parenthesized={parenthesized}");
+    }
+}
+
+#[test]
 fn test_nested_while_blocks_keep_their_own_break_targets() {
     assert_eq!(
         run_ppl(
