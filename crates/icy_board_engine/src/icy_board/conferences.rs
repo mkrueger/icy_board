@@ -448,7 +448,7 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_password(self.password.protected()));
         }
         if *name == *FILE_AREAS {
-            return Ok(directory_array_value(self.directories.clone().unwrap_or_default()));
+            return Ok(directory_array_value(self.directories.clone().unwrap_or_default(), self.number));
         }
         if *name == *MESSAGE_AREAS {
             return Ok(area_array_value(self.areas.clone().unwrap_or_default(), self.number));

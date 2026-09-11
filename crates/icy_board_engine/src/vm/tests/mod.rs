@@ -27,6 +27,8 @@ mod display_pause;
 mod enum_bitwise;
 mod errors;
 mod events;
+mod file_api;
+mod file_browser;
 mod file_channels;
 mod file_names;
 mod fonts;

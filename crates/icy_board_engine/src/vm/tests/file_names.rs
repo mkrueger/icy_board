@@ -4,6 +4,38 @@ use super::run_ppl_with_files;
 
 const CONTENT: &[u8] = b"the file was found\r\n";
 
+#[test]
+fn e1_legacy_file_listing_exposes_filesystem_entries_and_signed_sizes() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("download.zip"), CONTENT).unwrap();
+    std::fs::write(root.path().join("metadata.dat"), b"not a published download").unwrap();
+    std::fs::create_dir(root.path().join("subdirectory")).unwrap();
+    std::fs::File::create(root.path().join("large.zip"))
+        .unwrap()
+        .set_len(2_147_483_648)
+        .unwrap();
+    let source = format!(
+        r#"
+STRING path = FINDFIRST("{}/*")
+INTEGER entries = 0, files = 0
+BOOLEAN metadata = FALSE
+WHILE path <> "" DO
+    entries += 1
+    IF FILEINF(path, 1) files += 1
+    IF path.EndsWith("metadata.dat") metadata = TRUE
+    path = FINDNEXT()
+ENDWHILE
+PRINTLN entries, ":", files, ":", metadata
+PRINTLN FILEINF("{}/large.zip", 4)
+EXIT
+"#,
+        root.path().display(),
+        root.path().display()
+    );
+    let output = super::run_ppl(&source);
+    assert_eq!(output, "4:3:1\n-2147483648\n");
+}
+
 /// A PPE that pulls a name out of a fixed width record, which `MID` pads out to the
 /// width it asked for, still hands `PCBoard` a name it opens.
 #[test]

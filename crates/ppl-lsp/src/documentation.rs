@@ -2,10 +2,10 @@ use i18n_embed_fl::fl;
 use icy_board_ppl::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
 use icy_board_ppl::parser::{
     AUDIO_ID, BOARD_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
-    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID,
-    MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID,
-    REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
-    UserTypeRegistry,
+    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
+    HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
+    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, TERM_INFO_ID,
+    TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry,
 };
 use std::fmt::Write as _;
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
@@ -179,6 +179,12 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == MESSAGE_AREA_ID as u32 => get_sig_hint(Signature::new("AREA".to_string()), fl!(LANGUAGE_LOADER, "hint-type-area")),
         VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u32 => {
             get_sig_hint(Signature::new("DIRECTORY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-directory"))
+        }
+        VariableType::UserData(id) if id == FILE_ENTRY_ID as u32 => {
+            get_sig_hint(Signature::new("FILEENTRY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-file-entry"))
+        }
+        VariableType::UserData(id) if id == FILE_PAGE_ID as u32 => {
+            get_sig_hint(Signature::new("FILEPAGE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-file-page"))
         }
         VariableType::UserData(id) if id == DOOR_ID as u32 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
         VariableType::UserData(id) if id == CONTACT_ID as u32 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
@@ -460,8 +466,16 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-identity")),
             "path" | "isfree" | "hasnewfiles" | "password" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-options")),
             "hasaccess" | "candownload" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-access")),
+            "find" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-find")),
+            "flag" => Some(fl!(LANGUAGE_LOADER, "hint-member-directory-flag")),
             _ => None,
         };
+    }
+    if id == FILE_ENTRY_ID as u32 {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-file-entry"));
+    }
+    if id == FILE_PAGE_ID as u32 {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-file-page"));
     }
     if id == DOOR_ID as u32 {
         return match member.to_ascii_lowercase().as_str() {
@@ -686,6 +700,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "volume" => "hint-param-volume",
         "font" => "hint-param-font",
         "file" => "hint-param-file",
+        "filename" => "hint-param-directory-file-name",
         "password" => "hint-param-password",
         "username" => "hint-param-user-name",
         "service" => "hint-param-service",
@@ -706,6 +721,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "messagenumber" => "hint-param-message-number",
         "field" => "hint-param-field",
         "startmessage" => "hint-param-start-message",
+        "after" => "hint-param-file-after",
         "x" => "hint-param-x",
         "y" => "hint-param-y",
         "width" => "hint-param-width",

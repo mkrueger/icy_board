@@ -799,6 +799,85 @@ bedeutet nicht automatisch fehlende Gesamtfunktionalität.
 **Abnahme:** Die realen PPEs nutzen öffentliche BBS-APIs und keine selbst
 geschriebenen Parser für interne TOML-, JAM- oder Filebase-Strukturen.
 
+**Freigegebener Datei-API-Schritt (2026-09-11).** Nach der E1-Grundlage wurde
+die schreibgeschützte Filebase-API ausdrücklich freigegeben. Implementiert sind
+`DIRECTORY.Find(text [, after [, limit]])`, `FILEPAGE` und `FILEENTRY` mit
+Name, gespeicherter Beschreibung, 64-Bit-Größe und UTC-Datum. Neue Typ-IDs 56/57
+und der angehängte Directory-Member 9 lassen bestehende IDs unverändert.
+
+Die Suche liest ausschließlich den vorhandenen SQLite-Index: höchstens 100
+Treffer und 1.024 geprüfte Datensätze pro Aufruf, höchstens 16 KiB Beschreibung
+pro Eintrag, expliziter Cursor für die Fortsetzung auch nach leeren Seiten.
+Sie prüft aktuelle Konferenz-/Listenrechte und überspringt gelöschte, fehlende,
+verlinkte und unsichere Dateinamen. Es gibt keinen versteckten Verzeichnisscan,
+keine Archivextraktion und keinen PPE-eigenen Filebase-Parser. Ein noch nicht
+initialisierter Index meldet `Unavailable`. Beschreibungssuche arbeitet nur auf
+dem begrenzten Präfix; Seiten sind keine dauerhafte Transaktionsansicht und
+folgen der Datensatz-ID statt der konfigurierten Anzeigesortierung.
+
+Vier `dizbase`-Lesertests und zwei serialisierte PPE-/Compiler-Vertragstests
+prüfen Metadaten, Unicode-Suche, 2-GiB-Größe, Fortsetzung, Scanbudget,
+Beschreibungslimit, Rechte, Standardwerte, Fehlerbehandlung, Runtime-Grenze und
+Schreibschutz. Die Runtime-Registry-Brücke besteht mit vier Tests, der
+Workspace-Check mit allen Targets ist erfolgreich. Vollständiger Vertrag und
+Beispiel stehen unter [Filebase Search](new_ppl.md#filebase-search-400).
+Die Abschlussregression umfasst 28 Filebase-Tests, 14 Board-Objekt-Tests,
+beide vorhandenen E1-Tests und 398 PPL-Bibliothekstests (einer weiterhin
+ignoriert), jeweils ohne Fehler. Die LSP-Suite besteht in getrennten EN/DE-
+Prozessen; alle drei Lokalisierungstests bestehen ebenfalls.
+
+**Dateiansicht ergänzt (2026-09-11):** Das E1-PPE nutzt `Directory.Find` für
+Dateiseiten, Beschreibungssuche und Dateidetails mit Größe und Datum. Der Benutzer
+hat die befüllte Demo als passend bestätigt. Die gerenderten EN/DE-Tests prüfen
+auch leere Such-Zwischenseiten, Rückwärtsblättern und lange Beschreibungen.
+
+**Markierung freigegeben und umgesetzt (2026-09-11):** Der Benutzer hat den
+bestehenden Ablauf ausdrücklich bestätigt: Dateien markieren, Download separat.
+`Directory.Flag(fileName) -> BOOLEAN` markiert genau die indexierte Datei im
+gewählten Bereich. Der reproduzierte Legacy-Abgleich von `FLAG` sucht dagegen
+in allen Bereichen der Konferenz; ein vollständiger Pfad ist dort keine exakte
+Bereichsauswahl. Diese Legacy-Semantik wurde nicht geändert. Gleichnamige Dateien
+innerhalb einer Area bleiben unzulässig; gleiche Namen in verschiedenen Areas
+werden durch das Directory-Objekt eindeutig zugeordnet.
+
+`Flag` ist Member 10, additiv nach `Find`; keine neue Typ-ID und keine neue
+Download-API. Die Methode prüft aktuelle Konferenz-/Listen-/Downloadrechte,
+Batch-Limit und Guthaben, erhält vorhandene Markierungen und Aufrufer-Tokens
+und startet keinen Transfer. Bereits markierte Dateien liefern TRUE ohne
+Duplikat. Fehlende/gelöschte/unindexierte/verlinkte Dateien und veraltete
+Directory-Snapshots werden abgewiesen; Fehler stehen in `Error.Last()`.
+Tests prüfen exakte Auswahl bei gleichen Namen in zwei Areas, stille Ausgabe,
+Idempotenz, Rechteentzug, ausgetauschte Bereiche, Indexfehler und Guthaben ohne
+Abbuchung. Der Browser markiert mit `M` in Liste und Details; gerenderte
+80x25-EN/DE-Tests decken Erfolg, wiederholtes Markieren und Ablehnung ab.
+
+**Validierung dieses Schritts:** sechs E1-, fünf A4-, vier Registry- und
+32 Download-Kompatibilitätstests bestanden; die Gruppen überlappen teilweise.
+29 Filebase-Tests, 398 PPL-Bibliothekstests (einer ignoriert) und 37
+Accounting-Tests (einer ignoriert) bestanden ebenfalls. Die LSP-Suite besteht
+in getrennten EN/DE-Prozessen. Compiler, Runtime und LSP wurden neu gebaut;
+das Browser-Paket wurde kompiliert und in der lokalen Demo aktualisiert.
+
+**Separater Download-Befehl im Demo-PPE (2026-09-11):** Auf Benutzerwunsch öffnet
+`D` aus Dateiliste und Dateidetails den normalen BBS-Befehl über
+`COMMAND FALSE, "D"`. Markieren bleibt eine eigene Aktion; die hervorgehobene
+Datei wird nicht automatisch hinzugefügt. Das PPE gibt die Terminal-Eingabe frei
+und zeichnet nach Ende oder Abbruch dieselbe Ansicht erneut. Der bestehende
+Befehl prüft die Download-Berechtigung und übernimmt Batch, Dialoge und Transfer.
+Bei restlichen Aufrufer-Tokens wird `D` mit einem Hinweis abgelehnt, damit die
+gemeinsame Legacy-Tokenliste nicht versehentlich als BBS-Befehl ausgeführt wird.
+Der Demo-Aufrufer übergibt nur die Sprache und ist davon nicht betroffen.
+
+Ein neuer Test führt das serialisierte Browser-PPE in explizitem EN/DE aus:
+lokale Dateikopie mit Bytevergleich für zwei markierte Dateien, keine Übertragung
+der nur ausgewählten Datei, Abbruch mit erhaltener Batch, verweigerter BBS-Befehl,
+leere Batch und Aufrufer-Token-Schutz. Gerenderte 80x25-Ausgabe und Navigation nach
+der Rückkehr werden geprüft. Legacy-`COMMAND`, `FLAG` und `DOWNLOAD` bleiben
+unverändert; keine neue API.
+
+**Noch offen:** Vollständige manuelle E1-Abnahme und ein Remote-Protokolltransfer
+aus dem Browser. Die übrigen A4-Kandidaten bleiben separat zu entscheiden.
+
 **Befunde aus E2 (2026-09-10).** Der Nachrichtenteil wurde nicht entworfen,
 sondern beim Portieren von [LiQUiD Read](https://github.com/mkrueger/liquid_read)
 gemessen. Lesen, Filtern und Antworten sind mit der heutigen API vollständig
@@ -944,10 +1023,67 @@ einbauen, die normale PPE-Autoren nicht benutzen können.
 
 ### E1 — Dateibrowser
 
+**Stand 2026-09-11: Dateiansicht bestätigt, Markierung implementiert; Download separat.**
+Ohne vorhandenen Dateibrowser wurde ein eigenständiges PPE unter
+[ppe/files](../ppe/files/src/main.pps) begonnen. Der freigegebene Umfang war
+zunächst die Prüfung der bestehenden APIs und ein Verzeichnisbrowser; neue
+öffentliche API-Erweiterungen benötigen eine eigene Freigabe.
+
+Das PPE zeigt die zugänglichen Verzeichnisse der aktuellen Konferenz, mit
+BBS-konformen Nummern ab 1, Downloadberechtigung, Neu-Markierung und Details.
+Die Liste hat 15 sichtbare Zeilen, Tastaturnavigation, Suche nach Verzeichnisnamen
+und Rücksetzen. Die Suche verwendet Terminal-Events statt `INPUTSTR`, damit
+verbleibende Aufrufer-Tokens nicht als Eingabe verbraucht werden. Escape verwirft
+die Suchänderung oder kehrt aus den Details zurück; aus der Liste beendet es das
+PPE. Die Oberfläche ist für 80x25 ausgelegt, die Suche auf 48 ASCII-Zeichen begrenzt.
+
+**Nachweis der ursprünglichen Grundlage:** Der damalige Lauf von
+`cargo test-low -p icy_board_engine --lib e1_` bestand mit zwei Tests.
+Der Browser-Test kompiliert und serialisiert das tatsächliche PPE,
+führt es über die VM mit ChannelConnection aus und prüft gerenderte 80x25-Frames.
+Er wählt Englisch und Deutsch explizit und prüft je eine leere, eine vollständig
+gesperrte und eine große Liste mit 1.001 sichtbaren Verzeichnissen. Paging,
+Home/End, Details, verweigerte Downloads als Statusanzeige, Suche, Backspace,
+Abbruch, Eingabelimit, Rücksetzen, leere Treffer und Aufrufer-Token-Erhalt sind
+abgedeckt. Lange Namen und literale `@CLS@`-/`@HANGUP@`-Texte bleiben im Rahmen
+und lösen keine Makros aus. Der separate Paketbau mit
+`target/debug/pplc ppe/files/ppl.toml --mono` besteht ebenfalls.
+
+**Historische API-Lücke der Grundlage:** Das damalige `DIRECTORY` bot noch keine
+Filebase-Einträge mit Beschreibung, Größe und Datum. Die Legacy-Probe bestätigt,
+dass `FINDFIRST`/`FINDNEXT` auch Metadaten und Unterverzeichnisse enumerieren;
+`FILEINF(..., 4)` liefert für eine 2-GiB-Datei `-2147483648`. Diese Legacy-Semantik
+wurde nicht geändert. Das PPE liest keine privaten Filebase-Formate. Es zeigt
+inzwischen Dateien und Beschreibungen über die unter A4 dokumentierte
+FileEntry-/FilePage-API; der separate Download-Befehl ist oben beschrieben. Das Paging
+der Verzeichnisse begrenzt nur die Anzeige, nicht den vollständig materialisierten
+`Conference.Directories`-Snapshot; Dateiabrufe sind dagegen API-seitig begrenzt.
+
+**Erweiterung und Rückmeldung (2026-09-11):** Enter öffnet aus den
+Verzeichnisdetails die Dateiliste und von dort die Dateidetails. Dateiseiten,
+Vorwärts-/Rückwärtsblättern, Suche nach Name/Beschreibung und lange Beschreibungen
+sind angeschlossen. Escape führt jeweils eine Ebene zurück. Die befüllte lokale
+Demo wurde vom Benutzer als passend bestätigt; diese Rückmeldung gilt für den
+vorhandenen Anzeigeumfang, nicht als Transfernachweis.
+
+Die bisherigen vier E1-Tests prüfen zusätzlich zur Grundlage
+den verschachtelten `TOKENIZE`-/`CALL`-Start in EN/DE sowie gerenderte
+Dateiansichten mit 2-GiB-Größe, wörtlichen `@`-Makros, langen Beschreibungen,
+Seitenhistorie, Trefferfortsetzung nach einer leeren Such-Zwischenseite,
+leerem Index und fehlendem Index. Hinzu kommen der Legacy-Auswahltest und der
+gerenderte Markierungstest. `M` markiert die ausgewählte Datei über die unter A4
+beschriebene `Directory.Flag(fileName)`-API und zeigt Erfolg oder Ablehnung.
+Die Markierungen bleiben beim Verlassen des Browsers in derselben BBS-Sitzung
+erhalten. Download bleibt gemäß Benutzerentscheidung eine separate Aktion:
+`D` öffnet nun den bestehenden BBS-Downloadablauf und kehrt danach zum Browser
+zurück. Der zusätzliche Downloadtest prüft diesen Übergang einschließlich
+tatsächlicher lokaler Übertragung und Abbruch.
+
 - Verzeichnisse und zugängliche Dateien anzeigen.
 - Beschreibungen, Dateigröße und Datum darstellen.
 - Suche und Paging; große und leere Bestände berücksichtigen.
-- Download über öffentliche BBS-Funktionen einschließlich Ablehnung/Abbruch.
+- Exakt markieren; Download anschließend separat über öffentliche BBS-Funktionen,
+  einschließlich Ablehnung/Abbruch.
 - Keine Kenntnis interner Filebase- oder Konfigurationsformate voraussetzen.
 
 **Abnahme:** Vollständiger Nutzerablauf, korrekte Zugriffsregeln, begrenzter

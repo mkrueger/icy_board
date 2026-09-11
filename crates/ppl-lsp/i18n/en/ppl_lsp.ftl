@@ -126,6 +126,11 @@ hint-type-msg=A read-only message header with lazy access to its message body.
 hint-type-conference=A board conference with its message areas, file directories, doors and access checks.
 hint-type-area=A conference message area with access checks and read/search operations.
 hint-type-directory=A conference file directory with download access information.
+hint-type-file-entry=Read-only filebase snapshot: name, description, 64-bit byte size and UTC date. Available from runtime 400.
+hint-type-file-page=A bounded Directory.Find result with Entries, NextAfter and HasMore. Valid distinguishes an empty successful page from failure.
+hint-param-file-after=Exclusive filebase row cursor. Use 0 to begin, then the previous page's NextAfter with the same directory and search text.
+hint-param-directory-file-name=Exact indexed file name within this directory, compared without ASCII case sensitivity. No path, wildcard expansion or lookup in other directories.
+hint-member-directory-flag=Marks this directory's indexed file for the session's download batch without starting a transfer or displaying prompts. Rechecks conference/list/download rights, batch capacity and credit. TRUE means marked or already marked; FALSE reports failure through Error.Last(). Existing marks and caller tokens are preserved. DOWNLOAD remains a separate BBS step.
 hint-type-door=A configured external program or game and its access requirement.
 hint-type-contact=One service/account pair from a user's read-only contact list.
 hint-type-enum-400=An open nominal enum value. Every INTEGER value is allowed, including unnamed values and flag combinations; the first member is the default. Same-type `|` and `&` return enum values; `.Has(mask)` tests all mask bits. Use `==` or `!=` to compare values, and TOINTEGER(value) or EnumName(integer) to convert explicitly. Different enum types remain distinct. Enum storage and operations require runtime 400.
@@ -225,6 +230,9 @@ hint-member-area-find=Finds the next message whose `To`, `From`, or `Subject` fi
 hint-member-directory-identity=Read-only file-directory name, configured number, or validity flag.
 hint-member-directory-options=Read-only storage path, free-download/new-file state, or protected password.
 hint-member-directory-access=Checks the current caller's security for directory access or downloading.
+hint-member-directory-find=Searches indexed file names and stored descriptions using a case-insensitive literal substring. Optional after defaults to 0 and limit to 15 (1..100). Each call examines at most 1024 rows; continue with NextAfter while HasMore, even after an empty page. Requires current conference/list access and an initialized index; does not scan or modify files. Error.Last() reports failure.
+hint-member-file-entry=Read-only snapshot. Id is the filebase cursor, Size is LONG bytes and Date is UTC. Description is limited to 16384 UTF-8 bytes; DescriptionTruncated reports clipping. Search examines only this prefix. An uninitialized entry has Valid=FALSE and empty/zero fields.
+hint-member-file-page=Read-only page. Entries contains at most 100 FILEENTRY values. NextAfter is passed to the same directory and query; HasMore means more index rows, not necessarily more matches. Valid=FALSE indicates failure. Pages are live reads, not a cross-call database snapshot.
 hint-member-door-identity=Read-only door name, configured number, or validity flag.
 hint-member-door-options=Read-only description, executable path, or protected password for this external program.
 hint-member-door-access=Checks whether the current caller meets this door's security requirement.

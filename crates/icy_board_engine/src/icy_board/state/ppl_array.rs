@@ -24,7 +24,7 @@ pub fn area_array_value(items: Arc<AreaList>, conference: usize) -> VariableValu
     )
 }
 
-pub fn directory_array_value(items: Arc<DirectoryList>) -> VariableValue {
+pub fn directory_array_value(items: Arc<DirectoryList>, conference: usize) -> VariableValue {
     VariableValue::new_vector(
         VariableType::UserData(FILE_DIRECTORY_ID as u32),
         items
@@ -34,6 +34,7 @@ pub fn directory_array_value(items: Arc<DirectoryList>) -> VariableValue {
                 let mut item = item.clone();
                 item.number = number;
                 item.valid = true;
+                item.conference_number = conference;
                 user_data_value(item, FILE_DIRECTORY_ID)
             })
             .collect(),

@@ -758,6 +758,11 @@ impl PPECompiler {
             return Err(CompilationErrorType::TooManyDeclarations(declaration_count, declaration_limit));
         }
         if self.runtime < 400 {
+            if self.lookup_table.variable_table.get_entries().iter().any(|entry| {
+                matches!(entry.header.variable_type, VariableType::UserData(type_id) if matches!(type_id as usize, crate::parser::FILE_ENTRY_ID | crate::parser::FILE_PAGE_ID))
+            }) {
+                return Err(CompilationErrorType::BuiltinNeedsRuntime("Filebase objects".to_string(), 400));
+            }
             let script_size = self
                 .commands
                 .statements

@@ -1,8 +1,8 @@
 use super::{
     AUDIO_ID, BOARD_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID, EVENT_KIND_ENUM_ID,
-    FILE_DIRECTORY_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID,
-    MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID,
-    REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
+    FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID,
+    MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID,
+    REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
 };
 use crate::{
     compiler::user_data::UserDataMemberRegistry,
@@ -34,6 +34,8 @@ pub const TYPES: &[(usize, &str, Option<FuncOpCode>)] = &[
     (HTTP_RESPONSE_ID, "HttpResponse", None),
     (REGEX_ID, "Regex", None),
     (REGEX_MATCH_ID, "RegexMatch", None),
+    (FILE_ENTRY_ID, "FileEntry", None),
+    (FILE_PAGE_ID, "FilePage", None),
 ];
 
 fn n(name: &str) -> unicase::Ascii<String> {
@@ -436,6 +438,28 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_property(n("Password"), V::Password, false);
             registry.add_function(n("HasAccess"), Vec::new(), V::Boolean);
             registry.add_function(n("CanDownload"), Vec::new(), V::Boolean);
+            registry.add_named_function_with(
+                n("Find"),
+                vec![("text", V::UnboundedString), ("after", V::Long), ("limit", V::Integer)],
+                1,
+                V::UserData(FILE_PAGE_ID as u32),
+            );
+            registry.add_named_function(n("Flag"), vec![("fileName", V::UnboundedString)], V::Boolean);
+        }
+        FILE_ENTRY_ID => {
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_property(n("Id"), V::Long, false);
+            registry.add_property(n("Name"), V::UnboundedString, false);
+            registry.add_property(n("Description"), V::UnboundedString, false);
+            registry.add_property(n("Size"), V::Long, false);
+            registry.add_property(n("Date"), V::Date, false);
+            registry.add_property(n("DescriptionTruncated"), V::Boolean, false);
+        }
+        FILE_PAGE_ID => {
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_array_property(n("Entries"), V::UserData(FILE_ENTRY_ID as u32), 1);
+            registry.add_property(n("NextAfter"), V::Long, false);
+            registry.add_property(n("HasMore"), V::Boolean, false);
         }
         DOOR_ID => {
             registry.add_property(n("Name"), V::UnboundedString, false);

@@ -135,6 +135,37 @@ async fn accounting_queue_preflight_reserves_prior_files_without_debiting() {
 }
 
 #[tokio::test]
+async fn a4_directory_flag_reserves_credit_without_debit_or_output() {
+    use crate::{compiler::user_data::UserDataValue, executable::VariableValue, vm::{DiskIO, VirtualMachine}};
+    let (root, mut state, mut peer) = fixture("").await;
+    enable_activity_accounting(&mut state, crate::icy_board::accounting_cfg::AccountingConfig {
+        charge_per_download_file: 3.0,
+        charge_per_download_bytes: 2.0,
+        ..Default::default()
+    }).await;
+    state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = 10.0;
+    state.session.batch_limit = 10;
+    let mut directory = state.session.current_conference.directories.as_ref().unwrap()[0].clone();
+    directory.valid = true;
+    let registry = crate::parser::icy_board_registry();
+    let mut io = DiskIO::new(root.path().to_str().unwrap(), None);
+    let mut vm = VirtualMachine::new(root.path().join("flag.ppe"), &registry, &mut io, &mut state);
+    let member = unicase::Ascii::new("Flag".into());
+    for (name, expected) in [("A.ZIP", true), ("B.ZIP", false), ("A.ZIP", true)] {
+        vm.error_pending = false;
+        let result = directory.call_function(&mut vm, &member, &[VariableValue::new_unbounded_string(name.into())]).await.unwrap();
+        assert_eq!(result.as_bool(), expected, "{name}");
+        assert_eq!(vm.last_error.code, if expected { 0 } else { crate::icy_board::state::ppl_error::ERR_DENIED });
+    }
+    assert_eq!(vm.icy_board_state.session.flagged_files, [root.path().join("paid/A.ZIP")]);
+    let account = vm.icy_board_state.session.current_user.as_ref().unwrap().account.as_ref().unwrap();
+    assert_eq!(account.debit_download_file, 0.0);
+    assert_eq!(account.debit_download_bytes, 0.0);
+    assert_eq!(vm.icy_board_state.session.calculate_balance(), 10.0);
+    assert_eq!(output(&mut peer).await, "");
+}
+
+#[tokio::test]
 async fn accounting_command_writes_use_target_surcharge_and_one_category() {
     use crate::icy_board::message_area::{AreaList, MessageArea};
     use jamjam::jam::{JamMessage, JamMessageBase, attributes};

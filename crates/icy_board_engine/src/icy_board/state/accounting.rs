@@ -562,14 +562,18 @@ impl IcyBoardState {
         Ok(())
     }
 
-    #[async_recursion(?Send)]
-    pub async fn accounting_insufficient(&mut self, charge: f64, reserved: f64) -> Res<bool> {
+    pub(crate) fn accounting_credit_insufficient(&self, charge: f64, reserved: f64) -> Res<bool> {
         finite(charge)?;
         finite(reserved)?;
         if charge <= 0.0 || self.session.accounting.mode != AccountingMode::Enforced || !self.accounting_active() {
             return Ok(false);
         }
-        let insufficient = charge > finite(self.session.accounting_balance_at(Utc::now())? - reserved)?;
+        Ok(charge > finite(self.session.accounting_balance_at(Utc::now())? - reserved)?)
+    }
+
+    #[async_recursion(?Send)]
+    pub async fn accounting_insufficient(&mut self, charge: f64, reserved: f64) -> Res<bool> {
+        let insufficient = self.accounting_credit_insufficient(charge, reserved)?;
         if insufficient && !self.session.accounting.checking {
             self.session.accounting.checking = true;
             let previous = std::mem::replace(&mut self.session.op_text, format_credit(charge, self.session.accounting.options.use_money));

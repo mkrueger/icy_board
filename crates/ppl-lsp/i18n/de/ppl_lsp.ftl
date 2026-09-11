@@ -128,6 +128,11 @@ hint-type-msg=Schreibgeschützter Nachrichtenkopf mit verzögertem Zugriff auf d
 hint-type-conference=Eine Board-Konferenz mit Nachrichtenbereichen, Dateiverzeichnissen, Doors und Zugriffsprüfungen.
 hint-type-area=Ein Konferenz-Nachrichtenbereich mit Zugriffs-, Lese- und Suchfunktionen.
 hint-type-directory=Ein Konferenz-Dateiverzeichnis mit Download-Zugriffsinformationen.
+hint-type-file-entry=Schreibgeschützter Filebase-Snapshot: Name, Beschreibung, 64-Bit-Bytegröße und UTC-Datum. Ab Runtime 400 verfügbar.
+hint-type-file-page=Begrenztes Ergebnis von Directory.Find mit Entries, NextAfter und HasMore. Valid unterscheidet eine erfolgreiche leere Seite von einem Fehler.
+hint-param-file-after=Exklusiver Filebase-Datensatzcursor. Zum Beginn 0, danach NextAfter der vorherigen Seite mit demselben Verzeichnis und Suchtext verwenden.
+hint-param-directory-file-name=Exakter indexierter Dateiname in diesem Verzeichnis; ASCII-Groß-/Kleinschreibung wird ignoriert. Kein Pfad, keine Wildcard-Auswertung und keine Suche in anderen Verzeichnissen.
+hint-member-directory-flag=Markiert die indexierte Datei dieses Verzeichnisses für die Downloadliste der Sitzung, ohne Transfer oder Eingabedialog. Prüft Konferenz-/Listen-/Downloadrechte, Batch-Limit und Guthaben erneut. TRUE bedeutet markiert oder bereits markiert; FALSE meldet den Fehler über Error.Last(). Vorhandene Markierungen und Aufrufer-Tokens bleiben erhalten. DOWNLOAD bleibt ein separater BBS-Schritt.
 hint-type-door=Ein konfiguriertes externes Programm oder Spiel mit Zugriffsanforderung.
 hint-type-contact=Ein Dienst-/Kontopaar aus der schreibgeschützten Kontaktliste eines Benutzers.
 hint-type-enum-400=Ein offener nominaler Enumwert. Jeder INTEGER-Wert ist erlaubt, einschließlich unbenannter Werte und Flagkombinationen; das erste Mitglied ist der Standardwert. `|` und `&` liefern bei gleichem Enumtyp Enumwerte; `.Has(maske)` prüft alle Maskenbits. `==` und `!=` vergleichen Werte; TOINTEGER(wert) und EnumName(integer) konvertieren explizit. Unterschiedliche Enumtypen bleiben getrennt. Enum-Speicher und Operationen benötigen Runtime 400.
@@ -227,6 +232,9 @@ hint-member-area-find=Sucht die nächste Nachricht, deren Feld `To`, `From` oder
 hint-member-directory-identity=Schreibgeschützter Dateiverzeichnisname, konfigurierte Nummer oder Gültigkeitsstatus.
 hint-member-directory-options=Schreibgeschützter Speicherpfad, Gratisdownload-/Neue-Dateien-Status oder geschütztes Kennwort.
 hint-member-directory-access=Prüft die Sicherheit des aktuellen Anrufers für Verzeichniszugriff beziehungsweise Download.
+hint-member-directory-find=Sucht einen literalen Teilstring ohne Beachtung der Groß-/Kleinschreibung in indexierten Dateinamen und gespeicherten Beschreibungen. Optionales after ist zunächst 0, limit zunächst 15 (1..100). Pro Aufruf werden höchstens 1024 Datensätze geprüft; bei HasMore mit NextAfter fortsetzen, auch nach einer leeren Seite. Benötigt aktuelle Konferenz-/Listenrechte und einen initialisierten Index; scannt oder verändert keine Dateien. Error.Last() meldet Fehler.
+hint-member-file-entry=Schreibgeschützter Snapshot. Id ist der Filebase-Cursor, Size enthält Bytes als LONG und Date das UTC-Datum. Description ist auf 16384 UTF-8-Bytes begrenzt; DescriptionTruncated meldet die Kürzung. Die Suche berücksichtigt nur diesen Anfang. Ein uninitialisierter Eintrag hat Valid=FALSE und leere beziehungsweise Nullfelder.
+hint-member-file-page=Schreibgeschützte Seite. Entries enthält höchstens 100 FILEENTRY-Werte. NextAfter wird an dasselbe Verzeichnis und dieselbe Suche übergeben; HasMore bedeutet weitere Indexzeilen, nicht zwingend weitere Treffer. Valid=FALSE bedeutet Fehler. Seiten sind aktuelle Lesezugriffe, kein Datenbank-Snapshot über mehrere Aufrufe.
 hint-member-door-identity=Schreibgeschützter Doorname, konfigurierte Nummer oder Gültigkeitsstatus.
 hint-member-door-options=Schreibgeschützte Beschreibung, Programmpfad oder geschütztes Kennwort dieses externen Programms.
 hint-member-door-access=Prüft, ob der aktuelle Anrufer die Sicherheitsanforderung dieser Door erfüllt.

@@ -2182,6 +2182,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
+        if self.runtime < 400
+            && matches!(var_decl.get_variable_type(), VariableType::UserData(type_id) if matches!(type_id as usize, crate::parser::FILE_ENTRY_ID | crate::parser::FILE_PAGE_ID))
+        {
+            self.errors.lock().unwrap().report_error(
+                var_decl
+                    .get_variables()
+                    .first()
+                    .map(|variable| variable.get_identifier_token().span.clone())
+                    .unwrap_or_default(),
+                CompilationErrorType::BuiltinNeedsRuntime("Filebase objects".to_string(), 400),
+            );
+        }
         if self.runtime < 400 && self.type_registry.is_enum_type(var_decl.get_variable_type()) {
             self.errors.lock().unwrap().report_error(
                 var_decl

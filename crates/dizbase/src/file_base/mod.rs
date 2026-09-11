@@ -22,6 +22,7 @@ use self::{
 pub mod file_header;
 pub mod metadata;
 pub mod pattern;
+pub mod reader;
 
 /// Bumped whenever the schema changes so that `migrate` knows what to apply.
 const SCHEMA_VERSION: i32 = 1;

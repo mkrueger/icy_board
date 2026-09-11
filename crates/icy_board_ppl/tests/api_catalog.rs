@@ -173,6 +173,8 @@ fn validity_members_follow_the_documented_rule() {
         ("Directory", vec!["Valid"]),
         ("Door", vec!["Valid"]),
         ("Error", vec!["OK"]),
+        ("FileEntry", vec!["Valid"]),
+        ("FilePage", vec!["Valid"]),
         ("HttpResponse", vec!["Valid", "OK"]),
         ("Msg", vec!["Valid"]),
         ("Regex", vec!["Valid"]),

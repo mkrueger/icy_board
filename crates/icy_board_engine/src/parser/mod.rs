@@ -19,7 +19,7 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
         doors::Door,
         file_directory::FileDirectory,
         message_area::MessageArea,
-        state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user},
+        state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user},
     };
 
     fn bind<T: UserData>(registry: &mut UserTypeRegistry, id: usize) {
@@ -30,6 +30,8 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     bind::<Conference>(&mut registry, CONFERENCE_ID);
     bind::<MessageArea>(&mut registry, MESSAGE_AREA_ID);
     bind::<FileDirectory>(&mut registry, FILE_DIRECTORY_ID);
+    bind::<ppl_files::PplFileEntry>(&mut registry, FILE_ENTRY_ID);
+    bind::<ppl_files::PplFilePage>(&mut registry, FILE_PAGE_ID);
     bind::<Door>(&mut registry, DOOR_ID);
     bind::<ppl_user::PplUser>(&mut registry, USER_ID);
     bind::<ppl_surface::PplSurface>(&mut registry, SURFACE_ID);

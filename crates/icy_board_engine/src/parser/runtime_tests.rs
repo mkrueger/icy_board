@@ -10,11 +10,11 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
     let metadata = UserTypeRegistry::icy_board_registry();
     assert_eq!(runtime.registered_types, metadata.registered_types);
     assert_eq!(runtime.enums(), metadata.enums());
-    assert_eq!(runtime.types.len(), 24);
+    assert_eq!(runtime.types.len(), 26);
     for (id, count) in [
         (CONFERENCE_ID, 16),
         (MESSAGE_AREA_ID, 15),
-        (FILE_DIRECTORY_ID, 9),
+        (FILE_DIRECTORY_ID, 11),
         (DOOR_ID, 7),
         (SURFACE_ID, 18),
         (EVENT_ID, 23),
@@ -36,6 +36,8 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (HTTP_RESPONSE_ID, 10),
         (REGEX_ID, 10),
         (REGEX_MATCH_ID, 13),
+        (FILE_ENTRY_ID, 7),
+        (FILE_PAGE_ID, 4),
     ] {
         let actual = runtime.get_type_from_id(id as u32).unwrap();
         let expected = metadata.get_type_from_id(id as u32).unwrap();

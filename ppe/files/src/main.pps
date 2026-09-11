@@ -1,0 +1,461 @@
+;$LANGVERSION 400
+
+CONST INTEGER PAGE_ROWS = 15
+CONST INTEGER FIRST_ROW = 5
+STRING language, query, previousQuery
+DIRECTORY directories[]
+INTEGER directoryIndexes[]
+INTEGER count = 0
+INTEGER selected = 0
+INTEGER firstVisible = 0
+BOOLEAN details = FALSE
+BOOLEAN searching = FALSE
+BOOLEAN running = TRUE
+BOOLEAN viewingFiles = FALSE
+BOOLEAN fileDetails = FALSE
+BOOLEAN fileSearching = FALSE
+DIRECTORY activeDirectory
+FILEPAGE filePage
+FILEENTRY files[]
+STRING fileQuery, previousFileQuery
+STRING flagStatus
+LONG pageCursors[]
+INTEGER pageNumber = 0
+INTEGER fileSelected = 0
+INTEGER descriptionOffset = 0
+TERMINPUT input = Terminal.Input
+
+BEGIN
+    GETTOKEN language
+    directories = Session.Conference.Directories
+    directoryIndexes.Redim(directories.Len())
+    FilterDirectories()
+    STARTDISP FNS
+    Draw()
+    WHILE running DO
+        EVENT keyEvent = input.Wait(-1)
+        IF keyEvent.Kind <> EventKind.Key CONTINUE
+        IF viewingFiles THEN
+            HandleFiles(keyEvent)
+        ELSEIF searching THEN
+            IF keyEvent.Code = KEY_ESCAPE THEN
+                query = previousQuery
+                searching = FALSE
+            ELSEIF keyEvent.Code = KEY_ENTER THEN
+                searching = FALSE
+                FilterDirectories()
+            ELSEIF keyEvent.Code = KEY_BACKSPACE THEN
+                IF query.Len() > 0 query = query.Substring(0, query.Len() - 1)
+            ELSEIF keyEvent.Code >= 32 & keyEvent.Code < 127 & query.Len() < 48 THEN
+                query += keyEvent.Text
+            ENDIF
+        ELSEIF keyEvent.Code = KEY_ESCAPE THEN
+            IF details THEN
+                details = FALSE
+            ELSE
+                running = FALSE
+            ENDIF
+        ELSEIF details THEN
+            IF keyEvent.Code = KEY_ENTER THEN
+                activeDirectory = directories[directoryIndexes[selected]]
+                viewingFiles = TRUE
+                fileQuery = ""
+                ResetFiles()
+            ENDIF
+        ELSEIF !details THEN
+            SELECT CASE keyEvent.Code
+            CASE KEY_UP
+                selected -= 1
+            CASE KEY_DOWN
+                selected += 1
+            CASE KEY_PAGE_UP
+                selected -= PAGE_ROWS
+            CASE KEY_PAGE_DOWN
+                selected += PAGE_ROWS
+            CASE KEY_HOME
+                selected = 0
+            CASE KEY_END
+                selected = count - 1
+            CASE KEY_ENTER
+                IF count > 0 details = TRUE
+            CASE ELSE
+                IF keyEvent.Text.ToUpper() = "F" THEN
+                    previousQuery = query
+                    searching = TRUE
+                ELSEIF keyEvent.Text.ToUpper() = "R" THEN
+                    query = ""
+                    FilterDirectories()
+                ENDIF
+            ENDSELECT
+        ENDIF
+        KeepVisible()
+        IF running Draw()
+    ENDWHILE
+    input.Release()
+    CLS
+    EXIT
+END
+
+FUNCTION Label(STRING english, STRING german) STRING
+    IF language.ToLower() = "de" RETURN german
+    RETURN english
+ENDFUNC
+
+PROCEDURE PrintText(STRING text)
+    STRING clean = ""
+    INTEGER index
+    FOR index = 0 TO text.Len() - 1
+        STRING character = text.Substring(index, 1)
+        IF Asc(character) < 32 | Asc(character) = 127 THEN
+            clean += "."
+        ELSE
+            clean += character
+        ENDIF
+    NEXT
+    STRING parts[] = clean.Split("@")
+    FOR index = 0 TO parts.Len() - 1
+        IF index > 0 PRINT "@"
+        PRINT parts[index]
+    NEXT
+ENDPROC
+
+PROCEDURE FilterDirectories()
+    count = 0
+    INTEGER index
+    FOR index = 0 TO directories.Len() - 1
+        DIRECTORY directory = directories[index]
+        IF !directory.Valid CONTINUE
+        IF !directory.HasAccess() CONTINUE
+        IF query.Trim().Len() > 0 THEN
+            IF !directory.Name.ToUpper().Contains(query.Trim().ToUpper()) CONTINUE
+        ENDIF
+        directoryIndexes[count] = index
+        count += 1
+    NEXT
+    selected = 0
+    firstVisible = 0
+ENDPROC
+
+PROCEDURE KeepVisible()
+    IF selected >= count selected = count - 1
+    IF selected < 0 selected = 0
+    IF selected < firstVisible firstVisible = selected
+    IF selected >= firstVisible + PAGE_ROWS firstVisible = selected - PAGE_ROWS + 1
+ENDPROC
+
+PROCEDURE Draw()
+    CLS
+    COLOR @X0B
+    PRINTLN "+", STRING.Repeat("-", 76), "+"
+    PRINT "| "
+    PrintText(Left(Label("Files", "Dateien") + " / " + Session.Conference.Name, 74))
+    PRINTLN " |"
+    PRINTLN "+", STRING.Repeat("-", 76), "+"
+    IF viewingFiles THEN
+        DrawFiles()
+        RETURN
+    ENDIF
+    IF details THEN
+        DrawDetails()
+        ANSIPOS 2, 23
+        COLOR @X07
+        PRINT Label("Enter Files   Esc Back", "Enter Dateien   Esc Zurueck")
+        RETURN
+    ENDIF
+    ANSIPOS 2, 4
+    COLOR @X07
+    PRINT Label(" No.  Directory                                         Download    New", " Nr.  Verzeichnis                                       Download    Neu")
+    INTEGER row
+    FOR row = 0 TO PAGE_ROWS - 1
+        INTEGER item = firstVisible + row
+        IF item >= count BREAK
+        DIRECTORY directory = directories[directoryIndexes[item]]
+        ANSIPOS 2, FIRST_ROW + row
+        IF item = selected THEN
+            COLOR @X70
+            PRINT ">"
+        ELSE
+            COLOR @X07
+            PRINT " "
+        ENDIF
+        PRINT Right(STRING(directory.Number + 1), 4), " "
+        PrintText(Left(directory.Name, 48))
+        PRINT " ", Left(DownloadStatus(directory), 11)
+        IF directory.HasNewFiles PRINT Label("Yes", "Ja")
+    NEXT
+    IF count = 0 THEN
+        ANSIPOS 3, FIRST_ROW
+        COLOR @X07
+        PRINT Label("No accessible directories found.", "Keine zugaenglichen Verzeichnisse gefunden.")
+    ENDIF
+    ANSIPOS 2, 21
+    COLOR @X0B
+    PRINT Label("Directories: ", "Verzeichnisse: "), count
+    IF count > 0 PRINT "   ", selected + 1, "/", count
+    ANSIPOS 2, 22
+    COLOR @X07
+    PRINT Label("Search: ", "Suche: ")
+    PrintText(Left(query, 60))
+    ANSIPOS 2, 23
+    IF searching THEN
+        PRINT Label("Enter Apply   Esc Cancel", "Enter Uebernehmen   Esc Abbruch")
+        ANSIPOS 2 + Label("Search: ", "Suche: ").Len() + query.Len(), 22
+    ELSE
+        PRINT Label("Enter Details   F Search   R Reset   Esc Exit", "Enter Details   F Suche   R Zuruecksetzen   Esc Ende")
+    ENDIF
+ENDPROC
+
+PROCEDURE ResetFiles()
+    pageNumber = 0
+    pageCursors.Redim(15)
+    LoadFiles()
+ENDPROC
+
+PROCEDURE LoadFiles()
+    flagStatus = ""
+    filePage = activeDirectory.Find(fileQuery.Trim(), pageCursors[pageNumber], PAGE_ROWS)
+    files = filePage.Entries
+    fileSelected = 0
+ENDPROC
+
+PROCEDURE NextFiles()
+    IF !filePage.Valid | !filePage.HasMore RETURN
+    IF pageNumber + 1 >= pageCursors.Len() THEN
+        LONG savedCursors[] = pageCursors
+        pageCursors.Redim(savedCursors.Len() * 2 - 1)
+        INTEGER index
+        FOR index = 0 TO savedCursors.Len() - 1
+            pageCursors[index] = savedCursors[index]
+        NEXT
+    ENDIF
+    pageNumber += 1
+    pageCursors[pageNumber] = filePage.NextAfter
+    LoadFiles()
+ENDPROC
+
+PROCEDURE HandleFiles(EVENT keyEvent)
+    IF fileSearching THEN
+        IF keyEvent.Code = KEY_ESCAPE THEN
+            fileQuery = previousFileQuery
+            fileSearching = FALSE
+        ELSEIF keyEvent.Code = KEY_ENTER THEN
+            fileSearching = FALSE
+            ResetFiles()
+        ELSEIF keyEvent.Code = KEY_BACKSPACE THEN
+            IF fileQuery.Len() > 0 fileQuery = fileQuery.Substring(0, fileQuery.Len() - 1)
+        ELSEIF keyEvent.Code >= 32 & keyEvent.Code < 127 & fileQuery.Len() < 48 THEN
+            fileQuery += keyEvent.Text
+        ENDIF
+        RETURN
+    ENDIF
+    IF keyEvent.Code = KEY_ESCAPE THEN
+        IF fileDetails THEN
+            fileDetails = FALSE
+        ELSE
+            viewingFiles = FALSE
+        ENDIF
+        RETURN
+    ENDIF
+    flagStatus = ""
+    IF keyEvent.Text.ToUpper() = "D" THEN
+        IF TOKCOUNT() > 0 THEN
+            flagStatus = Label("Download unavailable: pending caller arguments.", "Download nicht moeglich: offene Aufrufer-Argumente.")
+            RETURN
+        ENDIF
+        input.Release()
+        CLS
+        COLOR @X07
+        COMMAND FALSE, "D"
+        STARTDISP FNS
+        RETURN
+    ENDIF
+    IF keyEvent.Text.ToUpper() = "M" THEN
+        IF files.Len() > 0 THEN
+            IF activeDirectory.Flag(files[fileSelected].Name) THEN
+                flagStatus = Label("Marked: ", "Markiert: ") + files[fileSelected].Name
+            ELSE
+                ERROR failure = Error.Last()
+                SELECT CASE failure.Code
+                CASE ErrCode.Denied
+                    flagStatus = Label("Marking denied.", "Markieren nicht erlaubt.")
+                CASE ErrCode.Limit
+                    flagStatus = Label("Batch limit reached.", "Markierungslimit erreicht.")
+                CASE ErrCode.Unavailable
+                    flagStatus = Label("File unavailable.", "Datei nicht verfuegbar.")
+                CASE ELSE
+                    flagStatus = Label("Unable to mark file.", "Datei konnte nicht markiert werden.")
+                ENDSELECT
+            ENDIF
+        ENDIF
+        RETURN
+    ENDIF
+    IF fileDetails THEN
+        SELECT CASE keyEvent.Code
+        CASE KEY_DOWN
+            descriptionOffset += 70
+        CASE KEY_UP
+            descriptionOffset -= 70
+        CASE KEY_PAGE_DOWN
+            descriptionOffset += 770
+        CASE KEY_PAGE_UP
+            descriptionOffset -= 770
+        CASE KEY_HOME
+            descriptionOffset = 0
+        CASE KEY_END
+            descriptionOffset = files[fileSelected].Description.Len()
+        ENDSELECT
+        INTEGER maximum = ((files[fileSelected].Description.Len() - 1) / 70) * 70
+        IF descriptionOffset > maximum descriptionOffset = maximum
+        IF descriptionOffset < 0 descriptionOffset = 0
+        RETURN
+    ENDIF
+    SELECT CASE keyEvent.Code
+    CASE KEY_DOWN
+        IF fileSelected + 1 < files.Len() THEN
+            fileSelected += 1
+        ELSE
+            NextFiles()
+        ENDIF
+    CASE KEY_UP
+        IF fileSelected > 0 THEN
+            fileSelected -= 1
+        ELSEIF pageNumber > 0 THEN
+            pageNumber -= 1
+            LoadFiles()
+            fileSelected = files.Len() - 1
+        ENDIF
+    CASE KEY_PAGE_DOWN
+        NextFiles()
+    CASE KEY_PAGE_UP
+        IF pageNumber > 0 THEN
+            pageNumber -= 1
+            LoadFiles()
+        ENDIF
+    CASE KEY_HOME
+        fileSelected = 0
+    CASE KEY_END
+        fileSelected = files.Len() - 1
+    CASE KEY_ENTER
+        IF files.Len() > 0 THEN
+            fileDetails = TRUE
+            descriptionOffset = 0
+        ENDIF
+    CASE ELSE
+        IF keyEvent.Text.ToUpper() = "F" THEN
+            previousFileQuery = fileQuery
+            fileSearching = TRUE
+        ELSEIF keyEvent.Text.ToUpper() = "R" THEN
+            ResetFiles()
+        ENDIF
+    ENDSELECT
+    IF fileSelected < 0 fileSelected = 0
+ENDPROC
+
+PROCEDURE DrawFiles()
+    COLOR @X07
+    ANSIPOS 3, 4
+    PrintText(Left(activeDirectory.Name, 72))
+    IF fileDetails THEN
+        FILEENTRY entry = files[fileSelected]
+        ANSIPOS 3, 5
+        COLOR @X0F
+        PrintText(Left(entry.Name, 72))
+        ANSIPOS 3, 7
+        COLOR @X07
+        PRINT entry.Size, " bytes   ", entry.Date
+        INTEGER row
+        FOR row = 0 TO 10
+            INTEGER offset = descriptionOffset + row * 70
+            IF offset >= entry.Description.Len() BREAK
+            ANSIPOS 3, 9 + row
+            PrintText(entry.Description.Substring(offset, 70))
+        NEXT
+        IF entry.Description.Len() = 0 THEN
+            ANSIPOS 3, 9
+            PRINT Label("No description.", "Keine Beschreibung.")
+        ENDIF
+        ANSIPOS 2, 21
+        IF entry.DescriptionTruncated PRINT Label("Description shortened", "Beschreibung gekuerzt")
+        ANSIPOS 2, 22
+        PrintText(Left(flagStatus, 76))
+        ANSIPOS 2, 23
+        PRINT Label("Up/Down Scroll  PgUp/PgDn Page  M Mark  D Download  Esc Back", "Auf/Ab Scrollen  Bild auf/ab Seite  M Markieren  D Download  Esc Zurueck")
+        RETURN
+    ENDIF
+    IF !filePage.Valid THEN
+        ANSIPOS 3, 6
+        PRINT Label("File index unavailable or access denied.", "Dateiindex nicht verfuegbar oder Zugriff gesperrt.")
+    ELSEIF files.Len() = 0 THEN
+        ANSIPOS 3, 6
+        IF filePage.HasMore THEN
+            PRINT Label("Search continues on the next page.", "Suche wird auf der naechsten Seite fortgesetzt.")
+        ELSE
+            PRINT Label("No files found.", "Keine Dateien gefunden.")
+        ENDIF
+    ELSE
+        INTEGER listRow
+        FOR listRow = 0 TO files.Len() - 1
+            FILEENTRY listEntry = files[listRow]
+            ANSIPOS 2, FIRST_ROW + listRow
+            IF listRow = fileSelected THEN
+                COLOR @X70
+                PRINT ">"
+            ELSE
+                COLOR @X07
+                PRINT " "
+            ENDIF
+            PrintText(Left(listEntry.Name, 42))
+            PRINT " ", Right(STRING(listEntry.Size), 19), " ", listEntry.Date
+        NEXT
+    ENDIF
+    ANSIPOS 2, 21
+    COLOR @X0B
+    PRINT Label("Page: ", "Seite: "), pageNumber + 1, "   ", files.Len(), Label(" files", " Dateien")
+    IF filePage.HasMore PRINT Label("   More >", "   Weiter >")
+    ANSIPOS 2, 22
+    COLOR @X07
+    IF flagStatus.Len() > 0 THEN
+        PrintText(Left(flagStatus, 76))
+    ELSE
+        PRINT Label("Search: ", "Suche: ")
+        PrintText(Left(fileQuery, 60))
+    ENDIF
+    ANSIPOS 2, 23
+    IF fileSearching THEN
+        PRINT Label("Enter Apply   Esc Cancel", "Enter Uebernehmen   Esc Abbruch")
+        ANSIPOS 2 + Label("Search: ", "Suche: ").Len() + fileQuery.Len(), 22
+    ELSE
+        PRINT Label("Enter Details  M Mark  D Download  F Search  R Refresh  Esc Back", "Enter Details  M Markieren  D Download  F Suche  R Neu  Esc Zurueck")
+    ENDIF
+ENDPROC
+
+FUNCTION DownloadStatus(DIRECTORY directory) STRING
+    IF !directory.CanDownload() RETURN Label("Denied", "Gesperrt")
+    RETURN Label("Allowed", "Erlaubt")
+ENDFUNC
+
+PROCEDURE DrawDetails()
+    DIRECTORY directory = directories[directoryIndexes[selected]]
+    ANSIPOS 3, 5
+    COLOR @X0F
+    PrintText(Left(directory.Name, 72))
+    ANSIPOS 3, 7
+    COLOR @X07
+    PRINT Label("Directory number: ", "Verzeichnisnummer: "), directory.Number + 1
+    ANSIPOS 3, 9
+    PRINT "Download: ", DownloadStatus(directory)
+    ANSIPOS 3, 10
+    PRINT Label("Free downloads: ", "Kostenlose Downloads: ")
+    IF directory.IsFree THEN
+        PRINT Label("Yes", "Ja")
+    ELSE
+        PRINT Label("No", "Nein")
+    ENDIF
+    ANSIPOS 3, 11
+    PRINT Label("New files: ", "Neue Dateien: ")
+    IF directory.HasNewFiles THEN
+        PRINT Label("Yes", "Ja")
+    ELSE
+        PRINT Label("No", "Nein")
+    ENDIF
+ENDPROC

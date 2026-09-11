@@ -85,6 +85,7 @@ impl UserDataValue for PplSession {
                 .and_then(|directories| directories.get(session.current_file_directory).cloned());
             let mut directory = directory.unwrap_or_else(FileDirectory::default);
             directory.number = session.current_file_directory;
+            directory.conference_number = session.current_conference_number as usize;
             directory.valid = session
                 .current_conference
                 .directories

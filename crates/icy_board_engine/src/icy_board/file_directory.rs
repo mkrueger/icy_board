@@ -67,6 +67,9 @@ pub struct FileDirectory {
     pub number: usize,
 
     #[serde(skip)]
+    pub conference_number: usize,
+
+    #[serde(skip)]
     pub valid: bool,
     #[serde(default)]
     pub metadata_path: PathBuf,
@@ -186,6 +189,7 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
         let metadata_path = path.join("dir");
         Ok(FileDirectory {
             number: 0,
+            conference_number: 0,
             valid: false,
             name,
             path,
@@ -262,8 +266,14 @@ impl UserDataValue for FileDirectory {
         &self,
         vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        _arguments: &[VariableValue],
+        arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if name.as_str().eq_ignore_ascii_case("Find") {
+            return super::state::ppl_files::find(self, vm, arguments).await;
+        }
+        if name.as_str().eq_ignore_ascii_case("Flag") {
+            return super::state::ppl_files::flag(self, vm, arguments).await;
+        }
         if *name == *HAS_ACCESS {
             let res = self.valid && self.list_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));

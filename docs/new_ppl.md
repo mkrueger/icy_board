@@ -1264,6 +1264,8 @@ an empty conference object, so its properties can still be read.
 | `Password` | `PASSWORD` | The password needed to reach it |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanDownload()` | `BOOLEAN` | Whether the current caller may download from it |
+| `Find(text [, after [, limit]])` | `FILEPAGE` | Read a bounded page of indexed files matching a literal substring |
+| `Flag(fileName)` | `BOOLEAN` | Add this directory's exact indexed file to the session download batch; no transfer |
 
 | Door member | Type | Description |
 | :--- | :--- | :--- |
@@ -1293,6 +1295,129 @@ CONFERENCE conf = Board.Conferences[0]
 
 IF conf.Password <> "" PRINTLN conf.Name, " needs a password"
 ```
+
+### Filebase Search (4.00)
+
+`Directory.Find(text [, after [, limit]])` reads the existing filebase index,
+not a filesystem glob. It returns a read-only `FILEPAGE`. `after` defaults to
+zero and is an exclusive row-ID cursor; `limit` defaults to 15 and must be in
+`1..100`. Results follow ascending filebase row ID, not filename or configured
+display sort order. `Directory.Number` is zero-based; add one when displaying
+the number accepted by the BBS `F` command.
+
+| FILEPAGE member | Type | Description |
+| :--- | :--- | :--- |
+| `Valid` | `BOOLEAN` | The read succeeded, including a successful empty page |
+| `Entries` | `FILEENTRY[]` | At most `limit` independent, read-only entry snapshots |
+| `NextAfter` | `LONG` | Cursor for the next call with the same directory and query |
+| `HasMore` | `BOOLEAN` | More index rows remain, not necessarily more matching files |
+
+| FILEENTRY member | Type | Description |
+| :--- | :--- | :--- |
+| `Valid` | `BOOLEAN` | This snapshot contains an entry |
+| `Id` | `LONG` | Filebase row ID, local to this directory |
+| `Name` | `STRING` | Basename, without a filesystem path |
+| `Description` | `STRING` | Stored UTF-8 description, at most 16,384 bytes |
+| `Size` | `LONG` | Indexed file size in bytes, including sizes above 2 GiB |
+| `Date` | `DATE` | Indexed modification date in UTC |
+| `DescriptionTruncated` | `BOOLEAN` | The description was shortened at a UTF-8 boundary |
+
+Strings are unbounded PPL400 strings subject to the stated API limits. An
+uninitialized entry/page has `Valid=FALSE`, empty strings/arrays and zero numeric
+fields. Assigning entry or page properties is not supported.
+
+The search is a Unicode-lowercased literal substring over the filename and the
+returned description prefix; it has no wildcard or regular-expression syntax.
+An empty string matches all eligible entries. The query is limited to 1,024
+UTF-8 bytes. Each call examines at most 1,024 index rows and holds only a bounded
+page in memory. A page can therefore be empty while `HasMore=TRUE`; always use
+`NextAfter` to continue. Each page sees a current database read, not a snapshot
+across calls. Restart at zero after changing the query or directory, or after
+rebuilding the index. Edits and additions between calls may change later results.
+
+```PPL
+DIRECTORY directory = Session.Directory
+LONG after = 0
+WHILE TRUE DO
+	FILEPAGE page = directory.Find("tools", after, 15)
+	ERROR failure = Error.Last()
+	IF !page.Valid THEN
+		PRINTLN failure.Message
+		BREAK
+	ENDIF
+	FOREACH entry IN page.Entries
+		PRINTLN entry.Size, " bytes, ", entry.Date
+	ENDFOREACH
+	IF !page.HasMore BREAK
+	after = page.NextAfter
+ENDWHILE
+```
+
+The runtime rechecks the current conference and directory listing security for
+every search. Deleted rows, missing files, directories, symlinks and unsafe
+basenames are skipped. Download permission remains a separate check; a visible
+entry does not authorize a transfer. Display names and descriptions as literal
+text, not executable BBS macros, and sanitize control characters as appropriate
+for the chosen terminal renderer.
+
+This API does not initialize an index, rescan directories, extract archive
+descriptions, update download counters, or modify files. The normal filebase
+maintenance tools must have populated the index and any descriptions first.
+An absent index returns `ErrKind.File`/`ErrCode.Unavailable`; invalid objects or
+arguments return `Invalid`, denied listing rights `Denied`, exceeded limits
+`Limit`, and unreadable/corrupt indexes `IO`. On failure the page is invalid;
+capture `Error.Last()` immediately. A successful read clears the operation error.
+The existing `DOWNLOAD` command is unchanged; file selection and full transfer
+acceptance remain separate from this read-only API.
+
+### Marking Files (4.00)
+
+`directory.Flag(fileName)` adds one file from that directory to the current
+session's download batch. The directory object already identifies its conference
+and file area; no file ID or extra conference/area arguments are needed.
+The name is matched exactly, ignoring ASCII case. It is not interpreted as a
+wildcard pattern or command line, even when it contains spaces. Paths, control
+characters, empty names and names longer than 1,024 UTF-8 bytes are invalid.
+
+```PPL
+DIRECTORY directory = Session.Directory
+BOOLEAN marked = directory.Flag("example.zip")
+IF !marked THEN
+	ERROR failure = Error.Last()
+	PRINTLN "Not marked: ", failure.Code
+ENDIF
+```
+
+`TRUE` means the file is marked, including an already marked file. It never adds
+a duplicate or clears other marks. `FALSE` means no mark was added; inspect
+`Error.Last()` immediately. Success clears the operation error. Current
+conference/list/download rights are checked against the live configuration;
+an obsolete directory snapshot cannot grant access. A new mark also checks the
+batch limit and download credit, including costs reserved by existing marks,
+without debiting the account. Missing, deleted, unindexed and symlinked files
+cannot be marked. No index is created by the name lookup.
+
+Failures use `ErrKind.File`: `Invalid` for an invalid name or stale directory,
+`Denied` for missing rights/current user or insufficient credit, `Limit` for a
+full batch, `Unavailable` for a missing index or unavailable file, and `IO` for
+index/lookup/accounting errors. Ambiguous case variants in a damaged index fail
+rather than selecting an arbitrary entry.
+
+The method displays no prompts, consumes no caller tokens and does not start a
+transfer or change conferences. Download stays a separate BBS step using the
+existing marked batch and its usual checks and dialogs. Legacy `FLAG` and
+`DOWNLOAD` keep their existing semantics. The [file browser PPE](../ppe/files/src/main.pps)
+uses `M` to mark a file from either its list or detail view. `D` is a separate
+action that releases terminal input and runs `COMMAND FALSE, "D"`: the normal
+BBS download command with its command-level permission check and marked batch.
+It does not automatically mark the highlighted file. Completion or cancellation
+returns to the same browser view; an empty batch uses the normal filename prompt.
+No new download API is involved.
+
+The browser expects only its optional language argument. If additional caller
+tokens remain, it refuses `D` with a status message and leaves them untouched:
+legacy `COMMAND` consumes the shared token queue, and `TOKENIZE` cannot restore
+arbitrary tokens losslessly. Marking and browsing remain available in that case.
 
 ### Messages (4.00)
 

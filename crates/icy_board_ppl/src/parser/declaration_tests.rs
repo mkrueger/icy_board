@@ -256,6 +256,8 @@ fn board_object_type_ids_are_compact() {
         ("REGEX", 53),
         ("REGEXMATCH", 54),
         ("MSGHEADER", 55),
+        ("FILEENTRY", 56),
+        ("FILEPAGE", 57),
     ];
 
     for (name, id) in expected {
@@ -278,6 +280,44 @@ fn error_member_ids_are_compact() {
     let error = &registry.types[&(super::ERROR_ID as u32)];
     for (name, id) in [("OK", 0), ("KIND", 1), ("CODE", 2), ("MESSAGE", 3), ("CHANNEL", 4)] {
         assert_eq!(error.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id), "ERROR.{name} moved");
+    }
+}
+
+#[test]
+fn filebase_member_ids_are_compact() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    for (type_id, names) in [
+        (
+            super::FILE_DIRECTORY_ID,
+            vec![
+                "Name",
+                "Number",
+                "Valid",
+                "Path",
+                "IsFree",
+                "HasNewFiles",
+                "Password",
+                "HasAccess",
+                "CanDownload",
+                "Find",
+                "Flag",
+            ],
+        ),
+        (
+            super::FILE_ENTRY_ID,
+            vec!["Valid", "Id", "Name", "Description", "Size", "Date", "DescriptionTruncated"],
+        ),
+        (super::FILE_PAGE_ID, vec!["Valid", "Entries", "NextAfter", "HasMore"]),
+    ] {
+        let object = &registry.types[&(type_id as u32)];
+        assert_eq!(object.id_table.len(), names.len());
+        for (member_id, name) in names.into_iter().enumerate() {
+            assert_eq!(
+                object.get_member_id(&unicase::Ascii::new(name.to_string())),
+                Some(member_id),
+                "{type_id}.{name} moved"
+            );
+        }
     }
 }
 

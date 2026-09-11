@@ -87,6 +87,8 @@ pub const HTTP_RESPONSE_ID: usize = 52;
 pub const REGEX_ID: usize = 53;
 pub const REGEX_MATCH_ID: usize = 54;
 pub const MSG_HEADER_ID: usize = 55;
+pub const FILE_ENTRY_ID: usize = 56;
+pub const FILE_PAGE_ID: usize = 57;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them. Their current compact order is what a PPE stores.

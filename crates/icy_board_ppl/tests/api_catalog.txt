@@ -54,6 +54,8 @@ TYPE Directory (32)
     6 getter Password: Password
     7 func   HasAccess() -> Boolean
     8 func   CanDownload() -> Boolean
+    9 func   Find(text: UnboundedString, after?: Long, limit?: Integer) -> FilePage
+   10 func   Flag(fileName: UnboundedString) -> Boolean
 
 TYPE Door (33)
     0 getter Name: UnboundedString
@@ -366,6 +368,21 @@ TYPE RegexMatch (54)
    10 func   NamedGroupStart(name: UnboundedString) -> Integer
    11 func   GroupLength(index: Integer) -> Integer
    12 func   NamedGroupLength(name: UnboundedString) -> Integer
+
+TYPE FileEntry (56)
+    0 getter Valid: Boolean
+    1 getter Id: Long
+    2 getter Name: UnboundedString
+    3 getter Description: UnboundedString
+    4 getter Size: Long
+    5 getter Date: Date
+    6 getter DescriptionTruncated: Boolean
+
+TYPE FilePage (57)
+    0 getter Valid: Boolean
+    1 getter Entries: FileEntry[1]
+    2 getter NextAfter: Long
+    3 getter HasMore: Boolean
 
 ENUM Checksum (2147483634)
   CRC32=0, MD5=1, SHA256=2
