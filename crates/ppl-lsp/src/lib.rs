@@ -92,6 +92,25 @@ mod tests {
     use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
 
     #[test]
+    fn a5_resize_help_is_localized_with_independent_loaders() {
+        for (locale, changed, unchanged) in [
+            ("en", "The logical text size changed", "remain unchanged"),
+            ("de", "Die logische Textgröße", "bleiben unverändert"),
+        ] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            let help = loader.get("hint-enum-event-kind-resize");
+            assert!(help.starts_with(changed), "{locale}: {help}");
+            for term in ["Terminal.Info", "Columns", "Rows", "Kind", "Time", "NAWS", "132", "60", unchanged] {
+                assert!(help.contains(term), "{locale}: {term}: {help}");
+            }
+            assert!(loader.get("hint-member-terminput-wait").contains("EventKind.Resize"));
+            assert!(loader.get("hint-type-event").contains("EventKind.Resize"));
+            assert!(loader.get("hint-member-terminal-info").contains(unchanged));
+        }
+    }
+
+    #[test]
     fn s6_error_help_is_localized_with_independent_loaders() {
         for (locale, scope, fatal) in [("en", "VM-wide", "Fatal"), ("de", "VM-weiten", "Fatale")] {
             let loader = fluent_language_loader!();

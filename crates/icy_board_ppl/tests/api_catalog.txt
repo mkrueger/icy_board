@@ -424,4 +424,4 @@ ENUM MouseAction (2147483646)
   None=0, Press=1, Release=2, Motion=3, Wheel=4
 
 ENUM EventKind (2147483647)
-  None=0, Key=1, KeyEdge=2, Mouse=3, Overflow=4, Audio=5
+  None=0, Key=1, KeyEdge=2, Mouse=3, Overflow=4, Audio=5, Resize=6

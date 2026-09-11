@@ -886,11 +886,13 @@ Audio that ends produces `EventKind.Audio` with its channel in `Event.Channel`.
 
 #### Input and events
 
-`Terminal.Input` is the caller's keyboard and mouse. Turning mouse or physical
-key reporting on takes that input over from classic `INPUT`/`InKey`; `Release()`
-stops those modes and gives it back. `Poll()` never blocks. `Wait(milliseconds)`
-waits for an event, with zero meaning poll and a negative value meaning no
-timeout.
+`Terminal.Input` delivers keyboard, mouse, audio-completion and logical-resize
+events. Turning mouse or physical key reporting on takes that input over from
+classic `INPUT`/`InKey`; `Release()` stops those modes and gives it back, also
+discarding pending resize notifications. `Poll()` never blocks.
+`Wait(milliseconds)` waits for an event, with zero meaning poll and a negative
+value meaning no timeout. Resize needs no input mode and wakes `Wait(-1)` without
+a keypress.
 
 ```PPL
 EVENT event
@@ -904,6 +906,9 @@ ELSEIF event.Kind = EventKind.KeyEdge THEN
     PRINTLN event.ScanCode, " ", event.Pressed
 ELSEIF event.Kind = EventKind.Mouse THEN
     PRINTLN event.Action, " ", event.X, ",", event.Y
+ELSEIF event.Kind = EventKind.Resize THEN
+	TERMINFO current = Terminal.Info
+	PRINTLN current.Columns, "x", current.Rows
 ENDIF
 
 Terminal.Input.Release()
@@ -914,26 +919,40 @@ Terminal.Input.Release()
 `WheelLeft` or `WheelRight`. `MouseAction` is `None`, `Press`, `Release`,
 `Motion` or `Wheel`.
 
-`Event.Kind` is an `EventKind`: `None`, `Key`, `KeyEdge`, `Mouse`, `Overflow` or
-`Audio`. `Kind` must be checked before reading kind-specific fields. A dash means
+`Event.Kind` is an `EventKind`: `None` (0), `Key` (1), `KeyEdge` (2), `Mouse` (3),
+`Overflow` (4), `Audio` (5) or `Resize` (6). `Kind` must be checked before reading
+kind-specific fields. A dash means
 the field has no meaning for that kind and returns its neutral fallback (`0`,
 `FALSE`, `""`, `MouseAction.None`, `MouseButton.None`, or `-1` for `Channel`).
 
-| Field | `None` | `Key` | `KeyEdge` | `Mouse` | `Overflow` | `Audio` | Meaning |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| `Kind` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Event discriminator |
-| `Time` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Monotonic connection time in milliseconds |
-| `Code`, `Text` | — | ✓ | — | — | — | — | Translated Unicode/named key code and text |
-| `ScanCode` | — | — | ✓ | — | — | — | Physical key code |
-| `Pressed` | — | ✓ | ✓ | — | — | — | `Key` is a press; `KeyEdge` distinguishes press/release |
-| `Repeated` | — | — | ✓ | — | — | — | Physical-key repeat flag |
-| `Action`, `Button` | — | — | — | ✓ | — | — | Typed mouse action and changed button |
-| `X`, `Y`, `Pixels` | — | — | — | ✓ | — | — | Mouse position and cell/pixel coordinate mode |
-| `WheelX`, `WheelY` | — | — | — | ✓ | — | — | Mouse wheel delta |
-| `LeftDown`, `MiddleDown`, `RightDown` | — | — | — | ✓ | — | — | Mouse buttons held at the event |
-| `Shift`, `Alt`, `Ctrl`, `Meta` | — | ✓ | — | ✓ | — | — | Active modifiers supplied by translated keys or mouse reports |
-| `Dropped` | — | — | — | — | ✓ | — | Number of queue entries lost before this event |
-| `Channel` | — | — | — | — | — | ✓ | Finished sound channel |
+| Field | `None` | `Key` | `KeyEdge` | `Mouse` | `Overflow` | `Audio` | `Resize` | Meaning |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| `Kind` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Event discriminator |
+| `Time` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Monotonic connection time in milliseconds |
+| `Code`, `Text` | — | ✓ | — | — | — | — | — | Translated Unicode/named key code and text |
+| `ScanCode` | — | — | ✓ | — | — | — | — | Physical key code |
+| `Pressed` | — | ✓ | ✓ | — | — | — | — | `Key` is a press; `KeyEdge` distinguishes press/release |
+| `Repeated` | — | — | ✓ | — | — | — | — | Physical-key repeat flag |
+| `Action`, `Button` | — | — | — | ✓ | — | — | — | Typed mouse action and changed button |
+| `X`, `Y`, `Pixels` | — | — | — | ✓ | — | — | — | Mouse position and cell/pixel coordinate mode |
+| `WheelX`, `WheelY` | — | — | — | ✓ | — | — | — | Mouse wheel delta |
+| `LeftDown`, `MiddleDown`, `RightDown` | — | — | — | ✓ | — | — | — | Mouse buttons held at the event |
+| `Shift`, `Alt`, `Ctrl`, `Meta` | — | ✓ | — | ✓ | — | — | — | Active modifiers supplied by translated keys or mouse reports |
+| `Dropped` | — | — | — | — | ✓ | — | — | Number of queue entries lost before this event |
+| `Channel` | — | — | — | — | — | ✓ | — | Finished sound channel |
+
+`Resize` has no dimension fields: before delivery, the logical screen and the
+`Columns`/`Rows` of a fresh `Terminal.Info` are already current. Stored `TERMINFO`
+snapshots remain unchanged. Identical logical sizes do not notify; rapid changes
+may coalesce into one notification of the latest size. Resize does not reset the
+idle timer or produce keyboard bytes. Pending resize notifications may precede
+queued keys, but do not consume or reorder those keys.
+
+Sources currently supported are Telnet NAWS and existing logical ANSI/board
+resizes. Positive NAWS reports update the logical size, capped at 132 columns and
+60 rows to match the ANSI renderer; raw reported dimensions remain cached
+internally. A NAWS report with either dimension zero is ignored. Other transport
+resize notifications and pixel-size changes are not implemented by this event.
 
 ANSI navigation keys use `KEY_UP`, `KEY_HOME`, `KEY_PAGE_DOWN` and the other
 `KEY_*` constants in `Code`. Printable input uses its Unicode value.
@@ -942,8 +961,10 @@ and key events remain ordered.
 
 ### Terminal information
 
-`Terminal.Info` is an immutable snapshot populated during connection setup. It
-never sends a new query when read.
+Each `Terminal.Info` read creates an immutable snapshot of cached capabilities
+and the current logical text size. Capabilities are populated during connection
+setup; `Columns`/`Rows` also track subsequent logical resizes. Reading it never
+sends a new terminal query, and stored snapshots do not change.
 
 ```PPL
 PRINTLN Terminal.Info.Program, " ", Terminal.Info.Columns, "x", Terminal.Info.Rows
@@ -953,7 +974,7 @@ IF Terminal.Info.InlineGraphics PRINTLN "Inline JPEG XL available"
 | Property | Meaning |
 | :--- | :--- |
 | `Program`, `DeviceAttrs`, `RipVersion`, `Utf8` | Terminal identity and encoding |
-| `Columns`, `Rows` | Text dimensions |
+| `Columns`, `Rows` | Current logical text dimensions at snapshot creation |
 | `CellWidth`, `CellHeight` | Cell dimensions in pixels |
 | `ScreenWidth`, `ScreenHeight` | Screen dimensions in pixels, or zero |
 | `CTermLevel` | Highest known CTerm-compatible protocol level |

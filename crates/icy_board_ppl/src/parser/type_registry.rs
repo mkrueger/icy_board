@@ -317,7 +317,15 @@ impl UserTypeRegistry {
         self.register_enum(
             EVENT_KIND_ENUM_ID,
             "EventKind",
-            &[("None", 0), ("Key", 1), ("KeyEdge", 2), ("Mouse", 3), ("Overflow", 4), ("Audio", 5)],
+            &[
+                ("None", 0),
+                ("Key", 1),
+                ("KeyEdge", 2),
+                ("Mouse", 3),
+                ("Overflow", 4),
+                ("Audio", 5),
+                ("Resize", 6),
+            ],
         );
         self.register_enum(
             MOUSE_ACTION_ENUM_ID,

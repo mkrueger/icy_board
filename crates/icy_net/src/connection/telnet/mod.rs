@@ -106,6 +106,7 @@ pub struct TelnetConnection {
     state: ParserState,
     read_buffer: Vec<u8>,
     sub_buffer: Vec<u8>,
+    pending_terminal_size: Option<(u16, u16)>,
     /// Which end of the line we are: it decides which options we offer and which
     /// ones we let the peer turn on.
     is_server: bool,
@@ -150,6 +151,7 @@ impl TelnetConnection {
             state: ParserState::Data,
             read_buffer: Vec::new(),
             sub_buffer: Vec::new(),
+            pending_terminal_size: None,
             is_server,
             remote: [Negotiation::default(); 256],
             local: [Negotiation::default(); 256],
@@ -242,8 +244,9 @@ impl TelnetConnection {
                     let width = u16::from_be_bytes([payload[0], payload[1]]);
                     let height = u16::from_be_bytes([payload[2], payload[3]]);
                     // A zero means "no opinion", so it must not overwrite what we have.
-                    if width > 0 && height > 0 {
+                    if width > 0 && height > 0 && self.caps.window_size != (width, height) {
                         self.caps.window_size = (width, height);
+                        self.pending_terminal_size = Some((width, height));
                     }
                 }
             }
@@ -381,6 +384,10 @@ impl TelnetConnection {
 impl Connection for TelnetConnection {
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Telnet
+    }
+
+    fn take_terminal_size_change(&mut self) -> Option<(u16, u16)> {
+        self.pending_terminal_size.take()
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
@@ -598,6 +605,23 @@ mod tests {
         let (mut board, mut peer) = board().await;
         feed(&mut board, &mut peer, &[IAC, SB, NAWS, 0, 132, 0, 43, IAC, SE]).await;
         assert_eq!(board.caps().window_size, (132, 43));
+    }
+
+    #[tokio::test]
+    async fn a5_window_changes_coalesce_without_becoming_payload() {
+        let (mut board, mut peer) = board().await;
+        assert_eq!(board.take_terminal_size_change(), None);
+        for (width, height) in [(80, 25), (132, 43), (132, 43), (0, 25), (80, 0)] {
+            let (data, _) = feed(&mut board, &mut peer, &[IAC, SB, NAWS, 0, width, 0, height, IAC, SE]).await;
+            assert!(data.is_empty());
+        }
+        assert_eq!(board.take_terminal_size_change(), Some((132, 43)));
+        assert_eq!(board.take_terminal_size_change(), None);
+        feed(&mut board, &mut peer, &[IAC, SB, NAWS, 0, 132, 0, 43, IAC, SE]).await;
+        assert_eq!(board.take_terminal_size_change(), None);
+        let (data, _) = feed(&mut board, &mut peer, &[b'a', IAC, SB, NAWS, 0, 80, 0, 25, IAC, SE, b'b']).await;
+        assert_eq!(data, b"ab");
+        assert_eq!(board.take_terminal_size_change(), Some((80, 25)));
     }
 
     #[tokio::test]

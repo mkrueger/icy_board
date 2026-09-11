@@ -753,6 +753,7 @@ pub struct IcyBoardState {
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
     ppl_event_keys: ppl_events::LogicalKeyState,
+    ppl_resize_pending: bool,
     ppl_audio_notify: ppl_events::AudioNotifyState,
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
@@ -814,21 +815,29 @@ impl IcyBoardState {
 
     /// Sets the terminal the board writes to, for a caller that cannot say so in ANSI.
     ///
-    /// The buffer holds its own size next to the viewport and a terminal buffer keeps the
-    /// two apart, so both are set here.
+    /// Buffer, viewport and text layers must use the same terminal geometry.
     pub fn set_terminal_size(&mut self, width: u16, height: u16) {
         let (width, height) = (width.max(1), height.max(1));
         let size = icy_engine::Size::new(i32::from(width), i32::from(height));
         for screen in [&mut self.user_screen, &mut self.sysop_screen] {
-            screen.buffer.buffer.set_size(size);
-            screen.buffer.buffer.terminal_state.set_size(size);
+            virtual_screen::resize_screen(&mut screen.buffer, size);
         }
+        self.ppl_resize_pending |= self.session.term_caps.term_size != (width, height);
         self.session.term_caps.term_size = (width, height);
     }
 
     fn sync_logical_screen_size(&mut self) {
         let size = self.user_screen.buffer.buffer.terminal_state.size();
-        self.session.term_caps.term_size = (size.width.max(1) as u16, size.height.max(1) as u16);
+        let size = (size.width.max(1) as u16, size.height.max(1) as u16);
+        self.ppl_resize_pending |= self.session.term_caps.term_size != size;
+        self.session.term_caps.term_size = size;
+    }
+
+    fn sync_connection_size(&mut self) {
+        if let Some((width, height)) = self.connection.take_terminal_size_change() {
+            self.session.term_caps.reported_term_size = (width, height);
+            self.set_terminal_size(width.clamp(1, 132), height.clamp(1, 60));
+        }
     }
     pub async fn new(
         bbs: Arc<Mutex<BBS>>,
@@ -888,6 +897,7 @@ impl IcyBoardState {
             raw_input: VecDeque::new(),
             ppl_graphics: None,
             ppl_event_keys: ppl_events::LogicalKeyState::default(),
+            ppl_resize_pending: false,
             ppl_audio_notify: ppl_events::AudioNotifyState::default(),
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
@@ -1410,6 +1420,8 @@ impl IcyBoardState {
             self.connection.send(b"\x1b[=2l\x1b[=1l").await?;
         }
         self.ppl_event_keys.clear();
+        self.sync_connection_size();
+        self.ppl_resize_pending = false;
         Ok(true)
     }
 
@@ -3494,7 +3506,9 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
-        self.get_char_with_timeout(target, Duration::from_millis(100)).await
+        let result = self.get_char_with_timeout(target, Duration::from_millis(100)).await;
+        self.sync_connection_size();
+        result
     }
 
     #[async_recursion(?Send)]
@@ -3959,6 +3973,13 @@ impl IcyBoardState {
     }
 
     fn take_pending_ppl_event(&mut self) -> Option<ppl_events::PplEvent> {
+        self.sync_connection_size();
+        if std::mem::take(&mut self.ppl_resize_pending) {
+            return Some(self.ppl_event_with_mode(ppl_events::PplEvent {
+                event_type: ppl_events::EVENT_RESIZE,
+                ..Default::default()
+            }));
+        }
         let dropped = self.ppl_keys.take_dropped().saturating_add(self.ppl_mouse.take_dropped());
         if dropped > 0 {
             return Some(self.ppl_event_with_mode(ppl_events::PplEvent::overflow(dropped)));
@@ -4018,7 +4039,7 @@ impl IcyBoardState {
             let mut input = [0u8; 64];
             let read = self.connection.try_read(&mut input).await?;
             if read == 0 {
-                return Ok(self.empty_ppl_event());
+                return Ok(self.take_pending_ppl_event().unwrap_or_else(|| self.empty_ppl_event()));
             }
             // Input read here never passes the keyboard timer in `get_char`, and a game
             // answering only events would look idle until the board hangs it up.
@@ -4854,6 +4875,36 @@ mod screen_tests {
             assert_eq!(state.session.term_caps.term_size, (132, 43));
             assert_eq!(state.sysop_screen.buffer.buffer.terminal_state.size(), icy_engine::Size::new(132, 43));
             assert_eq!(state.display_screen().buffer.caret.y, 0, "the line wrapped at the old width");
+        });
+    }
+
+    #[test]
+    fn a5_explicit_and_ansi_resizes_keep_both_screen_edges_writable() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            for ansi in [false, true] {
+                let (mut state, _peer) = graphics_state().await;
+                state.session.term_caps.reported_term_size = (80, 25);
+                for (width, height) in [(132, 43), (80, 25), (132, 43)] {
+                    if ansi {
+                        state.print(TerminalTarget::Both, &format!("\x1b[8;{height};{width}t")).await.unwrap();
+                    } else {
+                        state.set_terminal_size(width, height);
+                    }
+                    state
+                        .print(TerminalTarget::Both, &format!("\x1b[2J\x1b[H\x1b[{};{width}HX\x1b[H", height - 1))
+                        .await
+                        .unwrap();
+                    let size = icy_engine::Size::new(i32::from(width), i32::from(height));
+                    for screen in [&state.user_screen, &state.sysop_screen] {
+                        assert_eq!(screen.buffer.buffer.terminal_state.size(), size);
+                        assert_eq!((screen.buffer.width(), screen.buffer.height()), (size.width, size.height));
+                        assert_eq!(screen.buffer.char_at(icy_engine::Position::new(size.width - 1, size.height - 2)).ch, 'X');
+                        assert_eq!(screen.buffer.caret.position(), icy_engine::Position::default());
+                    }
+                    assert_eq!(state.session.term_caps.term_size, (width, height));
+                    assert_eq!(state.session.term_caps.reported_term_size, (80, 25));
+                }
+            }
         });
     }
 

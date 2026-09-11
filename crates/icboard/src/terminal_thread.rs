@@ -404,9 +404,42 @@ pub enum SendData {
 mod tests {
     use std::time::Duration;
 
+    use icy_engine::Position;
     use icy_net::connection::channel::ChannelConnection;
 
     use super::*;
+
+    #[tokio::test]
+    async fn a5_local_terminal_renders_resize_and_edge_in_one_packet() {
+        let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+        let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));
+        let generation = Arc::new(AtomicU64::new(0));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen.clone(), generation.clone());
+
+        for (width, height) in [(132, 43), (80, 25), (132, 43)] {
+            let previous_generation = generation.load(Ordering::Acquire);
+            board_connection
+                .send(format!("\x1b[8;{height};{width}t\x1b[2J\x1b[H\x1b[{};{width}HX\x1b[H", height - 1).as_bytes())
+                .await
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while generation.load(Ordering::Acquire) == previous_generation {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            let screen = screen.lock().unwrap();
+            assert_eq!(screen.buffer.terminal_state.size(), Size::new(width, height));
+            assert_eq!((screen.width(), screen.height()), (width, height));
+            assert_eq!(screen.char_at(Position::new(width - 1, height - 2)).ch, 'X');
+            assert_eq!(screen.caret.position(), Position::default());
+        }
+
+        drop(tx);
+        drop(board_connection);
+        handle.join().unwrap();
+    }
 
     #[tokio::test]
     async fn local_terminal_forwards_keyboard_input_to_the_board() {

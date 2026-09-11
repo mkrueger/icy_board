@@ -1,17 +1,88 @@
-use icy_engine::{TextPane, TextScreen};
+use icy_engine::{Size, TextPane, TextScreen};
+use icy_parser_core::{CommandSink, TerminalCommand};
 
 use crate::Res;
 
-/// Runs the parser over `bytes` and brings the viewport along with any resize.
-///
-/// `CSI 8 ; h ; w t` resizes the buffer, but a terminal buffer keeps its viewport apart
-/// from it and the parser only touches the buffer.
+/// Keeps the viewport and text layers in step before commands following a resize.
 pub fn parse_into_screen(parser: &mut dyn icy_parser_core::CommandParser, screen: &mut TextScreen, bytes: &[u8]) {
     let before = (screen.width(), screen.height());
-    parser.parse(bytes, &mut icy_engine::ScreenSink::new(screen));
+    parser.parse(bytes, &mut TerminalScreenSink(screen));
     let after = (screen.width(), screen.height());
     if before != after {
-        screen.buffer.terminal_state.set_size(icy_engine::Size::new(after.0, after.1));
+        resize_screen(screen, Size::new(after.0, after.1));
+    }
+}
+
+pub(super) fn resize_screen(screen: &mut TextScreen, size: Size) {
+    screen.buffer.set_size(size);
+    screen.buffer.terminal_state.set_size(size);
+    for layer in &mut screen.buffer.layers {
+        layer.set_size(size);
+    }
+}
+
+struct TerminalScreenSink<'a>(&'a mut TextScreen);
+
+impl CommandSink for TerminalScreenSink<'_> {
+    fn print(&mut self, text: &[u8]) {
+        icy_engine::ScreenSink::new(self.0).print(text);
+    }
+
+    fn emit(&mut self, command: TerminalCommand) {
+        let before = (self.0.width(), self.0.height());
+        icy_engine::ScreenSink::new(self.0).emit(command);
+        let after = (self.0.width(), self.0.height());
+        if before != after {
+            resize_screen(self.0, Size::new(after.0, after.1));
+        }
+    }
+
+    fn emit_rip(&mut self, command: icy_parser_core::RipCommand) {
+        icy_engine::ScreenSink::new(self.0).emit_rip(command);
+    }
+
+    fn emit_skypix(&mut self, command: icy_parser_core::SkypixCommand) {
+        icy_engine::ScreenSink::new(self.0).emit_skypix(command);
+    }
+
+    fn emit_igs(&mut self, command: icy_parser_core::IgsCommand) {
+        icy_engine::ScreenSink::new(self.0).emit_igs(command);
+    }
+
+    fn emit_view_data(&mut self, command: icy_parser_core::ViewDataCommand) -> bool {
+        icy_engine::ScreenSink::new(self.0).emit_view_data(command)
+    }
+
+    fn device_control(&mut self, command: icy_parser_core::DeviceControlString) {
+        icy_engine::ScreenSink::new(self.0).device_control(command);
+    }
+
+    fn operating_system_command(&mut self, command: icy_parser_core::OperatingSystemCommand) {
+        icy_engine::ScreenSink::new(self.0).operating_system_command(command);
+    }
+
+    fn aps(&mut self, data: &[u8]) {
+        icy_engine::ScreenSink::new(self.0).aps(data);
+    }
+
+    fn play_music(&mut self, music: icy_parser_core::AnsiMusic) {
+        icy_engine::ScreenSink::new(self.0).play_music(music);
+    }
+
+    fn request(&mut self, request: icy_parser_core::TerminalRequest) {
+        icy_engine::ScreenSink::new(self.0).request(request);
+    }
+
+    fn report_error(&mut self, error: icy_parser_core::ParseError, level: icy_parser_core::ErrorLevel) {
+        icy_engine::ScreenSink::new(self.0).report_error(error, level);
+    }
+
+    fn begin_igs_xor_mode(&mut self) {
+        icy_engine::ScreenSink::new(self.0).begin_igs_xor_mode();
+    }
+
+    fn end_igs_xor_mode(&mut self) {
+        icy_engine::ScreenSink::new(self.0).end_igs_xor_mode();
     }
 }
 
@@ -51,6 +122,34 @@ mod tests {
     use icy_engine::{Position, TextPane};
 
     use super::*;
+
+    #[test]
+    fn a5_resize_clear_and_edge_output_are_independent_of_chunk_boundaries() {
+        for (width, height) in [(132, 43), (80, 25)] {
+            let data = format!(
+                "\x1b[8;50;160t\x1b[8;{height};{width}t\x1b[2J\x1b[HGr\u{fc}sse\x1b[{};{}HX\x1b[1;1H",
+                height - 1,
+                width
+            );
+            for split in 0..=data.len() {
+                let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+                screen.write_bytes(&data.as_bytes()[..split]);
+                screen.write_bytes(&data.as_bytes()[split..]);
+                assert_eq!(screen.buffer.buffer.terminal_state.size(), Size::new(width, height), "split {split}");
+                assert_eq!((screen.buffer.width(), screen.buffer.height()), (width, height), "split {split}");
+                assert_eq!(screen.buffer.char_at(Position::new(2, 0)).ch, '\u{fc}', "split {split}");
+                assert_eq!(screen.buffer.char_at(Position::new(width - 1, height - 2)).ch, 'X', "split {split}");
+                assert_eq!(screen.buffer.caret.position(), Position::default(), "split {split}");
+            }
+            let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+            for byte in data.bytes() {
+                screen.write_bytes(&[byte]);
+            }
+            assert_eq!(screen.buffer.buffer.terminal_state.size(), Size::new(width, height));
+            assert_eq!(screen.buffer.char_at(Position::new(2, 0)).ch, '\u{fc}');
+            assert_eq!(screen.buffer.char_at(Position::new(width - 1, height - 2)).ch, 'X');
+        }
+    }
 
     #[test]
     fn unicode_box_drawing_is_not_truncated_to_its_low_byte() {

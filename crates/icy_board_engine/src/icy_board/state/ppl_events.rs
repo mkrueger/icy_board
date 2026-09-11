@@ -17,6 +17,7 @@ pub const EVENT_KEY_EDGE: i32 = 2;
 pub const EVENT_MOUSE: i32 = 3;
 pub const EVENT_OVERFLOW: i32 = 4;
 pub const EVENT_SOUND: i32 = 5;
+pub const EVENT_RESIZE: i32 = 6;
 
 pub const KEY_UP: i32 = 0x11_0001;
 pub const KEY_DOWN: i32 = 0x11_0002;

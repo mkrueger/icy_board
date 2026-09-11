@@ -41,6 +41,12 @@ pub enum ConnectionState {
 pub trait Connection: Send + Unpin {
     fn get_connection_type(&self) -> ConnectionType;
 
+    /// Consume the latest positive (columns, rows) report parsed during I/O.
+    /// Reports may coalesce and never appear as payload bytes or EOF.
+    fn take_terminal_size_change(&mut self) -> Option<(u16, u16)> {
+        None
+    }
+
     /// Wait for payload bytes, EOF, or an error. For a nonempty buffer, `Ok(0)`
     /// means EOF, never temporary inactivity or a protocol-only/empty record.
     /// An empty buffer may return `Ok(0)` without indicating EOF.

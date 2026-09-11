@@ -6,14 +6,14 @@ use super::{compile_errors, run_ppl, run_ppl_with_input};
 fn an_enum_member_stands_for_the_value_it_always_had() {
     let output = run_ppl(
         r"
-        PrintLn EventKind.None, EventKind.Key, EventKind.KeyEdge, EventKind.Mouse, EventKind.Overflow, EventKind.Audio
+        PrintLn EventKind.None, EventKind.Key, EventKind.KeyEdge, EventKind.Mouse, EventKind.Overflow, EventKind.Audio, EventKind.Resize
         PrintLn GfxBackend.None, GfxBackend.Auto, GfxBackend.Sixel, GfxBackend.Jxl
         PrintLn MouseButton.Left, MouseButton.Middle, MouseButton.Right
         PrintLn ErrCode.Ok, ErrCode.Invalid, ErrKind.Audio, ErrKind.Term
         ",
     );
 
-    assert_eq!(output, "012345\n-1023\n012\n0267\n");
+    assert_eq!(output, "0123456\n-1023\n012\n0267\n");
 }
 
 #[test]

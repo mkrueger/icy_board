@@ -245,6 +245,16 @@ fn event_fields_document_their_applicable_kind() {
     assert!(channel.contains("EventKind.Audio"), "{channel}");
 }
 
+#[test]
+fn resize_event_documents_fresh_terminal_info() {
+    let resize = completion_documentation("EventKind.", "Resize");
+    for term in ["Terminal.Info", "Columns", "Rows", "Kind", "Time", "NAWS", "132", "60"] {
+        assert!(resize.contains(term), "{term}: {resize}");
+    }
+    let wait = completion_documentation("TERMINPUT input\ninput.", "Wait");
+    assert!(wait.contains("EventKind.Resize"), "{wait}");
+}
+
 /// Snapshot arrays expose array members rather than their internal legacy getter.
 #[test]
 fn a_collection_does_not_offer_its_internal_getter() {

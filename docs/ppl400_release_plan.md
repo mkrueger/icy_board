@@ -994,6 +994,62 @@ angemeldeten SYSOP `FALSE` meldet.
 
 ### A5 — Terminal-Layout und aktuelle Geometrie
 
+**Bestandsprüfung und freigegebene Renderkorrektur (2026-09-11):** Ein neuer
+`Terminal.Info`-Abruf liefert die aktuelle logische Größe; gespeicherte
+`TERMINFO`-Werte bleiben Snapshots. Ein serialisiertes PPE bestätigt dies in
+EN/DE bei 80x25 und 132x43 in beiden Größenrichtungen. Resize-Ereignisse und
+neue öffentliche Layout-/Text-APIs waren zu diesem Zeitpunkt noch nicht freigegeben.
+
+Der Randtest reproduzierte zwei gekoppelte Fehler: Ein ANSI-Resize änderte nur
+die Puffergröße, während die Zeichenebene bei 80x25 blieb und Randzeichen
+verwarf. Der Viewport wurde erst nach dem gesamten Parser-Aufruf aktualisiert;
+ein unmittelbar folgendes `CLS` konnte daher die alte Größe wiederherstellen.
+Der lokale Parser-Adapter synchronisiert Puffer, Viewport und Zeichenebenen
+jetzt vor dem nächsten Befehl. Explizites `set_terminal_size` nutzt dieselbe
+Korrektur. `icy_tools` und die öffentlichen PPE-Signaturen bleiben unverändert.
+
+Drei A5-Engine-Tests prüfen tatsächliche Randzeichen, Snapshot-Verhalten,
+Benutzer-/Sysop-Bildschirme und jede Zweiteilung des Ausgabestroms einschließlich
+UTF-8- und Escape-Grenzen sowie byteweisen Empfang. Ein zusätzlicher Test führt
+Resize, Löschen und Randzeichen im lokalen Terminal-Thread aus. Alle bestanden;
+auch 71 Terminal-, 13 Bildschirm- und sieben E1-Tests bestanden (überlappende
+Testgruppen). Remote-Client-Resize, Zellbreiten-/Pixelverträge und sichere
+Textausgabe bleiben separat zu klären; keine vollständige A5-/E3-Abnahme.
+
+**Anschließend freigegeben und implementiert: `EventKind.Resize = 6`.** Die
+bisherigen Enumwerte und EVENT-Felder bleiben unverändert. Vor der Auslieferung
+sind logischer Bildschirm und ein neuer `Terminal.Info`-Snapshot aktuell;
+gespeicherte Snapshots bleiben stabil. Nur `Kind` und `Time` sind relevant.
+`Wait(-1)` wird ohne Tastendruck geweckt, identische Größen erzeugen nichts,
+schnelle Änderungen dürfen auf den neuesten Stand zusammengefasst werden.
+Resize erzeugt keine Eingabebytes und setzt die Idle-Zeit nicht zurück.
+`Release()` verwirft anstehende Resize-Meldungen.
+
+Quellen dieses Schritts sind Telnet NAWS und vorhandene logische
+ANSI-/Board-Größenänderungen. Die logische NAWS-Größe ist entsprechend dem
+ANSI-Renderer auf 132x60 begrenzt; rohe gemeldete Maße bleiben intern erhalten.
+Meldungen mit einer Null-Dimension werden ignoriert. Der Transport behält seinen
+Read-Vertrag: protokollreine Pakete werden nicht als Eingabe oder EOF ausgegeben.
+
+Ein echter TCP-/Telnet-Socket speist ein serialisiertes PPE mit EN-/DE-Ausgabe.
+Der bestandene Test prüft 80x25, 132x43 und die Begrenzung von 65535x65535 auf
+132x60 anhand gerenderter Randzeichen, außerdem unbegrenztes/endliches Warten,
+unveränderte Snapshots, Duplikate, Null-Maße, gemischte Resize-/Tastendaten,
+Idle-Zeit, Aufrufer-Tokens und Verbindungsabbruch während `Wait(-1)`.
+Logische Coalescing-/Release-Tests, der Telnet-Parser-Test, zwölf Enum-Tests und
+der aktualisierte API-Katalog wurden ebenfalls erfolgreich geprüft.
+
+Abschließend bestanden fünf A5-, 16 Telnet-, 38 Event-, 73 Terminal-,
+13 Bildschirm-, sieben E1- und sechs lokale Terminal-Thread-Tests
+(überlappende Gruppen). Die gesamte LSP-Suite, 45 Completion-Tests in einem
+separaten deutschen Prozess und die Hilfeprüfung mit unabhängigen EN-/DE-Loadern
+bestanden. `pplc`, `icboard` und `ppl-lsp` wurden neu gebaut; der unveränderte
+Dateibrowser kompiliert mit diesem Compiler.
+
+Weitere Transportquellen, Pixelgeometrie, sichere Text-/Layout-APIs und die
+manuelle Remote-Client-Matrix bleiben separat; weiterhin keine vollständige
+A5-/E3-Abnahme.
+
 **Besprechen:** Connection-Fähigkeiten versus aktuelle Größe; Resize-Ereignisse;
 Zell-/Pixelkoordinaten; sichtbare Textbreite; ANSI-/ATX-bewusstes Layout;
 sichere Ausgabe fremder Texte ohne Steuersequenzinterpretation.

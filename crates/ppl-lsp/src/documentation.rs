@@ -523,6 +523,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     if id == EVENT_KIND_ENUM_ID {
         return match member.to_ascii_lowercase().as_str() {
             "none" => Some(fl!(LANGUAGE_LOADER, "hint-enum-event-kind-none")),
+            "resize" => Some(fl!(LANGUAGE_LOADER, "hint-enum-event-kind-resize")),
             "key" | "keyedge" | "mouse" | "overflow" | "audio" => Some(fl!(LANGUAGE_LOADER, "hint-enum-event-kind-value")),
             _ => None,
         };
