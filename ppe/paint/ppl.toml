@@ -1,12 +1,8 @@
 [package]
 name = "paint"
 version = "0.1.0"
+runtime = 400
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 
 [compiler]
 language_version = 400
-
-[data]
-binary_files = [
-    "paint_ui.png",
-]

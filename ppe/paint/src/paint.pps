@@ -1,147 +1,77 @@
 ;$LANGVERSION 400
 
-CONST INTEGER SCREEN_W = 640
-CONST INTEGER SCREEN_H = 400
-CONST INTEGER CANVAS_X = 20
-CONST INTEGER CANVAS_Y = 76
-CONST INTEGER CANVAS_W = 600
-CONST INTEGER CANVAS_H = 304
-CONST INTEGER SWATCH_X = 144
-CONST INTEGER SWATCH_Y = 25
-CONST INTEGER SWATCH_STEP = 34
-CONST INTEGER SWATCH_SIZE = 26
-CONST INTEGER COLOR_COUNT = 8
-
-; The canvas is presented once per frame; input is answered as it arrives.
-CONST INTEGER FRAME_MS = 33
-
+CONST INTEGER MAX_PIXEL_W = 1280
+CONST INTEGER MAX_PIXEL_H = 1024
 CONST UNSIGNED C_CANVAS = Rgb(255, 255, 255)
 CONST UNSIGNED C_INK = Rgb(1, 2, 3)
-CONST UNSIGNED C_FRAME = Rgb(35, 26, 19)
 
-UNSIGNED colors(7)
-INTEGER selected, brushSize
+UNSIGNED colors[7]
+INTEGER selected = 0
+INTEGER brushSize = 7
 INTEGER mx, my
-MOUSEBUTTON btn
 INTEGER lastX, lastY
-MOUSEACTION mouseKind
 MOUSEBUTTON dragButton
-INTEGER tries
-UNSIGNED nextFrame
-BOOLEAN running, dragging, dirty, pendingInput
+BOOLEAN running = TRUE
+BOOLEAN dragging, dirty
 STRING key
-SURFACE screen, ui
+SURFACE screen, view
 EVENT inputEvent
 TERMINPUT input
+BYTE cells[127, 63]
+INTEGER textColors[7]
+INTEGER columns, rows, canvasColumns, canvasRows, cursorX, cursorY
+INTEGER cellWidth, cellHeight, pixelWidth, pixelHeight
+INTEGER eventCount
+STRING language
 
 InitColors()
+GETTOKEN language
+STARTDISP FNS
 CLS
-PRINTLN "Starting PPE Paint..."
 
-Terminal.Gfx.Init(GfxBackend.Auto)
-IF Terminal.Gfx.Backend = GfxBackend.None THEN
-    CLS
-    PRINTLN "PPE Paint requires a graphics-capable terminal."
-    EXIT
-ENDIF
-screen = Surface.New(SCREEN_W, SCREEN_H)
-ui = Surface.Load("./paint_ui.png")
-screen.Blit(ui, 0, 0)
-
-selected = 0
-brushSize = 7
-dragging = FALSE
-dirty = FALSE
-RenderToolbar()
-
+Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+ON ERROR GOTO PaintError
 input = Terminal.Input
-input.MouseOn(MouseMode.Pixels, MouseTracking.All)
-tries = 0
-inputEvent = input.Poll()
-WHILE !inputEvent.Pixels & tries < 30 DO
-    DELAY 1
-    inputEvent = input.Poll()
-    tries += 1
-ENDWHILE
-IF !inputEvent.Pixels THEN
-    input.Release()
-    Terminal.Gfx.Shutdown()
-    CLS
-    PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
-    EXIT
-ENDIF
-pendingInput = inputEvent.Kind <> EventKind.None
-nextFrame = inputEvent.Time + FRAME_MS
-
-running = TRUE
-WHILE running DO
-    dirty = FALSE
-    IF pendingInput THEN
-        pendingInput = FALSE
-    ELSE
-        inputEvent = input.Poll()
-    ENDIF
-    WHILE inputEvent.Kind <> EventKind.None DO
-        IF inputEvent.Kind = EventKind.Mouse THEN
-            mouseKind = inputEvent.Action
-            mx = inputEvent.X
-            my = inputEvent.Y
-            btn = inputEvent.Button
-
-            IF mouseKind = MouseAction.Press THEN
-                IF my < CANVAS_Y THEN
-                    HandleToolbar(mx, my)
-                ELSEIF (InsideCanvas(mx, my)) THEN
-                    IF btn = MouseButton.Left | btn = MouseButton.Right THEN
-                        dragging = TRUE
-                        dragButton = btn
-                        lastX = mx
-                        lastY = my
-                        DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
-                    ENDIF
-                ENDIF
-            ELSEIF (mouseKind = MouseAction.Motion) THEN
-                IF dragging & btn = dragButton & InsideCanvas(mx, my) THEN
-                    DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
-                    lastX = mx
-                    lastY = my
-                ENDIF
-            ELSEIF (mouseKind = MouseAction.Release) THEN
+IF Terminal.Gfx.Backend = GfxBackend.None THEN
+    RunAnsi()
+ELSE
+    screen = Surface.New(MAX_PIXEL_W, MAX_PIXEL_H)
+    IF !screen.Valid GOTO PaintError
+    screen.Clear(C_CANVAS)
+    UpdateGraphicsGeometry()
+    input.MouseOn(MouseMode.Pixels, MouseTracking.Drag)
+    DrawGraphics()
+    WHILE running DO
+        inputEvent = input.Wait(-1)
+        dirty = FALSE
+        eventCount = 0
+        WHILE running & inputEvent.Kind <> EventKind.None & eventCount < 64 DO
+            IF inputEvent.Kind = EventKind.Resize THEN
+                UpdateGraphicsGeometry()
+                dirty = TRUE
+            ELSEIF (inputEvent.Kind = EventKind.Key) THEN
+                HandleGraphicsKey()
+            ELSEIF (inputEvent.Kind = EventKind.Mouse) THEN
+                HandleGraphicsMouse()
+            ELSEIF (inputEvent.Kind = EventKind.Overflow) THEN
                 dragging = FALSE
-            ELSEIF (mouseKind = MouseAction.Wheel) THEN
-                IF btn = MouseButton.WheelUp THEN
-                    ChangeBrush(1)
-                ELSEIF (btn = MouseButton.WheelDown) THEN
-                    ChangeBrush(-1)
-                ENDIF
             ENDIF
-        ELSEIF (inputEvent.Kind = EventKind.Key) THEN
-            key = Upper(inputEvent.Text)
-            IF key = "Q" | key = Chr(27) THEN
-                running = FALSE
-            ELSEIF (key = "C") THEN
-                ClearCanvas()
-            ELSEIF (key = "+" | key = "=") THEN
-                ChangeBrush(1)
-            ELSEIF (key = "-") THEN
-                ChangeBrush(-1)
-            ENDIF
-        ENDIF
-        inputEvent = input.Poll()
+            ClampGraphicsCursor()
+            eventCount += 1
+            IF running & eventCount < 64 inputEvent = input.Poll()
+        ENDWHILE
+        ClampGraphicsCursor()
+        IF dirty DrawGraphics()
     ENDWHILE
-    IF dirty PresentDirty()
-    IF inputEvent.Time < nextFrame THEN
-        inputEvent = input.Wait(nextFrame - inputEvent.Time)
-        pendingInput = inputEvent.Kind <> EventKind.None
-    ENDIF
-    IF inputEvent.Time >= nextFrame nextFrame = inputEvent.Time + FRAME_MS
-ENDWHILE
+ENDIF
+Cleanup()
+EXIT
 
-input.Release()
-ui.Free()
-screen.Free()
-Terminal.Gfx.Shutdown()
-CLS
+:PaintError
+ON ERROR OFF
+Cleanup()
+PRINT Label("Paint error", "Paint-Fehler")
+STOP
 
 PROCEDURE InitColors()
     colors[0] = Rgb(34, 34, 34)
@@ -152,79 +82,173 @@ PROCEDURE InitColors()
     colors[5] = Rgb(66, 217, 232)
     colors[6] = Rgb(91, 143, 249)
     colors[7] = Rgb(167, 109, 255)
+    textColors[0] = 0
+    textColors[1] = 4
+    textColors[2] = 6
+    textColors[3] = 14
+    textColors[4] = 2
+    textColors[5] = 3
+    textColors[6] = 1
+    textColors[7] = 5
 ENDPROC
 
-FUNCTION InsideCanvas(INTEGER x, INTEGER y) BOOLEAN
-    InsideCanvas = x >= CANVAS_X & x < CANVAS_X + CANVAS_W & y >= CANVAS_Y & y < CANVAS_Y + CANVAS_H
-ENDFUNC
+PROCEDURE Cleanup()
+    input.Release()
+    IF view.Valid view.Free()
+    IF screen.Valid screen.Free()
+    IF Terminal.Gfx.Backend <> GfxBackend.None Terminal.Gfx.Shutdown()
+    COLOR 7
+    CLS
+ENDPROC
 
-FUNCTION StrokeColor(MOUSEBUTTON whichButton) UNSIGNED
-    IF whichButton = MouseButton.Right THEN
-        StrokeColor = C_CANVAS
-    ELSE
-        StrokeColor = colors[selected]
+PROCEDURE UpdateGraphicsGeometry()
+    UpdateAnsiGeometry()
+    cellWidth = Terminal.Info.CellWidth
+    cellHeight = Terminal.Info.CellHeight
+    IF cellWidth < 1 cellWidth = 8
+    IF cellHeight < 1 cellHeight = 16
+    pixelWidth = canvasColumns * cellWidth
+    pixelHeight = canvasRows * cellHeight
+    IF pixelWidth > MAX_PIXEL_W pixelWidth = MAX_PIXEL_W
+    IF pixelHeight > MAX_PIXEL_H pixelHeight = MAX_PIXEL_H
+    dragging = FALSE
+    SURFACE previous = view
+    IF previous.Valid previous.Free()
+    IF pixelWidth > 0 & pixelHeight > 0 THEN
+        view = Surface.New(pixelWidth, pixelHeight)
+        IF !view.Valid GOTO PaintError
     ENDIF
-ENDFUNC
-
-PROCEDURE RenderToolbar()
-    INTEGER i, x
-    ; Restore the original toolbar, then draw state indicators.
-    screen.BlitRect(ui, 0, 0, SCREEN_W, CANVAS_Y, 0, 0)
-    i = 0
-    WHILE i < COLOR_COUNT DO
-        x = SWATCH_X + i * SWATCH_STEP
-        screen.FillRect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, colors[i])
-        screen.DrawRect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK)
-        IF i = selected screen.DrawRect(x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS)
-        i += 1
-    ENDWHILE
-    ; Brush preview.
-    screen.FillRect(432, 25, 36, 28, C_CANVAS)
-    screen.DrawRect(432, 25, 36, 28, C_FRAME)
-    screen.FillRect(450 - brushSize / 2, 39 - brushSize / 2, brushSize, brushSize, colors[selected])
-    screen.Present()
+    ClampGraphicsCursor()
 ENDPROC
 
-PROCEDURE HandleToolbar(INTEGER x, INTEGER y)
-    INTEGER index
-    IF x >= SWATCH_X & x < SWATCH_X + COLOR_COUNT * SWATCH_STEP & y >= SWATCH_Y & y < SWATCH_Y + SWATCH_SIZE THEN
-        index = (x - SWATCH_X) / SWATCH_STEP
-        IF index >= 0 & index < COLOR_COUNT THEN
-            selected = index
-            RenderToolbar()
-            RETURN
+PROCEDURE ClampGraphicsCursor()
+    IF cursorX >= pixelWidth cursorX = pixelWidth - 1
+    IF cursorY >= pixelHeight cursorY = pixelHeight - 1
+    IF cursorX < 0 cursorX = 0
+    IF cursorY < 0 cursorY = 0
+ENDPROC
+
+PROCEDURE DrawGraphics()
+    Terminal.BeginUpdate()
+    COLOR 7
+    CLS
+    IF view.Valid & pixelWidth > 0 & pixelHeight > 0 THEN
+        view.BlitRect(screen, 0, 0, pixelWidth, pixelHeight, 0, 0)
+        view.DrawRect(cursorX - brushSize / 2 - 1, cursorY - brushSize / 2 - 1, brushSize + 2, brushSize + 2, C_INK)
+        IF !view.PresentAt(2, 4) GOTO PaintError
+    ENDIF
+    IF Terminal.Gfx.Backend = GfxBackend.Sixel THEN
+        DrawHeader("Sixel")
+    ELSE
+        DrawHeader("JXL")
+    ENDIF
+    Terminal.EndUpdate()
+ENDPROC
+
+PROCEDURE HandleGraphicsKey()
+    key = Upper(inputEvent.Text)
+    dragging = FALSE
+    IF key = "Q" | inputEvent.Code = KEY_ESCAPE THEN
+        running = FALSE
+        RETURN
+    ENDIF
+    dirty = TRUE
+    IF key >= "1" & key <= "8" THEN
+        selected = Asc(key) - Asc("1")
+    ELSEIF (key = "C") THEN
+        screen.Clear(C_CANVAS)
+    ELSEIF (key = "+" | key = "=") THEN
+        ChangeBrush(1)
+    ELSEIF (key = "-") THEN
+        ChangeBrush(-1)
+    ELSEIF (pixelWidth > 0 & pixelHeight > 0) THEN
+        IF key = "UP" THEN
+            cursorY -= cellHeight
+        ELSEIF (key = "DOWN") THEN
+            cursorY += cellHeight
+        ELSEIF (key = "LEFT") THEN
+            cursorX -= cellWidth
+        ELSEIF (key = "RIGHT") THEN
+            cursorX += cellWidth
+        ELSEIF (key = " ") THEN
+            Dab(cursorX, cursorY, colors[selected])
+        ELSEIF (inputEvent.Code = KEY_DELETE | inputEvent.Code = KEY_BACKSPACE) THEN
+            Dab(cursorX, cursorY, C_CANVAS)
         ENDIF
     ENDIF
-    IF x >= 480 & x < 510 & y >= 25 & y < 53 THEN
-        ChangeBrush(-1)
-    ELSEIF (x >= 518 & x < 548 & y >= 25 & y < 53) THEN
-        ChangeBrush(1)
-    ELSEIF (x >= 556 & x < 624 & y >= 25 & y < 53) THEN
-        ClearCanvas()
+ENDPROC
+
+PROCEDURE HandleGraphicsMouse()
+    INTEGER textX = inputEvent.X
+    INTEGER textY = inputEvent.Y
+    IF inputEvent.Pixels THEN
+        textX = inputEvent.X / cellWidth
+        textY = inputEvent.Y / cellHeight
+        mx = inputEvent.X - cellWidth
+        my = inputEvent.Y - 3 * cellHeight
+    ELSE
+        mx = (inputEvent.X - 1) * cellWidth + cellWidth / 2
+        my = (inputEvent.Y - 3) * cellHeight + cellHeight / 2
+    ENDIF
+    IF inputEvent.Action = MouseAction.Release THEN
+        dragging = FALSE
+    ELSEIF (inputEvent.Action = MouseAction.Wheel) THEN
+        ChangeBrush(inputEvent.WheelY)
+    ELSEIF (inputEvent.Action = MouseAction.Press) THEN
+        dragging = FALSE
+        IF HandleToolbar(textX, textY) THEN
+            dirty = TRUE
+        ELSEIF (InsideCanvas(mx, my)) THEN
+            IF inputEvent.Button = MouseButton.Left | inputEvent.Button = MouseButton.Right THEN
+                dragging = TRUE
+                dragButton = inputEvent.Button
+                lastX = mx
+                lastY = my
+                cursorX = mx
+                cursorY = my
+                DrawStroke(mx, my, mx, my, StrokeColor())
+            ENDIF
+        ENDIF
+    ELSEIF (inputEvent.Action = MouseAction.Motion) THEN
+        IF dragging & InsideCanvas(mx, my) & (inputEvent.LeftDown | inputEvent.RightDown) THEN
+            DrawStroke(lastX, lastY, mx, my, StrokeColor())
+            lastX = mx
+            lastY = my
+            cursorX = mx
+            cursorY = my
+        ELSE
+            dragging = FALSE
+        ENDIF
     ENDIF
 ENDPROC
+
+FUNCTION InsideCanvas(INTEGER column, INTEGER row) BOOLEAN
+    RETURN column >= 0 & column < pixelWidth & row >= 0 & row < pixelHeight
+ENDFUNC
+
+FUNCTION StrokeColor() UNSIGNED
+    IF dragButton = MouseButton.Right RETURN C_CANVAS
+    RETURN colors[selected]
+ENDFUNC
 
 PROCEDURE ChangeBrush(INTEGER amount)
     brushSize += amount * 2
     IF brushSize < 1 brushSize = 1
     IF brushSize > 31 brushSize = 31
-    RenderToolbar()
+    dirty = TRUE
 ENDPROC
 
-PROCEDURE ClearCanvas()
-    screen.FillRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_CANVAS)
-    screen.DrawRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME)
-    screen.Present()
-ENDPROC
-
-PROCEDURE Dab(INTEGER x, INTEGER y, UNSIGNED color)
-    INTEGER half, drawLeft, drawTop
-    half = brushSize / 2
-    drawLeft = x - half
-    drawTop = y - half
-    IF drawLeft < CANVAS_X drawLeft = CANVAS_X
-    IF drawTop < CANVAS_Y drawTop = CANVAS_Y
-    screen.FillRect(drawLeft, drawTop, brushSize, brushSize, color)
+PROCEDURE Dab(INTEGER column, INTEGER row, UNSIGNED color)
+    INTEGER left = column - brushSize / 2
+    INTEGER top = row - brushSize / 2
+    INTEGER right = column + brushSize / 2 + 1
+    INTEGER bottom = row + brushSize / 2 + 1
+    IF left < 0 left = 0
+    IF top < 0 top = 0
+    IF right > pixelWidth right = pixelWidth
+    IF bottom > pixelHeight bottom = pixelHeight
+    screen.FillRect(left, top, right - left, bottom - top, color)
+    dirty = TRUE
 ENDPROC
 
 PROCEDURE DrawStroke(INTEGER x0, INTEGER y0, INTEGER x1, INTEGER y1, UNSIGNED color)
@@ -254,9 +278,167 @@ PROCEDURE DrawStroke(INTEGER x0, INTEGER y0, INTEGER x1, INTEGER y1, UNSIGNED co
     dirty = TRUE
 ENDPROC
 
-PROCEDURE PresentDirty()
-    ; Sixel terminals do not consistently preserve previous images under
-    ; transparent partial updates. The event batch still limits this to one
-    ; complete image per frame.
-    screen.Present()
+PROCEDURE RunAnsi()
+    input.MouseOn(MouseMode.Text, MouseTracking.Drag)
+    UpdateAnsiGeometry()
+    DrawAnsi()
+    WHILE running DO
+        inputEvent = input.Wait(-1)
+        IF inputEvent.Kind = EventKind.Resize THEN
+            UpdateAnsiGeometry()
+        ELSEIF (inputEvent.Kind = EventKind.Key) THEN
+            key = Upper(inputEvent.Text)
+            IF key = "Q" | inputEvent.Code = KEY_ESCAPE THEN
+                running = FALSE
+            ELSEIF (canvasColumns > 0 & canvasRows > 0) THEN
+                HandleAnsiKey()
+            ENDIF
+        ELSEIF (inputEvent.Kind = EventKind.Mouse) THEN
+            mx = inputEvent.X - 1
+            my = inputEvent.Y - 3
+            BOOLEAN toolbar = FALSE
+            IF inputEvent.Action = MouseAction.Press toolbar = HandleToolbar(inputEvent.X, inputEvent.Y)
+            IF !toolbar & mx >= 0 & mx < canvasColumns & my >= 0 & my < canvasRows THEN
+                IF inputEvent.Action = MouseAction.Press | inputEvent.Action = MouseAction.Motion THEN
+                    cursorX = mx
+                    cursorY = my
+                    IF inputEvent.LeftDown cells[mx, my] = selected + 1
+                    IF inputEvent.RightDown cells[mx, my] = 0
+                ENDIF
+            ENDIF
+        ENDIF
+        ClampCursor()
+        IF running DrawAnsi()
+    ENDWHILE
 ENDPROC
+
+PROCEDURE UpdateAnsiGeometry()
+    TERMINFO info = Terminal.Info
+    columns = info.Columns
+    rows = info.Rows
+    canvasColumns = columns - 2
+    canvasRows = rows - 5
+    IF canvasColumns > 128 canvasColumns = 128
+    IF canvasRows > 64 canvasRows = 64
+    IF canvasColumns < 0 canvasColumns = 0
+    IF canvasRows < 0 canvasRows = 0
+ENDPROC
+
+PROCEDURE ClampCursor()
+    IF cursorX >= canvasColumns cursorX = canvasColumns - 1
+    IF cursorY >= canvasRows cursorY = canvasRows - 1
+    IF cursorX < 0 cursorX = 0
+    IF cursorY < 0 cursorY = 0
+ENDPROC
+
+PROCEDURE HandleAnsiKey()
+    IF key = "UP" THEN
+        cursorY -= 1
+    ELSEIF (key = "DOWN") THEN
+        cursorY += 1
+    ELSEIF (key = "LEFT") THEN
+        cursorX -= 1
+    ELSEIF (key = "RIGHT") THEN
+        cursorX += 1
+    ELSEIF (key = " ") THEN
+        cells[cursorX, cursorY] = selected + 1
+    ELSEIF (inputEvent.Code = KEY_DELETE | inputEvent.Code = KEY_BACKSPACE) THEN
+        cells[cursorX, cursorY] = 0
+    ELSEIF (key >= "1" & key <= "8") THEN
+        selected = Asc(key) - Asc("1")
+    ELSEIF (key = "C") THEN
+        ClearAnsi()
+    ENDIF
+ENDPROC
+
+PROCEDURE ClearAnsi()
+    INTEGER row, column
+    FOR row = 0 TO 63
+        FOR column = 0 TO 127
+            cells[column, row] = 0
+        NEXT
+    NEXT
+ENDPROC
+
+PROCEDURE DrawAnsi()
+    INTEGER row, column, ink
+    Terminal.BeginUpdate()
+    COLOR 7
+    CLS
+    DrawHeader("ANSI")
+    FOR row = 0 TO canvasRows - 1
+        ANSIPOS 2, row + 4
+        FOR column = 0 TO canvasColumns - 1
+            ink = cells[column, row]
+            IF ink = 0 THEN
+                COLOR 112
+            ELSE
+                COLOR textColors[ink - 1] * 16 + 15
+            ENDIF
+            PRINT " "
+        NEXT
+    NEXT
+    COLOR 7
+    IF canvasColumns > 0 & canvasRows > 0 ANSIPOS cursorX + 2, cursorY + 4
+    Terminal.EndUpdate()
+ENDPROC
+
+PROCEDURE DrawHeader(STRING backend)
+    INTEGER colorIndex
+    COLOR 7
+    TextAt(1, 1, "Paint | " + backend + " " + STRING(columns) + "x" + STRING(rows))
+    FOR colorIndex = 0 TO 7
+        COLOR textColors[colorIndex] * 16 + 15
+        TextAt(2 + colorIndex * 2, 2, STRING(colorIndex + 1) + " ")
+    NEXT
+    COLOR 7
+    TextAt(20, 2, Label("Color ", "Farbe ") + STRING(selected + 1))
+    TextAt(2, 3, Label("Clear   Quit", "Loeschen   Ende"))
+    IF backend <> "ANSI" TextAt(30, 2, Label("Brush ", "Pinsel ") + STRING(brushSize) + "  - +")
+ENDPROC
+
+FUNCTION HandleToolbar(INTEGER column, INTEGER row) BOOLEAN
+    IF column < 0 | column >= columns - 1 | row < 0 | row >= rows RETURN FALSE
+    IF row = 1 & column >= 1 & column < 17 THEN
+        selected = (column - 1) / 2
+        RETURN TRUE
+    ENDIF
+    IF row = 1 & Terminal.Gfx.Backend <> GfxBackend.None THEN
+        INTEGER minusColumn = 31 + Label("Brush ", "Pinsel ").Len() + STRING(brushSize).Len()
+        IF column = minusColumn THEN
+            ChangeBrush(-1)
+            RETURN TRUE
+        ELSEIF (column = minusColumn + 2) THEN
+            ChangeBrush(1)
+            RETURN TRUE
+        ENDIF
+    ENDIF
+    IF row = 2 THEN
+        IF column >= 1 & column < 1 + Label("Clear", "Loeschen").Len() THEN
+            IF Terminal.Gfx.Backend = GfxBackend.None THEN
+                ClearAnsi()
+            ELSE
+                screen.Clear(C_CANVAS)
+            ENDIF
+            RETURN TRUE
+        ENDIF
+        INTEGER quitColumn = 4 + Label("Clear", "Loeschen").Len()
+        IF column >= quitColumn & column < quitColumn + Label("Quit", "Ende").Len() THEN
+            running = FALSE
+            RETURN TRUE
+        ENDIF
+    ENDIF
+    RETURN FALSE
+ENDFUNC
+
+PROCEDURE TextAt(INTEGER column, INTEGER row, STRING text)
+    INTEGER available = columns - column
+    IF column < 1 | row < 1 | row > rows | available < 1 RETURN
+    ANSIPOS column, row
+    PRINT LEFT(text, available)
+ENDPROC
+
+FUNCTION Label(STRING english, STRING german) STRING
+    IF Lower(language) = "de" RETURN german
+    RETURN english
+ENDFUNC

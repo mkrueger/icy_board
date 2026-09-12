@@ -1404,6 +1404,83 @@ im PPE. Header-/Body-Konsistenz und Benutzerberechtigungen sind nachgewiesen.
 
 ### E3 — Interaktive Terminalanwendung
 
+**Freigegeben und umgesetzt (2026-09-12): Paint als Abnahme-PPE.** Der Benutzer
+hat Maus-/Tastaturzeichnen, Resize, Grafik plus ANSI-Fallback, EN/DE und
+Ressourcen-Cleanup freigegeben. Audio und zusätzliche Speicherfunktionen bleiben
+ausgeklammert. Die Umsetzung erweitert `ppe/paint`, nicht die öffentliche API
+oder Runtime. Die folgende Client-Abnahme ist damit noch nicht abgeschlossen.
+
+Paint verwendet eine gemeinsame, begrenzte Text-Werkzeugleiste mit Farbfeldern,
+Löschen, Beenden und im Grafikmodus Pinselgröße. Das erste Aufrufargument `de`
+wählt Deutsch, sonst Englisch. Pfeile bewegen den Zeichenpunkt, Leertaste
+zeichnet, Delete/Backspace löscht dort, `1` bis `8` wählen Farben, `C` löscht
+das Bild und `Q`/Escape beendet. Grafik unterstützt zusätzlich `+`/`-`, Mausrad
+und freie Striche mit linker bzw. rechter Maustaste zum Zeichnen bzw. Radieren.
+Werkzeuge sind auch anklickbar. Pixelmaus wird angefragt; ohne Bestätigung
+werden Textmauskoordinaten verwendet, fehlende Mausfähigkeit verhindert die
+Tastaturbedienung nicht.
+
+Ohne Grafikfähigkeit startet eine benutzbare ANSI-Fläche mit acht DOS-Farben,
+nicht bloß eine Fehlermeldung. Das ist ein zellbasierter Fallback, kein
+verlustfreier Pixelrenderer. Der Backend-Modus wird beim Start gewählt; ein
+Wechsel zwischen ANSI und Grafik während der Bearbeitung ist nicht enthalten.
+Der Bildspeicher ist auf 128×64 ANSI-Zellen bzw. 1280×1024 RGBA-Pixel begrenzt.
+Die sichtbare Fläche folgt der logischen Terminalgröße und den gemeldeten
+Zellmaßen (bei fehlenden Zellmaßen 8×16); Resize schneidet die Ansicht zu,
+löscht aber das Bild nicht. Die Grafik-Ansichtsfläche wird über ein geteiltes
+Surface-Handle freigegeben und neu angelegt. Der Pinselcursor liegt nur auf
+dieser Ansicht, nicht im Bild. Grafik verarbeitet höchstens 64 Ereignisse je
+Ausgabebündel. JXL bleibt über die bestehende Auto-Auswahl erreichbar, wurde
+in dieser Paint-Abnahme aber nicht geprüft.
+
+**Automatisierter Nachweis:** Sieben Paint-Tests bestehen in getrennten EN-/DE-
+Prozessen mit `CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine --lib paint_
+--quiet`. Vier neue Tests ergänzen zwei vorhandene Pixelmaus-/Bündelungsfälle.
+Hinzu kommt ein Grafik-Unit-Test für außerhalb liegende Paint-Cursorrechtecke.
+Die interaktiven Tests kompilieren und serialisieren das tatsächliche PPE,
+laden es über `run_ppe` von einer temporären Datei und bedienen eine echte
+Telnet-Verbindung. Sie prüfen gerenderte ANSI-Farbzellen und aus der Ausgabe
+dekodierte Sixel-Pixel, nicht nur PPE-Variablen:
+
+- EN/DE, Zeichnen/Radieren, Pfeiltasten, Farbwahl, Werkzeugklicks und Pinselgröße;
+  Sixel jeweils mit bestätigter Pixelmaus und mit Textmaus-Fallback.
+- 80×25 → 132×43 → sehr kleine Geometrien bis 1×1 → 80×25, Erhalt des Bilds,
+  korrekte Sixel-Positionierung und Wiederanlage der Ansichtsressourcen.
+- Normales Ende, injiziertes `STOP`, echter Seek-VM-Fehler und Disconnect in
+  ANSI/Sixel. Grafik, Maus-/Tastaturmodi, Updates und Margins sind danach frei;
+  bei weiterbestehender Verbindung liest ein nachfolgendes PPE klassische
+  Eingabe. Ein nicht von Paint benötigter Aufruftoken bleibt bis zum Ende im
+  PPE erhalten; der äußere Datei-Start bereinigt seine Parameter wie bisher.
+- Die beiden bestehenden Tests bestätigen weiterhin Pixelmaus-Probing und
+  genau zwei Grafikframes für den gebündelten Mausablauf.
+
+`target/debug/pplc ppe/paint/ppl.toml --mono` baut das Paket ohne Warnungen.
+Die feste Toolbar-Bitmap wird nicht mehr benötigt oder mitkopiert; ihre
+Quelldatei bleibt erhalten. Zwei aus Testausgabe gespeicherte Sixel-Bilder
+wurden zusätzlich visuell geprüft. Das ist keine Prüfung echter Clientfonts,
+der vollständigen Hostoberfläche oder realer Remote-Clients.
+
+**Korrektur nach lokaler Probe (2026-09-12):** Der gemeldete Panic in
+`clipped_rect` wurde mit einem Cursorrahmen am unteren rechten Rand einer
+624×320-Fläche reproduziert. `then_some` wertete die unsigned-Subtraktionen
+auch für vollständig außerhalb liegende Rechteckkanten aus; die verzögerte
+Auswertung mit `then` verhindert den Überlauf. Der Unit-Test deckt außerdem
+vollständig außerhalb liegende Füllungen, Rahmen und Bildausschnitte ab.
+Das tatsächliche Paint-PPE prüft nun alle vier Ecken bei 80×25 und 132×43,
+jeweils EN/DE mit Pixel- und Textmaus sowie Pfeiltasten, anhand dekodierter
+Sixel-Pixel einschließlich abgeschnittener Cursorrahmen. Alle sechs
+Grafik-Unit-Tests und die sieben Tests der Paint-Gruppe in separaten EN-/DE-
+Prozessen bestehen; `icboard` wurde neu gebaut. Der Benutzer bestätigte
+anschließend die Wiederholungsprobe als funktionierend. Clientversion und
+Geometrie wurden dabei nicht separat protokolliert.
+
+**Noch offen:** Manuelle Clientversionen/-geometrien für SyncTERM, icy_term und
+ein einfaches ANSI-Terminal; JXL-Paint, abweichende Fonts/Zellmaße und
+Pixelgrößenänderungen ohne logisches Resize sind nicht nachgewiesen. Der
+umfassende Engine-Library-Lauf wurde in diesem Schritt nicht wiederholt;
+die drei zuvor dokumentierten Fehler wurden nicht bearbeitet. Die erfolgreiche
+lokale Wiederholungsprobe ersetzt keine vollständige E3-Client-Matrix.
+
 - Maus und Tastatur in einer Eventschleife.
 - Resize-fähiges Layout und synchronisierte Ausgabe.
 - Mindestens ein Grafikpfad sowie nutzbarer Fallback ohne diese Fähigkeit.

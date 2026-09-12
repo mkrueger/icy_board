@@ -308,7 +308,7 @@ fn clipped_rect(x: i32, y: i32, width: i32, height: i32, target_width: usize, ta
     let top = y.max(0) as usize;
     let right = x.saturating_add(width).clamp(0, target_width as i32) as usize;
     let bottom = y.saturating_add(height).clamp(0, target_height as i32) as usize;
-    (left < right && top < bottom).then_some((left, top, right - left, bottom - top))
+    (left < right && top < bottom).then(|| (left, top, right - left, bottom - top))
 }
 
 fn blend_pixel(destination: &mut [u8], source: &[u8]) {
@@ -330,6 +330,35 @@ fn blend_pixel(destination: &mut [u8], source: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clipped_rect_handles_offscreen_paint_cursor_edges() {
+        let mut surface = GfxSurface::new(624, 320).unwrap();
+        surface.clear(0xFFFF_FFFF);
+        surface.rect(619, 315, 9, 9, 0x0102_03FF);
+        assert_eq!(surface.get_pixel(619, 315), 0x0102_03FF);
+        assert_eq!(surface.get_pixel(623, 315), 0x0102_03FF);
+        assert_eq!(surface.get_pixel(619, 319), 0x0102_03FF);
+        assert_eq!(surface.get_pixel(623, 319), 0xFFFF_FFFF);
+
+        for (left, top, width, height) in [
+            (625, 0, 9, 9),
+            (0, 321, 9, 9),
+            (-10, 0, 9, 9),
+            (0, -10, 9, 9),
+            (i32::MAX, i32::MAX, i32::MAX, i32::MAX),
+            (i32::MIN, i32::MIN, i32::MAX, i32::MAX),
+            (0, 0, 0, 9),
+            (0, 0, 9, -1),
+        ] {
+            let before = surface.pixels.clone();
+            surface.fill_rect(left, top, width, height, 0xFF00_00FF);
+            surface.rect(left, top, width, height, 0xFF00_00FF);
+            assert_eq!(surface.pixels, before, "{left},{top}/{width}x{height}");
+            assert!(surface.region(left, top, width, height).is_none());
+            assert!(surface.region_from_origin(left, top, width, height).is_none());
+        }
+    }
 
     #[test]
     fn surfaces_can_be_composed_offscreen() {

@@ -67,6 +67,7 @@ mod static_members;
 mod string_capacity;
 mod string_members;
 mod terminal_control;
+mod paint;
 mod terminal_gfx;
 mod terminal_info;
 mod terminal_output;

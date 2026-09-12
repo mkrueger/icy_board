@@ -896,6 +896,21 @@ DrawScreen()
 Terminal.EndUpdate()
 ```
 
+The bundled [Paint PPE](../ppe/paint/src/paint.pps) exercises these APIs as an
+interactive application. Build it with `pplc ppe/paint/ppl.toml --mono` and pass
+`de` or `en` as its first argument. Arrow keys move the drawing point, Space
+draws, Delete/Backspace erases, `1` through `8` select colors, `C` clears, and
+`Q`/Escape exits. Graphics also supports freehand mouse strokes, right-button
+erasing, and brush sizing with the wheel or `+`/`-`. Toolbar actions are clickable.
+
+Paint automatically falls back to an eight-color ANSI cell canvas when graphics
+is unavailable. It retains a bounded image while resizing the visible area:
+128 by 64 ANSI cells or 1280 by 1024 RGBA pixels. ANSI is not pixel-equivalent
+to graphics, and the backend is selected only at startup. No saving or audio is
+included. Automated tests cover ANSI and Sixel output, both mouse coordinate
+modes, English/German, resizing and cleanup; actual terminal-client acceptance
+and the automatically selected JXL path remain unverified for this PPE.
+
 The root groups the session by responsibility:
 
 | Member | Purpose |
