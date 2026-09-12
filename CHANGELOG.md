@@ -8,7 +8,60 @@ releases.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-12
+
+Third public beta. This release expands the BBS administration, upload and FTN
+workflows and introduces the current PPL 4.00 language, APIs and PPE container.
+It is not a stable release; see [known limitations](docs/known_limitations.md).
+
+### Compatibility
+
+- Recompile older beta PPEs for the current runtime 4.00, including ASCII-only
+  programs. The new sectioned container replaces the old beta encoding, and
+  earlier experimental APIs and array calling conventions are not preserved.
+  Review source changes using the [language guide](docs/new_ppl.md) and
+  [PPE format specification](docs/ppe_format.md).
+- Classic PCBoard targets remain separate. Selecting language 400 is an
+  upgrade, not a promise of unchanged source semantics; use the original
+  language/runtime versions for compatibility-sensitive programs.
+- Review upload-processing configuration before upgrading: advertisement file
+  and description catalogs are separate, and ZIP comments use an explicit mode
+  instead of the removed comment-rule catalog.
+- Validation for this release ran on Linux. Windows/macOS execution, the full
+  terminal-client matrix and some external DOS/editor workflows remain
+  unverified. These are beta limitations, not successful test results.
+
 ### Added
+
+- PPL 4.00 uses a versioned, sectioned PPE container with strict UTF-8 constants,
+  record and enum metadata, host imports bound by qualified name and signature,
+  optional Zstd compression and optional debug symbol names. Loader budgets
+  validate decoded content; the initial whole-file read is not memory-bounded
+  by those checks. Only install trusted PPEs.
+- PPL records support dynamic array and host-object fields, with copy-on-write
+  value semantics for nested data and shared identity for embedded resources.
+  `&&` and `||` provide short-circuit evaluation through compilation,
+  serialization, execution and decompilation.
+- File-browser APIs: bounded indexed `Directory.Find`, read-only `FILEPAGE` and
+  `FILEENTRY` snapshots, and `Directory.Flag` for exact area-scoped marking.
+  The example browser separates marking from the normal BBS download command.
+- Message composition through the session's post, reply and edit workflows,
+  including external-editor integration and the standalone `ledit` PPE editor.
+  The message-reader example uses public BBS APIs instead of parsing JAM files.
+- Logical terminal resize events and an adaptive Paint PPE with ANSI/Sixel
+  output, terminal-input handoff and cleanup. The JXL Paint path and a complete
+  versioned client matrix remain unverified.
+- Cooperative, process-local sharing for PPE file channels, including a
+  documented lock-file workflow for read/modify/write operations. It does not
+  provide cross-process locking or power-loss durability.
+- Scheduled maintenance and online events with weekday/window rules,
+  start-anchored intervals, durable execution history and manual runs.
+  Maintenance drains managed writers before restart; online events must not
+  modify live board files. See the [event guide](docs/events.md).
+- Generated English BBS command help with 68 substantive topics, source
+  export/override support and guarded offline installation. Language suffixes
+  support sysop-supplied translations, not a bundled German translation.
+  See the [command help guide](docs/gettingstarted.md#command-help).
 
 - Optional, default-off email temporary-password recovery for normal BBS login.
   After three failed passwords, callers can request mail to their saved address;
@@ -133,116 +186,6 @@ releases.
   itself with over `EMSI_DAT`, which is the only place it kept one.
   `PCBOARD.DAT` has no such field, so the location used to come out empty and
   a binkp session announced nothing.
-
-### Changed
-
-- Uniform hotkey bars in ICBSetup, ICBSM, ICBText, the call-wait monitors and
-  shared dialogs. The existing hint bars now come from one structured catalog
-  with Unicode key symbols, centered placement on the frame and theme colours
-  instead of per-tool hint strings; runtime keys are unchanged.
-  See the [developer guide](docs/hotkey_bars.md).
-
-- The call-wait subscreens share one frame: yellow double borders, a centered
-  bracketed title, the board's date format on the left and the clock on the
-  right. The main call-wait screen keeps its own white frame and plain title.
-
-### Fixed
-
-- W/LANG profile saves no longer finalize accounting. Logoff waits for enclosing
-  command/door usage and successful final account persistence before summaries;
-  settlement or final-save errors suppress them. Credit display retains up to
-  six decimals with trailing zeros trimmed; money uses fixed dollar formatting
-  with two decimals. Account saves and audit writes are not an atomic ledger.
-
-- PPL compiler and language server now share source-level semantic analysis
-  before executable lowering and constant folding. Invalid expressions and
-  calls in dead branches are still diagnosed at their original source spans.
-  Lowering consumes checked annotations rather than rerunning source semantics;
-  generated HIR is validated before executable serialization. See the
-  [compiler architecture](docs/ppl_compiler_architecture.md).
-
-- `ppld` preserves expression grouping (including raw output), fractional
-  arithmetic and function-call side effects. FOR reconstruction validates the
-  counter, step direction and increment target; nested loops retain cross-loop
-  jumps instead of capturing them as an inner BREAK/CONTINUE. Symbolic flag
-  output retains unknown mask bits. Source mode `--output` writes only source
-  to stdout, with its banner and diagnostics on stderr. Regression coverage
-  compares serialized PPE execution before/after decompilation under an
-  instruction budget, including historical fixtures.
-
-- Module-level variable initializers now require constant expressions, including
-  recursively constant array and record literals. Calls and mutable reads are
-  rejected by the compiler and language server before optimization, for explicit
-  and implicit library modules. Routine-local initialization remains unrestricted.
-
-- PPL 4.00 array parameters preserve rank, contents and bounds through direct,
-  recursive and callback calls. Value parameters are independent copies;
-  `VAR` array parameters copy their final value and bounds back to the caller.
-  Recompile unreleased 4.00 PPEs using array parameters: variable-header flag
-  `0x04` now distinguishes whole-array formals from classic element-zero
-  parameters, independently of static `0x01` and dynamic-storage `0x02`.
-  Unmarked legacy formals keep their rank/bounds and element-zero save/restore
-  and copyback behavior, including persistent tails and runtime-400 targets;
-  there is no compatibility shim for ambiguous older beta PPEs.
-
-- `DECLARE` matching follows the source language. Below 400, implementation
-  parameter types, `VAR` modes, dimensions and function result types take
-  precedence; parameter counts must still match. A declared procedure may be
-  implemented with `FUNCTION`, retaining the implementation's `VAR` modes but
-  emitting a procedure without a result slot; the reverse is rejected.
-  Multidimensional implementation formals fail at the dimension comma even
-  when unused, while multidimensional declarations remain accepted. Compiler
-  and LSP call checks collect normalized implementation signatures package-wide.
-  Language 400 strictly checks kind, count, types, `VAR`, ranks, bounds, dynamic
-  markers and function return type/rank, recursively through callbacks; names
-  are irrelevant. See the [DECLARE audit](compat/DECLARE_AUDIT.md) for the 23
-  authored PPLC 3.40 compiler probes and the separate source-derived runtime
-  evidence, rather than a claim of universal or byte-identical compatibility.
-
-- Record array fields accept square-bracket assignments and compound updates,
-  including nested paths, without weakening read-only property checks.
-- Runtime 4.00 `SORT` handles empty arrays without panicking and produces
-  exactly one index per input element rather than appending a spurious zero.
-
-- PPL 4.00 dynamic arrays now have per-call local storage and fresh function
-  results, including recursion. Whole-array assignments copy all elements and
-  adopt bounds; brace initializers preserve explicit dynamic declarations.
-- Array-returning functions no longer require explicit `DECLARE`. Callback
-  signatures check and display the complete return type, including array rank.
-  Array results are rejected consistently in scalar expressions, and 4.00
-  `REDIM` preserves the declared rank in both statement and member notation.
-- Compound assignments evaluate target indices and object receivers once,
-  including nested record fields, recursive calls and module-qualified code.
-  Recompile beta 4.00 PPEs using dynamic arrays: their storage flag is now
-  distinct from the classic static-variable flag. Pre-4.00 PPE behavior is
-  unchanged.
-
-- PPL 4.00 case-insensitive string comparisons report oversized search literals
-  through `Error.Last()` instead of panicking. `FindLast` and `EndsWith` handle
-  overlapping matches correctly, and `Regex.FindAll` starts at the requested
-  character position while preserving anchor, word-boundary and empty-match
-  semantics.
-- PPL 4.00 user mutations roll back the caller and in-memory user record when
-  saving fails, return failure and publish `ErrKind.User` / `ErrCode.Io`.
-  Invalid user and text-margin mutations now publish errors consistently;
-  successful mutations clear errors left by earlier statements.
-
-- Echomail for a point is no longer discarded as already travelled merely
-  because its two-dimensional `PATH` names the point's boss. This could make a
-  rescan report every message as a duplicate, remove the inbound bundle and
-  leave automatically added areas without message bases.
-
-- Mail that is handed on to a downlink or routed to the next hop is written to
-  the outbound before what it arrived in is removed. A bundle that could not be
-  written left the tosser having already thrown the only copy away.
-
-- A file arriving over binkp is written under a working name and only takes the
-  name it was offered as once it is complete. A session that broke off used to
-  leave a partial bundle that the next toss read as a whole one, and a file
-  named like one still waiting in the inbound overwrote it. Working files a
-  killed session left behind are cleared away by the next one.
-
-### Added
 
 - Files that arrive with a `.TIC` are tossed into the file directory carrying
   their area. They used to be announced as being tossed and then left in the
@@ -399,16 +342,10 @@ releases.
   Writes to page length and security-level fields reject out-of-range values
   with `ErrKind.User` instead of silently wrapping them.
 
-- PPL ``TYPE`` fields may be one-, two- or three-dimensional arrays, including
-  arrays of an earlier record type. Runtime 400's versioned type table stores a
-  fixed field descriptor with the type, rank and three `u16` upper bounds, so
-  field arrays survive PPE serialization and decompilation. Assignment copies
-  their contents and record equality compares them. Fixed fields answer `Len`,
-  work with `FOREACH`, and may be copied from another field with the same element
-  type, rank and bounds. `REDIM`, scalar use and shape-mismatched assignment are
-  rejected with specific diagnostics; malformed record literals, member
-  references, member calls and indexed-member bytecode are rejected instead of
-  reaching unchecked VM indexing.
+- PPL record fields support rank-1/2/3 arrays. Fixed fields retain their
+  declared bounds; dynamic fields may adopt new bounds. Both survive PPE
+  serialization and decompilation. Fixed-field shape mismatches and malformed
+  record/member bytecode are rejected before changing the destination.
 
 - `MSG`, the message type. `AREA.Read(number)` answers with one, and it reports
   `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`, `Status`, `Size`,
@@ -429,10 +366,30 @@ releases.
   `MESSAGE` would have turned `MESSAGE conf, to, ...` into a declaration at
   language 400 and quietly broken the statement.
 
-  Reading is all it does. `GETMSGHDR`, `SETMSGHDR`, `SCANMSGHDR` and the
-  `MESSAGE` statement are unchanged, and writing a message is still theirs.
+  Legacy `GETMSGHDR`, `SETMSGHDR`, `SCANMSGHDR` and `MESSAGE` remain available.
+  Use the session APIs for interactive post, reply and edit workflows.
+
+- Added runtime 4.00 `Board` snapshots and a live `Session` view, including the
+  current conference, message area, file directory and caller. The session's
+  own properties are read-only; documented `Session.User` fields are writable.
+- `icbfile scan` now identifies archives that have no usable description and
+  distinguishes files that are missing from disk.
+- `icbfile scan --all` scans every area in a `file_areas.toml`; it can be
+  combined with `--force` to re-extract descriptions in every area.
+- Added end-to-end coverage for multiline `FILE_ID.DIZ` extraction and
+  all-area scanning.
 
 ### Changed
+
+- Uniform hotkey bars in ICBSetup, ICBSM, ICBText, the call-wait monitors and
+  shared dialogs. The existing hint bars now come from one structured catalog
+  with Unicode key symbols, centered placement on the frame and theme colours
+  instead of per-tool hint strings; runtime keys are unchanged.
+  See the [developer guide](docs/hotkey_bars.md).
+
+- The call-wait subscreens share one frame: yellow double borders, a centered
+  bracketed title, the board's date format on the left and the clock on the
+  right. The main call-wait screen keeps its own white frame and plain title.
 
 - Call-wait now offers User / Sysop / Exit, then Log Viewer / System Status /
   Event Monitor. Local logins keep network services running; Exit stops the
@@ -456,22 +413,13 @@ releases.
   and signature help retain array ranks, distinguish scalar/array members and
   offer typed StringComparison/Checksum arguments.
 
-- Enums are closed nominal types consistently from language 3.50 onward.
-  Uninitialized values, array elements, record fields and fresh routine locals
-  and results use the first declared member. `EnumName(integer)` checks domain
-  membership; `TOINTEGER(value)` converts back explicitly. Numeric enum `FOR`
-  counters, arithmetic and untyped output writes are rejected. Enum storage
-  and checked conversion now require runtime 4.00, which retains numeric domains
-  for validation and decompiler roundtrips. Recompile older beta PPEs for these
-  guarantees. Same-type enum `|` and `&` operations (including `|=` and `&=`)
-  preserve the enum type and check each result against its domain. Regex options
-  expose only `None` and six individual options, combinable with `|` and testable
-  with `&` and `==`; their domain is 0–63. Artificial combination names are removed.
-  Every enum also provides `value.Has(mask) -> BOOLEAN` to test all mask bits
-  without constructing an intermediate enum value. It requires the same enum
-  type on both sides, evaluates each operand once and returns true for a zero
-  mask. Available from language 3.50 with runtime 4.00; completion, hover,
-  signature help and decompiler roundtrips support the method.
+- Enums are open nominal signed-32-bit types from language 3.50 onward.
+  Unnamed values and bit combinations are legal; different enum types do not
+  mix implicitly. The first declared member is the default. `EnumName(integer)`
+  and `TOINTEGER(value)` convert explicitly, while same-type `|`, `&`, `|=`,
+  `&=` and `Has(mask)` retain nominal typing. Storage and explicit conversions
+  require runtime 4.00. Individual host APIs still reject unsupported values
+  or option bits; accepting an enum value does not imply operational support.
 
 - PPL 4.00 arrays use square-bracket declarations and indexing. Empty brackets
   declare dynamic vectors, matrices or cubes, functions can return dynamic
@@ -580,126 +528,151 @@ releases.
   setter to call - so this is a guard for the day one of those objects gains a
   writable member, not a hole that was open.
 
-- The editor grammars are now checked against the type registry, not only against
-  the statements, constants and keywords. That found eight object types the
-  grammars never learned - `AREAS`, `AUDIO`, `CONFERENCES`, `CONTACTS`,
-  `DIRECTORIES`, `DOORS`, `NOTES`, `SURFACE` - and the `GFXBACKEND` enum.
-
-- Followed up the 4.00 API review: `Session.ConferenceNumber`, `AreaNumber` and
-  `DirectoryNumber` are gone, because the object beside them already reports the
-  same `Number`. `Macros.StartRecord`/`StopRecord` became `BeginRecord`/
-  `EndRecord`, so `Begin`/`End` is the one pairing the API uses.
-  `Contacts.Set()` became `Contacts.Put()`, since it is keyed by service rather
-  than by position, and a note is now written through its index:
-  `Session.User.Notes[0] = "..."`, including `+=` and the rest.
-- Retired the `FONT` type. A terminal never reports which font a class is using,
-  so the object had no state to read and was three write-only calls in a coat:
-  `Terminal.SetFont(font [, slot])` and `Terminal.LoadFont(font, file)` say the
-  same thing without it.
-
-- `User.NoteCount`/`GetNote(i)`/`SetNote(i, t)` and `User.ContactCount`/
-  `GetContact(i)`/`SetContact(s, a)`/`DeleteContact(s)` became the collections
-  `User.Notes` and `User.Contacts`, which answer `Count`, are read with an index
-  and are walked with `FOREACH`. Writing goes through `Notes.Set(i, t)`,
-  `Contacts.Set(s, a)` and `Contacts.Delete(s)`. With that, every count-and-
-  accessor pair in the object model is gone.
-
-- `FOREACH` settles how many elements there are when the loop starts, so it reads
-  its source once per step instead of twice. Walking a conference's areas through
-  `Board.Conferences[0].Areas` went from 5.9 ms to 3.8 ms over 2000 areas, which
-  makes the walk faster than the indexed loop it replaces. Resizing an array
-  inside its own walk no longer changes how far the walk goes.
-
-- `Board.ConferenceCount`/`GetConference(i)` became `Board.Conferences`, the last
-  of the board's count-and-accessor pairs. The conferences are built once with the
-  board snapshot, so reading one shares it rather than copying the whole record,
-  and what a conference has configured no longer decides what reading it costs.
-- The language server no longer offers a collection's internal getter as a name,
-  and completion now steps through an index, so `Board.Conferences[0].` offers
-  what a conference has.
-
-- `Board` is taken once per run rather than rebuilt on every access. Reading it
-  copies every conference, so a PPE that touched `Board` inside a loop paid for
-  the whole board on each step: walking 2000 areas through `Board` on a board
-  with 201 conferences went from 146 ms to 7 ms, and no longer grows with the
-  number of conferences.
-
-- Turned the conference's `AreaCount`/`GetArea(i)` pairs into collections:
-  `Areas`, `Directories` and `Doors` answer `Count`, are read with an index, and
-  are walked with `FOREACH`. A collection shares the list it stands for, so a
-  conference no longer carries a copy of every area and directory with it —
-  reaching an area through `Board.GetConference(0)` on each step of a loop went
-  from 802 ms to 7 ms over 2000 areas.
-
-- Added `FOREACH ... ENDFOREACH`, which walks every element of an array whatever
-  its rank. A matrix or a cube walks the same way a vector does, row-major, so a
-  PPE no longer needs one nested `FOR` per dimension nor needs to know how many
-  there are. The loop variable is a copy, `BREAK` and `CONTINUE` work as usual,
-  and `IN` stays available as a variable name the way `TO` and `STEP` do.
-  Indexing stays bound to the rank, so `a[i]` into a matrix is still the compile
-  error it should be, and the flat step `FOREACH` walks with is the compiler's
-  own rather than a function a PPE can call.
-- Gave arrays members: `a.Len()`, `a.Len(dim)` and `a.Redim(...)` are the same
-  calls as `Len(a, dim)` and `REDIM a, ...`, written the other way round. Only a
-  declared array has them.
-
-- Added `Session.User`, the caller's own record: identity, address, preferences,
-  security, statistics and contacts in one object. It gathers what the `U_*`
-  variables report, which stay unchanged for PCBoard compatibility.
-- Made `Session.User` writable wherever `PUTUSER` used to write, so the object
-  replaces the `GETUSER`/`PUTUSER` round trip instead of sitting beside it. A
-  write lands at once. The caller's `Name` and the board's own accounting stay
-  read-only, and writing one now names the member in the error. `SetNote()` and
-  `SetPassword()` join the object, the latter hashing the way the board is
-  configured to. The overlapping `FullScreenEditor`/`AskForEditor` flags became
-  one `EditorMode` value of `Yes`, `No` or `Ask`, and `PasswordExpires` is
-  reachable for the first time.
-- Retired `U_CONTACT`. Contacts are reached through `Session.User` with
-  `ContactCount`, `GetContact()`, `SetContact()` and `DeleteContact()`, and no
-  longer need a `GETUSER`/`PUTUSER` round trip. Runtime 4.00 therefore adds no
-  predefined user variable of its own.
-- Replaced the `ERR()` function and the `ERRCLR` statement with static members
-  on the `ERROR` type: `Error.Last()` and `Error.Clear()`. Every 4.00 concept is
-  now reached through an object; `ON ERROR` stays a statement because it is
-  control flow, and `FERR`/`DERR` are unchanged.
-- Finished the PPL 4.00 API review: board objects expose `Valid`, `Board` keeps
-  its conference snapshot, `Nodes` is `NodeCount`, multimedia capabilities and
-  event/error kinds consistently say `Audio`, and terminal macro capability is
-  exposed only by `Terminal.Info.TerminalMacros`.
-- Reworked the runtime 4.00 object API after review. Board objects report the
-  `Number` they were fetched under, counts are spelled `DoorCount`, `AreaCount`,
-  `DirectoryCount` and `ConferenceCount`, `GetDir` is `GetDirectory`, and
-  `Session` hands out the current `Area` and `Directory` as objects.
-- Tightened the terminal facade: `Audio.Volume` is writable and replaces
-  `SetVolume`, `Palette.SetRgb` is gone in favour of `Set(n, Rgb(...))`,
-  `Margins.ResetAll()` and `Macros.DeleteAll()` say that they mean all,
-  `Macros.StartRecord`/`StopRecord` replace `Record`/`End`, `Surface.DrawRect`
-  replaces `Rect`, and `Event.ScanCode` splits the physical key out of `Code`.
-- Removed the `Terminal.Sound` slot. `Audio.StopAll()` stops every channel and
-  `Terminal.Info.Audio` reports whether the terminal can play at all.
-- Collapsed the beta PPE runtimes 4.00, 4.01 and 4.02 into a single runtime
-  4.00, which now carries the type table, the routine-reference marker and
-  `U_CONTACT`. PPEs compiled by an earlier beta must be rebuilt from source;
-  the PCBoard runtimes 1.00 through 3.40 are unchanged.
-- Retired the object form of `ConfInfo(conf)`. `Board.GetConference(index)` and
-  `Session.Conference` answer with the same `CONFERENCE` snapshot. The PCBoard
-  `ConfInfo(conf, field)` function and statement are untouched. Its opcode slot
-  was reclaimed rather than reserved, so every function opcode below it moved up
-  by one and beta PPEs must be rebuilt from source.
-- Replaced the experimental runtime 4.02 terminal globals with the `Terminal`
-  facade: `Info`, `Gfx`, `Input`, `Margins`, `Palette`, `Font`, `Macros` and
-  `Sound`, plus synchronized `BeginUpdate()`/`EndUpdate()` calls.
-- Moved resource construction to static type members (`Surface.New`,
-  `Surface.Load`, `Audio.Load`) and made graphics pacing a writable Boolean
-  property.
-- Replaced flat graphics, mouse, event and error constants with typed enums;
-  split overloaded event data into `Action`, `Channel` and `Dropped`, and
-  replaced raw button/modifier masks with Boolean properties.
-- Retired `TERMSTATE` and the draft flat runtime 4.02 statements/functions.
-  Their opcode slots were reclaimed rather than reserved, so the numbering has
-  no beta holes left and PPEs built by an earlier beta must be rebuilt.
+- The PPL object API now uses typed array snapshots for `Board.Conferences`,
+  `Board.Users`, conference areas/directories/doors and user notes/contacts.
+  Arrays support indexing, `Len()` and `FOREACH`, not the interim collection
+  wrappers or `Count`/getter pairs. Board state is captured once per PPE;
+  user/conference arrays are materialized only when first requested, so reading
+  metadata does not build the complete user array.
+- `FOREACH` evaluates its source once and walks a value snapshot in row-major
+  order at any rank. Changing or resizing the original does not alter the walk.
+  Array members expose `Len()` and `Redim(...)`; computed and read-only arrays
+  cannot be redimensioned, while dynamic record array fields can.
+- `Session.User` exposes the live caller with immediate, checked persistence
+  for writable fields. Notes and contacts are read-only array snapshots;
+  mutations use `SetNote`, `AddContact` and `RemoveContact`. `SetPassword`
+  follows the board's hashing configuration. Caller names, statistics and
+  `Board.Users` entries remain read-only. Classic `U_*` variables remain
+  available; the experimental `U_CONTACT` is removed.
+- The current runtime 4.00 replaces the interim 4.01/4.02 APIs. Terminal access
+  uses `Terminal.Info`, `Gfx`, `Input`, `Margins`, `Palette` and `Macros`, with
+  font operations directly on `Terminal`. Resources use `Surface.New/Load` and
+  `Audio.Load`; audio mutations use methods such as `SetVolume` and
+  `Fade(targetVolume, durationMs)`. Error state uses `Error.Last/Clear`, while
+  `ON ERROR`, `FERR` and `DERR` retain their separate roles. See the
+  [API reference](docs/new_ppl.md) for complete signatures and migration rules.
+- Editor grammars, completion and signatures track the current type catalog,
+  including `FILEENTRY`/`FILEPAGE`, array ranks and members after indexing.
+  Compiler checks, formatting and decompilation use the versioned language
+  rules; `pplc --check` reports formatting differences as well as source errors.
+- Command-line tools include the build's short Git commit hash in `--version`.
+- Runtime persistence is serialized without holding the global board lock.
+  Shutdown drains managed writes, and user updates preserve session accounting.
 
 ### Fixed
+
+- UTF-8 terminal output uses grapheme-aware display cells across the screen
+  model, local console and TUI, including combining characters and wide text.
+  PPL string lengths remain Unicode-scalar counts; CP437 substitution is
+  unchanged. Graphics clipping also handles off-screen coordinates safely.
+- `ON ERROR` dispatches after the invoking VM instruction completes and keeps
+  the first error within that instruction. PPE cleanup preserves the primary
+  error; terminal reset after disconnect remains best-effort.
+- Freed audio/surface handles stay invalid after resource-slot reuse or a
+  graphics restart. Resource equality compares allocation identity, not reused
+  channel numbers.
+- `VAR` targets and indices are bound once in argument order. Copy-out retains
+  the documented reverse order, while the language server warns about provably
+  overlapping arguments without treating them as reference aliases.
+- Classic `STRIPATX` follows PCBoard behavior; the modern member remains a
+  separate API, and neither should be used as a general output sanitizer.
+- File-search defaults, OSC 8 link colors and editor grammar coverage are
+  corrected. `NEXT` no longer consumes the following assignment's name.
+- Builds without default features skip the BBS-only stored-PPE fixture target.
+
+- W/LANG profile saves no longer finalize accounting. Logoff waits for enclosing
+  command/door usage and successful final account persistence before summaries;
+  settlement or final-save errors suppress them. Credit display retains up to
+  six decimals with trailing zeros trimmed; money uses fixed dollar formatting
+  with two decimals. Account saves and audit writes are not an atomic ledger.
+
+- PPL compiler and language server now share source-level semantic analysis
+  before executable lowering and constant folding. Invalid expressions and
+  calls in dead branches are still diagnosed at their original source spans.
+  Lowering consumes checked annotations rather than rerunning source semantics;
+  generated HIR is validated before executable serialization. See the
+  [compiler architecture](docs/ppl_compiler_architecture.md).
+
+- `ppld` preserves expression grouping (including raw output), fractional
+  arithmetic and function-call side effects. FOR reconstruction validates the
+  counter, step direction and increment target; nested loops retain cross-loop
+  jumps instead of capturing them as an inner BREAK/CONTINUE. Symbolic flag
+  output retains unknown mask bits. Source mode `--output` writes only source
+  to stdout, with its banner and diagnostics on stderr. Regression coverage
+  compares serialized PPE execution before/after decompilation under an
+  instruction budget, including historical fixtures.
+
+- Module-level variable initializers now require constant expressions, including
+  recursively constant array and record literals. Calls and mutable reads are
+  rejected by the compiler and language server before optimization, for explicit
+  and implicit library modules. Routine-local initialization remains unrestricted.
+
+- PPL 4.00 array parameters preserve rank, contents and bounds through direct,
+  recursive and callback calls. Value parameters are independent copies;
+  `VAR` array parameters copy their final value and bounds back to the caller.
+  Recompile unreleased 4.00 PPEs using array parameters: variable-header flag
+  `0x04` now distinguishes whole-array formals from classic element-zero
+  parameters, independently of static `0x01` and dynamic-storage `0x02`.
+  Unmarked legacy formals keep their rank/bounds and element-zero save/restore
+  and copyback behavior, including persistent tails and runtime-400 targets;
+  there is no compatibility shim for ambiguous older beta PPEs.
+
+- `DECLARE` matching follows the source language. Below 400, implementation
+  parameter types, `VAR` modes, dimensions and function result types take
+  precedence; parameter counts must still match. A declared procedure may be
+  implemented with `FUNCTION`, retaining the implementation's `VAR` modes but
+  emitting a procedure without a result slot; the reverse is rejected.
+  Multidimensional implementation formals fail at the dimension comma even
+  when unused, while multidimensional declarations remain accepted. Compiler
+  and LSP call checks collect normalized implementation signatures package-wide.
+  Language 400 strictly checks kind, count, types, `VAR`, ranks, bounds, dynamic
+  markers and function return type/rank, recursively through callbacks; names
+  are irrelevant. See the [DECLARE audit](compat/DECLARE_AUDIT.md) for the 23
+  authored PPLC 3.40 compiler probes and the separate source-derived runtime
+  evidence, rather than a claim of universal or byte-identical compatibility.
+
+- Record array fields accept square-bracket assignments and compound updates,
+  including nested paths, without weakening read-only property checks.
+- Runtime 4.00 `SORT` handles empty arrays without panicking and produces
+  exactly one index per input element rather than appending a spurious zero.
+
+- PPL 4.00 dynamic arrays now have per-call local storage and fresh function
+  results, including recursion. Whole-array assignments copy all elements and
+  adopt bounds; brace initializers preserve explicit dynamic declarations.
+- Array-returning functions no longer require explicit `DECLARE`. Callback
+  signatures check and display the complete return type, including array rank.
+  Array results are rejected consistently in scalar expressions, and 4.00
+  `REDIM` preserves the declared rank in both statement and member notation.
+- Compound assignments evaluate target indices and object receivers once,
+  including nested record fields, recursive calls and module-qualified code.
+  Recompile beta 4.00 PPEs using dynamic arrays: their storage flag is now
+  distinct from the classic static-variable flag. Pre-4.00 PPE behavior is
+  unchanged.
+
+- PPL 4.00 case-insensitive string comparisons report oversized search literals
+  through `Error.Last()` instead of panicking. `FindLast` and `EndsWith` handle
+  overlapping matches correctly, and `Regex.FindAll` starts at the requested
+  character position while preserving anchor, word-boundary and empty-match
+  semantics.
+- PPL 4.00 user mutations roll back the caller and in-memory user record when
+  saving fails, return failure and publish `ErrKind.User` / `ErrCode.Io`.
+  Invalid user and text-margin mutations now publish errors consistently;
+  successful mutations clear errors left by earlier statements.
+
+- Echomail for a point is no longer discarded as already travelled merely
+  because its two-dimensional `PATH` names the point's boss. This could make a
+  rescan report every message as a duplicate, remove the inbound bundle and
+  leave automatically added areas without message bases.
+
+- Mail that is handed on to a downlink or routed to the next hop is written to
+  the outbound before what it arrived in is removed. A bundle that could not be
+  written left the tosser having already thrown the only copy away.
+
+- A file arriving over binkp is written under a working name and only takes the
+  name it was offered as once it is complete. A session that broke off used to
+  leave a partial bundle that the next toss read as a whole one, and a file
+  named like one still waiting in the inbound overwrote it. Working files a
+  killed session left behind are cleared away by the next one.
 
 - A command whose action is `Door` opens the door its parameter names, so a
   door can be reached by a keyword of its own instead of only through `OPEN`.
@@ -748,27 +721,10 @@ releases.
 - The ICBSetup door editor is tall enough to show its complete form without
   clipping fields.
 
-### Added
-
-- Added the runtime 4.02 `Board` and `Session` objects. `Board` is a snapshot of
-  the configured board and can walk its conferences without `HIGHCONFNUM()`;
-  `Session` reads the call in progress live. Both are read-only and leave the
-  classic `CURCONF()`, `PCBNODE()` and `U_*` surface untouched.
-- `icbfile scan` now identifies archives that have no usable description and
-  distinguishes files that are missing from disk.
-- `icbfile scan --all` scans every area in a `file_areas.toml`; it can be
-  combined with `--force` to re-extract descriptions in every area.
-- Added end-to-end coverage for multiline `FILE_ID.DIZ` extraction and
-  all-area scanning.
-
-### Fixed
-
-- Reading an array without a subscript is now an error, the way `PCBoard` had it
-  (`wrVIDSUB` wanted one subscript per dimension), instead of quietly answering
-  an unrelated empty slot. Original `REDIM` and `SORT`, plus the runtime-400
-  `.Len()`, `Len(array, dim)` and `FOREACH` APIs, still take the whole array. A
-  bare array that reaches the runtime from a foreign PPE answers its first
-  element like `cVAR::getVal(0,0,0)`.
+- Classic array reads require the correct number of subscripts rather than
+  silently returning an unrelated slot. Operations that explicitly accept whole
+  arrays retain that contract; language 400 additionally supports typed array
+  values, assignments, parameters and function results.
 - File listings now keep size, date and description in their fixed columns when
   a filename longer than 12 characters wraps onto its own line.
 - File-base lookup, upload duplicate checks, flagging and downloads now treat
@@ -888,7 +844,8 @@ First public beta of IcyBoard 0.2.
 Last release before the 0.2 beta series. Earlier release history is available
 from the repository tags and GitHub Releases.
 
-[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/mkrueger/icy_board/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-beta.1...0.2.1
 [0.2.0-beta.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-lsp1...0.2.0-beta.1
 [0.2.0-lsp1]: https://github.com/mkrueger/icy_board/compare/0.1.7...0.2.0-lsp1
