@@ -576,16 +576,25 @@ async fn message_api_liquid_read_real_package() {
     let executable = crate::executable::Executable::read_file(&path, false).unwrap();
     let editor_kind = std::env::var("ICB_LIQUID_READ_EDITOR").unwrap_or_else(|_| "ppe".into());
     assert!(
-        matches!(editor_kind.as_str(), "ppe" | "internal" | "iceedit" | "gedit"),
+        matches!(editor_kind.as_str(), "ppe" | "internal" | "iceedit" | "gedit" | "lredit" | "ledit"),
         "unknown editor: {editor_kind}"
     );
     let dos_editor = matches!(editor_kind.as_str(), "iceedit" | "gedit");
+    let editor_language = std::env::var("ICB_LIQUID_EDIT_LANGUAGE").unwrap_or_else(|_| "en".into());
     for abort in [false, true] {
         let root = tempfile::tempdir().unwrap();
         let (mut state, mut peer) = fixture(root.path(), "", abort).await;
         if editor_kind == "internal" {
             state.session.fse_mode = FSEMode::No;
             state.get_board().await.config.message.external_editor.mode = ExternalEditorMode::Internal;
+        }
+        if matches!(editor_kind.as_str(), "lredit" | "ledit") {
+            state.get_board().await.config.message.external_editor = ExternalEditorConfig {
+                mode: ExternalEditorMode::Ppe,
+                path: std::env::var("ICB_LIQUID_EDIT_PPE").expect("ICB_LIQUID_EDIT_PPE is required"),
+                arguments: editor_language.clone(),
+                ..Default::default()
+            };
         }
         if dos_editor {
             let source_variable = if editor_kind == "gedit" { "ICB_GEDIT_SOURCE" } else { "ICB_ICEEDIT_SOURCE" };
@@ -636,6 +645,14 @@ async fn message_api_liquid_read_real_package() {
             inputs.extend(["ICB reader reply\r", "\r"].map(String::from));
             inputs.extend(if abort { ["A\r", "Y\r"] } else { ["Q 1 1\r", "S\r"] }.map(String::from));
         }
+        if editor_kind == "lredit" {
+            inputs.truncate(2);
+            inputs.extend(["ICB reader reply\r", if abort { "/A\r" } else { "/S\r" }].map(String::from));
+        }
+        if editor_kind == "ledit" {
+            inputs.truncate(2);
+            inputs.extend(["\x1b[F\rICB reader reply", if abort { "\x01" } else { "\x13" }].map(String::from));
+        }
         if dos_editor {
             let default_keys = match (editor_kind.as_str(), abort) {
                 ("gedit", true) => "ICB reader reply\r\x0fay\r",
@@ -650,6 +667,7 @@ async fn message_api_liquid_read_real_package() {
         let editor_input_end = inputs.len();
         inputs.extend(["\x1b".into(), "\x1b".into()]);
         let mut typed_text_visible = false;
+        let mut editor_header_visible = false;
         let mut transcript = Vec::new();
         let drive = async {
             let trigger = if editor_kind == "gedit" { "[ ^Q=Quote ]" } else { "\x1b[5;1H" };
@@ -678,6 +696,47 @@ async fn message_api_liquid_read_real_package() {
                         }
                         Err(_) if dos_editor && index == 5 && !String::from_utf8_lossy(&transcript).contains(trigger) => {}
                         Err(_) => {
+                            if editor_kind == "lredit" && index == 2 {
+                                let rows = (0..6)
+                                    .map(|row| {
+                                        (0..80)
+                                            .map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                            .collect::<String>()
+                                    })
+                                    .collect::<Vec<_>>();
+                                assert!(rows[0].starts_with("LiQUiD Read / Editor"), "{rows:?}");
+                                let expected = if editor_language == "de" {
+                                    ["Von: READER", "An: ALICE", "Betreff: Original subject"]
+                                } else {
+                                    ["From: READER", "To: ALICE", "Subject: Original subject"]
+                                };
+                                for (row, text) in rows[1..4].iter().zip(expected) {
+                                    assert!(row.starts_with(text), "missing {text}: {row}");
+                                }
+                                assert!(rows[4].starts_with("Area: Area 0"), "{rows:?}");
+                                assert_eq!(rows[4].chars().skip(62).take(5).collect::<String>(), "[YES]", "{rows:?}");
+                                assert!(rows[5].contains("Original body"), "{rows:?}");
+                                editor_header_visible = true;
+                            }
+                            if editor_kind == "ledit" && index == 2 {
+                                let rows = (0..25)
+                                    .map(|row| {
+                                        (0..80)
+                                            .map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                            .collect::<String>()
+                                    })
+                                    .collect::<Vec<_>>();
+                                assert!(rows[1].starts_with(if editor_language == "de" { "| An   : ALICE" } else { "| To   : ALICE" }), "{rows:?}");
+                                assert!(rows[1].contains("LiQUiD Edit"), "{rows:?}");
+                                assert!(rows[2].contains("Original subject"), "{rows:?}");
+                                assert!(rows[2].contains(if editor_language == "de" { "^A Abbruch ^S Speichern" } else { "^A Abort  ^S Save" }), "{rows:?}");
+                                assert!(rows[4..22].iter().any(|row| row.contains("Original body")), "{rows:?}");
+                                for (row, text) in rows.iter().enumerate().take(23) {
+                                    assert_eq!(text.chars().nth(77), Some(if matches!(row, 0 | 3 | 22) { '+' } else { '|' }), "{rows:?}");
+                                    assert!(text.chars().skip(78).all(|character| character == ' '), "{rows:?}");
+                                }
+                                editor_header_visible = true;
+                            }
                             peer.send(input.as_bytes()).await.unwrap();
                             break;
                         }
@@ -721,11 +780,24 @@ async fn message_api_liquid_read_real_package() {
             assert!(typed_text_visible, "editor input was not rendered; editor={editor_kind}, abort={abort}");
             assert!(!state.session.request_logoff);
         }
+        if matches!(editor_kind.as_str(), "lredit" | "ledit") {
+            assert!(editor_header_visible);
+        }
         if !abort {
             let reply = base.read_message(2).unwrap();
             assert_eq!(reply.header().reply_to, 1);
             assert!(reply.header().is_private());
             assert!(reply.text().to_string().contains("Original body"), "saved body: {:?}", reply.text());
+            if matches!(editor_kind.as_str(), "lredit" | "ledit") {
+                let expected_pid = if editor_kind == "ledit" { "LiQUiD Edit 1.1.0" } else { "LiQUiD Read Editor 0.1.0" };
+                assert!(
+                    reply
+                        .header()
+                        .sub_fields
+                        .iter()
+                        .any(|field| { field.field_type() == SubfieldType::PID && field.content().to_string() == expected_pid })
+                );
+            }
             if editor_kind != "ppe" {
                 assert!(reply.text().to_string().contains("ICB reader reply"));
                 assert_eq!(rows[4].chars().skip(7).take(16).collect::<String>(), "Original subject", "{screen}");
@@ -857,6 +929,283 @@ EXIT
         assert_eq!(execute(&mut state, session_root.path(), last_read).await, if phase == 0 { "0" } else { "5" });
         assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
         assert!(!state.session.request_logoff);
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires ICB_LIQUID_EDIT_PPE pointing to the compiled LiQUiD editor"]
+async fn message_api_liquid_editor_edit_and_abort_contract() {
+    let editor_path = std::env::var("ICB_LIQUID_EDIT_PPE").expect("ICB_LIQUID_EDIT_PPE is required");
+    for language in ["en", "de"] {
+        for scenario in ["edit", "abort", "empty", "oversized", "long_line", "field_boundary", "unicode"] {
+            let root = tempfile::tempdir().unwrap();
+            let input = match scenario {
+                "edit" => "/E 1\rChanged body\rdiscard me\r/D 2\r/H\rChanged subject\r/S\r",
+                "abort" => "/E 1\rChanged body\r/H\rChanged subject\r/A\r",
+                "empty" => "/D 1\r/S\r",
+                "oversized" => "",
+                "long_line" | "field_boundary" => "/E 1\r/S\r",
+                "unicode" => "/E 1\rGr\u{fc}\u{df}e\r/S\r",
+                _ => unreachable!(),
+            };
+            let (mut state, _peer) = fixture(root.path(), input, false).await;
+            state.get_board().await.config.message.external_editor = ExternalEditorConfig {
+                mode: ExternalEditorMode::Ppe,
+                path: editor_path.clone(),
+                arguments: language.into(),
+                ..Default::default()
+            };
+            state.get_board().await.config.message.max_msg_lines = 200;
+            state.get_board().await.config.switches.disable_high_ascii_filter = true;
+            state.session.term_caps.is_utf8 = true;
+            let original_text = match scenario {
+                "oversized" => vec!["line"; 101].join("\n"),
+                "long_line" => "x".repeat(300),
+                "field_boundary" => "x".repeat(78),
+                _ => "Original body".into(),
+            };
+            let mut base = JamMessageBase::open(root.path().join("area1")).unwrap();
+            let mut header = base.read_header(1).unwrap();
+            std::fs::write(root.path().join("area1.jdt"), original_text.as_bytes()).unwrap();
+            header.offset = 0;
+            header.txt_len = original_text.len() as u32;
+            jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+            drop(base);
+            let result = execute(
+                &mut state,
+                root.path(),
+                r#"
+MSG original = Board.Conferences[1].Areas[0].Read(1)
+MSG saved = Session.EditMessage(original)
+ERROR failure = Error.Last()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, saved.Valid, ":", failure.OK
+FCLOSE 1
+EXIT
+"#,
+            )
+            .await;
+            let saved = matches!(scenario, "edit" | "long_line" | "field_boundary" | "unicode");
+            assert_eq!(result, if saved { "1:1" } else { "0:1" }, "{language}/{scenario}");
+            let base = JamMessageBase::open(root.path().join("area1")).unwrap();
+            assert_eq!(base.highest_message_number(), 1);
+            let message = base.read_message(1).unwrap();
+            let expected_text = match scenario {
+                "edit" => "Changed body",
+                "unicode" => "Gr\u{fc}\u{df}e",
+                _ => &original_text,
+            };
+            assert_eq!(message.text().to_string().trim_end(), expected_text, "{language}/{scenario}");
+            assert_eq!(
+                message.header().subject().unwrap().to_string(),
+                if scenario == "edit" { "Changed subject" } else { "Original subject" }
+            );
+            assert!(message.header().is_private());
+            assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
+        }
+    }
+}
+
+#[tokio::test]
+async fn message_api_ledit_standalone_editor_contract() {
+    use icy_engine::TextPane;
+    use icy_net::Connection;
+
+    let editor_source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ppe/ledit/src/ledit.pps")).unwrap();
+    let editor = crate::vm::tests::compile(&editor_source);
+    let editor_bytes = editor.to_buffer().unwrap();
+    for language in ["en", "de"] {
+        for scenario in [
+            "edit",
+            "abort",
+            "escape",
+            "reply",
+            "post",
+            "unicode",
+            "scroll",
+            "wide",
+            "oversized",
+            "empty",
+            "empty_save",
+            "keys",
+            "macros",
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let (mut state, mut peer) = fixture(root.path(), if scenario == "post" { "\r\r\r" } else { "" }, false).await;
+            std::fs::write(root.path().join("editor.ppe"), &editor_bytes).unwrap();
+            state.get_board().await.config.message.external_editor.arguments = language.into();
+            state.get_board().await.config.message.max_msg_lines = 250;
+            state.get_board().await.config.switches.disable_high_ascii_filter = true;
+            state.set_terminal_size(80, 25);
+            state.session.disp_options.grapics_mode = crate::icy_board::state::GraphicsMode::Graphics;
+            state.session.term_caps.is_utf8 = true;
+            let original_text = match scenario {
+                "wide" => "x".repeat(77),
+                "oversized" => vec!["line"; 201].join("\n"),
+                "scroll" => (1..=25).map(|number| format!("Line {number:02}")).collect::<Vec<_>>().join("\n"),
+                "empty" | "empty_save" => String::new(),
+                "macros" => "@CLS@ @HANGUP@ @X0C Original body".into(),
+                _ => "Original body".into(),
+            };
+            let mut base = JamMessageBase::open(root.path().join("area1")).unwrap();
+            let mut header = base.read_header(1).unwrap();
+            std::fs::write(root.path().join("area1.jdt"), original_text.as_bytes()).unwrap();
+            header.offset = 0;
+            header.txt_len = original_text.len() as u32;
+            jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+            drop(base);
+            let operation = match scenario {
+                "reply" => "Session.ReplyMessage(original)",
+                "post" => "Session.PostMessage(Board.Conferences[1].Areas[0], header, \"Original body\")",
+                _ => "Session.EditMessage(original)",
+            };
+            let source = format!(
+                r#"
+MSG original = Board.Conferences[1].Areas[0].Read(1)
+MSGHEADER header
+header.To = "ALICE"
+header.Subject = "Original subject"
+MSG saved = {operation}
+ERROR failure = Error.Last()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, saved.Valid, ":", failure.OK
+FCLOSE 1
+EXIT
+"#
+            );
+            let changed_text = if scenario == "unicode" { "Gr\u{fc}\u{df}e" } else { "Standalone reply" };
+            let editing_keys = if scenario == "scroll" {
+                "\x1b[6~\x1b[6~\x1b[F!".to_string()
+            } else if scenario == "empty_save" {
+                String::new()
+            } else if scenario == "keys" {
+                format!("\x1b[H\x1b[C\x1b[3~r\x1b[F\rdiscard\x1b[H\x08{}!\r{changed_text}", "\x1b[3~".repeat(7))
+            } else {
+                format!("\x1b[F!\r{changed_text}")
+            };
+            let exit_keys = match scenario {
+                "abort" => "\x01",
+                "escape" => "\x1b",
+                _ => "\x13",
+            };
+            let rejected = matches!(scenario, "wide" | "oversized");
+            let mut rendered_initial = false;
+            let mut rendered_edit = false;
+            let drive = async {
+                let mut screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
+                for (phase, keys) in [editing_keys.as_str(), exit_keys].into_iter().enumerate() {
+                    loop {
+                        let mut packet = [0; 4096];
+                        match tokio::time::timeout(Duration::from_millis(150), peer.read(&mut packet)).await {
+                            Ok(read) => {
+                                let count = read.unwrap();
+                                assert_ne!(count, 0);
+                                screen.write_bytes(&packet[..count]);
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                    let rows = (0..25)
+                        .map(|row| {
+                            (0..80)
+                                .map(|column| screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                                .collect::<String>()
+                        })
+                        .collect::<Vec<_>>();
+                    assert!(!rejected, "rejected draft reached input: {language}/{scenario}");
+                    for row in 0..23 {
+                        assert_eq!(
+                            rows[row].chars().nth(77),
+                            Some(if row == 0 || row == 3 || row == 22 { '+' } else { '|' }),
+                            "{language}/{scenario}, row {row}: {rows:?}"
+                        );
+                        assert!(
+                            rows[row].chars().skip(78).all(|character| character == ' '),
+                            "{language}/{scenario}, overflow: {rows:?}"
+                        );
+                    }
+                    if phase == 0 {
+                        assert!(
+                            rows[1].starts_with(if language == "de" { "| An   : ALICE" } else { "| To   : ALICE" }),
+                            "{rows:?}"
+                        );
+                        assert!(rows[1].contains("LiQUiD Edit"), "{rows:?}");
+                        assert!(rows[2].contains("Original subject"), "{rows:?}");
+                        assert!(
+                            rows[2].contains(if language == "de" { "^A Abbruch ^S Speichern" } else { "^A Abort  ^S Save" }),
+                            "{rows:?}"
+                        );
+                        if scenario == "scroll" {
+                            assert!(rows[4].contains("Line 01"), "{rows:?}");
+                            assert!(rows[21].contains("Line 18"), "{rows:?}");
+                        } else if !matches!(scenario, "empty" | "empty_save") {
+                            assert!(rows[4..22].iter().any(|row| row.contains("Original body")), "{rows:?}");
+                        }
+                        if scenario == "macros" {
+                            assert!(rows[4].contains(&original_text), "{rows:?}");
+                        }
+                        rendered_initial = true;
+                    } else {
+                        if scenario != "empty_save" {
+                            assert!(
+                                rows[4..22]
+                                    .iter()
+                                    .any(|row| row.contains(if scenario == "scroll" { "Line 25!" } else { changed_text })),
+                                "{language}/{scenario}: {rows:?}"
+                            );
+                        }
+                        rendered_edit = true;
+                    }
+                    peer.send(keys.as_bytes()).await.unwrap();
+                }
+                std::future::pending::<()>().await;
+            };
+            let result = tokio::select! {
+                result = execute(&mut state, root.path(), &source) => result,
+                () = drive => unreachable!(),
+            };
+            let saved = !matches!(scenario, "abort" | "escape" | "wide" | "oversized" | "empty_save");
+            let final_screen = (0..25)
+                .map(|row| {
+                    (0..80)
+                        .map(|column| state.user_screen.buffer.char_at(icy_engine::Position::new(column, row)).ch)
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(result, if saved { "1:1" } else { "0:1" }, "{language}/{scenario}: {final_screen:?}");
+            assert_eq!(rendered_initial && rendered_edit, !rejected, "{language}/{scenario}");
+            assert!(!state.session.request_logoff);
+            assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
+            let base = JamMessageBase::open(root.path().join("area1")).unwrap();
+            let new_message = matches!(scenario, "reply" | "post");
+            assert_eq!(base.highest_message_number(), if new_message { 2 } else { 1 });
+            let message = base.read_message(if new_message { 2 } else { 1 }).unwrap();
+            assert_eq!(message.header().subject().unwrap().to_string(), "Original subject");
+            assert_eq!(message.to().unwrap().to_string(), "ALICE");
+            assert_eq!(message.header().is_private(), scenario != "post");
+            let body = message.text().to_string();
+            if !saved {
+                assert_eq!(body, original_text, "{language}/{scenario}");
+            } else {
+                if scenario == "scroll" {
+                    assert_eq!(body.trim_end(), format!("{original_text}!"));
+                } else if scenario == "reply" {
+                    assert!(body.contains("Original body"), "{body:?}");
+                    assert!(body.contains(changed_text), "{body:?}");
+                    assert_eq!(message.header().reply_to, 1);
+                } else {
+                    assert_eq!(body.trim_end(), format!("{original_text}!\n{changed_text}"), "{language}/{scenario}");
+                }
+                assert!(
+                    message
+                        .header()
+                        .sub_fields
+                        .iter()
+                        .any(|field| field.field_type() == SubfieldType::PID && field.content().to_string() == "LiQUiD Edit 1.1.0")
+                );
+            }
+            assert_eq!(JamMessageBase::open(root.path().join("area0")).unwrap().highest_message_number(), 1);
+        }
     }
 }
 

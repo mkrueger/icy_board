@@ -937,9 +937,9 @@ implementiert, die echte DOS-Editor-Abnahme bleibt teilweise offen:
   Ursache und vollständige ICE-Kompatibilität bleiben offen; erfolgreiche
   Eingabe-/Speicher-Einzeltests ersetzen diesen fehlenden Zitatnachweis nicht.
 
-**E2-Zwischenstand (2026-09-11, noch nicht abgenommen).** Der bestehende
-LiQUiD-Read-Port wurde als `956bbc4` gepusht. Die anschließende, noch nicht
-committete Umstellung verwendet `Session.ReplyMessage` statt eines eigenen
+**Historischer E2-Zwischenstand (2026-09-11, vor der unten dokumentierten Abnahme).** Der bestehende
+LiQUiD-Read-Port wurde als `956bbc4` gepusht. Die anschließende, lokal als
+`b661403` committete Umstellung verwendet `Session.ReplyMessage` statt eines eigenen
 Editors und erfasst `Error.Last()` unmittelbar nach dem Aufruf. Listenaufbau,
 Lesemarkierung und erneute Zugriffsprüfung wurden angepasst. Das Paket
 kompiliert für Runtime 400 mit null Fehlern und zehn Warnungen.
@@ -983,11 +983,76 @@ ohne Override und mit GEdit ohne X00. Die Sprachprozesse sind getrennt;
 Board- und DOS-Dialoge bleiben englisch. Die Opt-in-Tests verwenden ausschließlich
 temporäre Installationskopien und Diskimages, keine Änderungen an DOS-Originalen.
 
-Konferenz-/Area-Auswahl, echte Löcher im JAM-Index, parallele Änderungen mit
-Header-/Body-Konsistenz, langer Text/Scrollgrenzen, interner Vollbildeditor und
-deutsche Dialoge bleiben für diese Reader-Abnahme offen. Für ICE fehlt der
-Zitatablauf. E2 ist weiterhin nicht vollständig abgenommen; kein neuer
-Release-Plan-Schritt wurde damit freigegeben.
+Zu diesem Zwischenstand waren Konferenz-/Area-Auswahl, echte Löcher im JAM-Index,
+parallele Änderungen mit Header-/Body-Konsistenz, langer Text/Scrollgrenzen,
+interner Vollbildeditor und deutsche Dialoge noch offen. Für ICE fehlt der
+Zitatablauf. Diese Liste dokumentiert den damaligen Prüfstand; die spätere
+E2-Abnahme und die Entscheidung zur BBS-Bedienung stehen unten.
+
+**PPE-Editor-Proof-of-Concept (2026-09-11).** Separat freigegeben ist ein
+LiQUiD-Read-Editor-PPE: Unterpaket `editor`, Artefakt `lredit.ppe`, Modus `Ppe`,
+Argument `en` oder `de`. Der Reader bleibt `lread.ppe`; nur der Editor wird
+eingesteckt, damit kein rekursiver Antwortaufruf entsteht. Der Zeileneditor
+liest das Board-Verzeichnis per GETTOKEN, übernimmt MSGINF/MSGTMP und gibt
+MSGTMP/RESULT.ED mit EXIT zurück; STOP bricht ab. Er besitzt keinen eigenen
+Nachrichtenspeicherpfad. Der echte Reader-Ablauf und Session.EditMessage prüfen
+Speichern, Abbruch, Betreff/PID, vorhandene Quotes, private Thread-Metadaten,
+unveränderte Aufruftokens, UTF-8 sowie abgewiesene übergroße Entwürfe und
+unveränderte lange Zeilen. Der Umfang ist ein Zeileneditor mit 100 Zeilen,
+68-Byte-Eingabefeldern und explizit gewählter EN-/DE-Oberfläche.
+
+Abschlussprüfung: 22 `message_api_`-Tests je EN/DE in getrennten Prozessen mit
+`--include-ignored --test-threads=1`, `ICB_LIQUID_READ_EDITOR=lredit`, beiden
+echten PPE-Artefakten und jeweils passendem `ICB_LIQUID_EDIT_LANGUAGE` bestanden.
+Der Editor-Vertragstest führt sieben Bearbeitungs-/Abbruchszenarien pro Sprache
+aus. Nicht-ASCII-Eingabe verlangt weiterhin die Board-Freigabe
+`disable_high_ascii_filter`; bestehende UTF-8-Dateitexte werden erhalten.
+Reader und Editor wurden direkt mit `pplc --runtime 400` gebaut: Reader mit
+zehn bestehenden Warnungen, Editor ohne Warnungen. Die angepasste just-Rezeptur
+konnte mangels installiertem `just` nicht direkt ausgeführt werden; ihre
+Compiler- und Kopierschritte wurden einzeln erfolgreich ausgeführt.
+
+**Eigenständiger Vollbildeditor (2026-09-11).** Auf ausdrücklichen Wunsch wurde
+statt des neuen Zeileneditors der vorhandene `ppe/ledit` als Grundlage verwendet.
+`ledit.ppe` ist ein eigenes Runtime-400-Paket ohne Abhängigkeit von LiQUiD Read.
+Es übernimmt MSGINF/MSGTMP, gibt den Entwurf mit EXIT zurück und bricht mit
+STOP ab; der frühere eigene MESSAGE-Speicherpfad entfällt. Die vorhandene
+Vollbildbedienung bleibt erhalten. Konfiguration und Grenzen stehen in
+`docs/new_ppl.md`: Modus Ppe, Argument en/de, bis zu 200 Zeilen mit jeweils
+76 Zeichen; größere Eingangsentwürfe werden ohne Kürzung abgelehnt.
+
+Der reguläre Test `message_api_ledit_standalone_editor_contract` kompiliert den
+Quelltext unabhängig vom Reader. Er prüft 13 Szenarien je Editor-Sprache über
+Post/Edit/Reply, tatsächliche 80x25-Ausgabe, Navigation und Textänderungen,
+UTF-8-Netzwerkeingabe, Zitate, Makrotext ohne Auswertung, Größenlimits und
+leeren Entwurf sowie Speichern/Abbruch und persistierte JAM-Metadaten.
+Die zugehörigen regulären `message_api_`-Läufe bestanden mit je 20 Tests in
+getrennten EN-/DE-Prozessen; drei bestehende Opt-in-Tests waren ausgelassen.
+Der Benutzer bestätigte anschließend den lokalen Editorstart als funktionierend.
+
+Die Reader-Abnahme unterstützt nun zusätzlich `ICB_LIQUID_READ_EDITOR=ledit`
+mit `ICB_LIQUID_EDIT_PPE` auf das eigenständige Artefakt. Beide opt-in
+`message_api_liquid_read`-Tests bestanden je EN/DE: echter Reader, ledit,
+Speichern und Abbruch, sichtbare Eingabe und Zitate, passende EN-/DE-Kopfzeile,
+Rückkehr zur aktualisierten Liste, Thread-/Privatdaten, Editor-PID und
+unveränderte Aufruftokens; außerdem leere/gefilterte Areas und persistierter
+Lesestand in einer frischen Sitzung. Dies koppelt ausschließlich den Test,
+nicht die beiden PPE-Pakete. Reader- und Board-Texte bleiben englisch.
+**E2-Abnahme durch den Benutzer (2026-09-11): erfüllt.** Nach erfolgreicher
+lokaler Probe hat der Benutzer E2 ausdrücklich als erfüllt bewertet und die
+vorgeschlagene Konferenz-/Area-Auswahl im Reader abgelehnt: Die Auswahl gehört
+zum bestehenden BBS-Bedienablauf, nicht in LiQUiD Read. Die dokumentierten
+Testlücken und die ICE-Quote-Einschränkung bleiben sichtbar, blockieren diese
+Abnahme aber nicht und gelten dadurch nicht als nachgewiesen. Dies ist keine
+Freigabe für den nächsten Umsetzungsschritt oder die vorgeschlagene
+Program/Script-Kodierungsoption.
+
+**Kodierungsgrenze:** DOS bleibt CP437; PPE-Austausch verwendet UTF-8 mit BOM.
+Program/Script-Dateien und -Pipes sind derzeit ebenfalls CP437. Vorgeschlagen,
+aber noch nicht umgesetzt/freigegeben, ist eine Kodierungswahl nur für
+Program/Script, mit CP437 als kompatiblem Standard. Dateien und Terminal-I/O
+müssen dabei dieselbe Einstellung verwenden; automatische Erkennung allein
+ist bei mehrdeutigen CP437-Bytefolgen keine verlässliche DOS-Dekodierung.
 
 Ungeprüft geblieben ist, warum `Session.IsSysop` bei einem über `--runppe`
 angemeldeten SYSOP `FALSE` meldet.
@@ -1392,15 +1457,22 @@ Ressourcenbedarf und brauchbare Darstellung in Englisch und Deutsch.
 
 ### E2 — Nachrichtenleser mit Antwortfunktion
 
-- Konferenz/Area wählen, Header auflisten und Text lesen.
+**Status: erfüllt, vom Benutzer am 2026-09-11 ausdrücklich abgenommen.**
+Die Konferenz-/Area-Auswahl bleibt im BBS-Bedienablauf; eine zusätzliche Auswahl
+im Reader ist nicht gewünscht. Grundlage sind der bestehende Reader-Ablauf,
+der unabhängige Editor-PPE und die oben protokollierten Tests und lokale Probe.
+Verbleibende Testlücken sind dokumentiert, aber keine E2-Abnahmeblocker.
+
+- Im BBS-Ablauf Konferenz/Area wählen; im Reader Header auflisten und Text lesen.
 - Sparse Nachrichtennummern, leere Areas und gelöschte Nachrichten behandeln.
 - Persönliche ungelesene Nachrichten und Last-read-Verhalten prüfen.
 - Private und gesperrte Inhalte korrekt behandeln.
 - Antwort schreiben; Attachment-Umfang vor Umsetzung ausdrücklich entscheiden.
 - Parallele Änderungen durch andere Nodes berücksichtigen.
 
-**Abnahme:** Lesen → Markieren → Antworten funktioniert ohne JAM-/TOML-Parser
-im PPE. Header-/Body-Konsistenz und Benutzerberechtigungen sind nachgewiesen.
+**Abnahmeziel:** Lesen → Markieren → Antworten ohne JAM-/TOML-Parser im PPE;
+Header-/Body-Konsistenz und Benutzerberechtigungen prüfen. Der tatsächlich
+nachgewiesene Umfang und seine Grenzen stehen im Abnahmeprotokoll oben.
 
 ### E3 — Interaktive Terminalanwendung
 
@@ -1541,7 +1613,7 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 - [x] F5: `Fade`-Vertrag einschließlich realer Ausgabe konsistent.
 - [x] F6: Metadatenzugriff skaliert unabhängig von vollständigen User-Snapshots.
 - [ ] E1 Dateibrowser abgenommen.
-- [ ] E2 Nachrichtenleser mit Antwortfunktion abgenommen.
+- [x] E2 Nachrichtenleser mit Antwortfunktion abgenommen.
 - [ ] E3 Interaktive Terminalanwendung und Client-Matrix abgenommen.
 - [ ] Legacy-Kompatibilität und relevante Gesamtregressionen bestanden.
 - [ ] Dokumentation entspricht Signaturen, Limits, Fehlern und Lebensdauerregeln.

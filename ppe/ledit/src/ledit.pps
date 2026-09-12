@@ -13,47 +13,32 @@ INTEGER cursorColumn = 0
 INTEGER firstVisible = 0
 BOOLEAN editing = TRUE
 BOOLEAN saveMessage = FALSE
+STRING workDir, language
+STRING messageInfo[5]
+INTEGER inputBytes = 0
+INTEGER expectedBytes = 0
 TERMINPUT input = Terminal.Input
 
 BEGIN
-    STRING recipient, subject, privacy
-
-    DrawAddressScreen()
-    recipient = ReadField(35, 12, 24).Trim()
-
-    IF recipient.Equals("SYSOP", StringComparison.OrdinalIgnoreCase) THEN
-        recipient = Board.SysopName
-    ENDIF
-    IF recipient = "" THEN
-        recipient = "ALL"
-        ANSIPOS 35, 12
-        COLOR @X0B
-        PRINT recipient
-    ENDIF
-
-    IF !recipient.Equals("ALL", StringComparison.OrdinalIgnoreCase) & U_RecNum(recipient) = -1 THEN
+    GETTOKEN workDir
+    GETTOKEN language
+    IF workDir = "" THEN
         input.Release()
-        CLS
-        PRINTLN "@X0BU@X03ser not found@X02."
-        DELAY 2
-        EXIT
+        STOP
     ENDIF
+    ON ERROR GOTO FileError
 
-    subject = ReadField(35, 13, 24).Trim()
-    IF subject = "" THEN
+    IF !LoadDraft() THEN
         input.Release()
-        CLS
-        PRINTLN "@X0BM@X03essage aborted@X02."
-        DELAY 2
-        EXIT
+        PRINTLN Label("Draft exceeds 200 lines or 76 columns. Not saved.", "Entwurf hat mehr als 200 Zeilen oder 76 Spalten. Nicht gespeichert.")
+        STOP
     ENDIF
+    FCREATE 2, workDir + "/KEYBUF", O_WR, S_DN
+    FCLOSE 2
+    FOPEN 2, workDir + "/KEYBUF", O_RW, S_DN
 
-    privacy = "N"
-    IF !recipient.Equals("ALL", StringComparison.OrdinalIgnoreCase) THEN
-        privacy = ReadYesNo(51, 14)
-    ENDIF
-
-    DrawEditor(recipient, subject)
+    STARTDISP FNS
+    DrawEditor(messageInfo[1], messageInfo[2])
     WHILE editing DO
         EVENT keyEvent = input.Wait(-1)
         IF keyEvent.Kind = EventKind.Key THEN
@@ -62,101 +47,117 @@ BEGIN
     ENDWHILE
 
     input.Release()
+    FCLOSE 2
     IF !saveMessage THEN
-        CLS
-        PRINTLN "@X0BM@X03essage aborted@X02."
-        DELAY 2
-        EXIT
+        STOP
     ENDIF
 
-    STRING tempFile = PPEPath() + "ledit.tmp"
-    IF WriteMessageFile(tempFile) THEN
-        STRING status = "N"
-        IF privacy = "Y" status = "R"
-        MESSAGE CurConf(), recipient, Session.UserName, subject, status, Date(), FALSE, FALSE, tempFile
-        DELETE tempFile
-    ELSE
-        CLS
-        PRINTLN "@X0BC@X03ould not create the temporary message file@X02."
-        DELAY 2
-    ENDIF
+    IF !WriteMessageFile(workDir + "/MSGTMP") GOTO FileError
+    FCREATE 1, workDir + "/RESULT.ED", O_WR, S_DN
+    FPUTLN 1, "0"
+    FPUTLN 1, messageInfo[2]
+    FPUTLN 1, "LiQUiD Edit 1.1.0"
+    FCLOSE 1
+    EXIT
+
+:FileError
+    ERROR failure = Error.Last()
+    ON ERROR OFF
+    input.Release()
+    PRINT Label("Editor error. Not saved: ", "Editorfehler. Nicht gespeichert: ")
+    PrintText(failure.Message)
+    PRINTLN
+    STOP
 END
 
-;;; Reads a single-line field using the modern terminal event API.
-FUNCTION ReadField(INTEGER x, INTEGER y, INTEGER width) STRING
-    STRING value = ""
-    BOOLEAN reading = TRUE
-
-    ANSIPOS x, y
-    COLOR @X07
-    PRINT STRING.Repeat("·", width)
-    ANSIPOS x, y
-
-    WHILE reading DO
-        EVENT keyEvent = input.Wait(-1)
-        IF keyEvent.Kind <> EventKind.Key CONTINUE
-
-        IF (keyEvent.Code = KEY_ENTER) THEN
-            reading = FALSE
-        ELSEIF (keyEvent.Code = KEY_BACKSPACE) THEN
-            IF (value.Len() > 0) THEN
-                value = value.Left(value.Len() - 1)
-                ANSIPOS x + value.Len(), y
-                COLOR @X07
-                PRINT "·"
-                ANSIPOS x + value.Len(), y
-            ENDIF
-        ELSEIF (keyEvent.Code = KEY_ESCAPE) THEN
-            value = ""
-            reading = FALSE
-        ELSEIF (keyEvent.Text.Len() = 1 & Asc(keyEvent.Text) >= 32 & value.Len() < width) THEN
-            STRING character = keyEvent.Text
-            IF value = "" | value.EndsWith(" ") character = character.ToUpper()
-            value += character
-            PrintInputCharacter(character)
-        ENDIF
-    ENDWHILE
-
-    RETURN value
+FUNCTION Label(STRING english, STRING german) STRING
+    IF language.ToLower() = "de" RETURN german
+    RETURN english
 ENDFUNC
 
-FUNCTION ReadYesNo(INTEGER x, INTEGER y) STRING
-    ANSIPOS x, y
-    COLOR @X09
-    PRINT "N"
-
-    LOOP
-        EVENT keyEvent = input.Wait(-1)
-        IF keyEvent.Kind <> EventKind.Key CONTINUE
-        STRING answer = keyEvent.Text.ToUpper()
-        IF (answer = "Y" | answer = "N") THEN
-            ANSIPOS x, y
-            PRINT answer
-            RETURN answer
+FUNCTION DisplayText(STRING text) STRING
+    STRING visible = ""
+    INTEGER index
+    FOR index = 0 TO text.Len() - 1
+        STRING character = text.Substring(index, 1)
+        IF Asc(character) < 32 | Asc(character) = 127 THEN
+            visible += "."
+        ELSE
+            visible += character
         ENDIF
-        IF keyEvent.Code = KEY_ENTER | keyEvent.Code = KEY_ESCAPE RETURN "N"
-    ENDLOOP
+    NEXT
+    RETURN visible
 ENDFUNC
 
-PROCEDURE PrintInputCharacter(STRING character)
-    INTEGER code = Asc(character)
-    IF (code >= 48 & code <= 57) THEN
-        COLOR @X09
-    ELSEIF (code >= 65 & code <= 90) THEN
-        COLOR @X0B
-    ELSEIF (code >= 97 & code <= 122) THEN
-        COLOR @X03
-    ELSEIF (code > 127) THEN
-        COLOR @X0E
-    ELSE
-        COLOR @X02
-    ENDIF
-    PRINT character
+PROCEDURE PrintText(STRING text)
+    STRING parts[] = DisplayText(text).Split("@")
+    INTEGER index
+    FOR index = 0 TO parts.Len() - 1
+        IF index > 0 PRINT "@"
+        PRINT parts[index]
+    NEXT
 ENDPROC
+
+FUNCTION LoadDraft() BOOLEAN
+    FOPEN 1, workDir + "/MSGINF", O_RD, S_DN
+    INTEGER index
+    FOR index = 0 TO 5
+        FGET 1, messageInfo[index]
+        IF FERR(1) THEN
+            FCLOSE 1
+            GOTO FileError
+        ENDIF
+    NEXT
+    FCLOSE 1
+    FOPEN 1, workDir + "/MSGTMP", O_RD, S_DN
+    lineCount = 0
+    STRING text
+    LOOP
+        FGET 1, text
+        IF FERR(1) BREAK
+        IF lineCount >= MAX_LINES | text.Len() > EDIT_WIDTH THEN
+            FCLOSE 1
+            RETURN FALSE
+        ENDIF
+        lines[lineCount] = text
+        lineCount += 1
+    ENDLOOP
+    FCLOSE 1
+    IF lineCount = 0 lineCount = 1
+    RETURN TRUE
+ENDFUNC
+
+FUNCTION InputCharacter(EVENT keyEvent) STRING
+    INTEGER code = keyEvent.Code
+    IF code > 255 RETURN keyEvent.Text
+    IF !Terminal.Info.Utf8 RETURN CHR(code)
+    IF code < 128 THEN
+        inputBytes = 0
+        RETURN keyEvent.Text
+    ENDIF
+    IF inputBytes > 0 & (code < 128 | code > 191) inputBytes = 0
+    IF inputBytes = 0 THEN
+        IF code < 194 | code > 244 RETURN ""
+        expectedBytes = 2
+        IF code >= 224 expectedBytes = 3
+        IF code >= 240 expectedBytes = 4
+        FSEEK 2, 0, 0
+    ENDIF
+    BYTE inputByte = code
+    FWRITE 2, inputByte, 1
+    inputBytes += 1
+    IF inputBytes < expectedBytes RETURN ""
+    FSEEK 2, 0, 0
+    BYTES encoded
+    FREAD 2, encoded, inputBytes
+    inputBytes = 0
+    RETURN encoded.ToString()
+ENDFUNC
 
 PROCEDURE HandleKey(EVENT keyEvent)
     STRING key = keyEvent.Text
     STRING upperKey = key.ToUpper()
+    IF keyEvent.Code < 32 | keyEvent.Code > 255 inputBytes = 0
 
     IF (keyEvent.Code = 19 | (keyEvent.Ctrl & upperKey = "S")) THEN
         saveMessage = TRUE
@@ -191,8 +192,9 @@ PROCEDURE HandleKey(EVENT keyEvent)
         Backspace()
     ELSEIF (keyEvent.Code = KEY_DELETE) THEN
         DeleteCharacter()
-    ELSEIF (!keyEvent.Ctrl & key.Len() = 1 & Asc(key) >= 32) THEN
-        InsertCharacter(key)
+    ELSEIF (!keyEvent.Ctrl & key.Len() = 1 & keyEvent.Code >= 32) THEN
+        STRING character = InputCharacter(keyEvent)
+        IF character <> "" InsertCharacter(character)
     ENDIF
 
     KeepCursorVisible()
@@ -226,7 +228,7 @@ ENDPROC
 
 PROCEDURE InsertCharacter(STRING character)
     IF lines[cursorLine].Len() >= EDIT_WIDTH RETURN
-    lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + character + Mid(lines[cursorLine], cursorColumn + 1, EDIT_WIDTH)
+    lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + character + Mid(lines[cursorLine], cursorColumn + 1, lines[cursorLine].Len() - cursorColumn)
     cursorColumn += 1
     DrawTextRow(cursorLine)
 ENDPROC
@@ -250,7 +252,7 @@ ENDPROC
 
 PROCEDURE Backspace()
     IF cursorColumn > 0 THEN
-        lines[cursorLine] = Left(lines[cursorLine], cursorColumn - 1) + Mid(lines[cursorLine], cursorColumn + 1, EDIT_WIDTH)
+        lines[cursorLine] = Left(lines[cursorLine], cursorColumn - 1) + Mid(lines[cursorLine], cursorColumn + 1, lines[cursorLine].Len() - cursorColumn)
         cursorColumn -= 1
         DrawTextRow(cursorLine)
         RETURN
@@ -268,7 +270,7 @@ ENDPROC
 
 PROCEDURE DeleteCharacter()
     IF cursorColumn < lines[cursorLine].Len() THEN
-        lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + Mid(lines[cursorLine], cursorColumn + 2, EDIT_WIDTH)
+        lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + Mid(lines[cursorLine], cursorColumn + 2, lines[cursorLine].Len() - cursorColumn - 1)
         DrawTextRow(cursorLine)
         RETURN
     ENDIF
@@ -317,7 +319,7 @@ PROCEDURE DrawTextRow(INTEGER line)
     IF text.Len() < EDIT_WIDTH text += Space(EDIT_WIDTH - text.Len())
     ANSIPOS 2, screenRow
     COLOR @X0E
-    PRINT text.Left(EDIT_WIDTH)
+    PrintText(text.Left(EDIT_WIDTH))
 ENDPROC
 
 FUNCTION WriteMessageFile(STRING fileName) BOOLEAN
@@ -325,10 +327,6 @@ FUNCTION WriteMessageFile(STRING fileName) BOOLEAN
     IF !Error.Last().OK RETURN FALSE
 
     INTEGER lastLine = lineCount - 1
-    WHILE lastLine > 0 & lines[lastLine] = "" DO
-        lastLine -= 1
-    ENDWHILE
-
     INTEGER index
     FOR index = 0 TO lastLine
         FPUTLN 1, lines[index]
@@ -341,32 +339,17 @@ FUNCTION WriteMessageFile(STRING fileName) BOOLEAN
     RETURN Error.Last().OK
 ENDFUNC
 
-PROCEDURE DrawAddressScreen()
-    CLS
-    COLOR @X0D
-    PRINTLN "                         Write a LiQUiD message"
-    PRINTLN
-    PRINTLN "               +----------------------------------------------+"
-    PRINTLN "               |                                              |"
-    PRINTLN "               |                                              |"
-    PRINTLN "               |                                              |"
-    PRINTLN "               +----------------------------------------------+"
-    PRINTLN
-    PRINTLN
-    PRINTLN
-    PRINTLN "               | To (Enter=ALL) : ........................ |"
-    PRINTLN "               | Subject        : ........................ |"
-    PRINTLN "               | Private (Y/N)  : ( )                      |"
-    COLOR @X07
-ENDPROC
-
 PROCEDURE DrawEditor(STRING recipient, STRING subject)
     CLS
     COLOR @X0B
     STRING border = "+" + STRING.Repeat("-", EDIT_WIDTH) + "+"
     PRINTLN border
-    PRINTLN "| To   : ", Left(recipient + Space(56), 56), "LiQUiD Edit |"
-    PRINTLN "| Subj : ", Left(subject + Space(51), 51), "^A Abort ^S Save |"
+    PRINT Label("| To   : ", "| An   : ")
+    PrintText(Left(recipient + Space(56), 56))
+    PRINTLN "LiQUiD Edit |"
+    PRINT Label("| Subj : ", "| Betr.: ")
+    PrintText(Left(subject + Space(43), 43))
+    PRINTLN Label("^A Abort  ^S Save        |", "^A Abbruch ^S Speichern  |")
     PRINTLN border
     INTEGER row
     FOR row = FIRST_EDIT_ROW TO LAST_EDIT_ROW

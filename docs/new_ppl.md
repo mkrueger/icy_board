@@ -1988,6 +1988,37 @@ followed by the configured arguments. Use `EXIT` for normal completion and
 anything. Native/DOS status `0` means saved, `1` aborted/empty, `2` time or
 inactivity expiry (disconnect), and other statuses mean failure.
 
+The bundled `ppe/ledit` package is a standalone full-screen PPE editor for this
+contract. It has no dependency on LiQUiD Read and no longer posts messages with
+`MESSAGE` itself. Build it with `pplc ppe/ledit/ppl.toml` (runtime 400 is set in
+the manifest), install `ppe/ledit/target/icboard/ledit.ppe` in the board, and use:
+
+```toml
+[message.external_editor]
+mode = "Ppe"
+path = "ppe/ledit.ppe"
+arguments = "de"
+drop_file = "None"
+timeout_seconds = 900
+```
+
+Use `en` for English labels. The user's full-screen editor preference must be
+enabled. `ledit` receives the header and draft from the board, including prepared
+reply quotes. Ctrl+S saves; Ctrl+A or Escape aborts. Arrow keys, Home/End,
+Page Up/Down, Enter, Backspace and Delete edit the body. The board owns header
+editing, recipient validation, permissions, threading and persistence.
+
+The editor uses an 80x25 layout, with up to 200 lines and 76 characters per
+line; it rejects larger incoming drafts without replacing them. The board's
+own line limit still applies. Exchange files are UTF-8. Byte-oriented keyboard
+events are decoded according to `Terminal.Info.Utf8`; the editor uses a private
+binary scratch file in the exchange directory for UTF-8 input. Incoming text is
+displayed without executing its control characters or `@` macros. Empty saves
+are treated as aborts. The `message_api_ledit_standalone_editor_contract` test
+compiles the editor source and exercises Post/Edit/Reply independently of any
+reader, checking persisted JAM data and rendered 80x25 output in English and
+German.
+
 DOS requires the assets installed by `icbsetup dos-image`. Each invocation uses
 a temporary copy of the installation and fresh exchange files in `C:\DOOR`.
 Only the message result is read back: editor preferences and other installation
