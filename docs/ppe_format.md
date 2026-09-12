@@ -30,9 +30,10 @@ for legacy encryption and packing.
 ## Runtime 400 container
 
 The 400 container is a header, a section directory and the section payloads.
-Every section is located by an explicit offset and length, so the file can be
-parsed without reading it end to end and a truncated file is rejected before any
-payload is interpreted.
+Every section has an explicit offset and length. The decoder checks section
+bounds before interpreting payloads. The current `Executable::read_file` entry
+point nevertheless reads the entire file into memory before decoding it;
+the container layout is not a streaming-loader guarantee.
 
 ```text
 +--------------------------------------+
@@ -184,10 +185,14 @@ result type, rank, required argument count and parameter types.
 
 **Host binding is by name and signature, not by stored number.** On load the file's
 host ids are matched against the current catalog by qualified name, and every used
-member must still exist with the same kind, static flag, required count, rank,
-result type and parameter types. Ids may be renumbered and the catalog may grow
-freely; a genuine signature change is rejected before the program runs. Enum value
-lists are not part of this contract, so new enum values do not invalidate old files.
+member must still exist with the same kind, static flag, rank and result type.
+The stored parameter types must match the current signature's prefix. A newer
+host may append optional parameters or require fewer existing parameters, but
+may not require more than the stored signature did. The reverse direction is
+not guaranteed: a file built against an extended signature cannot bind to a
+shorter old one. Ids may be renumbered and the catalog may grow; incompatible
+changes are rejected before the program runs. Enum value lists are not part of
+this contract, so new enum values do not invalidate old files.
 
 `CODE` — one length-framed record per instruction, each starting with a `u32`
 opcode. Jumps address instruction indices rather than byte offsets. Expressions
@@ -200,6 +205,10 @@ malformed call is refused before the VM sees it.
 The wire format uses 32 bit counts and 64 bit offsets. The limits below are
 operating budgets that keep a corrupt or hostile file from allocating without
 bound; they are not the widths the format can express.
+
+These checks apply during container decoding. The initial whole-file read
+described above happens first, so the file-size budget does not cap that
+initial allocation. PPE files should be installed from trusted sources.
 
 | Limit | Value |
 | :--- | ---: |

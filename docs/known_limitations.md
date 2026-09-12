@@ -111,6 +111,82 @@ output cannot be repaired or re-adopted later. See the
 [command help guide](gettingstarted.md#command-help) for the commands, the
 generation flags, source overrides and the recovery locations under `main/`.
 
+## PPL 400 Beta
+
+The implemented language, format and API contracts are documented in
+[New PPL](new_ppl.md), the [language overview](ppl.md), the
+[compiler guide](pplc.md) and the [PPE format](ppe_format.md).
+These limits are part of the beta scope, not promises that the omitted features
+will arrive before release.
+
+### Compatibility and Loader
+
+- Runtime 400 targets Icy Board, not an original PCBoard.
+- Recompile unreleased 400 files written in the old container and older beta
+	programs using unmarked array formals. Classic PPE compatibility is backed by
+	the checked-in fixtures, not by a claim that every third-party PPE was tested.
+- The loader validates container and section budgets, but `Executable::read_file`
+	reads the whole file before those checks. The 64 MiB container budget does
+	not cap that initial allocation. Install PPEs from trusted sources.
+- Debug data can preserve symbol names, not source positions, source text or a
+	separate debug file. Content identity is not authentication or encryption.
+- The current release validation ran on Linux, where Zstd was built and tested.
+	Windows/macOS execution, including Zstd support, remains unverified; no new
+	loader fuzz acceptance was run.
+
+### Files and Data
+
+- PPE file sharing coordinates cooperating channels in one BBS process only.
+	External tools, DOS doors, other processes and direct `DELETE`/`RENAME`/`COPY`
+	operations do not participate. Read/modify/write requires the stable separate
+	lock-file protocol in [record file I/O](new_ppl.md#record-file-io).
+- Positional record files have no automatic schema migration or fingerprint.
+	Record I/O supports fixed value layouts, not host objects or dynamic fields,
+	even though those fields are supported in executable record layouts.
+- The tested temporary-file/rename workflow is not a power-loss guarantee.
+	`FFLUSH` does not promise `fsync`; cancellation can leave temporary files.
+- File searches need an existing index, inspect bounded description prefixes,
+	and may return an empty page with `HasMore=TRUE`. Pages are not one stable
+	transaction and follow row ID, not display sort order. Marking is separate
+	from the normal BBS download command; no typed transfer-result API is added.
+- `Board.Users` remains a full array snapshot, built on first collection access.
+	It has no userbase search/pagination API. Metadata reads do not build that array.
+
+### Terminals and Messages
+
+- String lengths and slicing count Unicode scalars, not display cells. UTF-8
+	output uses grapheme-aware cells; CP437 boundaries retain substitution and
+	their one-cell model. There is no public cell-width/cropping API or
+	`Terminal.WriteText` safe-output helper. `StripATX` is not a sanitizer.
+- Logical resize events currently cover Telnet NAWS and existing ANSI/board
+	resizes, not every transport or pixel-only resize. Optional graphics, audio,
+	fonts and input modes depend on the actual terminal's capabilities.
+- E1 and E3 were accepted for the implemented scope. A remote protocol transfer
+	from the browser and a complete versioned SyncTERM/icy_term/ANSI client matrix
+	remain unverified, as do JXL Paint and differing fonts/cell metrics. Paint has
+	no save/audio feature and selects its backend only at startup.
+- Terminal cleanup is best-effort after disconnect and does not guarantee
+	restoration after a process crash or forced cancellation. PPE file-channel
+	reservations have their own cancellation-safe release; that is not a guarantee
+	that terminal reset sequences reached the client.
+- Low-level `Area.Read`, `Find` and `Msg.Text` are not the interactive reader's
+	permission filter and do not mark messages read. Caller-facing PPEs must apply
+	visibility rules and existing read-marker operations themselves; the
+	not-for-display header flag has no dedicated object member. Use the `Session`
+	methods for the board's interactive post/reply/edit workflow.
+- `ledit` is an 80x25 editor limited to 200 lines of 76 characters. Real DOS
+	editor compatibility remains installation-specific: ICE's full quote workflow
+	and EXITINFO layout are not established. The ignored external-editor and
+	LiQUiD package tests were not rerun in the current general regression suite.
+
+### Deferred Additions
+
+`TRY`/`CATCH`/`FINALLY` and `DEFER` are not implemented; use `ON ERROR` and
+explicit application cleanup. JSON objects, additional file objects, UTC
+timestamp types, asynchronous HTTP, further object-based session navigation
+and door execution are not part of this beta scope. Existing procedural BBS
+operations remain available. No new API is implied by these omissions.
+
 ## Import
 
 Importing a PCBoard installation is best effort. Simple installations come over

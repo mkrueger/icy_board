@@ -176,10 +176,11 @@ this repository, so what the compiler reads is what an editor colours.
 
 ## The PPL 4.0 language
 
-PPL 4.0 is what IcyBoard's compiler targets by default. It is a superset of
-PCBoard 15.4 PPL: everything the original compiler accepted still means the same
-thing, and every addition sits behind a version number, so an old source keeps
-compiling as an old source.
+PPL 4.0 is what IcyBoard's compiler targets by default. Older source can select
+its original language and runtime versions. Compiling it as language 400 is an
+upgrade, not a guarantee of unchanged semantics; the versioned differences
+below and the [DECLARE contract](new_ppl.md#declare-contracts-and-language-versions)
+describe the compatibility boundary.
 
 ### Two version numbers
 
@@ -217,14 +218,16 @@ Some conveniences belong to this compiler rather than to a language version:
 * `RETURN expression` sets a function's result and returns in one statement.
   It is accepted even when compiling a source as language 3.40; a value in a
   procedure remains an error.
-* Declaration/implementation mismatches, invalid argument types, unknown record
-  members and writes to constants are diagnostics instead of silent output.
+* Language 400 checks complete declaration/implementation signatures. Classic
+  parameter types below 400 retain the permissive PPLC contract; nominal enum
+  signatures remain checked from 350. Unknown record members and writes to
+  constants are diagnostics.
 
 ### Language version 350
 
 3.50 is the "quality of life" version. It adds no new PPE format, so a 3.50
-source can still be compiled down to an older runtime as long as it does not
-call newer built-ins.
+source can still target an older runtime if it avoids newer built-ins and
+nominal enum storage or explicit enum conversions, which require runtime 400.
 
 #### Variable initializers
 
@@ -239,16 +242,8 @@ An array is initialized with a brace list:
 INTEGER values = { 1, 2, 3 }
 ```
 
-which is shorthand for
-
-```PPL
-INTEGER values(3)
-values(0) = 1
-values(1) = 2
-values(2) = 3
-```
-
-The brace list also decides the size, so the dimension is not written out.
+The brace list determines the array size and initializes its elements starting
+at index zero; no dimension needs to be written out.
 
 #### Bracket indexing
 
@@ -327,11 +322,12 @@ practice.
 
 #### CONST and ENUM
 
-`CONST` names a value the compiler works out and `ENUM` groups related integer
-values under a type and a namespace. Both are gone before anything is emitted -
-the name is replaced by its value, an enum is stored as `INTEGER` - so the PPE is
-the one the value written out by hand would produce, whatever runtime it targets.
-See the language reference for the full rules.
+`CONST` names a typed compile-time value. `ENUM` introduces an open nominal
+signed-32-bit type: unnamed values are legal, but different enum types do not
+implicitly mix with each other or with integers. The first declared member is
+the default. Member constants alone can target classic runtimes; enum storage
+and explicit conversions require runtime 400 and retain nominal metadata.
+See the [enum reference](new_ppl.md#constants-and-enums).
 
 #### What 350 breaks
 
@@ -349,8 +345,9 @@ See the language reference for the full rules.
 400 is where the language stops being bound by what PCBoard 15.4 could express.
 A PPE built at runtime 400 will not load on an original PCBoard.
 
-Runtime 400 is the IcyBoard-only format. It carries the type table custom types
-need, the routine-reference marker and the record-literal opcode.
+Runtime 400 is the IcyBoard-only sectioned format. It carries record and enum
+metadata, routine references, short-circuit expressions, UTF-8 constants and
+versioned host imports. See the [format specification](ppe_format.md).
 
 #### More work for brackets and braces
 
@@ -412,9 +409,9 @@ than failing, so its properties can still be read.
 | `AutoRejoin` | `BOOLEAN` | Whether a caller is rejoined here on the next call |
 | `PrivateUploads` | `BOOLEAN` | Whether uploads go to the private area |
 | `Password` | `PASSWORD` | The password needed to join |
-| `Directories` | `DIRECTORIES` | The file directories of the conference |
-| `Areas` | `AREAS` | The message areas of the conference |
-| `Doors` | `DOORS` | The doors of the conference |
+| `Directories` | `DIRECTORY[]` | The file directories of the conference |
+| `Areas` | `AREA[]` | The message areas of the conference |
+| `Doors` | `DOOR[]` | The doors of the conference |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can join the conference |
 | `CanPost()` | `BOOLEAN` | Whether the current caller may write a message |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may attach a file |
@@ -451,6 +448,8 @@ than failing, so its properties can still be read.
 | `Password` | `PASSWORD` | The password needed to reach it |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanDownload()` | `BOOLEAN` | Whether the current caller may download from it |
+| `Find(text [, after [, limit]])` | `FILEPAGE` | Bounded index search; see [filebase search](new_ppl.md#filebase-search-400) |
+| `Flag(fileName)` | `BOOLEAN` | Mark one exact indexed file for a separate download; see [marking files](new_ppl.md#marking-files-400) |
 
 **`DOOR`**
 
@@ -480,10 +479,9 @@ FOREACH item IN conf.Doors
 ENDFOREACH
 ```
 
-Note that `CONFERENCE`, `DOOR`, `AREA` and `DIRECTORY` are resolved wherever a
-type name is expected, so a variable cannot be called `door` or `area`. The names
-are compared without regard to case, so this holds for a record type a program
-declares too: `Point point` leaves `point` ambiguous.
+Type names are resolved in type positions. A variable may share a type's name,
+as in `AREA area` or `Point point`; type and value uses are distinguished by
+their context and names are case-insensitive.
 
 These objects are read-only snapshots, so assigning to a member — `conf.Name = "x"`
 — is rejected. What a member answers may be asked again, so
@@ -523,7 +521,7 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | :--- | :--- | :--- | :--- |
 | `AreaId` | Function | `AreaId(conf, area) : MSGAREAID` | Addresses a message area in any conference |
 | `Len` | Function | `Len(array, dim) : INTEGER` | Length of one array dimension |
-| `Rgb` | Function | `Rgb(r, g, b [, a]) : INTEGER` | Packs a colour as `0xRRGGBBAA` |
+| `Rgb` | Function | `Rgb(r, g, b [, a]) : UNSIGNED` | Packs a colour as `0xRRGGBBAA` |
 | `Http.Get` | Static function | `Http.Get(url) : HttpResponse` | Makes a policy-controlled GET request |
 | `Http.Download` | Static function | `Http.Download(url, file) : HttpResponse` | Streams a successful response atomically to a file |
 | `Http.New` | Static function | `Http.New(method, url) : HttpRequest` | Builds a GET, HEAD, POST, PUT, DELETE or PATCH request |
@@ -579,11 +577,11 @@ that type would be. Compound assignment works too:
 e.Age += 1
 ```
 
-A record starts out with the empty value of each of its fields, and each variable
-of a record type has fields of its own. A record is a value, not a reference:
-two variables of the same type do not share anything. A record travels into a
-routine and back out of a function like any other value, and a `VAR` parameter
-writes back.
+A record starts with each field's typed default. Ordinary nested record and
+array data has copy-on-write value semantics: changing a copy does not change
+the original. Embedded host objects retain their snapshot, live-view or shared
+resource semantics; host state is not deep-copied. A record can be a routine
+argument or result, and a checked `VAR` parameter writes back.
 
 A field may be a record itself, as long as its type was declared first, and the
 fields of that field are reached by carrying on with `.`:
@@ -623,13 +621,14 @@ Unknown and duplicate fields are errors. A field holding another record requires
 the exact nominal type. Record literals need runtime 400; the PPE stores type and
 field ids rather than their source names.
 
-Record fields may themselves be one-, two- or three-dimensional arrays,
-including arrays whose element type is an earlier record type.
-Their bounds are part of the type layout and are the same for every record value,
-so neither `REDIM record.Values, ...` nor `record.Values.Redim(...)` is allowed.
-They do answer `Len` and work with `FOREACH`. A whole field can be copied from
-another array with the same element type, rank and bounds; assigning a scalar,
-copying a different shape or using the whole field as a scalar is an error.
+Record fields may be one-, two- or three-dimensional arrays, including arrays
+of an earlier record type or a host-object type. Explicit bounds are fixed by
+the layout and cannot be changed by `REDIM` or `.Redim(...)`. Empty brackets
+declare a dynamic field of fixed rank, such as `INTEGER Values[]`; its bounds
+may change through assignment or redimensioning. Redimensioning creates fresh
+default elements, not a resized copy of the old contents. Both forms answer
+`Len` and work with `FOREACH`; fixed-field assignments additionally require
+matching bounds. See [dynamic and host-object fields](new_ppl.md#dynamic-and-host-object-fields).
 
 Rules the compiler enforces:
 
@@ -637,27 +636,29 @@ Rules the compiler enforces:
 * Field names must be unique within the type.
 * A type cannot contain a field of its own type, and can only name types that
   were declared before it, so a record cannot end up containing itself.
-* Board objects such as `CONFERENCE` cannot be fields. They are runtime snapshots,
-  not values with record copy and equality semantics.
+* Host objects may be fields, but embedding them grants no extra access or
+  mutability. Only `SURFACE` and `AUDIO` add resource-identity equality;
+  `CONTACT` retains value equality.
 * A type cannot reuse the name of a built-in or of a board object.
-* A program may declare 156 types; ids 100–255 are reserved for them, leaving
-  30–99 for board objects.
-* A type may hold 255 fields; the PPE stores the count in a single byte.
+* A program may declare up to 65,536 record types and 4,096 fields per record,
+  subject to the other [loader budgets](ppe_format.md#limits).
 * Naming a field the record does not have is an error, on both sides of an
   assignment.
 * Custom types are nominal: two separately declared records are different types
   even when their fields happen to match. Assignments and routine arguments
   require the exact custom type.
-* Equality compares two individual records of the same type by their fields.
-  Whole arrays of records cannot be compared; index them first.
+* Equality compares two individual records of the same type when every field
+  supports equality, including array contents. Whole arrays of records cannot
+  be compared directly; index them first.
 
 All `TYPE` declarations in a package are collected before its source files are
 parsed, so `main.pps` may use a type declared in another file. Record fields still
 follow declaration order: a record may only contain another record declared
 earlier in the package.
 
-Records are the one thing a PPE may assign a member of. The board objects are
-read-only snapshots, so `conf.Name = "x"` is rejected.
+Record fields and documented writable host properties can be assigned.
+Configured board snapshots remain read-only, so `conf.Name = "x"` is rejected;
+selected `Session.User` fields and local `MSGHEADER` values are writable.
 
 `TYPE` and `ENDTYPE` are keywords only at language version 400, so a 3.50 source
 may still have a variable called `type`.
@@ -666,9 +667,10 @@ The record layout is written into the PPE, which is why a program using `TYPE`
 needs runtime 400. The PCBoard runtimes have no type table - they were fixed
 before records existed.
 
-Only the field types are written, not their names — the same as for variables,
-routines and labels, none of which keep a name either. A shipped PPE therefore
-carries no identifier from the source, and a decompiler has to invent them. See
+Record layouts and enum values are always stored. With `pplc --debug`, optional
+debug data also preserves variable, record, field, enum and enum-member names;
+without it the decompiler invents names. Host imports retain the qualified API
+names needed for binding even in a stripped file. See
 [the PPE format](ppe_format.md) for the layout.
 
 #### BEGIN ... END
@@ -731,8 +733,8 @@ back at the column its `BEGIN` starts on.
   `STOP` aborts one.
 * `EXIT` is a statement name from 4.00 on, so a 3.50 source may still have a
   variable called `exit`.
-* A decompiled PPE names its records `TYPE001` and their fields `FIELD001`,
-  because the file carries no names to recover.
+* Without optional debug names, a decompiled PPE uses generated record and
+  field names such as `TYPE001` and `FIELD001`.
 
 ### The preprocessor
 

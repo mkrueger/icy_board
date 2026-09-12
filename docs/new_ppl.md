@@ -6,8 +6,9 @@ available as `pplc --lang-version`, `[compiler] language_version` in `ppl.toml`
 and the `PPL_LANG_VERSION` environment default.
 
 The *runtime version* is separate. It controls the PPE format written to disk.
-Icy Board writes one runtime of its own, 4.00. Every lower number is a PCBoard
-format, so 4.00 is what a PPE targets whenever it uses anything below.
+Icy Board writes one runtime of its own, 4.00. Lower supported targets use
+PCBoard formats. The table distinguishes syntax that can lower to classic
+instructions from features requiring the 4.00 container or APIs.
 
 | Feature | Language | Minimum runtime | What it adds |
 | :--- | :---: | :---: | :--- |
@@ -22,7 +23,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Compile-time modules | 350 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
 | Routine parameters | 400 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
-| Short-circuit logic | 400 | 400, in-memory only until the new encoding is decided | `&&` and `\|\|` skip the right operand when the left determines the result |
+| Short-circuit logic | 400 | 400 | `&&` and `\|\|` skip the right operand when the left determines the result |
 | Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `Board`, `Session` |
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
@@ -83,12 +84,10 @@ previous equal precedence of AND/OR and the overly strong NOT is a compiler
 compatibility fix, not a language-400-only rule. Existing compiled PPE trees
 are not regrouped; decompilation inserts parentheses where required.
 
-**Temporary release boundary:** new short-circuit expressions currently run
-only from the compiler's in-memory script. Writing such an executable is
-explicitly rejected with `UnsupportedShortCircuitEncoding`. No provisional
-opcode or file representation is emitted; file encoding and its roundtrip
-acceptance belong to C1/C2 of the PPL 400 release plan. Programs without these
-expressions continue to use the existing PPE path.
+Runtime 400 stores short-circuit expressions in its versioned `CODE` section.
+They survive serialization, loading and decompilation with their evaluation
+order intact. They do not require an in-memory-only execution path; see the
+[PPE 400 format](ppe_format.md#runtime-400-container).
 
 ## DECLARE contracts and language versions
 
@@ -217,9 +216,9 @@ Constants are typed compile-time expressions. Enums are open nominal integer typ
 members are scoped below the enum name, and two different enum types cannot be
 mixed merely because their stored numbers match. Their first declared member
 is the default, even when its value is not zero. Every signed 32-bit integer is
-a valid enum value, including unnamed flag combinations. The current PPE stores
-ordered enum metadata, not an allowed-value restriction or source names; the
-decompiler synthesizes names for user enums.
+a valid enum value, including unnamed flag combinations. The PPE stores ordered
+enum metadata, not an allowed-value restriction. Optional `--debug` data also
+preserves source names; without it the decompiler synthesizes user-enum names.
 
 ### Modules and imports
 
@@ -412,14 +411,15 @@ be assigned from another field only when element type, rank and all bounds match
 use an index whenever a scalar value is required.
 
 The PPE must store each record layout, so any use of `TYPE` requires runtime
-4.00. Field and type names are not stored; a decompiler invents names for them.
+4.00. Field and type names are stored only with `pplc --debug`; without that
+optional data the decompiler invents names for them.
 
-#### S1: dynamic and host-object fields (in-memory implementation)
+#### Dynamic and host-object fields
 
-**File-format gate:** The compiler and VM implement the following additions,
-but the PPE writer deliberately rejects these new record layouts until the
-separate PPE-400 format decision is implemented. They cannot yet be deployed
-as PPE files. Existing fixed value-only layouts retain their encoding.
+The runtime-400 `TYPE` section stores dynamic field shapes and host-object
+field types alongside fixed value fields. These layouts can be compiled to
+PPE files and loaded again. Host types bind by qualified name and signature;
+live resources themselves are not serialized into the program.
 
 - `INTEGER Values[]`, `STRING Grid[,]` and `Point Cells[,,]` declare empty
 	dynamic fields with a fixed element type and rank. Assignments may change
@@ -470,17 +470,16 @@ Numeric `TOBYTES` conversions retain their fixed-width little-endian format.
 
 **Stored literal encoding follows the PPE target runtime, not the source
 language version.** Below runtime 400 the existing CP437 format is unchanged.
-From runtime 400 literals are stored as UTF-8 without a BOM and loaded strictly
-as UTF-8. The existing `u16` byte length includes the final NUL: a literal can
-contain at most 65,534 encoded bytes. Embedded NULs are preserved by the
-length-delimited payload. This file limit does not limit language-400 `STRING`
-values constructed at runtime. Larger literal lengths and the remaining
-container changes are separate work.
+Runtime 400 stores literals as strict UTF-8 without a BOM in the `CONS`
+section. Each payload has a `u32` byte length and no final NUL; embedded NULs
+are preserved. The legacy 65,534-byte literal limit does not apply to this
+container. Its [section and file budgets](ppe_format.md#limits) still apply
+to compiled programs, independently of `STRING` values built at runtime.
 
-**Recompile old 400-beta PPEs containing non-ASCII literals.** Their CP437 bytes
-cannot reliably be distinguished from UTF-8 under the same version number.
-New files require the updated loader; there is no heuristic CP437 fallback.
-Malformed UTF-8, truncated literal payloads and missing final NULs are rejected.
+**Recompile old 400-beta PPEs written in the legacy container.** They are
+rejected even when their literals contain only ASCII. New 400 files start
+with `ICYPPE\0\0`; there is no heuristic fallback to the old beta encoding.
+Malformed UTF-8 and truncated literal payloads are rejected.
 
 Stored text encoding is independent of terminal encoding. UTF-8 caller
 connections receive UTF-8. At an actual CP437 output boundary, including the
@@ -859,7 +858,9 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `BOARD` | Snapshot created on first access; stable for the PPE run | Read-only |
 | `CONFERENCE` | Configured-entry snapshot | Read-only |
 | `AREA` | Configured-entry snapshot; message methods perform live I/O | Read-only |
-| `DIRECTORY` | Configured-entry snapshot | Read-only |
+| `DIRECTORY` | Configured-entry snapshot; search/mark operations recheck live permissions | Read-only |
+| `FILEENTRY` | Indexed file metadata snapshot | Read-only |
+| `FILEPAGE` | Result of one bounded index read; no snapshot across pages | Read-only |
 | `DOOR` | Configured-entry snapshot | Read-only |
 | `SESSION` | Live view of the active call | Read-only; mutate caller data through `Session.User` |
 | `USER` | Live write-through view from `Session.User`; snapshot from `Board.Users` | Session user is writable where documented; board snapshots are read-only |
@@ -867,7 +868,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `MSG` | Header snapshot; `Text()` loads the current stored body on demand | Read-only |
 | `MSGHEADER` | Local header value; `MSG.Header` returns an independent copy | Writable fields; no write-through |
 | `TERMINAL` | Live root for the caller's terminal | Read-only properties; methods change terminal state |
-| `TERMINFO` | Connection-time snapshot | Read-only |
+| `TERMINFO` | Snapshot of cached capabilities and logical dimensions at each read | Read-only |
 | `TERMINPUT` | PPE-owned input controller, released at cleanup | Mutable through methods |
 | `EVENT` | Value returned by `Poll()`/`Wait()` | Read-only |
 | `GFX` | Caller graphics-session controller | Mutable through `Init()`, `SetPacing()` and `Shutdown()` |
@@ -877,7 +878,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `PALETTE` | Live terminal palette controller | Mutable through methods |
 | `MACROS` | PPE-owned terminal macro controller | Mutable through methods |
 | `HTTP` | Stateless factory/root | Static methods only |
-| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` |
+| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetQuery()`, `SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` |
 | `HTTPRESPONSE` | Result snapshot from one completed request | Read-only; `Save()` performs output without changing the response |
 | `REGEX` | Compiled-pattern value | Read-only |
 | `REGEXMATCH` | Match-result value | Read-only |
@@ -908,8 +909,9 @@ is unavailable. It retains a bounded image while resizing the visible area:
 128 by 64 ANSI cells or 1280 by 1024 RGBA pixels. ANSI is not pixel-equivalent
 to graphics, and the backend is selected only at startup. No saving or audio is
 included. Automated tests cover ANSI and Sixel output, both mouse coordinate
-modes, English/German, resizing and cleanup; actual terminal-client acceptance
-and the automatically selected JXL path remain unverified for this PPE.
+modes, English/German, resizing and cleanup. The user accepted Paint for the
+beta; a versioned client-matrix report and the automatically selected JXL path
+remain unverified for this PPE.
 
 The root groups the session by responsibility:
 
@@ -930,9 +932,10 @@ resource returns an invalid object on failure, so it is safe to inspect its
 
 #### Graphics
 
-`Terminal.Gfx.Init(backend[, fullscreen])` starts a graphics session. `backend`
-is `GfxBackend.Auto`, `Sixel` or `Jxl`; `Auto` chooses the best capability in
-`Terminal.Info`. Fullscreen defaults to `TRUE`.
+`Terminal.Gfx.Init([backend [, fullscreen]])` starts a graphics session.
+`backend` defaults to `GfxBackend.Auto`; explicit choices are `Auto`, `Sixel`
+or `Jxl`. `Auto` chooses from the capabilities in `Terminal.Info`.
+Fullscreen defaults to `TRUE`.
 
 ```PPL
 IF !Terminal.Gfx.Init(GfxBackend.Auto) EXIT
@@ -1345,15 +1348,16 @@ Neither construct is available in this release step; `ON ERROR` remains supporte
 
 ## Runtime 4.00
 
-Runtime 4.00 is the PPE format Icy Board writes. Next to the PCBoard formats it
-adds:
+Runtime 4.00 uses a separate, sectioned container with strict UTF-8 literals,
+record and enum metadata, callable references, short-circuit expressions and
+host imports bound by name and signature. It supports optional Zstd compression,
+debug names and content identity; it is not an encrypted PCBoard container.
 
-- a type table for `TYPE ... ENDTYPE` layouts
-- a routine-reference marker for functions and procedures passed as values
-- a record-literal opcode carrying type and field identifiers
-
-A language 350 source lowers to an older compatible runtime; runtime 400 is only
-needed once a source uses something the list above adds.
+Most language-350 syntax lowers to classic instructions, but nominal enum
+storage and explicit enum conversions require runtime 400. Language-400 APIs
+and records also require runtime 400. See the
+[format specification](ppe_format.md#runtime-400-container) for its limits and
+the recompile requirement for old beta files.
 
 For the full rules, limits, diagnostics and compatibility breaks, see
 [PPL](ppl.md#the-ppl-40-language). The sections below are the library and
@@ -1500,6 +1504,7 @@ rebuilding the index. Edits and additions between calls may change later results
 ```PPL
 DIRECTORY directory = Session.Directory
 LONG after = 0
+FILEENTRY entry
 WHILE TRUE DO
 	FILEPAGE page = directory.Find("tools", after, 15)
 	ERROR failure = Error.Last()
@@ -1642,16 +1647,17 @@ everywhere else in the language, and a message number is not one.
 The body stays in the base until `Text()` asks for it, which is why it is a call.
 A listing that only prints headers never pays for a single body.
 
-A message number that is outside the base, deleted or an empty slot is an
-ordinary lookup miss: `Read()` answers an invalid `MSG`, `Text()` answers an
+A number outside the base, an empty slot or an entry JAM reports as deleted is
+an ordinary lookup miss: `Read()` answers an invalid `MSG`, `Text()` answers an
 empty string and `Error.Last().OK` remains true. Running off the end of `Find()`
 works the same way.
 
 #### Who may see a message is the program's decision
 
 `Read()` and `Find()` return what the message base holds. They do **not** apply
-the checks the interactive reader applies: a private message, a message that
-needs a password and a deleted message all come back like any other. This is
+the checks the interactive reader applies: returned headers can carry private,
+password-protected or deleted flags; entries reported as missing behave as
+described above. This is
 deliberate. A PPE is installed by the SysOp and runs with the board's own reach,
 and a maintenance or statistics program needs the unfiltered view.
 
@@ -1723,8 +1729,8 @@ below. `msg.Header` returns a mutable `MSGHEADER` copy without changing storage.
 
 ### Collections
 
-A collection answers `Count` and is read with an index. It is walked with
-`FOREACH`, which is what it is usually for:
+A collection property returns an ordinary array snapshot. It answers `Len()`,
+is read with an index and can be walked with `FOREACH`:
 
 ```PPL
 CONFERENCE conf = Session.Conference
@@ -1805,6 +1811,10 @@ ENDFOREACH
 
 The snapshot includes the user's notes and contacts, but assignments and
 `SetPassword()` are refused. Use `Session.User` when changing the caller.
+Board metadata reads do not materialize the full user array. `Users` and
+`Conferences` build and cache their PPL arrays on first access from the state
+captured for this `Board` snapshot. `Board.Users` is not a paginated or searchable
+userbase API; retaining it can retain the captured user data for the PPE run.
 
 `Session` is the call in progress. Unlike `Board` it is read live, so a value
 kept in a variable still answers with what the session became:
@@ -1930,9 +1940,9 @@ The return snapshot is captured at the write, without a fallible post-save
 reload. If accounting, output, reply bookkeeping or a later carbon copy fails
 after the first message was saved, the result still identifies that saved
 message and `Error.Last()` reports the failure. Do not retry blindly. For carbon
-lists the result identifies the first saved recipient copy. `ON ERROR` may
-transfer control before the receiving assignment completes; a handler must not
-assume that an error means nothing was saved.
+lists the result identifies the first saved recipient copy. `ON ERROR` dispatches
+after the invoking VM instruction completes, as described above; a handler must
+not assume that an error means nothing was saved.
 
 #### External editor protocol
 
@@ -2103,12 +2113,12 @@ Session.User.City = "Berlin"
 | Identity | `Valid`, `RecordNumber`, `Name`, `Alias`, `VerifyAnswer` | all but `Valid`, `RecordNumber` and `Name` |
 | Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
 | Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
-| Sysop text | `Comment`, `SysopComment`, `Notes`, `SetNote(index, text)` | yes |
+| Sysop text | `Comment`, `SysopComment`, `Notes`, `SetNote(index, text)` | comments directly; notes through `SetNote` |
 | Preferences | `ExpertMode`, `EditorMode`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `PageLength`, `Protocol` | yes |
 | Preferences the session owns | `UseGraphics`, `UseAlias`, `Language`, `DateFormat` | no |
 | Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate`, `PasswordExpires`, `SetPassword(text)` | yes |
 | Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` | no |
-| Contacts | `Contacts`, `AddContact(service, account)`, `RemoveContact(index)` | yes |
+| Contacts | `Contacts`, `AddContact(service, account)`, `RemoveContact(index)` | through the methods; array property is read-only |
 
 Whatever `PUTUSER` could write is writable here and is saved to the user file
 immediately, so the object replaces the old round trip rather than sitting beside
@@ -2183,8 +2193,9 @@ The returned array is a snapshot. Adding or removing contacts does not mutate an
 array already held by the PPE; read `User.Contacts` again to get the new list.
 
 Mutations write straight through to the caller, so no `GETUSER`/`PUTUSER` round trip
-is needed. `U_EMAIL` and `U_WEB` remain separate predefined variables for
-PCBoard 3.40 compatibility and are not duplicated here.
+is needed. `U_EMAIL` and `U_WEB` remain available for PCBoard 3.40 compatibility;
+the object exposes these details as `User.Email` and `User.Web`, separately from
+the contacts list.
 
 ## The `BYTES` type (4.00)
 
@@ -2273,9 +2284,9 @@ status or a transport failure as an empty string:
 
 ```PPL
 HttpResponse response = Http.Get("https://api.example.com/status")
-IF NOT response.Valid THEN
+IF !response.Valid THEN
 	PRINTLN Error.Last().Message
-	RETURN
+	EXIT
 ENDIF
 PRINTLN response.Status, " ", response.OK
 PRINTLN response.Header("Content-Type")
@@ -2302,8 +2313,9 @@ BYTES image = response.Bytes()
 PRINTLN image.Len(), " bytes, SHA-256 ", image.GetChecksum(Checksum.SHA256).ToHex()
 ```
 
-Use `Download()` or `Save()` instead when the body should reach a file without
-passing through memory. Both `Text()` and `Bytes()` report `ErrCode.Invalid`
+Use `Download()` to stream directly to a file without retaining the body in a
+response; `Save()` writes a body the response already holds in memory.
+Both `Text()` and `Bytes()` report `ErrCode.Invalid`
 when the response never retained a body.
 
 For a POST request or custom headers, build a request:
@@ -2437,6 +2449,7 @@ last index moving fastest:
 ```PPL
 INTEGER grid(9, 9)
 INTEGER cell
+INTEGER total = 0
 
 FOREACH cell IN grid
     total = total + cell
@@ -2622,9 +2635,9 @@ PRINTLN values.Len(), " slots"
 values.Redim(20)
 ```
 
-Only a declared array has these members. An array's type is its element's, so it
-is the declaration that says it has them; asking a plain value for `.Len()` is a
-compile error. `Redim` is a statement rather than a function, so it stands on a
+Array-member resolution uses the value's array rank as well as its element type.
+Strings and `BYTES` have their own `.Len()` members; other scalar values do not
+gain array operations. `Redim` is a statement rather than a function, so it stands on a
 line of its own the way `REDIM` does. In language 400 both forms require a
 declared array variable and exactly one bound per declared dimension: they
 change bounds, not rank. Computed arrays and read-only properties cannot be
@@ -2773,13 +2786,14 @@ Enum variables, arrays, parameters, function results and record fields retain
 their nominal type in runtime 400 PPEs, along with ordered member metadata.
 Storage, explicit conversions and bitwise operations require runtime 400 even in language 350;
 enum declarations and member constants alone can still target classic runtimes.
-The decompiler reconstructs user enum declarations with synthetic type/member
-names and preserves defaults, unnamed values and explicit conversions. Original
-names are not stored. This replaces the earlier beta's closed-value checks;
-programs must not rely on unknown numeric values causing a VM error. Deploy
-with the updated runtime; earlier beta runtimes can still reject these values.
-The existing metadata layout is unchanged. Stable host identity independent of
-compact file-local type IDs and evolving member lists remains a C1/C2 task.
+The decompiler preserves defaults, unnamed values and explicit conversions.
+It uses original type/member names when optional `--debug` data is present,
+and synthetic names otherwise. This replaces the earlier beta's closed-value
+checks; programs must not rely on unknown numeric values causing a VM error.
+Recompile old beta PPEs for the current container and deploy with the updated
+runtime. The `IMPT` section binds host types and members by their qualified names
+and stored signatures, independently of compact file-local IDs; see the
+[PPE format](ppe_format.md).
 
 ## `BEGIN ... END` Block (4.00)
 

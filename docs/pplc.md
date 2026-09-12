@@ -31,7 +31,7 @@ Options:
                     alone
   --check           checks source/package for errors without compiling
   --compression     section compression for runtime 400: none (default), zstd
-  --debug           keep variable names in the executable
+       --debug           keep optional source symbol names in PPE-400 debug data
   --print-config    prints the effective compiler configuration without
                     compiling
   --print-config-json
@@ -47,6 +47,14 @@ output is piped, redirected or read by an editor, `pplc` writes plain text, so
 escape sequences never end up in a log or an output pane. `--mono` forces plain
 text even on a terminal, `NO_COLOR` does the same through the environment, and
 `CLICOLOR_FORCE` keeps the colour when piping into a pager such as `less -R`.
+
+### Check mode
+
+`--check` validates source diagnostics and formatting without writing a PPE or
+changing the source. It returns a nonzero status for invalid code **or** a
+formatting difference. A formatting-only diff does not mean a program cannot
+compile. Use `--format` to apply formatting, or `--format --stdout` to inspect
+the formatted source without changing the file.
 
 ### Effective configuration
 
@@ -87,10 +95,11 @@ recorded in the file, so the loader never has to guess from a length difference.
 Compression is a runtime-400 feature; asking for it on an older target is an
 error rather than a silent fallback.
 
-`--debug` keeps the variable names in the executable. Without it the names are
-left out, and nothing else about the program changes — a stripped and an
-unstripped build have the same content identity. There is no source path, source
-text or line number in a PPE either way.
+`--debug` keeps variable, record, field, enum and enum-member names in optional
+PPE-400 debug data. Without it those names are left out, and nothing else about
+the program changes: stripped and unstripped builds have the same content
+identity. Qualified host API names remain necessary for binding in both forms.
+There is no source path, source text or line number in either form.
 
 ### Disassembling
 
@@ -131,9 +140,12 @@ instruction count instead of a script buffer size.
 
 ### Supported versions
 
-PPLC is designed to generate valid output files PCBoard 15.0-15.4 and icy board. Using `--version` changes the container format and sets the language version to that value.
-With `--langversion` it's possible to specify a special language version. This is useful for using the new PPL4 features for old PCBoard versions.
-Recommened is language verison 350.
+PPLC targets PCBoard 15.0-15.4 and Icy Board. `--runtime` selects the target
+container; `--version` only prints the compiler version and exits.
+`--lang-version` selects the source language independently. Language 350 syntax
+can target a classic runtime when it lowers to classic instructions; nominal
+enum storage and explicit conversions still require runtime 400. Language 400
+APIs and records cannot be made available on PCBoard by changing a CLI flag.
 
 Versions 400+ is just for icy board. Runtime 400 writes a different container
 entirely — sectioned, unencrypted and validated before it runs, described in
@@ -151,9 +163,14 @@ ppl.toml
 src/main.pps
 ```
 
-All .pps files in "src" and subdirs are taken for compilation. With "main.pps" being the 1st one. Since procedure/function declarations are no longer required in language version >= 350 this makes it easier to break down a ppl project in many logicial parts.
+All `.pps` files in `src` and its subdirectories are compiled together, with
+`main.pps` first. Explicit `DECLARE` statements are optional at every supported
+language version because the compiler collects routine signatures package-wide.
 
-Just compile 'pplc ppl.toml' and the executable is generated in `target/icy_board`. If another `--version` number is given the target directory changes to according pcboard version. Let's say `--version 330` produces `target/pcboard-15.30`.
+Run `pplc ppl.toml` to generate the executable in `target/icboard`, relative to
+the package. A classic `--runtime` selects a version-specific directory;
+`pplc --runtime 330 --lang-version 350 ppl.toml` uses `target/pcboard_15.30`.
+An explicit `;$LANGVERSION` in a source still takes precedence over the CLI.
 
 It's possible to generate/copy more files to handle CP437 for targetting DOS/PCBOARD.
 

@@ -193,6 +193,10 @@ name = "search_highlight"
 required-features = ["bbs"]
 
 [[test]]
+name = "stored_ppe"
+required-features = ["bbs"]
+
+[[test]]
 name = "test_ppe_roundtrip"
 required-features = ["bbs"]
 
