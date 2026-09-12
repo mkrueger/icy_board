@@ -64,7 +64,11 @@ fn both_languages_fit_every_supported_width_and_encoding() {
     for source in [ENGLISH, GERMAN] {
         for width in 40..=79 {
             for encoding in [Encoding::Cp437, Encoding::Utf8] {
-                let options = RenderOptions { width, encoding, ..RenderOptions::default() };
+                let options = RenderOptions {
+                    width,
+                    encoding,
+                    ..RenderOptions::default()
+                };
                 let output = render(source, &options).unwrap();
                 let visible = visible_generated(&output.bytes, encoding);
                 assert!(visible.lines().all(|line| line.chars().count() <= width), "width {width}: {visible}");
@@ -82,7 +86,14 @@ fn both_languages_fit_every_supported_width_and_encoding() {
 fn themes_change_bytes_but_not_semantic_plain_text() {
     for source in [ENGLISH, GERMAN] {
         let classic = render(source, &RenderOptions::default()).unwrap();
-        let minimal = render(source, &RenderOptions { theme: HelpTheme::preset("minimal").unwrap(), ..RenderOptions::default() }).unwrap();
+        let minimal = render(
+            source,
+            &RenderOptions {
+                theme: HelpTheme::preset("minimal").unwrap(),
+                ..RenderOptions::default()
+            },
+        )
+        .unwrap();
         assert_ne!(classic.bytes, minimal.bytes);
         assert_eq!(classic.plain_text, minimal.plain_text);
         assert_eq!(visible_generated(&minimal.bytes, Encoding::Utf8), minimal.plain_text);
@@ -102,7 +113,10 @@ fn all_roles_remain_semantic_until_serialization() {
 #[test]
 fn literal_macros_and_dispatch_characters_cannot_become_commands() {
     let source = "!door.ppe\n\n$include\n\n%script\n\n@USER@ @CLS@ @X01 @X00 @XFF @@ @ @URL:evil@\n\n`@USER@`\n\n```\n!door.ppe\n$include\n%script\n@USER@ @CLS@ @X01\n```\n";
-    let options = RenderOptions { theme: HelpTheme::preset("minimal").unwrap(), ..RenderOptions::default() };
+    let options = RenderOptions {
+        theme: HelpTheme::preset("minimal").unwrap(),
+        ..RenderOptions::default()
+    };
     let rendered = render(source, &options).unwrap();
     let wire = decoded(&rendered.bytes, options.encoding);
     assert_eq!(wire.matches("@CLS@").count(), 1);
@@ -119,7 +133,11 @@ fn literal_macros_and_dispatch_characters_cannot_become_commands() {
 #[test]
 fn escaping_happens_after_long_word_wrapping() {
     let text = format!("{}@USER@{}", "a".repeat(38), "b".repeat(91));
-    let options = RenderOptions { width: 40, theme: HelpTheme::preset("minimal").unwrap(), ..RenderOptions::default() };
+    let options = RenderOptions {
+        width: 40,
+        theme: HelpTheme::preset("minimal").unwrap(),
+        ..RenderOptions::default()
+    };
     let result = render(&text, &options).unwrap();
     assert_eq!(result.plain_text.lines().collect::<String>(), text);
     assert_eq!(visible_generated(&result.bytes, Encoding::Utf8), result.plain_text);
@@ -129,11 +147,20 @@ fn escaping_happens_after_long_word_wrapping() {
 #[test]
 fn wrapping_preserves_words_and_inline_code_spaces() {
     let text = "One two three four five six seven eight nine ten eleven twelve thirteen fourteen.";
-    let options = RenderOptions { width: 40, ..RenderOptions::default() };
+    let options = RenderOptions {
+        width: 40,
+        ..RenderOptions::default()
+    };
     let result = render(text, &options).unwrap();
-    assert_eq!(result.plain_text.split_whitespace().collect::<Vec<_>>(), text.split_whitespace().collect::<Vec<_>>());
+    assert_eq!(
+        result.plain_text.split_whitespace().collect::<Vec<_>>(),
+        text.split_whitespace().collect::<Vec<_>>()
+    );
     assert!(render("Use `a  b` now.", &options).unwrap().plain_text.contains("a  b"));
-    assert_eq!(render("A soft\nbreak and a hard  \nbreak.", &options).unwrap().plain_text, "A soft break and a hard\nbreak.\n");
+    assert_eq!(
+        render("A soft\nbreak and a hard  \nbreak.", &options).unwrap().plain_text,
+        "A soft break and a hard\nbreak.\n"
+    );
 }
 
 #[test]
@@ -150,7 +177,10 @@ fn fenced_code_preserves_whitespace_and_expands_tabs_at_four_cells() {
 
 #[test]
 fn oversized_code_is_an_error_not_silently_wrapped() {
-    let options = RenderOptions { width: 40, ..RenderOptions::default() };
+    let options = RenderOptions {
+        width: 40,
+        ..RenderOptions::default()
+    };
     assert!(render(&format!("```\n{}\n```", "x".repeat(40)), &options).is_ok());
     let err = render(&format!("```\n{}\n```", "x".repeat(41)), &options).unwrap_err();
     assert!(err.to_string().contains("Code line"));
@@ -160,7 +190,10 @@ fn oversized_code_is_an_error_not_silently_wrapped() {
 #[test]
 fn nested_lists_keep_hanging_indentation_and_numbers() {
     let source = "3. First entry\n   - Nested entry with many words that should wrap onto a continuation line\n   - Next nested entry\n4. Last entry\n";
-    let options = RenderOptions { width: 40, ..RenderOptions::default() };
+    let options = RenderOptions {
+        width: 40,
+        ..RenderOptions::default()
+    };
     let text = render(source, &options).unwrap().plain_text;
     assert!(text.contains("3. First entry\n"), "{text}");
     assert!(text.contains("   - Nested entry"), "{text}");
@@ -174,7 +207,14 @@ fn tables_use_stacked_label_value_rows() {
         "| Command | Description |\n| --- | --- |\n| `R` | Read **messages** |\n| `W` | Write a message |\n",
         "| Befehl | Beschreibung |\n| --- | --- |\n| `R` | Nachrichten **lesen** |\n| `W` | Nachricht schreiben |\n",
     ] {
-        let result = render(source, &RenderOptions { width: 40, ..RenderOptions::default() }).unwrap();
+        let result = render(
+            source,
+            &RenderOptions {
+                width: 40,
+                ..RenderOptions::default()
+            },
+        )
+        .unwrap();
         assert!(result.plain_text.contains(": R\n"));
         assert!(result.plain_text.contains(": W\n"));
         assert!(!result.plain_text.contains('|'));
@@ -217,10 +257,33 @@ fn unsupported_markdown_is_rejected() {
 #[test]
 fn source_and_entity_controls_and_non_cell_characters_are_rejected() {
     for source in [
-        "a\x1bb", "a\x00b", "a\x07b", "a\x08b", "a\x1ab", "a\x7fb", "a\u{0085}b", "a&#27;b", "a&#10;b", "e\u{0301}", "漢字", "🙂", "a\u{200b}b", "a\u{202e}b",
+        "a\x1bb",
+        "a\x00b",
+        "a\x07b",
+        "a\x08b",
+        "a\x1ab",
+        "a\x7fb",
+        "a\u{0085}b",
+        "a&#27;b",
+        "a&#10;b",
+        "e\u{0301}",
+        "漢字",
+        "🙂",
+        "a\u{200b}b",
+        "a\u{202e}b",
     ] {
         for encoding in [Encoding::Cp437, Encoding::Utf8] {
-            assert!(render(source, &RenderOptions { encoding, ..RenderOptions::default() }).is_err(), "Accepted {source:?}");
+            assert!(
+                render(
+                    source,
+                    &RenderOptions {
+                        encoding,
+                        ..RenderOptions::default()
+                    }
+                )
+                .is_err(),
+                "Accepted {source:?}"
+            );
         }
     }
 }
@@ -228,7 +291,10 @@ fn source_and_entity_controls_and_non_cell_characters_are_rejected() {
 #[test]
 fn cp437_is_lossless_and_utf8_has_a_bom() {
     let source = "ÄÖÜ äöü ß é";
-    let legacy = RenderOptions { encoding: Encoding::Cp437, ..RenderOptions::default() };
+    let legacy = RenderOptions {
+        encoding: Encoding::Cp437,
+        ..RenderOptions::default()
+    };
     let cp = render(source, &legacy).unwrap();
     assert!(!cp.bytes.starts_with(&[0xEF, 0xBB, 0xBF]));
     assert!(cp.bytes.contains(&0x8E));
@@ -245,26 +311,67 @@ fn cp437_is_lossless_and_utf8_has_a_bom() {
 #[test]
 fn invalid_geometry_and_special_or_blinking_colors_are_rejected() {
     for width in [0, 39, 80, usize::MAX] {
-        assert!(render("text", &RenderOptions { width, ..RenderOptions::default() }).is_err());
+        assert!(
+            render(
+                "text",
+                &RenderOptions {
+                    width,
+                    ..RenderOptions::default()
+                }
+            )
+            .is_err()
+        );
     }
     for attribute in [0x00, 0x80, 0xFF] {
         let mut theme = HelpTheme::default();
         theme.body = attribute;
-        assert!(render("text", &RenderOptions { theme, ..RenderOptions::default() }).is_err());
+        assert!(
+            render(
+                "text",
+                &RenderOptions {
+                    theme,
+                    ..RenderOptions::default()
+                }
+            )
+            .is_err()
+        );
     }
     let mut theme = HelpTheme::default();
     theme.margin = usize::MAX;
-    assert!(render("text", &RenderOptions { theme, ..RenderOptions::default() }).is_err());
+    assert!(
+        render(
+            "text",
+            &RenderOptions {
+                theme,
+                ..RenderOptions::default()
+            }
+        )
+        .is_err()
+    );
     let mut theme = HelpTheme::default();
     theme.margin = 19;
-    assert!(render("> > > too deep", &RenderOptions { width: 40, theme, ..RenderOptions::default() }).is_err());
+    assert!(
+        render(
+            "> > > too deep",
+            &RenderOptions {
+                width: 40,
+                theme,
+                ..RenderOptions::default()
+            }
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn margins_reserve_both_edges() {
     let mut theme = HelpTheme::default();
     theme.margin = 3;
-    let options = RenderOptions { width: 40, theme, ..RenderOptions::default() };
+    let options = RenderOptions {
+        width: 40,
+        theme,
+        ..RenderOptions::default()
+    };
     let result = render(ENGLISH, &options).unwrap();
     for line in visible_generated(&result.bytes, Encoding::Utf8).lines().filter(|line| !line.is_empty()) {
         assert!(line.starts_with("   "));
@@ -276,7 +383,14 @@ fn margins_reserve_both_edges() {
 fn clear_screen_is_optional_reset_is_unconditional_and_crlf_is_normalized() {
     for clear_screen in [true, false] {
         for source in ["", "plain\n\ntext", "plain\r\n\r\ntext", "plain\r\rtext"] {
-            let result = render(source, &RenderOptions { clear_screen, ..RenderOptions::default() }).unwrap();
+            let result = render(
+                source,
+                &RenderOptions {
+                    clear_screen,
+                    ..RenderOptions::default()
+                },
+            )
+            .unwrap();
             let wire = decoded(&result.bytes, Encoding::Utf8);
             assert_eq!(wire.matches("@CLS@").count(), usize::from(clear_screen));
             assert!(wire.ends_with("@X07"));

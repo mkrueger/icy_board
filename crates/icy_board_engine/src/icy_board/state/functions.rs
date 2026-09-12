@@ -689,7 +689,11 @@ impl IcyBoardState {
             let user_name = msg.to().ok_or_else(|| std::io::Error::other("Message has no recipient"))?.to_string();
             self.get_email_msgbase(&user_name).await
         } else {
-            let path = self.get_board().await.conferences.get(conf as usize)
+            let path = self
+                .get_board()
+                .await
+                .conferences
+                .get(conf as usize)
                 .and_then(|conference| conference.areas.as_ref())
                 .and_then(|areas| usize::try_from(area).ok().and_then(|area| areas.get(area)))
                 .map(|area| area.path.clone())

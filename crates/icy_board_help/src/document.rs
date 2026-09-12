@@ -201,7 +201,10 @@ fn is_inline(event: &Event<'_>) -> bool {
 fn validate_text(text: &str) -> Result<()> {
     for ch in text.chars() {
         if ch.is_control() || UnicodeWidthChar::width(ch) != Some(1) {
-            return Err(invalid(format!("Character {ch:?} (U+{:04X}) must be printable and exactly one terminal cell wide", ch as u32)));
+            return Err(invalid(format!(
+                "Character {ch:?} (U+{:04X}) must be printable and exactly one terminal cell wide",
+                ch as u32
+            )));
         }
     }
     Ok(())
@@ -250,12 +253,23 @@ impl Layout<'_> {
                 Block::Heading(spans, role) => {
                     self.prose(spans, prefix, *role)?;
                     if self.theme.decoration {
-                        let text = format!("{}{}", prefix.rest, if *role == Role::Title { "=" } else { "-" }.repeat(self.available(&prefix.rest)?));
-                        self.document.lines.push(StyledLine { spans: vec![span(Role::Border, &text)?], decoration: true });
+                        let text = format!(
+                            "{}{}",
+                            prefix.rest,
+                            if *role == Role::Title { "=" } else { "-" }.repeat(self.available(&prefix.rest)?)
+                        );
+                        self.document.lines.push(StyledLine {
+                            spans: vec![span(Role::Border, &text)?],
+                            decoration: true,
+                        });
                     }
                 }
                 Block::Note(children) => {
-                    let mut nested = Prefix { first: format!("{}> ", prefix.take()), rest: format!("{}> ", prefix.rest), used: false };
+                    let mut nested = Prefix {
+                        first: format!("{}> ", prefix.take()),
+                        rest: format!("{}> ", prefix.rest),
+                        used: false,
+                    };
                     self.blocks(children, &mut nested, Role::Note)?;
                 }
                 Block::List(start, items) => {
@@ -293,7 +307,10 @@ impl Layout<'_> {
                         validate_text(&expanded)?;
                         let lead = prefix.take();
                         if column > self.available(&lead)? {
-                            return Err(invalid(format!("Code line has {column} cells but only {} fit; shorten the line or increase width", self.available(&lead)?)));
+                            return Err(invalid(format!(
+                                "Code line has {column} cells but only {} fit; shorten the line or increase width",
+                                self.available(&lead)?
+                            )));
                         }
                         self.push_line(&lead, &expanded.chars().map(|ch| (ch, Role::Code)).collect::<Vec<_>>(), base)?;
                     }
@@ -311,7 +328,13 @@ impl Layout<'_> {
                                 self.gap();
                             }
                             for (header, cell) in headers.iter().zip(row) {
-                                let mut field: Inline = header.iter().map(|s| StyledSpan { role: Role::Heading, text: s.text.clone() }).collect();
+                                let mut field: Inline = header
+                                    .iter()
+                                    .map(|s| StyledSpan {
+                                        role: Role::Heading,
+                                        text: s.text.clone(),
+                                    })
+                                    .collect();
                                 field.push(span(Role::Body, ": ")?);
                                 field.extend(cell.iter().cloned());
                                 self.prose(&field, prefix, base)?;
@@ -440,10 +463,21 @@ pub fn compile(markdown: &str, width: usize, theme: &HelpTheme) -> Result<Docume
             return Err(invalid(format!("Tabs are allowed only in code, at byte {offset}")));
         }
     }
-    let blocks = Reader { events: events.into_iter().peekable() }.blocks(None)?;
+    let blocks = Reader {
+        events: events.into_iter().peekable(),
+    }
+    .blocks(None)?;
     let margin = " ".repeat(theme.margin);
-    let mut prefix = Prefix { first: margin.clone(), rest: margin, used: false };
-    let mut layout = Layout { width, theme, document: Document::default() };
+    let mut prefix = Prefix {
+        first: margin.clone(),
+        rest: margin,
+        used: false,
+    };
+    let mut layout = Layout {
+        width,
+        theme,
+        document: Document::default(),
+    };
     layout.blocks(&blocks, &mut prefix, Role::Body)?;
     Ok(layout.document)
 }

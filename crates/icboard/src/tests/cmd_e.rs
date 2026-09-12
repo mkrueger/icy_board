@@ -43,7 +43,10 @@ fn test_cmd_e_empty_subject_aborts() {
 fn test_cmd_e_validates_unknown_recipients() {
     let output = test_output("E\nNOBODY\nC\n\n".to_string(), |_| {});
     assert!(output.contains("Could not find"), "the unknown name was accepted:\n{output}");
-    assert!(output.to_ascii_lowercase().contains("e-enter user's name"), "the validation choice is missing:\n{output}");
+    assert!(
+        output.to_ascii_lowercase().contains("e-enter user's name"),
+        "the validation choice is missing:\n{output}"
+    );
 }
 
 #[test]

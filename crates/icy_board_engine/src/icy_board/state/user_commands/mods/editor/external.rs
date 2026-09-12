@@ -402,7 +402,13 @@ mod tests {
             }
             state.session.tokens.push_back("caller argument".into());
             let config = state.get_board().await.config.message.external_editor.clone();
-            let mut editor = EditState { msg: vec!["original".into()], subj: "Original".into(), max_lines: 1, max_line_length: 79, ..Default::default() };
+            let mut editor = EditState {
+                msg: vec!["original".into()],
+                subj: "Original".into(),
+                max_lines: 1,
+                max_line_length: 79,
+                ..Default::default()
+            };
             assert!(state.run_external_editor(&config, &mut editor, "General", false).await.is_err());
             assert_eq!(editor.msg, ["original"]);
             assert_eq!(editor.subj, "Original");
@@ -429,7 +435,13 @@ mod tests {
             };
             state.session.tokens.push_back("caller argument".into());
             state.ppe_nesting = 1;
-            let mut editor = EditState { msg: vec!["original body".into()], subj: "Original".into(), max_lines: 100, max_line_length: 79, ..Default::default() };
+            let mut editor = EditState {
+                msg: vec!["original body".into()],
+                subj: "Original".into(),
+                max_lines: 100,
+                max_line_length: 79,
+                ..Default::default()
+            };
             let result = state.run_external_editor(&config, &mut editor, "General", false).await.unwrap();
             assert_eq!(result, if stop { EditResult::Abort } else { EditResult::SendMessage });
             assert_eq!(state.session.tokens.front().map(String::as_str), Some("caller argument"));

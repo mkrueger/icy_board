@@ -694,7 +694,10 @@ fn genhelp_theme_accepts_a_file_path_and_rejects_unreadable_ones() {
         theme: toml::from_str(theme_text).unwrap(),
         ..Default::default()
     };
-    let output = genhelp_command(root.path()).args(["--output", "themed", "--theme", "custom.toml"]).output().unwrap();
+    let output = genhelp_command(root.path())
+        .args(["--output", "themed", "--theme", "custom.toml"])
+        .output()
+        .unwrap();
     assert_help_success(&output);
     let themed = root.path().join("themed");
     assert_eq!(fs::read_dir(&themed).unwrap().count(), 68);
@@ -720,10 +723,7 @@ fn genhelp_theme_accepts_a_file_path_and_rejects_unreadable_ones() {
     fs::create_dir(root.path().join("directory.toml")).unwrap();
     let before = tree_snapshot(root.path());
     for theme in ["missing.toml", "broken.toml", "unknown-field.toml", "blinking.toml", "directory.toml"] {
-        let output = genhelp_command(root.path())
-            .args(["--output", "rejected", "--theme", theme])
-            .output()
-            .unwrap();
+        let output = genhelp_command(root.path()).args(["--output", "rejected", "--theme", theme]).output().unwrap();
         assert!(!output.status.success(), "{theme}");
         assert!(String::from_utf8_lossy(&output.stderr).to_lowercase().contains("theme"), "{theme}");
         assert!(!root.path().join("rejected").exists(), "{theme}");

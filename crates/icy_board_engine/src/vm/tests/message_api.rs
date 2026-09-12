@@ -789,7 +789,11 @@ async fn message_api_liquid_read_real_package() {
             assert!(reply.header().is_private());
             assert!(reply.text().to_string().contains("Original body"), "saved body: {:?}", reply.text());
             if matches!(editor_kind.as_str(), "lredit" | "ledit") {
-                let expected_pid = if editor_kind == "ledit" { "LiQUiD Edit 1.1.0" } else { "LiQUiD Read Editor 0.1.0" };
+                let expected_pid = if editor_kind == "ledit" {
+                    "LiQUiD Edit 1.1.0"
+                } else {
+                    "LiQUiD Read Editor 0.1.0"
+                };
                 assert!(
                     reply
                         .header()

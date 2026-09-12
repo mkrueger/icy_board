@@ -15,8 +15,14 @@ impl IcyBoardState {
     pub async fn read_messages_in_area(&mut self, msg_area: usize) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
         if !self.session.user_command_level.cmd_r.session_can_access(&self.session)
-            || self.session.current_conference.areas.as_ref().and_then(|areas| areas.get(msg_area))
-                .is_some_and(|area| !area.req_level_to_list.session_can_access(&self.session)) {
+            || self
+                .session
+                .current_conference
+                .areas
+                .as_ref()
+                .and_then(|areas| areas.get(msg_area))
+                .is_some_and(|area| !area.req_level_to_list.session_can_access(&self.session))
+        {
             return Ok(());
         }
         let Some(message_base_file) = self.message_area_path(msg_area) else {

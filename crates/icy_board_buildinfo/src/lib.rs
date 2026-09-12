@@ -27,9 +27,5 @@ fn git(arguments: &[&str]) -> Option<String> {
         return None;
     }
     let text = String::from_utf8(output.stdout).ok()?.trim().to_string();
-    if text.is_empty() {
-        None
-    } else {
-        Some(text)
-    }
+    if text.is_empty() { None } else { Some(text) }
 }

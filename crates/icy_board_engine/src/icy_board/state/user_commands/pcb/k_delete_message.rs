@@ -184,7 +184,9 @@ impl IcyBoardState {
                 return self.kill_message_result(IceText::NoSuchMessageNumber, number).await;
             }
         };
-        self.try_to_kill_reply_source(message_base, snapshot.message, snapshot.generation).await.map(|_| ())
+        self.try_to_kill_reply_source(message_base, snapshot.message, snapshot.generation)
+            .await
+            .map(|_| ())
     }
 
     /// Use an already-owned source, never a newly selected message at its number.
@@ -192,7 +194,13 @@ impl IcyBoardState {
     pub(super) async fn try_to_kill_reply_source(&mut self, message_base: &mut JamMessageBase, original: JamMessage, generation: u32) -> Res<bool> {
         let number = original.header().message_number;
         let snapshot = KillSnapshot { message: original, generation };
-        let read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
+        let read_all = self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .read_all_mail
+            .session_can_access(&self.session);
         let access = KillAccess {
             user: &self.session.user_name,
             alias: &self.session.alias_name,

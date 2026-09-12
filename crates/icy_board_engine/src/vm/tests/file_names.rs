@@ -10,10 +10,7 @@ fn e1_legacy_file_listing_exposes_filesystem_entries_and_signed_sizes() {
     std::fs::write(root.path().join("download.zip"), CONTENT).unwrap();
     std::fs::write(root.path().join("metadata.dat"), b"not a published download").unwrap();
     std::fs::create_dir(root.path().join("subdirectory")).unwrap();
-    std::fs::File::create(root.path().join("large.zip"))
-        .unwrap()
-        .set_len(2_147_483_648)
-        .unwrap();
+    std::fs::File::create(root.path().join("large.zip")).unwrap().set_len(2_147_483_648).unwrap();
     let source = format!(
         r#"
 STRING path = FINDFIRST("{}/*")

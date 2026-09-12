@@ -252,7 +252,11 @@ fn test_cmd_r_export_protocol_prompt_can_be_cancelled() {
     assert!(!output.contains("Invalid Entry"), "X was rejected:\n{output}");
     assert!(!output.contains("Sending File(s)"), "cancel started a transfer:\n{output}");
     assert_eq!(output.matches("Body of message 1").count(), 2, "cancel must redisplay the message:\n{output}");
-    assert_eq!(output.matches("End of Message Command?").count(), 2, "cancel must return to the reader:\n{output}");
+    assert_eq!(
+        output.matches("End of Message Command?").count(),
+        2,
+        "cancel must return to the reader:\n{output}"
+    );
     assert!(base.read_last_read_file().unwrap().is_empty());
 }
 
@@ -279,7 +283,12 @@ fn persisted_read_with_session(input: &str, local: bool, setup: impl Fn(&mut icy
 }
 
 fn last_pointer(base: &jamjam::jam::JamMessageBase) -> u32 {
-    base.read_last_read_file().unwrap().into_iter().map(|last| last.last_read_msg).max().unwrap_or(0)
+    base.read_last_read_file()
+        .unwrap()
+        .into_iter()
+        .map(|last| last.last_read_msg)
+        .max()
+        .unwrap_or(0)
 }
 
 #[test]
@@ -380,9 +389,14 @@ fn test_cmd_r_thread_uses_displayed_subject_and_skips_unrelated_messages() {
 
 fn second_conference_message(board: &mut icy_board_engine::icy_board::IcyBoard) {
     let mut base = jamjam::jam::JamMessageBase::create(&board.conferences[1].areas.as_ref().unwrap()[0].path).unwrap();
-    base.write_message(&jamjam::jam::JamMessage::default().with_from(bstr::BString::from("SYSOP"))
-        .with_to(bstr::BString::from("ALL")).with_subject(bstr::BString::from("Other conference"))
-        .with_text(bstr::BString::from("OTHER-CONFERENCE-BODY"))).unwrap();
+    base.write_message(
+        &jamjam::jam::JamMessage::default()
+            .with_from(bstr::BString::from("SYSOP"))
+            .with_to(bstr::BString::from("ALL"))
+            .with_subject(bstr::BString::from("Other conference"))
+            .with_text(bstr::BString::from("OTHER-CONFERENCE-BODY")),
+    )
+    .unwrap();
     base.write_jhr_header().unwrap();
 }
 

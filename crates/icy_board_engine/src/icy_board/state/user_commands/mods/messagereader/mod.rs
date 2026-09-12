@@ -57,7 +57,10 @@ enum ReaderExit {
 
 fn sync_receipt_files(base: &JamMessageBase) -> jamjam::Result<()> {
     for extension in ["jdt", "jhr", "jdx"] {
-        std::fs::OpenOptions::new().write(true).open(base.path().with_extension(extension))?.sync_all()?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(base.path().with_extension(extension))?
+            .sync_all()?;
     }
     Ok(())
 }
@@ -68,8 +71,11 @@ fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, ali
     Ok(base.transaction(|base| {
         let mut header = base.read_header(number)?;
         let to = header.to().map(|name| name.to_string()).unwrap_or_default();
-        if header.is_deleted() || to.starts_with('@') || to.eq_ignore_ascii_case("ALL")
-            || !(to.trim().eq_ignore_ascii_case(user) || (!alias.is_empty() && to.trim().eq_ignore_ascii_case(alias))) {
+        if header.is_deleted()
+            || to.starts_with('@')
+            || to.eq_ignore_ascii_case("ALL")
+            || !(to.trim().eq_ignore_ascii_case(user) || (!alias.is_empty() && to.trim().eq_ignore_ascii_case(alias)))
+        {
             return Ok(false);
         }
         let receipt = header.is_receipt_req();
@@ -81,10 +87,20 @@ fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, ali
         if receipt {
             // Keep a stable key on the receipt. If its append succeeds but the
             // source-header update fails, a retry finds it instead of duplicating it.
-            let existing_key = header.sub_fields.iter().find(|field| field.field_type() == SubfieldType::FTSKludge
-                && field.content().starts_with(b"ICYBOARD-RECEIPT-KEY: ")).map(|field| field.content().clone());
-            let key = if let Some(key) = existing_key { key } else {
-                let key = BString::from(format!("ICYBOARD-RECEIPT-KEY: {}:{}:{}", number, header.date_written, now.timestamp_nanos_opt().unwrap_or_default()));
+            let existing_key = header
+                .sub_fields
+                .iter()
+                .find(|field| field.field_type() == SubfieldType::FTSKludge && field.content().starts_with(b"ICYBOARD-RECEIPT-KEY: "))
+                .map(|field| field.content().clone());
+            let key = if let Some(key) = existing_key {
+                key
+            } else {
+                let key = BString::from(format!(
+                    "ICYBOARD-RECEIPT-KEY: {}:{}:{}",
+                    number,
+                    header.date_written,
+                    now.timestamp_nanos_opt().unwrap_or_default()
+                ));
                 header.sub_fields.push(MessageSubfield::new(SubfieldType::FTSKludge, key.clone()));
                 raw::update_header(base, number, &header)?;
                 sync_receipt_files(base)?;
@@ -96,8 +112,12 @@ fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, ali
             // re-arm a source whose request flag failed to clear.
             for candidate in raw::physical_headers(base)? {
                 let candidate = candidate?;
-                let is_ack = |header: &JamMessageHeader| header.sub_fields.iter().any(|field|
-                    field.field_type() == SubfieldType::FTSKludge && field.content() == &acknowledgment_key);
+                let is_ack = |header: &JamMessageHeader| {
+                    header
+                        .sub_fields
+                        .iter()
+                        .any(|field| field.field_type() == SubfieldType::FTSKludge && field.content() == &acknowledgment_key)
+                };
                 if is_ack(&candidate) && (candidate.is_deleted() || base.read_header(candidate.message_number).is_ok_and(|header| is_ack(&header))) {
                     exists = true;
                     received_at = candidate.date_written;
@@ -113,7 +133,10 @@ fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, ali
                     .with_date_time(now)
                     .with_attributes(attributes::MSG_PRIVATE | attributes::MSG_LOCAL)
                     .with_sub_field(MessageSubfield::new(SubfieldType::FTSKludge, acknowledgment_key))
-                    .with_text(BString::from(format!("Your message: {number}\r\nAddressed to: {to}\r\nReceived on: {}\r\n", now.format("%m/%d/%y %H:%M"))));
+                    .with_text(BString::from(format!(
+                        "Your message: {number}\r\nAddressed to: {to}\r\nReceived on: {}\r\n",
+                        now.format("%m/%d/%y %H:%M")
+                    )));
                 for field in &header.sub_fields {
                     if field.field_type() == SubfieldType::MsgID {
                         ack = ack.with_reply_id(field.content().clone());
@@ -209,7 +232,11 @@ fn commit_displayed_read(
             }
             let number = snapshot.header.message_number;
             let receipt = status && record_recipient_read(base, number, user, alias)?;
-            let pointers = if pointer { Some(advance_read_pointer(base, user, user_id, number)?) } else { None };
+            let pointers = if pointer {
+                Some(advance_read_pointer(base, user, user_id, number)?)
+            } else {
+                None
+            };
             Ok((receipt, pointers))
         })();
         result.map_err(|error| std::io::Error::other(error.to_string()).into())
@@ -408,15 +435,30 @@ impl MessageViewer {
                     .filter(|_| header.date_received != 0)
                     .map(|date| date.format("%m/%d/%y (%H:%M)").to_string())
                     .unwrap_or_else(|| self._not_read.text.clone())
-            } else { self._not_read.text.clone() };
+            } else {
+                self._not_read.text.clone()
+            };
             let status = if header.needs_password() {
-                if requires_read_password(header, false) { &self._grp_pwd.text } else { &self._snd_pwd.text }
-            } else if header.is_private() { &self._rcv_only.text } else { &self._public.text };
+                if requires_read_password(header, false) {
+                    &self._grp_pwd.text
+                } else {
+                    &self._snd_pwd.text
+                }
+            } else if header.is_private() {
+                &self._rcv_only.text
+            } else {
+                &self._public.text
+            };
             let txt = self.format_hdr_text(&self._read.text, &received, &format!("{} {}", self._status.text.trim(), status));
             state.print(TerminalTarget::Both, &txt).await?;
-            let area = state.session.current_conference.areas.as_ref()
+            let area = state
+                .session
+                .current_conference
+                .areas
+                .as_ref()
                 .and_then(|areas| areas.get(state.session.current_message_area))
-                .map(|area| area.name.as_str()).unwrap_or_default();
+                .map(|area| area.name.as_str())
+                .unwrap_or_default();
             let txt = self.format_hdr_text(&self.confarea.text, &state.session.current_conference.name, area);
             state.print(TerminalTarget::Both, &txt).await?;
         }
@@ -487,7 +529,9 @@ impl IcyBoardState {
                 self.session.push_tokens(&text);
             }
 
-            let mut cmd = if let Some(cmd) = pending.take() { cmd } else {
+            let mut cmd = if let Some(cmd) = pending.take() {
+                cmd
+            } else {
                 let tokens: Vec<String> = self.session.tokens.drain(..).collect();
                 let ctx = self.read_parse_context(0).await;
                 read_command::parse(&tokens, ReadLoop::Outside, &ctx)
@@ -535,8 +579,11 @@ impl IcyBoardState {
                     }
                     MsgFunc::JumpOut => break,
                     MsgFunc::Kill if cmd.numbers.is_empty() => {
-                        let answer = if let Some(answer) = cmd.action_args.first() { answer.clone() } else {
-                            self.input_field(IceText::MessageNumberToKill, 10, &MASK_NUM, "hlpk", None, display_flags::NEWLINE).await?
+                        let answer = if let Some(answer) = cmd.action_args.first() {
+                            answer.clone()
+                        } else {
+                            self.input_field(IceText::MessageNumberToKill, 10, &MASK_NUM, "hlpk", None, display_flags::NEWLINE)
+                                .await?
                         };
                         if let Ok(number) = answer.parse::<u32>() {
                             self.run_read_action(&cmd, &mut message_base, number).await?;
@@ -552,9 +599,18 @@ impl IcyBoardState {
                         continue;
                     }
                     MsgFunc::Skip if !options.update_pointers || !self.get_board().await.config.message.update_last_read_pointer => continue,
-                    MsgFunc::Reply | MsgFunc::ReplyOther | MsgFunc::EditHeader | MsgFunc::EditMessage
-                    | MsgFunc::Copy | MsgFunc::Move | MsgFunc::Forward | MsgFunc::Protect | MsgFunc::Unprotect
-                    | MsgFunc::FindTo | MsgFunc::FindFrom | MsgFunc::Export => {
+                    MsgFunc::Reply
+                    | MsgFunc::ReplyOther
+                    | MsgFunc::EditHeader
+                    | MsgFunc::EditMessage
+                    | MsgFunc::Copy
+                    | MsgFunc::Move
+                    | MsgFunc::Forward
+                    | MsgFunc::Protect
+                    | MsgFunc::Unprotect
+                    | MsgFunc::FindTo
+                    | MsgFunc::FindFrom
+                    | MsgFunc::Export => {
                         self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
                         continue;
                     }
@@ -570,7 +626,8 @@ impl IcyBoardState {
             let exit = if cmd.all_conf {
                 self.read_all_conferences(&viewer, &cmd, &mut options).await?
             } else {
-                self.read_command_from_base(&mut message_base, &viewer, cmd, &mut options, None, only_personal).await?
+                self.read_command_from_base(&mut message_base, &viewer, cmd, &mut options, None, only_personal)
+                    .await?
             };
             match exit {
                 ReaderExit::Command(cmd) => pending = Some(cmd),
@@ -616,7 +673,12 @@ impl IcyBoardState {
 
     /// Turn a parsed range into the message numbers this base actually holds.
     fn clamp_range(&self, range: read_command::MsgRange, low_number: u32, high_number: u32) -> (u32, u32) {
-        if range.first <= 0 || high_number == 0 || low_number > high_number || range.first.max(range.last) < low_number as i64 || range.first.min(range.last) > high_number as i64 {
+        if range.first <= 0
+            || high_number == 0
+            || low_number > high_number
+            || range.first.max(range.last) < low_number as i64
+            || range.first.min(range.last) > high_number as i64
+        {
             return (0, 0);
         }
         let high = high_number.max(low_number);
@@ -759,8 +821,15 @@ impl IcyBoardState {
             }
         }
 
-        if cmd.func == MsgFunc::None && cmd.numbers.is_empty() && !cmd.all_conf && !cmd.since && !cmd.new_msgs
-            && !cmd.your_msgs && !cmd.from_msgs && !cmd.unread_only {
+        if cmd.func == MsgFunc::None
+            && cmd.numbers.is_empty()
+            && !cmd.all_conf
+            && !cmd.since
+            && !cmd.new_msgs
+            && !cmd.your_msgs
+            && !cmd.from_msgs
+            && !cmd.unread_only
+        {
             if !cmd.valid_cmd {
                 self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -780,11 +849,20 @@ impl IcyBoardState {
         keep_going: bool,
         filter: &MessageFilter,
     ) -> Res<()> {
-        let cmd = ReadCommand { numbers: vec![MsgRange { first: first as i64, last: last as i64 }], keep_going, ..Default::default() };
+        let cmd = ReadCommand {
+            numbers: vec![MsgRange {
+                first: first as i64,
+                last: last as i64,
+            }],
+            keep_going,
+            ..Default::default()
+        };
         let saved_search = self.session.search_pattern.clone();
         let result = async {
             let mut options = ReaderOptions::default();
-            let mut exit = self.read_command_from_base(message_base, viewer, cmd, &mut options, Some(filter.clone()), false).await?;
+            let mut exit = self
+                .read_command_from_base(message_base, viewer, cmd, &mut options, Some(filter.clone()), false)
+                .await?;
             while let ReaderExit::Command(cmd) = exit {
                 if cmd.all_conf {
                     exit = self.read_all_conferences(viewer, &cmd, &mut options).await?;
@@ -792,10 +870,13 @@ impl IcyBoardState {
                     self.session.tokens.extend(cmd.action_args);
                     self.join_conference_cmd().await?;
                     break;
-                } else { break; }
+                } else {
+                    break;
+                }
             }
             Ok(())
-        }.await;
+        }
+        .await;
         self.session.search_pattern = saved_search;
         result
     }
@@ -809,19 +890,28 @@ impl IcyBoardState {
                 self.session.search_pattern = Some(regex::Regex::new(r"\b\B").expect("never-matching regex"));
             }
         }
-        let may_read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
+        let may_read_all = self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .read_all_mail
+            .session_can_access(&self.session);
         MessageFilter::new(cmd, &self.session, may_read_all)
     }
 
     async fn apply_reader_options(&mut self, cmd: &ReadCommand, options: &mut ReaderOptions, inside: bool) -> Res<bool> {
         if let Some(reason) = capture::unsupported(cmd) {
-            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
+            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
             self.println(TerminalTarget::Both, reason).await?;
             return Ok(false);
         }
         options.update_pointers &= cmd.update_pointers;
         options.update_status &= cmd.update_msg_status;
-        if let Some(length) = cmd.header_len { options.header = length; }
+        if let Some(length) = cmd.header_len {
+            options.header = length;
+        }
         if let Some(alias) = cmd.toggle_alias {
             self.session.use_alias = match alias {
                 AliasToggle::On => true,
@@ -830,7 +920,13 @@ impl IcyBoardState {
             };
         }
         if cmd.show_help {
-            let path = self.get_board().await.config.paths.help_path.join(if inside { "hlpendr" } else { CommandType::ReadMessages.get_help() });
+            let path = self
+                .get_board()
+                .await
+                .config
+                .paths
+                .help_path
+                .join(if inside { "hlpendr" } else { CommandType::ReadMessages.get_help() });
             self.display_file(&path).await?;
         }
         Ok(true)
@@ -840,11 +936,22 @@ impl IcyBoardState {
         if let Some(user) = &mut self.session.current_user {
             let number = self.session.current_conference_number as usize;
             let mut flags = user.conference_flags.get(&number).copied().unwrap_or(ConferenceFlags::None);
-            if selected { flags |= ConferenceFlags::Selected; } else { flags &= !ConferenceFlags::Selected; }
-            if flags.is_empty() { user.conference_flags.remove(&number); }
-            else { user.conference_flags.insert(number, flags); }
+            if selected {
+                flags |= ConferenceFlags::Selected;
+            } else {
+                flags &= !ConferenceFlags::Selected;
+            }
+            if flags.is_empty() {
+                user.conference_flags.remove(&number);
+            } else {
+                user.conference_flags.insert(number, flags);
+            }
         }
-        self.display_text(if selected { IceText::Selected } else { IceText::DeSelected }, display_flags::NEWLINE | display_flags::LFBEFORE).await
+        self.display_text(
+            if selected { IceText::Selected } else { IceText::DeSelected },
+            display_flags::NEWLINE | display_flags::LFBEFORE,
+        )
+        .await
     }
 
     async fn read_all_conferences(&mut self, viewer: &MessageViewer, command: &ReadCommand, options: &mut ReaderOptions) -> Res<ReaderExit> {
@@ -853,52 +960,93 @@ impl IcyBoardState {
         let original_area = self.session.current_message_area;
         let original_user_conf = self.session.current_user.as_ref().map(|user| user.last_conference);
         let original_security = self.session.cur_security;
-        let original_message = (self.session.current_messagenumber, self.session.low_msg_num, self.session.high_msg_num,
-            self.session.last_msg_read, self.session.highest_msg_read);
+        let original_message = (
+            self.session.current_messagenumber,
+            self.session.low_msg_num,
+            self.session.high_msg_num,
+            self.session.last_msg_read,
+            self.session.highest_msg_read,
+        );
         let original_search = self.session.search_pattern.clone();
         let original_memorized = self.session.memorized_msg;
-        let original_limits = (self.session.time_limit, self.session.batch_limit, self.session.bytes_remaining, self.session.transfer_limits.clone());
+        let original_limits = (
+            self.session.time_limit,
+            self.session.batch_limit,
+            self.session.bytes_remaining,
+            self.session.transfer_limits.clone(),
+        );
         let conferences = self.get_board().await.conferences.clone();
         let may_join = self.session.user_command_level.cmd_j.session_can_access(&self.session);
-        let start = if command.stay_in_conf { original as usize } else { self.session.start_conf as usize };
+        let start = if command.stay_in_conf {
+            original as usize
+        } else {
+            self.session.start_conf as usize
+        };
         // Restore even on a corrupt base, failed output, disconnect or action error.
         let result = async {
             for (index, conf) in conferences.iter().enumerate().skip(start) {
                 self.session.start_conf = index as u16;
-                if self.session.request_logoff || self.session.disp_options.abort_printout { return Ok(ReaderExit::Stop); }
+                if self.session.request_logoff || self.session.disp_options.abort_printout {
+                    return Ok(ReaderExit::Stop);
+                }
                 // Authorization must use the original context, not a security
                 // bonus acquired while visiting the previous conference.
                 self.accounting_settle_conference().await?;
-                if self.session.request_logoff { return Ok(ReaderExit::Stop); }
+                if self.session.request_logoff {
+                    return Ok(ReaderExit::Stop);
+                }
                 self.session.current_conference_number = original;
                 self.session.current_conference = original_conf.clone();
                 self.session.cur_security = original_security;
-                let flags = self.session.current_user.as_ref().and_then(|user| user.conference_flags.get(&index)).copied().unwrap_or(ConferenceFlags::None);
+                let flags = self
+                    .session
+                    .current_user
+                    .as_ref()
+                    .and_then(|user| user.conference_flags.get(&index))
+                    .copied()
+                    .unwrap_or(ConferenceFlags::None);
                 let number = index as u16;
-                if index > u16::MAX as usize || !self.subscription_can_access_conference(number) || self.is_lockedout(number)
-                    || !conf.required_security.session_can_access(&self.session) {
+                if index > u16::MAX as usize
+                    || !self.subscription_can_access_conference(number)
+                    || self.is_lockedout(number)
+                    || !conf.required_security.session_can_access(&self.session)
+                {
                     continue;
                 }
-                if number != original && (!may_join
-                    || !(self.session.is_sysop || conf.is_public || flags.contains(ConferenceFlags::Registered))
-                    || (command.check_user_scan && !flags.contains(ConferenceFlags::Selected))
-                    || (!conf.password.is_empty() && !self.session.joined_conferences.contains(&number))) {
+                if number != original
+                    && (!may_join
+                        || !(self.session.is_sysop || conf.is_public || flags.contains(ConferenceFlags::Registered))
+                        || (command.check_user_scan && !flags.contains(ConferenceFlags::Selected))
+                        || (!conf.password.is_empty() && !self.session.joined_conferences.contains(&number)))
+                {
                     continue;
                 }
-                if command.mail_wait_conf && !flags.contains(ConferenceFlags::MailWaiting) { continue; }
+                if command.mail_wait_conf && !flags.contains(ConferenceFlags::MailWaiting) {
+                    continue;
+                }
                 self.accounting_settle_conference().await?;
-                if self.session.request_logoff { return Ok(ReaderExit::Stop); }
+                if self.session.request_logoff {
+                    return Ok(ReaderExit::Stop);
+                }
                 self.set_current_conference(number).await?;
-                if !self.session.user_command_level.cmd_r.session_can_access(&self.session) { continue; }
-                let Some(areas) = conf.areas.as_ref() else { continue; };
+                if !self.session.user_command_level.cmd_r.session_can_access(&self.session) {
+                    continue;
+                }
+                let Some(areas) = conf.areas.as_ref() else {
+                    continue;
+                };
                 for (area_number, area) in areas.iter().enumerate() {
-                    if !area.req_level_to_list.session_can_access(&self.session) || !area.path.with_extension("jhr").exists() { continue; }
+                    if !area.req_level_to_list.session_can_access(&self.session) || !area.path.with_extension("jhr").exists() {
+                        continue;
+                    }
                     self.session.current_message_area = area_number;
                     self.session.memorized_msg = None;
                     let mut base = match JamMessageBase::open(&area.path) {
                         Ok(base) => base,
                         Err(error) => {
-                            if options.capture.is_some() { return Err(error.into()); }
+                            if options.capture.is_some() {
+                                return Err(error.into());
+                            }
                             log::error!("Cannot scan conference {number}, area {area_number}: {error}");
                             self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
                             continue;
@@ -907,7 +1055,7 @@ impl IcyBoardState {
                     let mut local = command.clone();
                     local.all_conf = false;
                     match self.read_command_from_base(&mut base, viewer, local, options, None, false).await? {
-                        ReaderExit::Done => {},
+                        ReaderExit::Done => {}
                         ReaderExit::Skip => break,
                         exit => return Ok(exit),
                     }
@@ -915,7 +1063,8 @@ impl IcyBoardState {
             }
             self.session.start_conf = 0;
             Ok(ReaderExit::Done)
-        }.await;
+        }
+        .await;
         // Always restore the original reader context, even if settlement fails.
         let settled = self.accounting_settle_conference().await;
         self.session.current_conference_number = original;
@@ -924,11 +1073,25 @@ impl IcyBoardState {
         self.session.cur_security = original_security;
         self.session.memorized_msg = original_memorized;
         self.session.search_pattern = original_search;
-        (self.session.current_messagenumber, self.session.low_msg_num, self.session.high_msg_num,
-            self.session.last_msg_read, self.session.highest_msg_read) = original_message;
-        (self.session.time_limit, self.session.batch_limit, self.session.bytes_remaining, self.session.transfer_limits) = original_limits;
-        if let (Some(user), Some(last)) = (&mut self.session.current_user, original_user_conf) { user.last_conference = last; }
-        if let Some(state) = self.node_state.lock().await[self.node].as_mut() { state.cur_conference = original; }
+        (
+            self.session.current_messagenumber,
+            self.session.low_msg_num,
+            self.session.high_msg_num,
+            self.session.last_msg_read,
+            self.session.highest_msg_read,
+        ) = original_message;
+        (
+            self.session.time_limit,
+            self.session.batch_limit,
+            self.session.bytes_remaining,
+            self.session.transfer_limits,
+        ) = original_limits;
+        if let (Some(user), Some(last)) = (&mut self.session.current_user, original_user_conf) {
+            user.last_conference = last;
+        }
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.cur_conference = original;
+        }
         settled?;
         result
     }
@@ -961,7 +1124,10 @@ impl IcyBoardState {
             }
         }
         let update_last_read = self.get_board().await.config.message.update_last_read_pointer;
-        let mut filter = match initial_filter { Some(filter) => filter, None => self.reader_filter(&command).await };
+        let mut filter = match initial_filter {
+            Some(filter) => filter,
+            None => self.reader_filter(&command).await,
+        };
         let mut ranges: VecDeque<_> = command.numbers.clone().into();
         let mut first = 0;
         let mut last = 0;
@@ -985,11 +1151,19 @@ impl IcyBoardState {
                 (first, last) = self.clamp_range(range, self.session.low_msg_num, self.session.high_msg_num);
                 number = first;
                 display_msg = true;
-                if number == 0 { continue; }
+                if number == 0 {
+                    continue;
+                }
             }
             if display_msg {
                 display_msg = false;
-                let may_read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
+                let may_read_all = self
+                    .get_board()
+                    .await
+                    .config
+                    .sysop_command_level
+                    .read_all_mail
+                    .session_can_access(&self.session);
                 let found = loop {
                     // No lock is held over terminal I/O. Header and body must
                     // nevertheless come from the same generation of the base.
@@ -999,7 +1173,8 @@ impl IcyBoardState {
                         // filter before loading text. A hit-dependent password
                         // prompt would disclose the contents of protected mail.
                         if !may_read_header(&header, &self.session.user_name, &self.session.alias_name, may_read_all)
-                            || !filter.may_search(&header, may_read_all) {
+                            || !filter.may_search(&header, may_read_all)
+                        {
                             return Ok(None);
                         }
                         Ok(Some(DisplayedMessage::load(base, header)?))
@@ -1011,7 +1186,7 @@ impl IcyBoardState {
                                 break Some((snapshot, text));
                             }
                         }
-                        Ok(None) => {},
+                        Ok(None) => {}
                         Err(err) => {
                             log::error!("Error reading message header: {err}");
                         }
@@ -1061,7 +1236,11 @@ impl IcyBoardState {
                     self.accounting_record(4, "MSG READ", "", rate, 1)?;
                 }
                 let (receipt, pointers) = commit_displayed_read(
-                    message_base, &snapshot, &self.session.user_name, &self.session.alias_name, self.session.cur_user_id as u32,
+                    message_base,
+                    &snapshot,
+                    &self.session.user_name,
+                    &self.session.alias_name,
+                    self.session.cur_user_id as u32,
                     options.update_status && !command.quick_scan,
                     options.update_pointers && update_last_read && !command.quick_scan,
                 )?;
@@ -1107,8 +1286,12 @@ impl IcyBoardState {
                     // ALL/J handoff restores a different conference.
                     cmd.set_last_read = false;
                 }
-                if !self.apply_reader_options(&cmd, options, true).await? { continue; }
-                if cmd.threading { cmd.search_text = subject.clone(); }
+                if !self.apply_reader_options(&cmd, options, true).await? {
+                    continue;
+                }
+                if cmd.threading {
+                    cmd.search_text = subject.clone();
+                }
                 if cmd.memorize {
                     self.session.memorized_msg = Some((self.session.current_message_area, number));
                     self.display_text(IceText::MessageNumberMemorized, display_flags::LFBEFORE).await?;
@@ -1121,7 +1304,10 @@ impl IcyBoardState {
                 // An in-loop search begins after the message on screen unless
                 // the caller supplies explicit ranges.
                 if cmd.numbers.is_empty() && (cmd.do_text_search || cmd.do_user_search) {
-                    cmd.numbers.push(MsgRange { first: number as i64 + 1, last: read_command::LAST_MESSAGE });
+                    cmd.numbers.push(MsgRange {
+                        first: number as i64 + 1,
+                        last: read_command::LAST_MESSAGE,
+                    });
                     cmd.keep_going = true;
                 }
                 match self.resolve_read_command(&mut cmd).await? {
@@ -1144,9 +1330,14 @@ impl IcyBoardState {
                     // Keep the active scan's filters for that operation, then
                     // resume its exact ranges and end-of-message prompt.
                     let inherited = if cmd.capture_single && cmd.numbers.is_empty() {
-                        cmd.numbers.push(MsgRange { first: number as i64, last: number as i64 });
+                        cmd.numbers.push(MsgRange {
+                            first: number as i64,
+                            last: number as i64,
+                        });
                         Some(filter.clone())
-                    } else { None };
+                    } else {
+                        None
+                    };
                     Box::pin(self.run_reader_capture(message_base, viewer, cmd, options, inherited)).await?;
                     continue;
                 }
@@ -1187,7 +1378,13 @@ impl IcyBoardState {
                     AfterAction::Next => {
                         keep_going = true;
                     }
-                    AfterAction::Quit => return Ok(if matches!(cmd.func, MsgFunc::Skip | MsgFunc::DeselectConference) { ReaderExit::Skip } else { ReaderExit::Leave }),
+                    AfterAction::Quit => {
+                        return Ok(if matches!(cmd.func, MsgFunc::Skip | MsgFunc::DeselectConference) {
+                            ReaderExit::Skip
+                        } else {
+                            ReaderExit::Leave
+                        });
+                    }
                     AfterAction::NotHandled => {
                         // A command the reader parses but cannot run must say so;
                         // silence reads as a broken board rather than a missing one.
@@ -1204,7 +1401,9 @@ impl IcyBoardState {
                 if !cmd.numbers.is_empty() {
                     if cmd.since {
                         self.last_read_pointer(message_base)?;
-                        if self.session.last_msg_read >= self.session.high_msg_num { return Ok(ReaderExit::Done); }
+                        if self.session.last_msg_read >= self.session.high_msg_num {
+                            return Ok(ReaderExit::Done);
+                        }
                         cmd.numbers[0].first = self.session.last_msg_read as i64 + 1;
                     }
                     filter = self.reader_filter(&cmd).await;
@@ -1246,7 +1445,11 @@ mod persistence_tests {
         board.config.message.update_last_read_pointer = true;
         board.config.sysop_command_level.read_all_mail = SecurityExpression::from_req_security(255);
         let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(board)), nodes, node, Box::new(connection)).await;
-        state.session.current_user = Some(User { name: "READER".into(), security_level: 10, ..Default::default() });
+        state.session.current_user = Some(User {
+            name: "READER".into(),
+            security_level: 10,
+            ..Default::default()
+        });
         state.session.user_name = "READER".into();
         state.session.cur_security = 10;
         state.session.cur_user_id = 1;
@@ -1279,8 +1482,8 @@ mod persistence_tests {
 
     #[tokio::test]
     async fn ordinary_read_revalidates_after_password_and_pagination_waits() {
-        use std::io::{Seek, SeekFrom, Write};
         use jamjam::jam::pack::PackOptions;
+        use std::io::{Seek, SeekFrom, Write};
 
         // The unchanged control must still mark the message, send exactly one
         // receipt and advance both disk/session pointers. Each race must do none.
@@ -1290,9 +1493,15 @@ mod persistence_tests {
                 let path = root.path().join("mail");
                 let mut base = JamMessageBase::create(&path).unwrap();
                 let body = "DISPLAYED-BODY\n".repeat(40);
-                base.write_message(&JamMessage::default().with_from("SENDER".into()).with_to("READER".into())
-                    .with_subject("DISPLAYED-SUBJECT".into()).with_text(body.into())
-                    .with_attributes(attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ)).unwrap();
+                base.write_message(
+                    &JamMessage::default()
+                        .with_from("SENDER".into())
+                        .with_to("READER".into())
+                        .with_subject("DISPLAYED-SUBJECT".into())
+                        .with_text(body.into())
+                        .with_attributes(attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ),
+                )
+                .unwrap();
                 if password {
                     let mut header = base.read_header(1).unwrap();
                     header.password_crc = JamMessageBase::crc(&BString::from("SECRET"));
@@ -1341,7 +1550,9 @@ mod persistence_tests {
                         // or show the next message. No extra input masks a stall.
                         peer.send(b"N\r").await.unwrap();
                     })
-                }).await.expect("reader stalled at password/pagination or reprompted after N");
+                })
+                .await
+                .expect("reader stalled at password/pagination or reprompted after N");
                 result.unwrap();
                 let base = JamMessageBase::open(&path).unwrap();
                 let header = base.read_header(1).unwrap();
@@ -1448,9 +1659,16 @@ mod persistence_tests {
     }
 
     fn mail(base: &mut JamMessageBase, to: &str, flags: u32) {
-        base.write_message(&JamMessage::default().with_from(BString::from("SENDER"))
-            .with_to(BString::from(to)).with_subject(BString::from("Receipt test"))
-            .with_text(BString::from("body")).with_date_time(chrono::Utc::now()).with_attributes(flags)).unwrap();
+        base.write_message(
+            &JamMessage::default()
+                .with_from(BString::from("SENDER"))
+                .with_to(BString::from(to))
+                .with_subject(BString::from("Receipt test"))
+                .with_text(BString::from("body"))
+                .with_date_time(chrono::Utc::now())
+                .with_attributes(flags),
+        )
+        .unwrap();
         base.write_jhr_header().unwrap();
     }
 

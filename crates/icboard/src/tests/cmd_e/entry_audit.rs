@@ -2,8 +2,15 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use bstr::BString;
-use icy_board_engine::icy_board::{IcyBoard, security_expr::SecurityExpression, user_base::{FSEMode, User}};
-use jamjam::jam::{JamMessage, JamMessageBase, attributes, msg_header::{MessageSubfield, SubfieldType}};
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    security_expr::SecurityExpression,
+    user_base::{FSEMode, User},
+};
+use jamjam::jam::{
+    JamMessage, JamMessageBase, attributes,
+    msg_header::{MessageSubfield, SubfieldType},
+};
 
 use crate::tests::{setup_conference, test_output};
 
@@ -27,30 +34,50 @@ fn seed(board: &IcyBoard, message: JamMessage) {
 }
 
 fn original(from: &str, to: &str) -> JamMessage {
-    JamMessage::default().with_from(BString::from(from)).with_to(BString::from(to))
-        .with_subject(BString::from("Original subject")).with_date_time(chrono::Utc::now())
-        .with_msg_id(BString::from("test-original-id")).with_text(BString::from("first original line\r\nsecond original line"))
+    JamMessage::default()
+        .with_from(BString::from(from))
+        .with_to(BString::from(to))
+        .with_subject(BString::from("Original subject"))
+        .with_date_time(chrono::Utc::now())
+        .with_msg_id(BString::from("test-original-id"))
+        .with_text(BString::from("first original line\r\nsecond original line"))
 }
 
 #[test]
 fn sc_persists_independent_copies_with_recipient_addresses_and_attributes() {
-    let (output, path) = session("E\nfirst@example.org\nSubject\nR\nY\nY\nfirst@example.org\nBody\n\nSC\nsecond@example.org\nTHIRD\n\n", |board| {
-        board.conferences[0].echo_mail_in_conference = true;
-        board.conferences[0].prompt_for_routing = true;
-    });
+    let (output, path) = session(
+        "E\nfirst@example.org\nSubject\nR\nY\nY\nfirst@example.org\nBody\n\nSC\nsecond@example.org\nTHIRD\n\n",
+        |board| {
+            board.conferences[0].echo_mail_in_conference = true;
+            board.conferences[0].prompt_for_routing = true;
+        },
+    );
     let mut base = JamMessageBase::open(path).unwrap();
     assert_eq!(base.active_messages(), 3, "{output}");
-    let expected = [("first@example.org", Some("first@example.org")), ("second@example.org", Some("second@example.org")), ("THIRD", None)];
+    let expected = [
+        ("first@example.org", Some("first@example.org")),
+        ("second@example.org", Some("second@example.org")),
+        ("THIRD", None),
+    ];
     let mut ids = Vec::new();
     let mut offsets = Vec::new();
     for (index, (recipient, address)) in expected.into_iter().enumerate() {
         let header = base.read_header(index as u32 + 1).unwrap();
         assert_eq!(header.to().unwrap().to_string(), recipient);
         assert_eq!(base.read_message_text(&header).unwrap().to_string().trim(), "Body");
-        assert_eq!(header.attributes & (attributes::MSG_LOCAL | attributes::MSG_TYPEECHO | attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ),
-            attributes::MSG_LOCAL | attributes::MSG_TYPEECHO | attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ);
+        assert_eq!(
+            header.attributes & (attributes::MSG_LOCAL | attributes::MSG_TYPEECHO | attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ),
+            attributes::MSG_LOCAL | attributes::MSG_TYPEECHO | attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ
+        );
         assert_eq!(header.attributes & (attributes::MSG_SENT | attributes::MSG_READ | attributes::MSG_DELETED), 0);
-        assert_eq!(header.sub_fields.iter().find(|field| field.field_type() == SubfieldType::AddressD).map(|field| field.content().to_string()), address.map(str::to_string));
+        assert_eq!(
+            header
+                .sub_fields
+                .iter()
+                .find(|field| field.field_type() == SubfieldType::AddressD)
+                .map(|field| field.content().to_string()),
+            address.map(str::to_string)
+        );
         ids.push(header.msgid_crc);
         offsets.push(header.offset);
     }
@@ -140,7 +167,12 @@ fn sender_password_is_distinct_from_group_read_password() {
     let header = JamMessageBase::open(path).unwrap().read_header(1).unwrap();
     assert!(header.is_password_valid("SECRET"));
     assert!(!header.is_private());
-    assert!(header.sub_fields.iter().any(|field| field.field_type() == SubfieldType::FTSKludge && field.content() == "ICYBOARD-SECURITY: S"));
+    assert!(
+        header
+            .sub_fields
+            .iter()
+            .any(|field| field.field_type() == SubfieldType::FTSKludge && field.content() == "ICYBOARD-SECURITY: S")
+    );
 }
 
 #[test]
@@ -168,7 +200,10 @@ fn long_to_allows_empty_subject_and_preserves_full_address() {
 fn soundex_can_choose_an_existing_user() {
     let (output, path) = session("E\nRUPERT SMYTH\nS\nU\nSubject\nN\nBody\n\nS\n", |board| {
         board.config.message.validate_to_name = true;
-        board.users.new_user(User { name: "ROBERT SMITH".to_string(), ..Default::default() });
+        board.users.new_user(User {
+            name: "ROBERT SMITH".to_string(),
+            ..Default::default()
+        });
     });
     let header = JamMessageBase::open(path).unwrap().read_header(1).unwrap();
     assert_eq!(header.to().unwrap().to_string(), "ROBERT SMITH", "{output}");
@@ -177,17 +212,30 @@ fn soundex_can_choose_an_existing_user() {
 #[test]
 fn reply_to_own_message_targets_original_recipient_and_keeps_numeric_thread() {
     let (output, path) = session("REPLY 1\n\nN\nReply body\n\nS\n", |board| {
-        seed(board, original("SYSOP", "ALICE").with_sub_field(MessageSubfield::new(SubfieldType::AddressD, BString::from("alice@example.org"))));
+        seed(
+            board,
+            original("SYSOP", "ALICE").with_sub_field(MessageSubfield::new(SubfieldType::AddressD, BString::from("alice@example.org"))),
+        );
     });
     let base = JamMessageBase::open(path).unwrap();
     let reply = base.read_header(2).unwrap();
     assert_eq!(reply.to().unwrap().to_string(), "ALICE", "{output}");
     assert_eq!(reply.reply_to, 1);
     assert_eq!(reply.reply_crc, JamMessageBase::crc(&BString::from("test-original-id")));
-    assert!(reply.sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD && field.content() == "alice@example.org"));
+    assert!(
+        reply
+            .sub_fields
+            .iter()
+            .any(|field| field.field_type() == SubfieldType::AddressD && field.content() == "alice@example.org")
+    );
     let parent = base.read_header(1).unwrap();
     assert_eq!(parent.date_received, 0);
-    assert!(parent.sub_fields.iter().any(|field| field.content().to_string().starts_with("ICYBOARD-REPLY-DATE: ")));
+    assert!(
+        parent
+            .sub_fields
+            .iter()
+            .any(|field| field.content().to_string().starts_with("ICYBOARD-REPLY-DATE: "))
+    );
     assert!(!output.contains("Require Return Receipt"));
 }
 

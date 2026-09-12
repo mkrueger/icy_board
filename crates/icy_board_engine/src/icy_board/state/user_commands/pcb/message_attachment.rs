@@ -519,8 +519,12 @@ impl IcyBoardState {
         let mut base = self.open_accounted_message_base(conf, area, &message).await?;
         let mut snapshot = crate::icy_board::state::ppl_message::PplMessage::append(&mut base, &message)?;
         let number = snapshot.number;
-        if conf >= 0 { snapshot = snapshot.in_area(conf as usize, area as usize); }
-        if saved.is_none() { *saved = Some(snapshot); }
+        if conf >= 0 {
+            snapshot = snapshot.in_area(conf as usize, area as usize);
+        }
+        if saved.is_none() {
+            *saved = Some(snapshot);
+        }
         cleanup.commit();
         self.finish_accounted_message(&mut base, charge, &message, number, text).await
     }

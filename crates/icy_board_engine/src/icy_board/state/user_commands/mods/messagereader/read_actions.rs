@@ -1,23 +1,23 @@
 //! The commands that act on the message in front of the reader.
 
 use bstr::BString;
+use jamjam::jam::msg_header::{JamMessageHeader, MessageSubfield, SubfieldType};
+use jamjam::jam::{JamMessage, JamMessageBase, attributes, raw};
 use std::future::Future;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use jamjam::jam::msg_header::{JamMessageHeader, MessageSubfield, SubfieldType};
-use jamjam::jam::{JamMessage, JamMessageBase, attributes, raw};
 
 use crate::Res;
 use crate::icy_board::icb_text::IceText;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::{MASK_ASCII, MASK_NUM, display_flags};
 use crate::icy_board::state::user_commands::mods::editor::EditResult;
-use crate::icy_board::state::user_commands::pcb::select_conferences::SelectMode;
 use crate::icy_board::state::user_commands::pcb::message_attachment::{MessageCreditDenied, MessagePersistedError};
+use crate::icy_board::state::user_commands::pcb::select_conferences::SelectMode;
 use crate::icy_board::user_base::ConferenceFlags;
 use crate::vm::TerminalTarget;
 
-use super::message_security::{may_read_header, set_security_kind, requires_read_password};
+use super::message_security::{may_read_header, requires_read_password, set_security_kind};
 use super::read_command::{MsgFunc, ReadCommand};
 
 #[cfg(test)]
@@ -69,11 +69,15 @@ fn sync_destination(path: &Path) -> Res<()> {
     let mut base = JamMessageBase::open(path)?;
     base.read_transaction(|base| {
         for extension in ["jhr", "jdt", "jdx"] {
-            std::fs::OpenOptions::new().write(true).open(base.path().with_extension(extension))?.sync_all()?;
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(base.path().with_extension(extension))?
+                .sync_all()?;
         }
         std::fs::File::open(path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new(".")))?.sync_all()?;
         Ok(())
-    }).map_err(Into::into)
+    })
+    .map_err(Into::into)
 }
 
 fn compare_header(original: &JamMessageHeader, current: &JamMessageHeader) -> jamjam::Result<()> {
@@ -92,7 +96,9 @@ fn compare_header(original: &JamMessageHeader, current: &JamMessageHeader) -> ja
 fn action_snapshot(base: &mut JamMessageBase, number: u32, authorized: Option<&JamMessageHeader>) -> jamjam::Result<JamMessage> {
     base.read_transaction(|base| {
         let header = base.read_header(number)?;
-        if let Some(authorized) = authorized { compare_header(authorized, &header)?; }
+        if let Some(authorized) = authorized {
+            compare_header(authorized, &header)?;
+        }
         let body = base.read_message_text(&header)?;
         Ok(JamMessage::from_stored(header, body))
     })
@@ -111,14 +117,16 @@ fn delete_unchanged_message(base: &mut JamMessageBase, number: u32, original: &J
     base.transaction(|base| {
         compare_message(base, number, original)?;
         base.delete_message(number)
-    }).map_err(Into::into)
+    })
+    .map_err(Into::into)
 }
 
 fn replace_header(base: &mut JamMessageBase, number: u32, original: &JamMessageHeader, draft: &JamMessageHeader) -> Res<()> {
     base.transaction(|base| {
         compare_header(original, &base.read_header(number)?)?;
         raw::update_header(base, number, draft)
-    }).map_err(Into::into)
+    })
+    .map_err(Into::into)
 }
 
 fn clear_password(header: &mut JamMessageHeader) {
@@ -127,10 +135,11 @@ fn clear_password(header: &mut JamMessageHeader) {
 }
 
 fn same_message_base(source: &Path, target: &Path) -> bool {
-    source == target || match (source.with_extension("jhr").canonicalize(), target.with_extension("jhr").canonicalize()) {
-        (Ok(source), Ok(target)) => source == target,
-        _ => false,
-    }
+    source == target
+        || match (source.with_extension("jhr").canonicalize(), target.with_extension("jhr").canonicalize()) {
+            (Ok(source), Ok(target)) => source == target,
+            _ => false,
+        }
 }
 
 /// Replace the body without creating a second indexed message or changing its
@@ -145,7 +154,8 @@ fn replace_message_with_result(base: &mut JamMessageBase, number: u32, original:
         compare_message(base, number, original)?;
         let mut text_file = std::fs::OpenOptions::new().append(true).open(base.path().with_extension("jdt"))?;
         let old_len = text_file.metadata()?.len();
-        let end = old_len.checked_add(draft.text().len() as u64)
+        let end = old_len
+            .checked_add(draft.text().len() as u64)
             .filter(|end| *end <= u32::MAX as u64)
             .ok_or_else(|| std::io::Error::other("JAM text file is full"))?;
         let mut header = draft.header().clone();
@@ -163,7 +173,8 @@ fn replace_message_with_result(base: &mut JamMessageBase, number: u32, original:
             }
         }
         result.map(|()| header)
-    }).map_err(Into::into)
+    })
+    .map_err(Into::into)
 }
 
 /// JAM EnclFwAlias allows a NUL-separated display alias, but neither name is a
@@ -174,8 +185,7 @@ fn attachment_path(root: &Path, field: &MessageSubfield) -> Res<(PathBuf, String
     let mut parts = value.split('\0');
     let stored = parts.next().unwrap_or_default();
     let display = parts.next().unwrap_or(stored);
-    let safe = |name: &str| !name.is_empty() && name != "." && name != ".."
-        && !name.chars().any(|ch| ch.is_control() || "/\\:*?[]".contains(ch));
+    let safe = |name: &str| !name.is_empty() && name != "." && name != ".." && !name.chars().any(|ch| ch.is_control() || "/\\:*?[]".contains(ch));
     if parts.next().is_some() || !safe(stored) || !safe(display) || root.as_os_str().is_empty() {
         return Err(std::io::Error::other("Invalid attachment filename").into());
     }
@@ -195,11 +205,15 @@ struct ActionAttachments {
 }
 
 impl ActionAttachments {
-    fn commit(&mut self) { self.files.clear(); }
+    fn commit(&mut self) {
+        self.files.clear();
+    }
 
     fn copy(&mut self, source: &Path, target: &Path, field: &MessageSubfield) -> Res<()> {
         let (path, _) = attachment_path(source, field)?;
-        if source == target { return Ok(()); }
+        if source == target {
+            return Ok(());
+        }
         let destination = target.join(path.file_name().ok_or_else(|| std::io::Error::other("Invalid attachment"))?);
         let mut staged = tempfile::NamedTempFile::new_in(target)?;
         std::io::copy(&mut std::fs::File::open(&path)?, &mut staged)?;
@@ -236,14 +250,18 @@ fn identical_files(left: &Path, right: &Path) -> Res<bool> {
     let mut left = std::fs::File::open(left)?;
     let mut right = std::fs::File::open(right)?;
     let mut remaining = left.metadata()?.len();
-    if remaining != right.metadata()?.len() { return Ok(false); }
+    if remaining != right.metadata()?.len() {
+        return Ok(false);
+    }
     let mut a = [0; 8192];
     let mut b = [0; 8192];
     while remaining > 0 {
         let count = remaining.min(a.len() as u64) as usize;
         left.read_exact(&mut a[..count])?;
         right.read_exact(&mut b[..count])?;
-        if a[..count] != b[..count] { return Ok(false); }
+        if a[..count] != b[..count] {
+            return Ok(false);
+        }
         remaining -= count as u64;
     }
     Ok(true)
@@ -251,7 +269,11 @@ fn identical_files(left: &Path, right: &Path) -> Res<bool> {
 
 fn after_existing_edit(result: EditResult) -> AfterAction {
     // PCBoard's SK is save-only for EDIT, not save-and-kill the existing mail.
-    if result == EditResult::SendNext { AfterAction::Next } else { AfterAction::Redisplay }
+    if result == EditResult::SendNext {
+        AfterAction::Next
+    } else {
+        AfterAction::Redisplay
+    }
 }
 
 /// Swaps one variable length header field for a new value.
@@ -286,17 +308,30 @@ impl IcyBoardState {
             }
         };
         let header = original.header();
-        let read_all = self.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&self.session);
-        if header.is_deleted() || header.attributes & attributes::MSG_NODISP != 0
-            || !may_read_header(header, &self.session.user_name, &self.session.alias_name, read_all) {
+        let read_all = self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .read_all_mail
+            .session_can_access(&self.session);
+        if header.is_deleted()
+            || header.attributes & attributes::MSG_NODISP != 0
+            || !may_read_header(header, &self.session.user_name, &self.session.alias_name, read_all)
+        {
             self.display_text(IceText::NoSuchMessageNumber, display_flags::NEWLINE).await?;
             return Ok(None);
         }
         if requires_read_password(header, read_all)
-            && !self.check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password)).await? {
+            && !self
+                .check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password))
+                .await?
+        {
             return Ok(None);
         }
-        if self.session.request_logoff { return Ok(None); }
+        if self.session.request_logoff {
+            return Ok(None);
+        }
         // No JAM lock survives a terminal/board await. Recheck what was
         // authorized, then fetch the current header/body under one shared lock.
         match action_snapshot(base, number, Some(header)) {
@@ -313,15 +348,19 @@ impl IcyBoardState {
     }
 
     pub(crate) fn action_conference_access(&self, number: u16, conference: &crate::icy_board::conferences::Conference) -> bool {
-        let registered = self.session.current_user.as_ref()
+        let registered = self
+            .session
+            .current_user
+            .as_ref()
             .and_then(|user| user.conference_flags.get(&(number as usize)))
             .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
-        self.subscription_can_access_conference(number) && !self.is_lockedout(number)
+        self.subscription_can_access_conference(number)
+            && !self.is_lockedout(number)
             && conference.required_security.session_can_access(&self.session)
-            && (number == self.session.current_conference_number || (
-                self.session.user_command_level.cmd_j.session_can_access(&self.session)
-                && (self.session.is_sysop || conference.is_public || registered)
-                && (conference.password.is_empty() || self.session.joined_conferences.contains(&number))))
+            && (number == self.session.current_conference_number
+                || (self.session.user_command_level.cmd_j.session_can_access(&self.session)
+                    && (self.session.is_sysop || conference.is_public || registered)
+                    && (conference.password.is_empty() || self.session.joined_conferences.contains(&number))))
     }
 
     /// Bounds and authorization are checked before send_message's indexing, in
@@ -329,11 +368,15 @@ impl IcyBoardState {
     pub(crate) async fn read_action_target(&mut self, conference: u16, area: usize) -> Res<Option<PathBuf>> {
         let target = self.get_board().await.conferences.get(conference as usize).cloned();
         let Some(target) = target else { return Ok(None) };
-        let Some(message_area) = target.areas.as_ref().and_then(|areas| areas.get(area)) else { return Ok(None) };
-        if area > i32::MAX as usize || !self.action_conference_access(conference, &target)
+        let Some(message_area) = target.areas.as_ref().and_then(|areas| areas.get(area)) else {
+            return Ok(None);
+        };
+        if area > i32::MAX as usize
+            || !self.action_conference_access(conference, &target)
             || !target.sec_write_message.session_can_access(&self.session)
             || !message_area.req_level_to_list.session_can_access(&self.session)
-            || !message_area.req_level_to_enter.session_can_access(&self.session) {
+            || !message_area.req_level_to_enter.session_can_access(&self.session)
+        {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
             return Ok(None);
         }
@@ -341,7 +384,9 @@ impl IcyBoardState {
             self.display_text(IceText::ConferenceIsReadOnly, display_flags::NEWLINE).await?;
             return Ok(None);
         }
-        if message_area.path.as_os_str().is_empty() { return Ok(None); }
+        if message_area.path.as_os_str().is_empty() {
+            return Ok(None);
+        }
         Ok(Some(self.resolve_path(&message_area.path)))
     }
 
@@ -356,12 +401,26 @@ impl IcyBoardState {
 
     async fn edit_read_message(&mut self, base: &mut JamMessageBase, number: u32) -> Res<AfterAction> {
         let sec = self.session.user_command_level.edit_own_messages.clone();
-        if !self.check_sec("EDIT", &sec).await? { return Ok(AfterAction::Redisplay); }
-        let Some(original) = self.read_action_message(base, number).await? else { return Ok(AfterAction::Redisplay) };
+        if !self.check_sec("EDIT", &sec).await? {
+            return Ok(AfterAction::Redisplay);
+        }
+        let Some(original) = self.read_action_message(base, number).await? else {
+            return Ok(AfterAction::Redisplay);
+        };
         let header = original.header();
-        let own = header.from().is_some_and(|from| from.to_string().eq_ignore_ascii_case(&self.session.user_name)
-            || (!self.session.alias_name.is_empty() && from.to_string().eq_ignore_ascii_case(&self.session.alias_name)));
-        if !own && !self.get_board().await.config.sysop_command_level.edit_any_message.session_can_access(&self.session) {
+        let own = header.from().is_some_and(|from| {
+            from.to_string().eq_ignore_ascii_case(&self.session.user_name)
+                || (!self.session.alias_name.is_empty() && from.to_string().eq_ignore_ascii_case(&self.session.alias_name))
+        });
+        if !own
+            && !self
+                .get_board()
+                .await
+                .config
+                .sysop_command_level
+                .edit_any_message
+                .session_can_access(&self.session)
+        {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
             return Ok(AfterAction::Redisplay);
         }
@@ -372,13 +431,21 @@ impl IcyBoardState {
             let result = self.edit_message_context(&mut draft, quote.clone()).await;
             attachments.track(&draft)?;
             let result = result?;
-            if result == EditResult::Abort || self.session.request_logoff { return Ok(AfterAction::Redisplay); }
-            if result != EditResult::AttachFile { break result; }
+            if result == EditResult::Abort || self.session.request_logoff {
+                return Ok(AfterAction::Redisplay);
+            }
+            if result != EditResult::AttachFile {
+                break result;
+            }
             let attached = self.attach_message_file(&mut draft).await;
             attachments.track(&draft)?;
             let attached = attached?;
-            if self.session.request_logoff { return Ok(AfterAction::Redisplay); }
-            if attached { break EditResult::SendMessage; }
+            if self.session.request_logoff {
+                return Ok(AfterAction::Redisplay);
+            }
+            if attached {
+                break EditResult::SendMessage;
+            }
             // Failed/cancelled attachment returns to the SAME draft, not storage.
         };
         if let Err(error) = replace_message(base, number, &original, &draft) {
@@ -400,11 +467,23 @@ impl IcyBoardState {
         if !self.session.user_command_level.edit_own_messages.session_can_access(&self.session) {
             return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Editing messages is not permitted").into());
         }
-        let Some(original) = self.authorized_message_snapshot(source).await? else { return Ok(()); };
+        let Some(original) = self.authorized_message_snapshot(source).await? else {
+            return Ok(());
+        };
         let header = original.header();
-        let own = header.from().is_some_and(|from| from.to_string().eq_ignore_ascii_case(&self.session.user_name)
-            || (!self.session.alias_name.is_empty() && from.to_string().eq_ignore_ascii_case(&self.session.alias_name)));
-        if !own && !self.get_board().await.config.sysop_command_level.edit_any_message.session_can_access(&self.session) {
+        let own = header.from().is_some_and(|from| {
+            from.to_string().eq_ignore_ascii_case(&self.session.user_name)
+                || (!self.session.alias_name.is_empty() && from.to_string().eq_ignore_ascii_case(&self.session.alias_name))
+        });
+        if !own
+            && !self
+                .get_board()
+                .await
+                .config
+                .sysop_command_level
+                .edit_any_message
+                .session_can_access(&self.session)
+        {
             return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Editing another author's message is not permitted").into());
         }
         let mut header = header.clone();
@@ -412,40 +491,78 @@ impl IcyBoardState {
             let mut edited = defaults.clone();
             if self.session.user_command_level.cmd_e.session_can_access(&self.session) {
                 edited.from = self.get_message_sender(&edited.from).await?;
-                if self.session.request_logoff { return Ok(()); }
-                let Some(to) = self.get_message_recipient(IceText::MessageTo, edited.to, false).await? else { return Ok(()); };
+                if self.session.request_logoff {
+                    return Ok(());
+                }
+                let Some(to) = self.get_message_recipient(IceText::MessageTo, edited.to, false).await? else {
+                    return Ok(());
+                };
                 edited.to = to;
-                edited.subject = self.input_field(IceText::NewSubject, 60, &MASK_ASCII, "", Some(edited.subject),
-                    display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE | display_flags::LFBEFORE).await?;
-                if self.session.request_logoff { return Ok(()); }
+                edited.subject = self
+                    .input_field(
+                        IceText::NewSubject,
+                        60,
+                        &MASK_ASCII,
+                        "",
+                        Some(edited.subject),
+                        display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE | display_flags::LFBEFORE,
+                    )
+                    .await?;
+                if self.session.request_logoff {
+                    return Ok(());
+                }
                 // Password protected messages keep their security; only E HEADER manages it.
                 let can_edit_privacy = !header.needs_password()
-                    && self.get_board().await.config.sysop_command_level.protect_unprotect_messages.session_can_access(&self.session);
+                    && self
+                        .get_board()
+                        .await
+                        .config
+                        .sysop_command_level
+                        .protect_unprotect_messages
+                        .session_can_access(&self.session);
                 if can_edit_privacy {
-                    let privacy = self.input_field(IceText::MessageSecurity, 1, "NR", "hlpsec",
-                        Some(if edited.is_private { "R" } else { "N" }.to_string()),
-                        display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE).await?;
+                    let privacy = self
+                        .input_field(
+                            IceText::MessageSecurity,
+                            1,
+                            "NR",
+                            "hlpsec",
+                            Some(if edited.is_private { "R" } else { "N" }.to_string()),
+                            display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
+                        )
+                        .await?;
                     edited.is_private = privacy == "R";
                 }
             }
-            if self.session.request_logoff { return Ok(()); }
+            if self.session.request_logoff {
+                return Ok(());
+            }
             if edited.from.to_ascii_uppercase().contains("@USER@")
-                || [&edited.from, &edited.to, &edited.subject].iter().any(|field| field.chars().any(char::is_control)) {
+                || [&edited.from, &edited.to, &edited.subject]
+                    .iter()
+                    .any(|field| field.chars().any(char::is_control))
+            {
                 return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid message header").into());
             }
             if (edited.is_private != header.is_private() || edited.to != header.to().map(ToString::to_string).unwrap_or_default())
                 && (edited.is_private && (self.session.current_conference.disallow_private_msgs || edited.to.eq_ignore_ascii_case("ALL"))
-                    || !edited.is_private && (self.session.current_conference.private_msgs
-                        || self.session.current_conference.conference_type == crate::icy_board::conferences::ConferenceType::InternetEmail)) {
+                    || !edited.is_private
+                        && (self.session.current_conference.private_msgs
+                            || self.session.current_conference.conference_type == crate::icy_board::conferences::ConferenceType::InternetEmail))
+            {
                 return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message privacy conflicts with the target area").into());
             }
             edited.apply(&mut header);
         }
         let mut draft = JamMessage::from_stored(header, original.text().clone());
         let mut attachments = self.message_attachment_cleanup(&original);
-        let result = self.edit_message_context(&mut draft, original.text().to_string().lines().map(str::to_string).collect()).await;
+        let result = self
+            .edit_message_context(&mut draft, original.text().to_string().lines().map(str::to_string).collect())
+            .await;
         attachments.track(&draft)?;
-        if result? == EditResult::Abort || self.session.request_logoff { return Ok(()); }
+        if result? == EditResult::Abort || self.session.request_logoff {
+            return Ok(());
+        }
         let mut base = JamMessageBase::open(&source.path)?;
         let header = replace_message_with_result(&mut base, source.number, &original, &draft)?;
         attachments.commit();
@@ -459,32 +576,54 @@ impl IcyBoardState {
     /// body, security and extension metadata survive; provenance is recorded.
     async fn forward_read_message(&mut self, cmd: &ReadCommand, base: &mut JamMessageBase, number: u32) -> Res<AfterAction> {
         let sec = self.session.user_command_level.cmd_e.clone();
-        if !self.check_sec("FORWARD", &sec).await? { return Ok(AfterAction::Redisplay); }
+        if !self.check_sec("FORWARD", &sec).await? {
+            return Ok(AfterAction::Redisplay);
+        }
         let source_conf = self.session.current_conference_number;
-        if self.read_action_target(source_conf, self.session.current_message_area).await?.is_none() { return Ok(AfterAction::Redisplay); }
-        let Some(original) = self.read_action_message(base, number).await? else { return Ok(AfterAction::Redisplay) };
+        if self.read_action_target(source_conf, self.session.current_message_area).await?.is_none() {
+            return Ok(AfterAction::Redisplay);
+        }
+        let Some(original) = self.read_action_message(base, number).await? else {
+            return Ok(AfterAction::Redisplay);
+        };
         let header = original.header();
-        let personal = header.to().is_some_and(|to| to.to_string().eq_ignore_ascii_case(&self.session.user_name)
-            || (!self.session.alias_name.is_empty() && to.to_string().eq_ignore_ascii_case(&self.session.alias_name)));
+        let personal = header.to().is_some_and(|to| {
+            to.to_string().eq_ignore_ascii_case(&self.session.user_name)
+                || (!self.session.alias_name.is_empty() && to.to_string().eq_ignore_ascii_case(&self.session.alias_name))
+        });
         let move_sec = self.get_board().await.config.sysop_command_level.copy_move_messages.clone();
         let may_move = move_sec.session_can_access(&self.session);
-        if !personal && !self.check_sec("FORWARD", &move_sec).await? { return Ok(AfterAction::Redisplay); }
+        if !personal && !self.check_sec("FORWARD", &move_sec).await? {
+            return Ok(AfterAction::Redisplay);
+        }
         let conference = if may_move {
-            let Some(conference) = self.ask_target_conference(cmd, true).await? else { return Ok(AfterAction::Redisplay) };
+            let Some(conference) = self.ask_target_conference(cmd, true).await? else {
+                return Ok(AfterAction::Redisplay);
+            };
             conference
-        } else { source_conf };
-        let area = if conference == source_conf { self.session.current_message_area } else {
-            let Some(area) = self.ask_target_area(conference).await? else { return Ok(AfterAction::Redisplay) };
+        } else {
+            source_conf
+        };
+        let area = if conference == source_conf {
+            self.session.current_message_area
+        } else {
+            let Some(area) = self.ask_target_area(conference).await? else {
+                return Ok(AfterAction::Redisplay);
+            };
             area
         };
-        let Some(target) = self.read_action_target(conference, area).await? else { return Ok(AfterAction::Redisplay) };
+        let Some(target) = self.read_action_target(conference, area).await? else {
+            return Ok(AfterAction::Redisplay);
+        };
         let old_to = header.to().map(ToString::to_string).unwrap_or_default();
         // Recipient policy belongs to the target conference; restore context on
         // both success and error, without joining or acquiring its security bonus.
         let saved = self.session.current_conference.clone();
         let target_conf = self.get_board().await.conferences[conference as usize].clone();
         self.accounting_settle_conference().await?;
-        if self.session.request_logoff { return Ok(AfterAction::Redisplay); }
+        if self.session.request_logoff {
+            return Ok(AfterAction::Redisplay);
+        }
         self.session.current_conference = target_conf;
         self.session.current_conference_number = conference;
         let recipient = self.get_message_recipient(IceText::MessageTo, old_to, false).await;
@@ -493,18 +632,26 @@ impl IcyBoardState {
         self.session.current_conference_number = source_conf;
         settled?;
         let Some(recipient) = recipient? else { return Ok(AfterAction::Redisplay) };
-        if recipient.eq_ignore_ascii_case("@LIST@") || self.session.request_logoff { return Ok(AfterAction::Redisplay); }
+        if recipient.eq_ignore_ascii_case("@LIST@") || self.session.request_logoff {
+            return Ok(AfterAction::Redisplay);
+        }
         let draft = transfer_draft(original, same_message_base(base.path(), &target));
         let mut header = draft.header().clone();
         header.set_to(BString::from(recipient.clone()));
         header.attributes &= !(attributes::MSG_READ | attributes::MSG_SENT);
         header.date_received = 0;
         header.times_read = 0;
-        header.sub_fields.retain(|field| field.field_type() != SubfieldType::AddressD
-            && !(field.field_type() == SubfieldType::FTSKludge && field.content().starts_with(b"ICYBOARD-FORWARD: ")));
-        if recipient.contains('@') { header.sub_fields.push(MessageSubfield::new(SubfieldType::AddressD, BString::from(recipient))); }
-        header.sub_fields.push(MessageSubfield::new(SubfieldType::FTSKludge,
-            BString::from(format!("ICYBOARD-FORWARD: {source_conf} {}", self.session.get_username_or_alias()))));
+        header.sub_fields.retain(|field| {
+            field.field_type() != SubfieldType::AddressD
+                && !(field.field_type() == SubfieldType::FTSKludge && field.content().starts_with(b"ICYBOARD-FORWARD: "))
+        });
+        if recipient.contains('@') {
+            header.sub_fields.push(MessageSubfield::new(SubfieldType::AddressD, BString::from(recipient)));
+        }
+        header.sub_fields.push(MessageSubfield::new(
+            SubfieldType::FTSKludge,
+            BString::from(format!("ICYBOARD-FORWARD: {source_conf} {}", self.session.get_username_or_alias())),
+        ));
         let draft = JamMessage::from_stored(header, draft.text().clone());
         let mut attachments = match self.copy_action_attachments(&draft, conference, area).await {
             Ok(attachments) => attachments,
@@ -514,9 +661,16 @@ impl IcyBoardState {
                 return Ok(AfterAction::Redisplay);
             }
         };
-        if let Err(error) = self.send_action_message(conference, area, &target, draft, IceText::MessageCopied, &mut attachments).await {
-            if error.is::<MessagePersistedError>() { return Err(error); }
-            if error.is::<MessageCreditDenied>() { return Ok(AfterAction::Redisplay); }
+        if let Err(error) = self
+            .send_action_message(conference, area, &target, draft, IceText::MessageCopied, &mut attachments)
+            .await
+        {
+            if error.is::<MessagePersistedError>() {
+                return Err(error);
+            }
+            if error.is::<MessageCreditDenied>() {
+                return Ok(AfterAction::Redisplay);
+            }
             log::error!("Could not forward message {number}; original retained: {error}");
             self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
         }
@@ -528,16 +682,32 @@ impl IcyBoardState {
     /// Roll back newly copied files unless a message actually references them.
     async fn copy_action_attachments(&mut self, message: &JamMessage, conference: u16, area: usize) -> Res<ActionAttachments> {
         let mut copies = ActionAttachments::default();
-        let fields: Vec<_> = message.header().sub_fields.iter()
-            .filter(|field| matches!(field.field_type(), SubfieldType::EnclFile | SubfieldType::EnclFwAlias)).collect();
-        if fields.is_empty() { return Ok(copies); }
+        let fields: Vec<_> = message
+            .header()
+            .sub_fields
+            .iter()
+            .filter(|field| matches!(field.field_type(), SubfieldType::EnclFile | SubfieldType::EnclFwAlias))
+            .collect();
+        if fields.is_empty() {
+            return Ok(copies);
+        }
         let source = self.session.current_conference.attachment_location.clone();
-        let target = self.get_board().await.conferences.get(conference as usize).cloned()
+        let target = self
+            .get_board()
+            .await
+            .conferences
+            .get(conference as usize)
+            .cloned()
             .ok_or_else(|| std::io::Error::other("Invalid attachment conference"))?;
-        if source.as_os_str().is_empty() || target.attachment_location.as_os_str().is_empty()
+        if source.as_os_str().is_empty()
+            || target.attachment_location.as_os_str().is_empty()
             || !target.sec_attachments.session_can_access(&self.session)
-            || !target.areas.as_ref().and_then(|areas| areas.get(area))
-                .is_some_and(|area| area.req_level_to_save_attach.session_can_access(&self.session)) {
+            || !target
+                .areas
+                .as_ref()
+                .and_then(|areas| areas.get(area))
+                .is_some_and(|area| area.req_level_to_save_attach.session_can_access(&self.session))
+        {
             return Err(std::io::Error::other("Attachments are not allowed in the destination").into());
         }
         let source = self.resolve_path(&source).canonicalize()?;
@@ -550,8 +720,15 @@ impl IcyBoardState {
 
     /// send_message can fail after append (statistics or terminal output). For
     /// new enclosure copies, adopt them at the append, not at its UI result.
-    async fn send_action_message(&mut self, conference: u16, area: usize, _target: &Path, message: JamMessage, text: IceText,
-        attachments: &mut ActionAttachments) -> Res<()> {
+    async fn send_action_message(
+        &mut self,
+        conference: u16,
+        area: usize,
+        _target: &Path,
+        message: JamMessage,
+        text: IceText,
+        attachments: &mut ActionAttachments,
+    ) -> Res<()> {
         if attachments.files.is_empty() {
             return self.send_accounted_message(conference as i32, area as i32, message, text).await;
         }
@@ -563,15 +740,26 @@ impl IcyBoardState {
     }
 
     async fn read_attachment(&mut self, action: MsgFunc, base: &mut JamMessageBase, number: u32) -> Res<AfterAction> {
-        let Some(header) = self.read_action_header(base, number).await? else { return Ok(AfterAction::Prompt) };
+        let Some(header) = self.read_action_header(base, number).await? else {
+            return Ok(AfterAction::Prompt);
+        };
         let sec = self.session.user_command_level.cmd_d.clone();
-        if action == MsgFunc::FlagFile && !self.check_sec("FLAG", &sec).await? { return Ok(AfterAction::Prompt); }
-        let fields: Vec<_> = header.sub_fields.iter()
-            .filter(|field| matches!(field.field_type(), SubfieldType::EnclFile | SubfieldType::EnclFwAlias)).collect();
+        if action == MsgFunc::FlagFile && !self.check_sec("FLAG", &sec).await? {
+            return Ok(AfterAction::Prompt);
+        }
+        let fields: Vec<_> = header
+            .sub_fields
+            .iter()
+            .filter(|field| matches!(field.field_type(), SubfieldType::EnclFile | SubfieldType::EnclFwAlias))
+            .collect();
         if fields.is_empty() {
             if action == MsgFunc::FlagFile {
-                if self.session.current_conference.directories.is_some() { self.flag_files_cmd(true).await?; }
-            } else { self.view_file().await?; }
+                if self.session.current_conference.directories.is_some() {
+                    self.flag_files_cmd(true).await?;
+                }
+            } else {
+                self.view_file().await?;
+            }
             return Ok(AfterAction::Prompt);
         }
         let location = self.session.current_conference.attachment_location.clone();
@@ -589,8 +777,9 @@ impl IcyBoardState {
                     continue;
                 }
             };
-            if action == MsgFunc::FlagFile { self.add_flagged_file(path, false, true).await?; }
-            else {
+            if action == MsgFunc::FlagFile {
+                self.add_flagged_file(path, false, true).await?;
+            } else {
                 // Isolate view's pattern-based lookup to a private directory with
                 // exactly one regular file. No global rename or wildcard escape.
                 let temp = tempfile::tempdir()?;
@@ -612,8 +801,12 @@ impl IcyBoardState {
     /// EXPORT.BAT hook in this engine; never execute a caller-supplied filename.
     async fn export_read_message(&mut self, base: &mut JamMessageBase, number: u32) -> Res<AfterAction> {
         let sec = self.get_board().await.config.sysop_command_level.read_all_mail.clone();
-        if !self.check_sec("X", &sec).await? { return Ok(AfterAction::Redisplay); }
-        let Some(message) = self.read_action_message(base, number).await? else { return Ok(AfterAction::Redisplay) };
+        if !self.check_sec("X", &sec).await? {
+            return Ok(AfterAction::Redisplay);
+        }
+        let Some(message) = self.read_action_message(base, number).await? else {
+            return Ok(AfterAction::Redisplay);
+        };
         let temp = tempfile::tempdir()?;
         let path = temp.path().join("EXPORT.MSG");
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path)?;
@@ -647,11 +840,16 @@ impl IcyBoardState {
                 let protect = cmd.func == MsgFunc::Protect;
                 let sec = self.get_board().await.config.sysop_command_level.protect_unprotect_messages.clone();
                 if self.check_sec(if protect { "P" } else { "U" }, &sec).await? {
-                    let Some(mut header) = self.read_action_header(message_base, number).await? else { return Ok(AfterAction::Redisplay) };
+                    let Some(mut header) = self.read_action_header(message_base, number).await? else {
+                        return Ok(AfterAction::Redisplay);
+                    };
                     let original = header.clone();
                     clear_password(&mut header);
-                    if protect { header.attributes |= attributes::MSG_PRIVATE; }
-                    else { header.attributes &= !attributes::MSG_PRIVATE; }
+                    if protect {
+                        header.attributes |= attributes::MSG_PRIVATE;
+                    } else {
+                        header.attributes &= !attributes::MSG_PRIVATE;
+                    }
                     self.write_header(message_base, number, &original, &header).await?;
                 }
                 Ok(AfterAction::Redisplay)
@@ -811,12 +1009,16 @@ impl IcyBoardState {
             return Ok(None);
         }
         let areas = target.areas.clone().unwrap_or_default();
-        if areas.is_empty() { return Ok(None); }
+        if areas.is_empty() {
+            return Ok(None);
+        }
         if areas.len() == 1 {
             return Ok(Some(0));
         }
         for (i, area) in areas.iter().enumerate() {
-            if !area.req_level_to_list.session_can_access(&self.session) { continue; }
+            if !area.req_level_to_list.session_can_access(&self.session) {
+                continue;
+            }
             self.print(TerminalTarget::Both, &format!("{:>3}) {}", i + 1, area.name)).await?;
             self.new_line().await?;
         }
@@ -845,8 +1047,12 @@ impl IcyBoardState {
     }
 
     async fn copy_message_to_conference(&mut self, message_base: &mut JamMessageBase, number: u32, conference: u16, area: usize, moving: bool) -> Res<bool> {
-        let Some(target) = self.read_action_target(conference, area).await? else { return Ok(false) };
-        let Some(original) = self.read_action_message(message_base, number).await? else { return Ok(false) };
+        let Some(target) = self.read_action_target(conference, area).await? else {
+            return Ok(false);
+        };
+        let Some(original) = self.read_action_message(message_base, number).await? else {
+            return Ok(false);
+        };
         let same_base = same_message_base(message_base.path(), &target);
         let msg = transfer_draft(JamMessage::from_stored(original.header().clone(), original.text().clone()), same_base);
         let mut attachments = match self.copy_action_attachments(&msg, conference, area).await {
@@ -858,13 +1064,20 @@ impl IcyBoardState {
             }
         };
         let text = if moving { IceText::MessageMoved } else { IceText::MessageCopied };
-        let result = finish_transfer(self.send_action_message(conference, area, &target, msg, text, &mut attachments), &target, moving,
-            || delete_unchanged_message(message_base, number, &original)).await;
+        let result = finish_transfer(
+            self.send_action_message(conference, area, &target, msg, text, &mut attachments),
+            &target,
+            moving,
+            || delete_unchanged_message(message_base, number, &original),
+        )
+        .await;
         match result {
             Ok(()) => Ok(true),
             Err(error) => {
                 if let TransferFailure::Destination(error) = &error {
-                    if error.is::<MessageCreditDenied>() { return Ok(false); }
+                    if error.is::<MessageCreditDenied>() {
+                        return Ok(false);
+                    }
                 }
                 match error {
                     TransferFailure::Destination(error) if error.is::<MessagePersistedError>() => return Err(error),
@@ -886,13 +1099,15 @@ impl IcyBoardState {
         if !self.check_sec("E", &sec).await? {
             return Ok(());
         }
-        let Some(mut header) = self.read_action_header(message_base, number).await? else { return Ok(()) };
+        let Some(mut header) = self.read_action_header(message_base, number).await? else {
+            return Ok(());
+        };
         let original = header.clone();
 
         let from = header.from().map(std::string::ToString::to_string).unwrap_or_default();
         let edit_all = self.get_board().await.config.sysop_command_level.edit_any_message.clone();
-        let own = from.eq_ignore_ascii_case(&self.session.user_name)
-            || (!self.session.alias_name.is_empty() && from.eq_ignore_ascii_case(&self.session.alias_name));
+        let own =
+            from.eq_ignore_ascii_case(&self.session.user_name) || (!self.session.alias_name.is_empty() && from.eq_ignore_ascii_case(&self.session.alias_name));
         if !own && !edit_all.session_can_access(&self.session) {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -982,7 +1197,9 @@ impl IcyBoardState {
                                 display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
                             )
                             .await?;
-                        if password.is_empty() || self.session.request_logoff { return Ok(()); }
+                        if password.is_empty() || self.session.request_logoff {
+                            return Ok(());
+                        }
                         header.attributes &= !attributes::MSG_PRIVATE;
                         header.password_crc = JamMessageBase::crc(&BString::from(password.as_str()));
                         set_security_kind(&mut header, answer == "S");

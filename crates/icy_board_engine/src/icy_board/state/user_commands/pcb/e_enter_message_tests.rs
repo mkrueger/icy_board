@@ -30,9 +30,10 @@ fn source_message(body: &str) -> JamMessage {
 }
 
 fn has_reply_date(header: &JamMessageHeader) -> bool {
-    header.sub_fields.iter().any(|field| {
-        field.field_type() == SubfieldType::FTSKludge && field.content().starts_with(b"ICYBOARD-REPLY-DATE: ")
-    })
+    header
+        .sub_fields
+        .iter()
+        .any(|field| field.field_type() == SubfieldType::FTSKludge && field.content().starts_with(b"ICYBOARD-REPLY-DATE: "))
 }
 
 fn header_bytes(header: &JamMessageHeader) -> Vec<u8> {
@@ -107,7 +108,8 @@ fn reply_date_skips_a_renumbered_replacement_even_when_its_crc_matches() {
     let mut base = JamMessageBase::create(root.path().join("source")).unwrap();
     base.write_message(&source_message("original body")).unwrap();
     // Deliberately duplicate MsgID/CRC: identity checking must not use CRC alone.
-    base.write_message(&source_message("unrelated body").with_subject(BString::from("Other subject"))).unwrap();
+    base.write_message(&source_message("unrelated body").with_subject(BString::from("Other subject")))
+        .unwrap();
     let approved = base.read_header(1).unwrap();
     let (approved, body) = read_authorized_reply(&mut base, &approved, "READER", "", false).unwrap().unwrap();
     base.delete_message(1).unwrap();
@@ -173,16 +175,29 @@ async fn input_state(root: &Path, input: &str) -> (IcyBoardState, ChannelConnect
     board.config.paths.email_msgbase = root.join("email");
     board.config.message.validate_to_name = false;
     board.default_display_text = DEFAULT_DISPLAY_TEXT.clone();
-    board.default_display_text.update_record_number(IceText::PasswordToReadMessage as usize, PASSWORD_PROMPT).unwrap();
-    board.default_display_text.update_record_number(IceText::TextEntryCommand as usize, COMPOSE_PROMPT).unwrap();
-    board.users.new_user(User { name: "READER".into(), security_level: 10, ..Default::default() });
+    board
+        .default_display_text
+        .update_record_number(IceText::PasswordToReadMessage as usize, PASSWORD_PROMPT)
+        .unwrap();
+    board
+        .default_display_text
+        .update_record_number(IceText::TextEntryCommand as usize, COMPOSE_PROMPT)
+        .unwrap();
+    board.users.new_user(User {
+        name: "READER".into(),
+        security_level: 10,
+        ..Default::default()
+    });
     let caller = board.users[0].clone();
     board.conferences.clear();
     board.conferences.push(Conference {
         long_to_names: true,
         disallow_private_msgs: true,
         sec_request_rr: SecurityExpression::from_req_security(255),
-        areas: Some(Arc::new(AreaList::new(vec![MessageArea { path: root.join("area"), ..Default::default() }]))),
+        areas: Some(Arc::new(AreaList::new(vec![MessageArea {
+            path: root.join("area"),
+            ..Default::default()
+        }]))),
         ..Default::default()
     });
     let conference = board.conferences[0].clone();
@@ -217,7 +232,10 @@ async fn email_reply_and_ro_quote_the_actual_base_stay_private_and_do_not_touch_
         // or allows posting. Its destination is the email base, conf=-1/area=0.
         state.session.current_conference.is_read_only = true;
         state.session.current_conference.areas = None;
-        let result = timeout(Duration::from_secs(3), state.reply_from_base(&email_path, 1, ask_other, true)).await.unwrap().unwrap();
+        let result = timeout(Duration::from_secs(3), state.reply_from_base(&email_path, 1, ask_other, true))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(result, EditResult::SendNext);
         let email = JamMessageBase::open(&email_path).unwrap();
         let reply = email.read_message(2).unwrap();
@@ -225,7 +243,13 @@ async fn email_reply_and_ro_quote_the_actual_base_stay_private_and_do_not_touch_
         assert_eq!(reply.to().unwrap().to_string(), if ask_other { "OTHER" } else { "AUTHOR" });
         assert!(reply.header().is_private());
         assert_eq!(reply.header().reply_to, 1);
-        assert!(reply.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::ReplyID && field.content() == "source-message-id"));
+        assert!(
+            reply
+                .header()
+                .sub_fields
+                .iter()
+                .any(|field| field.field_type() == SubfieldType::ReplyID && field.content() == "source-message-id")
+        );
         assert!(has_reply_date(&email.read_header(1).unwrap()));
         assert_eq!(area_before, header_bytes(&base_header(&area_path, 1)));
         assert!(JamMessageBase::open(&area_path).unwrap().read_header(2).is_err());
@@ -277,7 +301,15 @@ async fn reply_sk_returns_save_only_when_kill_command_or_ownership_is_denied() {
         state.get_board().await.config.sysop_command_level.read_all_mail = SecurityExpression::from_req_security(255);
         state.session.user_command_level.cmd_k = SecurityExpression::from_req_security(if command_denied { 255 } else { 0 });
         assert!(!state.is_sysop());
-        assert!(!state.get_board().await.config.sysop_command_level.read_all_mail.session_can_access(&state.session));
+        assert!(
+            !state
+                .get_board()
+                .await
+                .config
+                .sysop_command_level
+                .read_all_mail
+                .session_can_access(&state.session)
+        );
         assert_eq!(state.session.user_command_level.cmd_k.session_can_access(&state.session), !command_denied);
         let result = timeout(Duration::from_secs(3), state.reply_current_message(1, false)).await.unwrap().unwrap();
         assert_eq!(result, EditResult::SendMessage, "command_denied={command_denied}");
@@ -296,7 +328,9 @@ async fn reply_sk_rejects_source_modified_or_identically_replaced_during_composi
         let mut base = JamMessageBase::create(&path).unwrap();
         let message = source_message("original");
         base.write_message(&message).unwrap();
-        if change == 2 { base.write_message(&message).unwrap(); }
+        if change == 2 {
+            base.write_message(&message).unwrap();
+        }
         let approved = header_bytes(&base.read_header(1).unwrap());
         let (mut state, mut peer) = input_state(root.path(), "\r").await;
         state.session.user_command_level.cmd_k = SecurityExpression::from_req_security(0);
@@ -316,28 +350,37 @@ async fn reply_sk_rejects_source_modified_or_identically_replaced_during_composi
                     header.set_subject(BString::from("Concurrent edit"));
                     jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
                 }
-                1 => base.transaction(|_| {
-                    // Equal length, same header and generation: compare the body too.
-                    std::fs::write(path.with_extension("jdt"), b"replaced")?;
-                    Ok(())
-                }).unwrap(),
+                1 => base
+                    .transaction(|_| {
+                        // Equal length, same header and generation: compare the body too.
+                        std::fs::write(path.with_extension("jdt"), b"replaced")?;
+                        Ok(())
+                    })
+                    .unwrap(),
                 _ => {
                     base.delete_message(1).unwrap();
                     base.pack(&PackOptions::default().with_renumber_from(1)).unwrap();
-                    assert_eq!(approved, header_bytes(&base.read_header(1).unwrap()), "only generation distinguishes this replacement");
+                    assert_eq!(
+                        approved,
+                        header_bytes(&base.read_header(1).unwrap()),
+                        "only generation distinguishes this replacement"
+                    );
                 }
             }
             let before = header_bytes(&base.read_header(1).unwrap());
             peer.send(b"Q 1 1\rSK\r").await.unwrap();
             (peer, before)
         };
-        let (result, (_peer, before)) = timeout(Duration::from_secs(3), async {
-            tokio::join!(state.reply_current_message(1, false), caller)
-        }).await.unwrap();
+        let (result, (_peer, before)) = timeout(Duration::from_secs(3), async { tokio::join!(state.reply_current_message(1, false), caller) })
+            .await
+            .unwrap();
         assert_eq!(result.unwrap(), EditResult::SendMessage);
         let base = JamMessageBase::open(&path).unwrap();
         assert_eq!(before, header_bytes(&base.read_header(1).unwrap()));
-        assert_eq!(base.read_message(1).unwrap().text(), &BString::from(if change == 1 { "replaced" } else { "original" }));
+        assert_eq!(
+            base.read_message(1).unwrap().text(),
+            &BString::from(if change == 1 { "replaced" } else { "original" })
+        );
         assert_eq!(base.read_message(2).unwrap().text(), &BString::from("-> original"));
     }
 }
@@ -353,7 +396,10 @@ async fn cross_base_reply_sk_kills_only_the_original_source() {
     let destination_before = header_bytes(&email.read_header(1).unwrap());
     let (mut state, _peer) = input_state(root.path(), "\rQ 1 1\rSK\r").await;
     state.session.user_command_level.cmd_k = SecurityExpression::from_req_security(0);
-    let result = timeout(Duration::from_secs(3), state.reply_from_base(&source_path, 1, false, true)).await.unwrap().unwrap();
+    let result = timeout(Duration::from_secs(3), state.reply_from_base(&source_path, 1, false, true))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(result, EditResult::SendKill);
     let source = JamMessageBase::open(&source_path).unwrap();
     assert!(matches!(source.read_header(1), Err(jamjam::Error::Jam(jamjam::jam::JamError::MessageDeleted))));
@@ -373,12 +419,24 @@ async fn cross_base_reply_drops_numeric_link_but_keeps_reply_id_and_updates_sour
     email.write_message(&source_message("unrelated destination")).unwrap();
     let destination_before = header_bytes(&email.read_header(1).unwrap());
     let (mut state, _peer) = input_state(root.path(), "\rQ 1 1\rS\r").await;
-    assert_eq!(timeout(Duration::from_secs(3), state.reply_from_base(&source_path, 1, false, true)).await.unwrap().unwrap(), EditResult::SendMessage);
+    assert_eq!(
+        timeout(Duration::from_secs(3), state.reply_from_base(&source_path, 1, false, true))
+            .await
+            .unwrap()
+            .unwrap(),
+        EditResult::SendMessage
+    );
     let email = JamMessageBase::open(root.path().join("email")).unwrap();
     let reply = email.read_message(2).unwrap();
     assert_eq!(reply.header().reply_to, 0);
     assert_eq!(reply.text(), &BString::from("-> other base quote"));
-    assert!(reply.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::ReplyID && field.content() == "source-message-id"));
+    assert!(
+        reply
+            .header()
+            .sub_fields
+            .iter()
+            .any(|field| field.field_type() == SubfieldType::ReplyID && field.content() == "source-message-id")
+    );
     assert_eq!(destination_before, header_bytes(&email.read_header(1).unwrap()));
     assert!(has_reply_date(&base_header(&source_path, 1)));
 }
@@ -388,8 +446,10 @@ async fn pack_during_password_prompt_is_unlocked_and_aborts_without_quoting_repl
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("email");
     let mut base = JamMessageBase::create(&path).unwrap();
-    base.write_message(&source_message("approved secret").with_password(&BString::from("SECRET"))).unwrap();
-    base.write_message(&source_message("replacement secret").with_to(BString::from("STRANGER"))).unwrap();
+    base.write_message(&source_message("approved secret").with_password(&BString::from("SECRET")))
+        .unwrap();
+    base.write_message(&source_message("replacement secret").with_to(BString::from("STRANGER")))
+        .unwrap();
     let (mut state, mut peer) = input_state(root.path(), "").await;
     let caller = async {
         let mut output = Vec::new();
@@ -409,7 +469,9 @@ async fn pack_during_password_prompt_is_unlocked_and_aborts_without_quoting_repl
     };
     let (result, _peer) = timeout(Duration::from_secs(3), async {
         tokio::join!(state.reply_from_base(&path, 1, false, true), caller)
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     assert_eq!(result.unwrap(), EditResult::Abort);
     let remaining = JamMessageBase::open(&path).unwrap().read_message(1).unwrap();
     assert_eq!(remaining.text(), &BString::from("replacement secret"));

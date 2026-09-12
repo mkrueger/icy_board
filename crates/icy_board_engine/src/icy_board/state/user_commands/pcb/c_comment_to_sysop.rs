@@ -12,7 +12,10 @@ use crate::{
 use bstr::BString;
 use chrono::{DateTime, Utc};
 use icy_engine::Position;
-use jamjam::jam::{JamMessage, attributes, msg_header::{MessageSubfield, SubfieldType}};
+use jamjam::jam::{
+    JamMessage, attributes,
+    msg_header::{MessageSubfield, SubfieldType},
+};
 
 fn message_text(lines: &[String], allow_esc_codes: bool) -> String {
     let mut text = lines.join("\n");
@@ -44,7 +47,9 @@ fn carbon_copy(message: &JamMessage, recipient: &str) -> JamMessage {
     if recipient.eq_ignore_ascii_case("ALL") {
         header.attributes &= !(attributes::MSG_PRIVATE | attributes::MSG_RECEIPTREQ);
     }
-    header.sub_fields.retain(|field| !matches!(field.field_type(), SubfieldType::AddressD | SubfieldType::MsgID));
+    header
+        .sub_fields
+        .retain(|field| !matches!(field.field_type(), SubfieldType::AddressD | SubfieldType::MsgID));
     if recipient.contains('@') {
         header.sub_fields.push(MessageSubfield::new(SubfieldType::AddressD, BString::from(recipient)));
     }
@@ -156,13 +161,19 @@ impl IcyBoardState {
         for field in sub_fields {
             message = message.with_sub_field(field);
         }
-        if to.contains('@') && !to.eq_ignore_ascii_case("@LIST@")
-            && !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD) {
+        if to.contains('@')
+            && !to.eq_ignore_ascii_case("@LIST@")
+            && !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD)
+        {
             message = message.with_sub_field(MessageSubfield::new(SubfieldType::AddressD, BString::from(to)));
         }
         if let Err(error) = self.write_message_context(conf, area, message, Vec::new(), text, true).await {
-            if error.is::<super::message_attachment::MessageCreditDenied>() { return Ok(()); }
-            if error.is::<super::message_attachment::MessagePersistedError>() { return Err(error); }
+            if error.is::<super::message_attachment::MessageCreditDenied>() {
+                return Ok(());
+            }
+            if error.is::<super::message_attachment::MessagePersistedError>() {
+                return Err(error);
+            }
             // The interactive compose command acknowledges a failed save;
             // storage callers such as MOVE must never wait here or see success.
             self.press_enter().await?;
@@ -204,9 +215,16 @@ impl IcyBoardState {
         let external = self.get_board().await.config.message.external_editor.clone();
         loop {
             let result = if use_fse && external.mode != crate::icy_board::icb_config::ExternalEditorMode::Internal {
-                let area = self.session.current_conference.areas.as_ref()
-                    .and_then(|areas| areas.get(self.session.current_message_area as usize)).map(|area| area.name.clone()).unwrap_or_default();
-                self.run_external_editor(&external, &mut editor, &area, message.header().attributes & attributes::MSG_PRIVATE != 0).await?
+                let area = self
+                    .session
+                    .current_conference
+                    .areas
+                    .as_ref()
+                    .and_then(|areas| areas.get(self.session.current_message_area as usize))
+                    .map(|area| area.name.clone())
+                    .unwrap_or_default();
+                self.run_external_editor(&external, &mut editor, &area, message.header().attributes & attributes::MSG_PRIVATE != 0)
+                    .await?
             } else {
                 editor.edit_message(self).await?
             };
@@ -222,9 +240,15 @@ impl IcyBoardState {
                 }
                 *message = JamMessage::from_stored(header, BString::from(body));
             }
-            if result != EditResult::AttachFile { return Ok(result); }
-            if self.attach_message_file(message).await? { return Ok(EditResult::SendMessage); }
-            if self.session.request_logoff { return Ok(EditResult::Abort); }
+            if result != EditResult::AttachFile {
+                return Ok(result);
+            }
+            if self.attach_message_file(message).await? {
+                return Ok(EditResult::SendMessage);
+            }
+            if self.session.request_logoff {
+                return Ok(EditResult::Abort);
+            }
             // Denial/cancellation returns to composition with the SAME editor,
             // including its unsaved body, header fields, and cursor position.
         }
@@ -243,7 +267,10 @@ impl IcyBoardState {
         allow_carbon_copy: bool,
     ) -> Res<EditResult> {
         let mut saved = None;
-        match self.write_message_with_result(conf, area, message, quote_text, text, allow_carbon_copy, &mut saved).await {
+        match self
+            .write_message_with_result(conf, area, message, quote_text, text, allow_carbon_copy, &mut saved)
+            .await
+        {
             Err(error) if saved.is_none() && error.is::<super::message_attachment::MessageCreditDenied>() => Ok(EditResult::Abort),
             result => result,
         }
@@ -260,7 +287,9 @@ impl IcyBoardState {
         saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
     ) -> Res<EditResult> {
         if !self.message_write_allowed(conf, &message).await? {
-            if self.session.request_logoff { return Ok(EditResult::Abort); }
+            if self.session.request_logoff {
+                return Ok(EditResult::Abort);
+            }
             return Err(super::message_attachment::MessageCreditDenied.into());
         }
         let mut attachments = self.message_attachment_cleanup(&message);
@@ -280,19 +309,27 @@ impl IcyBoardState {
         let mut header = message.header().clone();
         let mut list = Vec::new();
         header.sub_fields.retain(|field| {
-            if field.field_type() == SubfieldType::FTSKludge && let Some(to) = field.content().to_string().strip_prefix("ICYBOARD-CARBON-TO: ") {
+            if field.field_type() == SubfieldType::FTSKludge
+                && let Some(to) = field.content().to_string().strip_prefix("ICYBOARD-CARBON-TO: ")
+            {
                 list.push(to.to_string());
                 false
-            } else { true }
+            } else {
+                true
+            }
         });
         message = JamMessage::from_stored(header, message.text().clone());
         if message.to().is_some_and(|to| to.eq_ignore_ascii_case(b"@LIST@")) {
-            if list.is_empty() || !allow_carbon_copy || matches!(text, IceText::SavingComment)
-                || !self.session.current_conference.sec_carbon_copy.session_can_access(&self.session) {
+            if list.is_empty()
+                || !allow_carbon_copy
+                || matches!(text, IceText::SavingComment)
+                || !self.session.current_conference.sec_carbon_copy.session_can_access(&self.session)
+            {
                 return Ok(EditResult::Abort);
             }
             for to in list.into_iter().take(self.session.current_conference.carbon_list_limit as usize) {
-                self.send_message_with_result(conf, area, carbon_copy(&message, &to), text, &mut attachments, saved).await?;
+                self.send_message_with_result(conf, area, carbon_copy(&message, &to), text, &mut attachments, saved)
+                    .await?;
             }
         } else {
             let original = JamMessage::from_stored(message.header().clone(), message.text().clone());
@@ -302,7 +339,9 @@ impl IcyBoardState {
             while let Some(recipient) = self.get_message_recipient(IceText::CarbonCopyTo, String::new(), true).await? {
                 let copy = carbon_copy(&message, &recipient);
                 self.send_message_with_result(conf, area, copy, text, &mut attachments, saved).await?;
-                if recipient.chars().count() > 25 { break; }
+                if recipient.chars().count() > 25 {
+                    break;
+                }
             }
         }
         Ok(result)
@@ -394,7 +433,12 @@ mod tests {
         assert!(copy.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::PackoutDate));
         assert!(copy.header().sub_fields.iter().any(|field| field.content() == "ICYBOARD-SECURITY: S"));
         assert!(!copy.header().sub_fields.iter().any(|field| field.content() == "old@example.org"));
-        assert!(copy.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD && field.content() == "new@example.org"));
+        assert!(
+            copy.header()
+                .sub_fields
+                .iter()
+                .any(|field| field.field_type() == SubfieldType::AddressD && field.content() == "new@example.org")
+        );
         assert_eq!(original.to().unwrap().to_string(), "FIRST");
         assert!(original.header().is_read());
     }

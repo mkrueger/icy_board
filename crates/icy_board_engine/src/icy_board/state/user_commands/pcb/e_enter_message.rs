@@ -34,32 +34,51 @@ pub(super) struct MessageOptions {
 
 // Match each word, not an entire multiword name as one Soundex token.
 fn soundex_name(name: &str) -> Vec<String> {
-    name.split_whitespace().map(|word| {
-        let mut letters = word.chars().filter(char::is_ascii_alphabetic).map(|ch| ch.to_ascii_uppercase());
-        let Some(first) = letters.next() else { return String::new() };
-        let code = |ch| match ch {
-            'B' | 'F' | 'P' | 'V' => '1', 'C' | 'G' | 'J' | 'K' | 'Q' | 'S' | 'X' | 'Z' => '2',
-            'D' | 'T' => '3', 'L' => '4', 'M' | 'N' => '5', 'R' => '6', _ => '0',
-        };
-        let mut result = first.to_string();
-        let mut previous = code(first);
-        for ch in letters {
-            if ch == 'H' || ch == 'W' { continue; }
-            let digit = code(ch);
-            if digit != '0' && digit != previous { result.push(digit); }
-            previous = digit;
-            if result.len() == 4 { break; }
-        }
-        while result.len() < 4 { result.push('0'); }
-        result
-    }).collect()
+    name.split_whitespace()
+        .map(|word| {
+            let mut letters = word.chars().filter(char::is_ascii_alphabetic).map(|ch| ch.to_ascii_uppercase());
+            let Some(first) = letters.next() else { return String::new() };
+            let code = |ch| match ch {
+                'B' | 'F' | 'P' | 'V' => '1',
+                'C' | 'G' | 'J' | 'K' | 'Q' | 'S' | 'X' | 'Z' => '2',
+                'D' | 'T' => '3',
+                'L' => '4',
+                'M' | 'N' => '5',
+                'R' => '6',
+                _ => '0',
+            };
+            let mut result = first.to_string();
+            let mut previous = code(first);
+            for ch in letters {
+                if ch == 'H' || ch == 'W' {
+                    continue;
+                }
+                let digit = code(ch);
+                if digit != '0' && digit != previous {
+                    result.push(digit);
+                }
+                previous = digit;
+                if result.len() == 4 {
+                    break;
+                }
+            }
+            while result.len() < 4 {
+                result.push('0');
+            }
+            result
+        })
+        .collect()
 }
 
 impl IcyBoardState {
     pub async fn enter_message(&mut self) -> Res<()> {
         if let Err(error) = self.enter_message_with_defaults(None, "", &mut None).await {
-            if error.is::<super::message_attachment::MessageCreditDenied>() { return Ok(()); }
-            if error.is::<super::message_attachment::MessagePersistedError>() { return Err(error); }
+            if error.is::<super::message_attachment::MessageCreditDenied>() {
+                return Ok(());
+            }
+            if error.is::<super::message_attachment::MessagePersistedError>() {
+                return Err(error);
+            }
             self.press_enter().await?;
             return Err(error);
         }
@@ -85,18 +104,31 @@ impl IcyBoardState {
         if !self.check_sec("E", &write_sec).await? {
             return Ok(());
         }
-        if let Some(area) = self.session.current_conference.areas.as_ref()
-            .and_then(|areas| areas.get(self.session.current_message_area)).cloned() {
+        if let Some(area) = self
+            .session
+            .current_conference
+            .areas
+            .as_ref()
+            .and_then(|areas| areas.get(self.session.current_message_area))
+            .cloned()
+        {
             if area.is_read_only {
                 self.display_text(IceText::ConferenceIsReadOnly, display_flags::NEWLINE).await?;
                 return Ok(());
             }
-            if !self.check_sec("E", &area.req_level_to_enter).await? { return Ok(()); }
+            if !self.check_sec("E", &area.req_level_to_enter).await? {
+                return Ok(());
+            }
         }
         self.set_activity(NodeStatus::EnterMessage).await;
-        let from = if let Some(header) = header { self.get_message_sender(&header.from).await? }
-            else { self.session.get_username_or_alias() };
-        if self.session.request_logoff { return Ok(()); }
+        let from = if let Some(header) = header {
+            self.get_message_sender(&header.from).await?
+        } else {
+            self.session.get_username_or_alias()
+        };
+        if self.session.request_logoff {
+            return Ok(());
+        }
 
         // PCBoard joins the arguments into the recipient field and then still
         // asks the question with that name pre-filled. Consuming the token
@@ -110,7 +142,9 @@ impl IcyBoardState {
             to.push_str(&token);
         }
         to = to.chars().take(25).collect();
-        if let Some(header) = header { to = header.to.clone(); }
+        if let Some(header) = header {
+            to = header.to.clone();
+        }
         let default_to = if to.trim().is_empty() { "ALL".to_string() } else { to.trim().to_string() };
 
         let Some(mut to) = self.get_message_recipient(IceText::MessageTo, default_to, false).await? else {
@@ -122,14 +156,21 @@ impl IcyBoardState {
             let limit = self.session.current_conference.carbon_list_limit;
             if limit > 1 && self.session.current_conference.sec_carbon_copy.session_can_access(&self.session) {
                 for _ in 0..limit {
-                    let Some(recipient) = self.get_message_recipient(IceText::CarbonList, String::new(), true).await? else { break };
-                    carbon_fields.push(MessageSubfield::new(SubfieldType::FTSKludge, BString::from(format!("ICYBOARD-CARBON-TO: {recipient}"))));
+                    let Some(recipient) = self.get_message_recipient(IceText::CarbonList, String::new(), true).await? else {
+                        break;
+                    };
+                    carbon_fields.push(MessageSubfield::new(
+                        SubfieldType::FTSKludge,
+                        BString::from(format!("ICYBOARD-CARBON-TO: {recipient}")),
+                    ));
                 }
                 if carbon_fields.len() == limit as usize {
                     self.display_text(IceText::CarbonLimitReached, display_flags::NEWLINE).await?;
                 }
             }
-            if carbon_fields.is_empty() { to = "ALL".to_string(); }
+            if carbon_fields.is_empty() {
+                to = "ALL".to_string();
+            }
         }
 
         let subject = self
@@ -149,36 +190,78 @@ impl IcyBoardState {
 
         let to_all = to.eq_ignore_ascii_case("ALL");
         let mut options = if let Some(header) = header {
-            self.get_message_options_with_default(to_all, !carbon_fields.is_empty(), Some(header.is_private)).await?
+            self.get_message_options_with_default(to_all, !carbon_fields.is_empty(), Some(header.is_private))
+                .await?
         } else {
             self.get_message_options(to_all, !carbon_fields.is_empty()).await?
         };
         options.sub_fields.extend(carbon_fields);
 
         let mut message = jamjam::jam::JamMessage::default()
-            .with_from(from.into()).with_to(to.clone().into()).with_subject(subject.into())
-            .with_text(initial_text.into()).with_date_time(Utc::now()).with_attributes(options.attributes | attributes::MSG_LOCAL);
-        if let Some(password) = options.password { message = message.with_password(&password.into()); }
-        if let Some(date) = options.packout_date { message = message.with_packout_date(date); }
-        for field in options.sub_fields { message = message.with_sub_field(field); }
-        if to.contains('@') && !to.eq_ignore_ascii_case("@LIST@")
-            && !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD) {
+            .with_from(from.into())
+            .with_to(to.clone().into())
+            .with_subject(subject.into())
+            .with_text(initial_text.into())
+            .with_date_time(Utc::now())
+            .with_attributes(options.attributes | attributes::MSG_LOCAL);
+        if let Some(password) = options.password {
+            message = message.with_password(&password.into());
+        }
+        if let Some(date) = options.packout_date {
+            message = message.with_packout_date(date);
+        }
+        for field in options.sub_fields {
+            message = message.with_sub_field(field);
+        }
+        if to.contains('@')
+            && !to.eq_ignore_ascii_case("@LIST@")
+            && !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::AddressD)
+        {
             message = message.with_sub_field(MessageSubfield::new(SubfieldType::AddressD, to.into()));
         }
-        self.write_message_with_result(self.session.current_conference_number as i32, self.session.current_message_area as i32,
-            message, Vec::new(), IceText::SavingMessage, true, saved).await?;
+        self.write_message_with_result(
+            self.session.current_conference_number as i32,
+            self.session.current_message_area as i32,
+            message,
+            Vec::new(),
+            IceText::SavingMessage,
+            true,
+            saved,
+        )
+        .await?;
         Ok(())
     }
 
     pub(crate) async fn get_message_sender(&mut self, default: &str) -> Res<String> {
-        let mut from = if default.is_empty() { self.session.get_username_or_alias() } else { default.to_string() };
-        if self.get_board().await.config.sysop_command_level.edit_message_headers.session_can_access(&self.session) {
+        let mut from = if default.is_empty() {
+            self.session.get_username_or_alias()
+        } else {
+            default.to_string()
+        };
+        if self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .edit_message_headers
+            .session_can_access(&self.session)
+        {
             // EDIT HEADER shows the current sender before asking for its replacement.
             self.display_text(IceText::From, display_flags::LFBEFORE).await?;
             self.println(crate::vm::TerminalTarget::Both, &from).await?;
-            from = self.input_field(IceText::NewInfo, 25, &MASK_ASCII, "", Some(from),
-                display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE).await?;
-            if from.is_empty() { from = self.session.get_username_or_alias(); }
+            from = self
+                .input_field(
+                    IceText::NewInfo,
+                    25,
+                    &MASK_ASCII,
+                    "",
+                    Some(from),
+                    display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE,
+                )
+                .await?;
+            if from.is_empty() {
+                from = self.session.get_username_or_alias();
+            }
         }
         if from.to_ascii_uppercase().contains("@USER@") || from.chars().any(char::is_control) {
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid message sender").into());
@@ -203,18 +286,25 @@ impl IcyBoardState {
             }
             let mut to = if answer.is_empty() { default_to.clone() } else { answer.trim().to_string() };
             if to.trim().is_empty() {
-                if empty_ends { return Ok(None); }
+                if empty_ends {
+                    return Ok(None);
+                }
                 to = "ALL".to_string();
             }
             if to.eq_ignore_ascii_case("@LIST@") {
-                if matches!(prompt, IceText::MessageTo) { return Ok(Some("@LIST@".to_string())); }
+                if matches!(prompt, IceText::MessageTo) {
+                    return Ok(Some("@LIST@".to_string()));
+                }
                 self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
                 continue;
             }
 
             let validate = self.get_board().await.config.message.validate_to_name && !self.session.current_conference.echo_mail_in_conference;
-            if !validate || (self.session.current_conference.long_to_names && to.chars().count() > 25)
-                || to.eq_ignore_ascii_case("ALL") || to.eq_ignore_ascii_case("SYSOP") {
+            if !validate
+                || (self.session.current_conference.long_to_names && to.chars().count() > 25)
+                || to.eq_ignore_ascii_case("ALL")
+                || to.eq_ignore_ascii_case("SYSOP")
+            {
                 return Ok(Some(to));
             }
 
@@ -223,11 +313,12 @@ impl IcyBoardState {
                 let board = self.get_board().await;
                 match board.users.find_by_name(&to) {
                     Some(index) => {
-                        let registered = (self.session.current_conference.allow_aliases || board.users[index].name.eq_ignore_ascii_case(&to)) && (conference == 0
-                            || board.users[index]
-                                .conference_flags
-                                .get(&conference)
-                                .is_some_and(|flags| flags.contains(ConferenceFlags::Registered)));
+                        let registered = (self.session.current_conference.allow_aliases || board.users[index].name.eq_ignore_ascii_case(&to))
+                            && (conference == 0
+                                || board.users[index]
+                                    .conference_flags
+                                    .get(&conference)
+                                    .is_some_and(|flags| flags.contains(ConferenceFlags::Registered)));
                         (true, registered)
                     }
                     None => (false, false),
@@ -260,32 +351,72 @@ impl IcyBoardState {
             if retry.eq_ignore_ascii_case("C") {
                 return Ok(Some(to));
             }
-            if self.session.request_logoff { return Ok(None); }
+            if self.session.request_logoff {
+                return Ok(None);
+            }
             if !found && (retry.is_empty() || retry.eq_ignore_ascii_case("S")) {
                 let candidates = {
                     let board = self.get_board().await;
                     let key = soundex_name(&to);
-                    board.users.iter().filter(|user| conference == 0 || user.conference_flags.get(&conference)
-                        .is_some_and(|flags| flags.contains(ConferenceFlags::Registered)))
+                    board
+                        .users
+                        .iter()
+                        .filter(|user| {
+                            conference == 0
+                                || user
+                                    .conference_flags
+                                    .get(&conference)
+                                    .is_some_and(|flags| flags.contains(ConferenceFlags::Registered))
+                        })
                         .flat_map(|user| {
                             let mut names = vec![user.name.clone()];
-                            if self.session.current_conference.allow_aliases && !user.alias.is_empty() { names.push(user.alias.clone()); }
+                            if self.session.current_conference.allow_aliases && !user.alias.is_empty() {
+                                names.push(user.alias.clone());
+                            }
                             names
-                        }).filter(|name| soundex_name(name) == key).collect::<Vec<_>>()
+                        })
+                        .filter(|name| soundex_name(name) == key)
+                        .collect::<Vec<_>>()
                 };
                 for candidate in candidates {
                     self.session.op_text.clone_from(&candidate);
                     self.display_text(IceText::FoundName, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
-                    let choice = self.input_field(IceText::UseFoundName, 1, "CRSU", "", Some("U".to_string()),
-                        display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN).await?;
-                    if self.session.request_logoff { return Ok(None); }
+                    let choice = self
+                        .input_field(
+                            IceText::UseFoundName,
+                            1,
+                            "CRSU",
+                            "",
+                            Some("U".to_string()),
+                            display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
+                        )
+                        .await?;
+                    if self.session.request_logoff {
+                        return Ok(None);
+                    }
                     match choice.as_str() {
-                        "C" => return Ok(Some(to)), "R" => { default_to = to; continue 'recipient; }, "S" => continue, _ => return Ok(Some(candidate)),
+                        "C" => return Ok(Some(to)),
+                        "R" => {
+                            default_to = to;
+                            continue 'recipient;
+                        }
+                        "S" => continue,
+                        _ => return Ok(Some(candidate)),
                     }
                 }
-                let choice = self.input_field(IceText::ReEnterUsersName, 1, "CR", "", Some("R".to_string()),
-                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN).await?;
-                if choice == "C" { return Ok(Some(to)); }
+                let choice = self
+                    .input_field(
+                        IceText::ReEnterUsersName,
+                        1,
+                        "CR",
+                        "",
+                        Some("R".to_string()),
+                        display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
+                    )
+                    .await?;
+                if choice == "C" {
+                    return Ok(Some(to));
+                }
             }
             default_to = to;
         }
@@ -325,7 +456,6 @@ impl IcyBoardState {
     }
 
     pub(super) async fn get_message_delivery_options(&mut self, to_all: bool, receiver_only: bool, options: &mut MessageOptions) -> Res<()> {
-
         // Return receipt (getretreceipt) - only for receiver-only messages not addressed
         // to ALL and only if the user's security level allows requesting one.
         if receiver_only && !to_all && self.session.current_conference.sec_request_rr.session_can_access(&self.session) && self.get_ret_receipt().await? {
@@ -414,7 +544,13 @@ impl IcyBoardState {
 
     /// Returns `true` when the message is "receiver only" (private).
     async fn get_message_security(&mut self, to_all: bool, options: &mut MessageOptions, default_private: Option<bool>) -> Res<bool> {
-        let may_set_date = self.get_board().await.config.sysop_command_level.set_pack_out_date_on_messages.session_can_access(&self.session);
+        let may_set_date = self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .set_pack_out_date_on_messages
+            .session_can_access(&self.session);
         loop {
             let input = self
                 .input_field(
@@ -427,7 +563,9 @@ impl IcyBoardState {
                 )
                 .await?;
 
-            if self.session.request_logoff { return Ok(false); }
+            if self.session.request_logoff {
+                return Ok(false);
+            }
 
             match input.to_ascii_uppercase().chars().next().unwrap_or('N') {
                 // Public message
@@ -443,7 +581,8 @@ impl IcyBoardState {
                         continue;
                     }
                     if self.session.current_conference.disallow_private_msgs {
-                        self.display_text(IceText::NoPrivateMessages, display_flags::NEWLINE | display_flags::BELL).await?;
+                        self.display_text(IceText::NoPrivateMessages, display_flags::NEWLINE | display_flags::BELL)
+                            .await?;
                         continue;
                     }
                     return Ok(true);

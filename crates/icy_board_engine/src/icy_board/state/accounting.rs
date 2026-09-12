@@ -275,7 +275,11 @@ impl IcyBoardState {
         // Record has no fallible work after its monetary commit. Thus every
         // error here is safe to roll back and retry; no audit/debit is duplicated.
         // LOGIN.C logs how the caller reached the board: "LOCAL" or the speed.
-        let connection = if self.session.is_local { "LOCAL".to_string() } else { self.get_bps().max(0).to_string() };
+        let connection = if self.session.is_local {
+            "LOCAL".to_string()
+        } else {
+            self.get_bps().max(0).to_string()
+        };
         let posted = setup.and_then(|()| self.accounting_record(2, "LOGON", &connection, self.accounting_rates().charge_per_logon, 1));
         if let Err(error) = posted {
             self.session.accounting = before;
@@ -492,11 +496,7 @@ impl IcyBoardState {
     /// it after the awaited work, including every returned error.
     #[async_recursion(?Send)]
     pub async fn accounting_check_balance(&mut self) -> Res<()> {
-        if self.session.accounting.checking
-            || !self.session.accounting.begun
-            || self.session.accounting.finished
-            || self.session.accounting.finish_requested
-        {
+        if self.session.accounting.checking || !self.session.accounting.begun || self.session.accounting.finished || self.session.accounting.finish_requested {
             return Ok(());
         }
         self.session.accounting.checking = true;
@@ -897,12 +897,19 @@ mod tests {
             board.config.paths.command_display_path = root.path().join("missing-commands");
             board.languages.clear();
             board.languages.push(Language {
-                description: "English".into(), locale: "en_US".into(), extension: "eng".into(), yes_char: 'Y', no_char: 'N',
+                description: "English".into(),
+                locale: "en_US".into(),
+                extension: "eng".into(),
+                yes_char: 'Y',
+                no_char: 'N',
             });
         }
         state.accounting_start().await.unwrap();
         state.session.tokens.push_back("1".into());
-        tokio::time::timeout(std::time::Duration::from_secs(3), state.set_language_cmd()).await.unwrap().unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(3), state.set_language_cmd())
+            .await
+            .unwrap()
+            .unwrap();
         assert!(state.accounting_active());
         assert_eq!(state.get_board().await.users[0].language, "eng");
         state.accounting_record(4, "READ", "AFTER LANG", 5.0, 1).unwrap();

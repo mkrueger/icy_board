@@ -56,11 +56,35 @@ impl Drop for BoardLock {
         let Ok(mut held) = held_locks().lock() else {
             return;
         };
-        if let Some((_, count)) = held.get_mut(&self.key) {
+        if let Some((file, count)) = held.get_mut(&self.key) {
             *count -= 1;
             if *count == 0 {
+                if let Err(error) = file.unlock() {
+                    log::error!("Error unlocking board {}: {error}", self.key.display());
+                }
                 held.remove(&self.key);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_board_lock_releases_os_lock_with_a_duplicated_descriptor() {
+        let root = tempfile::tempdir().unwrap();
+        let first = BoardLock::acquire(root.path()).unwrap();
+        let second = BoardLock::acquire(root.path()).unwrap();
+        let inherited = held_locks().lock().unwrap().get(&first.key).unwrap().0.try_clone().unwrap();
+        let probe = OpenOptions::new().read(true).write(true).open(root.path().join(LOCK_FILE_NAME)).unwrap();
+
+        drop(first);
+        assert!(matches!(probe.try_lock(), Err(TryLockError::WouldBlock)));
+        drop(second);
+        probe.try_lock().unwrap();
+        probe.unlock().unwrap();
+        drop(inherited);
     }
 }

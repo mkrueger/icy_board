@@ -41,7 +41,9 @@ fn assert_transfer_metadata(original: &JamMessage, stored: &JamMessage, same_bas
     expected.txt_len = stored.header().txt_len;
     expected.reply_first = 0;
     expected.reply_next = 0;
-    if !same_base { expected.reply_to = 0; }
+    if !same_base {
+        expected.reply_to = 0;
+    }
     assert_eq!(header_bytes(&expected), header_bytes(stored.header()));
     assert_eq!(original.text(), stored.text());
     assert!(stored.header().is_password_valid("SECRET"));
@@ -57,8 +59,17 @@ async fn copy_preserves_all_metadata_but_not_cross_base_storage_or_numeric_threa
     target.write_message(&JamMessage::default().with_text(BString::from("padding"))).unwrap();
     let original = source.read_message(1).unwrap();
     let draft = transfer_draft(source.read_message(1).unwrap(), false);
-    finish_transfer(async { target.write_message(&draft)?; Ok(()) }, &temp.path().join("target"), false,
-        || panic!("COPY must never delete its source")).await.unwrap();
+    finish_transfer(
+        async {
+            target.write_message(&draft)?;
+            Ok(())
+        },
+        &temp.path().join("target"),
+        false,
+        || panic!("COPY must never delete its source"),
+    )
+    .await
+    .unwrap();
     assert_transfer_metadata(&original, &target.read_message(2).unwrap(), false);
     assert!(!source.read_header(1).unwrap().is_deleted());
     assert_eq!(source.read_message(1).unwrap().text(), original.text());
@@ -73,15 +84,22 @@ async fn move_commits_destination_before_deleting_source() {
     source.write_message(&message_fixture()).unwrap();
     let original = source.read_message(1).unwrap();
     let draft = transfer_draft(source.read_message(1).unwrap(), false);
-    finish_transfer(async {
-        let mut target = JamMessageBase::create(&target_path)?;
-        target.write_message(&draft)?;
-        Ok(())
-    }, &target_path, true, || {
-        let target = JamMessageBase::open(&target_path)?;
-        assert_transfer_metadata(&original, &target.read_message(1)?, false);
-        delete_unchanged_message(&mut source, 1, &original)
-    }).await.unwrap();
+    finish_transfer(
+        async {
+            let mut target = JamMessageBase::create(&target_path)?;
+            target.write_message(&draft)?;
+            Ok(())
+        },
+        &target_path,
+        true,
+        || {
+            let target = JamMessageBase::open(&target_path)?;
+            assert_transfer_metadata(&original, &target.read_message(1)?, false);
+            delete_unchanged_message(&mut source, 1, &original)
+        },
+    )
+    .await
+    .unwrap();
     assert!(matches!(source.read_header(1), Err(jamjam::Error::Jam(jamjam::jam::JamError::MessageDeleted))));
 }
 
@@ -91,10 +109,19 @@ async fn destination_open_failure_never_deletes_the_source() {
     let mut source = JamMessageBase::create(temp.path().join("source")).unwrap();
     source.write_message(&message_fixture()).unwrap();
     let original = header_bytes(&source.read_header(1).unwrap());
-    let result = finish_transfer(async {
-        JamMessageBase::open(temp.path().join("missing"))?;
-        Ok(())
-    }, &temp.path().join("missing"), true, || { source.delete_message(1)?; Ok(()) }).await;
+    let result = finish_transfer(
+        async {
+            JamMessageBase::open(temp.path().join("missing"))?;
+            Ok(())
+        },
+        &temp.path().join("missing"),
+        true,
+        || {
+            source.delete_message(1)?;
+            Ok(())
+        },
+    )
+    .await;
     assert!(matches!(result, Err(TransferFailure::Destination(_))));
     assert_eq!(original, header_bytes(&source.read_header(1).unwrap()));
     assert_eq!(message_fixture().text(), source.read_message(1).unwrap().text());
@@ -111,8 +138,19 @@ async fn destination_text_write_failure_never_deletes_the_source() {
     std::fs::remove_file(target_path.with_extension("jdt")).unwrap();
     std::fs::create_dir(target_path.with_extension("jdt")).unwrap();
     let draft = transfer_draft(source.read_message(1).unwrap(), false);
-    let result = finish_transfer(async { target.write_message(&draft)?; Ok(()) }, &target_path, true,
-        || { source.delete_message(1)?; Ok(()) }).await;
+    let result = finish_transfer(
+        async {
+            target.write_message(&draft)?;
+            Ok(())
+        },
+        &target_path,
+        true,
+        || {
+            source.delete_message(1)?;
+            Ok(())
+        },
+    )
+    .await;
     assert!(matches!(result, Err(TransferFailure::Destination(_))));
     assert!(!source.read_header(1).unwrap().is_deleted());
     assert_eq!(source.read_message(1).unwrap().text(), draft.text());
@@ -127,12 +165,21 @@ async fn source_deletion_failure_keeps_the_successful_destination_copy() {
     source.write_message(&message_fixture()).unwrap();
     let original = source.read_message(1).unwrap();
     let draft = transfer_draft(source.read_message(1).unwrap(), false);
-    let result = finish_transfer(async {
-        target.write_message(&draft)?;
-        std::fs::rename(source_path.with_extension("jdx"), source_path.with_extension("saved-index"))?;
-        std::fs::create_dir(source_path.with_extension("jdx"))?;
-        Ok(())
-    }, &temp.path().join("target"), true, || { source.delete_message(1)?; Ok(()) }).await;
+    let result = finish_transfer(
+        async {
+            target.write_message(&draft)?;
+            std::fs::rename(source_path.with_extension("jdx"), source_path.with_extension("saved-index"))?;
+            std::fs::create_dir(source_path.with_extension("jdx"))?;
+            Ok(())
+        },
+        &temp.path().join("target"),
+        true,
+        || {
+            source.delete_message(1)?;
+            Ok(())
+        },
+    )
+    .await;
     assert!(matches!(result, Err(TransferFailure::Source(_))));
     std::fs::remove_dir(source_path.with_extension("jdx")).unwrap();
     std::fs::rename(source_path.with_extension("saved-index"), source_path.with_extension("jdx")).unwrap();
@@ -211,7 +258,17 @@ fn attachment_paths_reject_traversal_wildcards_and_alias_escape() {
     let (path, alias) = attachment_path(temp.path(), &field("stored.zip\0display.zip")).unwrap();
     assert_eq!(path, temp.path().join("stored.zip"));
     assert_eq!(alias, "display.zip");
-    for name in ["", ".", "..", "../secret", "/etc/passwd", "C:\\SECRET", "*.zip", "stored.zip\0../evil", "stored.zip\0safe\0extra"] {
+    for name in [
+        "",
+        ".",
+        "..",
+        "../secret",
+        "/etc/passwd",
+        "C:\\SECRET",
+        "*.zip",
+        "stored.zip\0../evil",
+        "stored.zip\0safe\0extra",
+    ] {
         assert!(attachment_path(temp.path(), &field(name)).is_err(), "accepted {name:?}");
     }
 }
@@ -227,7 +284,13 @@ fn attachment_paths_reject_symlinks_even_if_the_target_is_regular() {
 }
 
 async fn action_state(root: &Path) -> (IcyBoardState, icy_net::channel::ChannelConnection) {
-    use crate::icy_board::{IcyBoard, bbs::BBS, conferences::Conference, message_area::{AreaList, MessageArea}, user_base::User};
+    use crate::icy_board::{
+        IcyBoard,
+        bbs::BBS,
+        conferences::Conference,
+        message_area::{AreaList, MessageArea},
+        user_base::User,
+    };
     use icy_net::{ConnectionType, channel::ChannelConnection};
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -238,13 +301,21 @@ async fn action_state(root: &Path) -> (IcyBoardState, icy_net::channel::ChannelC
     let (peer, connection) = ChannelConnection::create_pair();
     let mut board = IcyBoard::new();
     board.config.paths.statistics_file = root.join("statistics.toml");
-    board.users.new_user(User { name: "AUTHOR".into(), security_level: 255, ..Default::default() });
+    board.users.new_user(User {
+        name: "AUTHOR".into(),
+        security_level: 255,
+        ..Default::default()
+    });
     let caller = board.users[0].clone();
     board.conferences.clear();
     for name in ["source", "target"] {
         board.conferences.push(Conference {
             is_public: true,
-            areas: Some(Arc::new(AreaList::new(vec![MessageArea { name: name.into(), path: root.join(name), ..Default::default() }]))),
+            areas: Some(Arc::new(AreaList::new(vec![MessageArea {
+                name: name.into(),
+                path: root.join(name),
+                ..Default::default()
+            }]))),
             ..Default::default()
         });
     }
@@ -348,15 +419,25 @@ async fn reader_reply_sk_deletes_actual_source_and_advances_without_a_second_kil
             let (mut state, _peer) = reply_action_state(temp.path()).await;
             let path = temp.path().join(if email { "email" } else { "source" });
             let mut source = JamMessageBase::create(&path).unwrap();
-            source.write_message(&JamMessage::default()
-                .with_from(BString::from("REMOTE"))
-                .with_to(BString::from("AUTHOR"))
-                .with_attributes(attributes::MSG_PRIVATE)
-                .with_text(BString::from("source quote"))).unwrap();
+            source
+                .write_message(
+                    &JamMessage::default()
+                        .with_from(BString::from("REMOTE"))
+                        .with_to(BString::from("AUTHOR"))
+                        .with_attributes(attributes::MSG_PRIVATE)
+                        .with_text(BString::from("source quote")),
+                )
+                .unwrap();
             let input = if other { "REMOTE\r\r\rQ 1 1\rSK\r" } else { "\rQ 1 1\rSK\r" };
             state.char_buffer.extend(input.chars().map(|ch| KeyChar::new(KeySource::User, ch)));
-            let cmd = ReadCommand { func: if other { MsgFunc::ReplyOther } else { MsgFunc::Reply }, ..Default::default() };
-            let result = timeout(Duration::from_secs(3), state.run_read_action(&cmd, &mut source, 1)).await.unwrap().unwrap();
+            let cmd = ReadCommand {
+                func: if other { MsgFunc::ReplyOther } else { MsgFunc::Reply },
+                ..Default::default()
+            };
+            let result = timeout(Duration::from_secs(3), state.run_read_action(&cmd, &mut source, 1))
+                .await
+                .unwrap()
+                .unwrap();
             assert!(matches!(result, AfterAction::Next));
             let mut saved = JamMessageBase::open(&path).unwrap();
             assert!(matches!(saved.read_header(1), Err(jamjam::Error::Jam(jamjam::jam::JamError::MessageDeleted))));
@@ -374,7 +455,10 @@ async fn reader_reply_sk_deletes_actual_source_and_advances_without_a_second_kil
 
 #[tokio::test]
 async fn reader_reply_sk_redisplays_instead_of_killing_a_source_edited_during_composition() {
-    use crate::icy_board::{icb_text::DEFAULT_DISPLAY_TEXT, state::{KeyChar, KeySource}};
+    use crate::icy_board::{
+        icb_text::DEFAULT_DISPLAY_TEXT,
+        state::{KeyChar, KeySource},
+    };
     use icy_net::Connection;
     use std::time::Duration;
     use tokio::time::timeout;
@@ -389,11 +473,20 @@ async fn reader_reply_sk_redisplays_instead_of_killing_a_source_edited_during_co
     assert_eq!(state.get_display_text(IceText::TextEntryCommand).unwrap(), PROMPT);
     let path = temp.path().join("source");
     let mut source = JamMessageBase::create(&path).unwrap();
-    source.write_message(&JamMessage::default().with_from(BString::from("REMOTE"))
-        .with_to(BString::from("AUTHOR")).with_attributes(attributes::MSG_PRIVATE)
-        .with_text(BString::from("source quote"))).unwrap();
+    source
+        .write_message(
+            &JamMessage::default()
+                .with_from(BString::from("REMOTE"))
+                .with_to(BString::from("AUTHOR"))
+                .with_attributes(attributes::MSG_PRIVATE)
+                .with_text(BString::from("source quote")),
+        )
+        .unwrap();
     state.char_buffer.push_back(KeyChar::new(KeySource::User, '\r'));
-    let cmd = ReadCommand { func: MsgFunc::Reply, ..Default::default() };
+    let cmd = ReadCommand {
+        func: MsgFunc::Reply,
+        ..Default::default()
+    };
     let caller = async {
         let mut output = Vec::new();
         while !output.windows(PROMPT.len()).any(|bytes| bytes == PROMPT.as_bytes()) {
@@ -405,16 +498,20 @@ async fn reader_reply_sk_redisplays_instead_of_killing_a_source_edited_during_co
         let mut writer = JamMessageBase::open(&path).unwrap();
         assert!(writer.try_lock().unwrap());
         writer.unlock();
-        writer.transaction(|_| {
-            std::fs::write(path.with_extension("jdt"), b"edited quote")?;
-            Ok(())
-        }).unwrap();
+        writer
+            .transaction(|_| {
+                std::fs::write(path.with_extension("jdt"), b"edited quote")?;
+                Ok(())
+            })
+            .unwrap();
         peer.send(b"Q 1 1\rSK\r").await.unwrap();
         peer
     };
     let (result, _peer) = timeout(Duration::from_secs(3), async {
         tokio::join!(state.run_read_action(&cmd, &mut source, 1), caller)
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     assert!(matches!(result.unwrap(), AfterAction::Redisplay));
     let source = JamMessageBase::open(&path).unwrap();
     assert_eq!(source.read_message(1).unwrap().text(), &BString::from("edited quote"));
@@ -428,11 +525,15 @@ async fn attachment_view_restores_tokens_and_file_list_even_for_an_invalid_archi
     state.session.current_conference.attachment_location = temp.path().to_path_buf();
     std::fs::write(temp.path().join("stored.bin"), b"not an archive").unwrap();
     let mut source = JamMessageBase::create(temp.path().join("source")).unwrap();
-    source.write_message(&message_fixture().with_sub_field(MessageSubfield::new(
-        SubfieldType::EnclFwAlias, BString::from("stored.bin\0display.zip")))).unwrap();
+    source
+        .write_message(&message_fixture().with_sub_field(MessageSubfield::new(SubfieldType::EnclFwAlias, BString::from("stored.bin\0display.zip"))))
+        .unwrap();
     state.session.tokens.push_back("KEEP".into());
     state.session.disp_options.in_file_list = Some(temp.path().join("old-list"));
-    assert!(matches!(state.read_attachment(MsgFunc::ViewFile, &mut source, 1).await.unwrap(), AfterAction::Prompt));
+    assert!(matches!(
+        state.read_attachment(MsgFunc::ViewFile, &mut source, 1).await.unwrap(),
+        AfterAction::Prompt
+    ));
     assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), vec!["KEEP".to_string()]);
     assert_eq!(state.session.disp_options.in_file_list, Some(temp.path().join("old-list")));
     assert!(temp.path().join("stored.bin").exists());
@@ -498,15 +599,18 @@ fn post_password_snapshot_rejects_changed_security_before_reading_text() {
         raw::update_header(&mut base, 1, &changed).unwrap();
         std::fs::remove_file(path.with_extension("jdt")).unwrap();
         let error = action_snapshot(&mut base, 1, Some(original.header())).err().unwrap();
-        assert!(error.to_string().contains("Message changed"), "must reject before trying to read missing text: {error}");
+        assert!(
+            error.to_string().contains("Message changed"),
+            "must reject before trying to read missing text: {error}"
+        );
     }
 }
 
 #[tokio::test]
 async fn password_prompt_holds_no_jam_lock_and_rejects_packed_replacement() {
+    use crate::icy_board::{icb_text::DEFAULT_DISPLAY_TEXT, security_expr::SecurityExpression};
     use icy_net::Connection;
     use jamjam::jam::pack::PackOptions;
-    use crate::icy_board::{icb_text::DEFAULT_DISPLAY_TEXT, security_expr::SecurityExpression};
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("source");
     let (mut state, mut peer) = action_state(temp.path()).await;
@@ -514,7 +618,10 @@ async fn password_prompt_holds_no_jam_lock_and_rejects_packed_replacement() {
     // State construction clones the board's text; input_field reads this
     // session copy, not later changes to board.default_display_text.
     state.display_text = DEFAULT_DISPLAY_TEXT.clone();
-    state.display_text.update_record_number(IceText::PasswordToReadMessage as usize, PROMPT).unwrap();
+    state
+        .display_text
+        .update_record_number(IceText::PasswordToReadMessage as usize, PROMPT)
+        .unwrap();
     {
         let mut board = state.get_board().await;
         board.config.sysop_command_level.read_all_mail = SecurityExpression::from_req_security(255);
@@ -524,8 +631,13 @@ async fn password_prompt_holds_no_jam_lock_and_rejects_packed_replacement() {
     state.session.user_name = "READER".into();
     let mut base = JamMessageBase::create(&path).unwrap();
     base.write_message(&message_fixture()).unwrap();
-    base.write_message(&JamMessage::default().with_to(BString::from("STRANGER"))
-        .with_attributes(attributes::MSG_PRIVATE).with_text(BString::from("other secret"))).unwrap();
+    base.write_message(
+        &JamMessage::default()
+            .with_to(BString::from("STRANGER"))
+            .with_attributes(attributes::MSG_PRIVATE)
+            .with_text(BString::from("other secret")),
+    )
+    .unwrap();
     let mut writer = JamMessageBase::open(&path).unwrap();
     let caller = async {
         let mut output = Vec::new();
@@ -544,9 +656,14 @@ async fn password_prompt_holds_no_jam_lock_and_rejects_packed_replacement() {
     };
     let (result, _peer) = tokio::time::timeout(std::time::Duration::from_secs(3), async {
         tokio::join!(state.read_action_message(&mut base, 1), caller)
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     assert!(result.unwrap().is_none());
-    assert_eq!(state.session.last_password, "SECRET", "reject the stale snapshot only after successful password input");
+    assert_eq!(
+        state.session.last_password, "SECRET",
+        "reject the stale snapshot only after successful password input"
+    );
     assert_eq!(base.read_message(1).unwrap().text(), &BString::from("other secret"));
 }
 
@@ -602,7 +719,8 @@ fn body_edit_and_move_reject_in_place_text_changes_with_an_unchanged_header() {
     base.transaction(|base| {
         std::fs::write(base.path().with_extension("jdt"), &replacement)?;
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
     let draft = JamMessage::from_stored(original.header().clone(), BString::from("new edit"));
     assert!(replace_message(&mut base, 1, &original, &draft).is_err());
     assert!(delete_unchanged_message(&mut base, 1, &original).is_err());
@@ -623,22 +741,33 @@ async fn move_retains_both_copies_on_source_header_body_or_pack_conflict() {
         let original = action_snapshot(&mut source, 2, None).unwrap();
         let draft = transfer_draft(JamMessage::from_stored(original.header().clone(), original.text().clone()), false);
         let mut writer = JamMessageBase::open(&source_path).unwrap();
-        let result = finish_transfer(async {
-            let mut target = JamMessageBase::create(&target_path)?;
-            target.write_message(&draft)?;
-            match change {
-                0 => { raw::set_attributes(&mut writer, 2, attributes::MSG_READ, 0)?; }
-                1 => writer.transaction(|base| {
-                    use std::io::{Seek, SeekFrom};
-                    let mut file = std::fs::OpenOptions::new().write(true).open(base.path().with_extension("jdt"))?;
-                    file.seek(SeekFrom::Start(original.header().offset as u64))?;
-                    file.write_all(&vec![b'X'; original.text().len()])?;
-                    Ok(())
-                })?,
-                _ => { writer.delete_message(1)?; writer.pack(&PackOptions::default())?; }
-            }
-            Ok(())
-        }, &target_path, true, || delete_unchanged_message(&mut source, 2, &original)).await;
+        let result = finish_transfer(
+            async {
+                let mut target = JamMessageBase::create(&target_path)?;
+                target.write_message(&draft)?;
+                match change {
+                    0 => {
+                        raw::set_attributes(&mut writer, 2, attributes::MSG_READ, 0)?;
+                    }
+                    1 => writer.transaction(|base| {
+                        use std::io::{Seek, SeekFrom};
+                        let mut file = std::fs::OpenOptions::new().write(true).open(base.path().with_extension("jdt"))?;
+                        file.seek(SeekFrom::Start(original.header().offset as u64))?;
+                        file.write_all(&vec![b'X'; original.text().len()])?;
+                        Ok(())
+                    })?,
+                    _ => {
+                        writer.delete_message(1)?;
+                        writer.pack(&PackOptions::default())?;
+                    }
+                }
+                Ok(())
+            },
+            &target_path,
+            true,
+            || delete_unchanged_message(&mut source, 2, &original),
+        )
+        .await;
         assert!(matches!(result, Err(TransferFailure::Source(_))));
         assert!(source.read_header(2).is_ok());
         assert_transfer_metadata(&original, &JamMessageBase::open(&target_path).unwrap().read_message(1).unwrap(), false);
@@ -654,13 +783,19 @@ async fn move_requires_every_destination_file_to_sync_before_source_deletion() {
         source.write_message(&message_fixture()).unwrap();
         let original = action_snapshot(&mut source, 1, None).unwrap();
         let draft = transfer_draft(JamMessage::from_stored(original.header().clone(), original.text().clone()), false);
-        let result = finish_transfer(async {
-            let mut target = JamMessageBase::create(&target_path)?;
-            target.write_message(&draft)?;
-            // Missing files must not be silently ignored by a durability barrier.
-            std::fs::rename(target_path.with_extension(extension), target_path.with_extension("saved"))?;
-            Ok(())
-        }, &target_path, true, || panic!("source deletion must not run after a sync failure")).await;
+        let result = finish_transfer(
+            async {
+                let mut target = JamMessageBase::create(&target_path)?;
+                target.write_message(&draft)?;
+                // Missing files must not be silently ignored by a durability barrier.
+                std::fs::rename(target_path.with_extension(extension), target_path.with_extension("saved"))?;
+                Ok(())
+            },
+            &target_path,
+            true,
+            || panic!("source deletion must not run after a sync failure"),
+        )
+        .await;
         assert!(matches!(result, Err(TransferFailure::Destination(_))));
         assert_eq!(source.read_message(1).unwrap().text(), original.text());
         std::fs::rename(target_path.with_extension("saved"), target_path.with_extension(extension)).unwrap();
@@ -781,16 +916,32 @@ async fn appended_attachment_survives_cancellation_during_post_save_bookkeeping(
     struct PendingOutput;
     #[async_trait::async_trait]
     impl icy_net::Connection for PendingOutput {
-        fn get_connection_type(&self) -> icy_net::ConnectionType { icy_net::ConnectionType::Channel }
-        async fn read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> { std::future::pending().await }
-        async fn try_read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> { Ok(0) }
-        async fn send(&mut self, _buf: &[u8]) -> icy_net::Result<()> { std::future::pending().await }
-        async fn shutdown(&mut self) -> icy_net::Result<()> { Ok(()) }
+        fn get_connection_type(&self) -> icy_net::ConnectionType {
+            icy_net::ConnectionType::Channel
+        }
+        async fn read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> {
+            std::future::pending().await
+        }
+        async fn try_read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> {
+            Ok(0)
+        }
+        async fn send(&mut self, _buf: &[u8]) -> icy_net::Result<()> {
+            std::future::pending().await
+        }
+        async fn shutdown(&mut self) -> icy_net::Result<()> {
+            Ok(())
+        }
     }
     let temp = tempfile::tempdir().unwrap();
     let (mut state, _peer, source, target) = attachment_action_state(temp.path()).await;
-    crate::icy_board::state::user_commands::pcb::d_download::enable_activity_accounting(&mut state,
-        crate::icy_board::accounting_cfg::AccountingConfig { charge_per_msg_write_private: 5.0, ..Default::default() }).await;
+    crate::icy_board::state::user_commands::pcb::d_download::enable_activity_accounting(
+        &mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig {
+            charge_per_msg_write_private: 5.0,
+            ..Default::default()
+        },
+    )
+    .await;
     std::fs::write(source.join("file.zip"), b"enclosure").unwrap();
     let message = enclosed_message(&["file.zip"]);
     let mut copies = state.copy_action_attachments(&message, 1, 0).await.unwrap();
@@ -803,12 +954,16 @@ async fn appended_attachment_survives_cancellation_during_post_save_bookkeeping(
         std::future::poll_fn(|cx| {
             assert!(save.as_mut().poll(cx).is_pending());
             std::task::Poll::Ready(())
-        }).await;
+        })
+        .await;
         // Dropping this suspended future simulates a disconnect/cancellation.
     }
     assert!(copies.files.is_empty(), "append must commit before the first bookkeeping await");
     assert!(state.session.request_logoff, "cancelled completion must not offer a save retry");
-    assert_eq!(state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_write_private, 5.0);
+    assert_eq!(
+        state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_write_private,
+        5.0
+    );
     drop(copies);
     assert!(JamMessageBase::open(&target_path).unwrap().read_header(1).is_ok());
     assert_eq!(std::fs::read(target.join("file.zip")).unwrap(), b"enclosure");
@@ -847,7 +1002,11 @@ async fn edit_attachment_cleanup_preserves_originals_and_rolls_back_conflicts() 
 
 #[tokio::test]
 async fn actual_edit_sk_saves_without_killing_existing_mail() {
-    use crate::icy_board::{icb_text::DEFAULT_DISPLAY_TEXT, state::{KeyChar, KeySource}, user_base::FSEMode};
+    use crate::icy_board::{
+        icb_text::DEFAULT_DISPLAY_TEXT,
+        state::{KeyChar, KeySource},
+        user_base::FSEMode,
+    };
     let temp = tempfile::tempdir().unwrap();
     let (mut state, _peer) = action_state(temp.path()).await;
     state.get_board().await.default_display_text = DEFAULT_DISPLAY_TEXT.clone();
@@ -856,7 +1015,10 @@ async fn actual_edit_sk_saves_without_killing_existing_mail() {
     let mut base = JamMessageBase::create(temp.path().join("source")).unwrap();
     base.write_message(&message_fixture()).unwrap();
     let before = base.read_header(1).unwrap().offset;
-    let result = tokio::time::timeout(std::time::Duration::from_secs(3), state.edit_read_message(&mut base, 1)).await.unwrap().unwrap();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(3), state.edit_read_message(&mut base, 1))
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(result, AfterAction::Redisplay));
     assert!(base.read_header(1).unwrap().offset > before, "EDIT must actually replace the body");
     assert_eq!(base.highest_message_number(), 1, "EDIT must not create another indexed message");
@@ -866,8 +1028,11 @@ async fn actual_edit_sk_saves_without_killing_existing_mail() {
 
 #[tokio::test]
 async fn actual_header_edit_rejects_changes_made_during_new_info_prompt() {
+    use crate::icy_board::{
+        icb_text::DEFAULT_DISPLAY_TEXT,
+        state::{KeyChar, KeySource},
+    };
     use icy_net::Connection;
-    use crate::icy_board::{icb_text::DEFAULT_DISPLAY_TEXT, state::{KeyChar, KeySource}};
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("source");
     let (mut state, mut peer) = action_state(temp.path()).await;
@@ -898,9 +1063,15 @@ async fn actual_header_edit_rejects_changes_made_during_new_info_prompt() {
     };
     let (result, _peer) = tokio::time::timeout(std::time::Duration::from_secs(3), async {
         tokio::join!(state.edit_header(&mut base, 1), caller)
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     result.unwrap();
-    assert_eq!(state.session.last_answer.as_deref(), Some("My stale subject"), "the proposed edit must be read before rejecting it");
+    assert_eq!(
+        state.session.last_answer.as_deref(),
+        Some("My stale subject"),
+        "the proposed edit must be read before rejecting it"
+    );
     assert_eq!(header_bytes(&concurrent), header_bytes(&base.read_header(1).unwrap()));
 }
 
@@ -917,11 +1088,17 @@ async fn copied_attachments_remain_referenced_when_move_source_comparison_fails(
     let draft = transfer_draft(JamMessage::from_stored(original.header().clone(), original.text().clone()), false);
     let mut copies = state.copy_action_attachments(&draft, 1, 0).await.unwrap();
     let mut writer = JamMessageBase::open(&source_path).unwrap();
-    let result = finish_transfer(async {
-        state.send_action_message(1, 0, &target_path, draft, IceText::MessageMoved, &mut copies).await?;
-        raw::set_attributes(&mut writer, 1, attributes::MSG_READ, 0)?;
-        Ok(())
-    }, &target_path, true, || delete_unchanged_message(&mut source, 1, &original)).await;
+    let result = finish_transfer(
+        async {
+            state.send_action_message(1, 0, &target_path, draft, IceText::MessageMoved, &mut copies).await?;
+            raw::set_attributes(&mut writer, 1, attributes::MSG_READ, 0)?;
+            Ok(())
+        },
+        &target_path,
+        true,
+        || delete_unchanged_message(&mut source, 1, &original),
+    )
+    .await;
     assert!(matches!(result, Err(TransferFailure::Source(_))));
     drop(copies);
     assert!(source.read_header(1).is_ok());

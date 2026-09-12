@@ -399,7 +399,10 @@ async fn all_help_bodies_reach_80_column_ansi_terminal_cells() {
     let (mut state, mut connection) = display_state(directory.path(), GraphicsMode::Graphics).await;
     for source in catalog::sources(None).unwrap() {
         for encoding in [Encoding::Cp437, Encoding::Utf8] {
-            let options = RenderOptions { encoding, ..Default::default() };
+            let options = RenderOptions {
+                encoding,
+                ..Default::default()
+            };
             let document = icy_board_help::document::compile(&source.markdown, options.width, &options.theme).unwrap();
             let generated = render(&source.markdown, &options).unwrap();
             let path = directory.path().join(catalog::output_name(&source.topic, "").unwrap());
@@ -415,7 +418,12 @@ async fn all_help_bodies_reach_80_column_ansi_terminal_cells() {
                 let line = lines.next().expect("every rendered row must reach the terminal");
                 parser.parse(line.as_bytes(), &mut icy_engine::ScreenSink::new(&mut terminal));
                 // Inspect each completed row before scrolling can remove it from an 80x25 screen.
-                assert_eq!(row(&terminal, (y as i32).min(23), 80), expected.plain_text(), "{} {encoding:?} row {y}", source.topic);
+                assert_eq!(
+                    row(&terminal, (y as i32).min(23), 80),
+                    expected.plain_text(),
+                    "{} {encoding:?} row {y}",
+                    source.topic
+                );
             }
             let remaining = lines.collect::<String>();
             parser.parse(remaining.as_bytes(), &mut icy_engine::ScreenSink::new(&mut terminal));
@@ -427,9 +435,11 @@ async fn all_help_bodies_reach_80_column_ansi_terminal_cells() {
 #[test]
 fn generated_catalog_covers_command_and_context_help() {
     let sources = catalog::sources(None).unwrap();
-    for topic in CommandType::iter().map(CommandType::get_help).filter(|topic| !topic.is_empty()).chain([
-        "hlp!", "hlpcmenu", "hlpendr", "hlpfscrn", "hlpreg", "hlpsec", "hlpsrch",
-    ]) {
+    for topic in CommandType::iter()
+        .map(CommandType::get_help)
+        .filter(|topic| !topic.is_empty())
+        .chain(["hlp!", "hlpcmenu", "hlpendr", "hlpfscrn", "hlpreg", "hlpsec", "hlpsrch"])
+    {
         assert!(sources.iter().any(|source| source.topic == topic), "Missing runtime help: {topic}");
     }
     // These two prompts are rendered from ICBTEXT, not help-path display files.
@@ -452,8 +462,14 @@ fn h_dispatches_generated_letter_symbol_and_sysop_topics() {
         install_topic(directory.path(), topic);
     }
     for (command, topic) in [
-        ("H A", "hlpa"), ("H !", "hlp!"), ("H @", "hlp@"), ("H R", "hlpr"),
-        ("H 1", "hlp1"), ("H 8", "hlp8"), ("H 16", "hlp16"), ("H HLP9", "hlp9"),
+        ("H A", "hlpa"),
+        ("H !", "hlp!"),
+        ("H @", "hlp@"),
+        ("H R", "hlpr"),
+        ("H 1", "hlp1"),
+        ("H 8", "hlp8"),
+        ("H 16", "hlp16"),
+        ("H HLP9", "hlp9"),
     ] {
         let output = test_output(format!("{command}\n\n"), |board| {
             setup_conference(board);

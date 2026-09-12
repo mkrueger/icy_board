@@ -34,10 +34,19 @@ async fn fixture(enabled: bool) -> (TempDir, IcyBoardState, ChannelConnection) {
     board.config.accounting.tracking_file = root.path().join("usage.dbf");
     board.config.accounting.peak_holiday_list_file = PathBuf::new();
     board.config.accounting.accounting_config = Some(AccountingConfig::default());
-    board.sec_levels.push(SecurityLevel { security: 10, is_enabled: true, time_per_day: 60, ..Default::default() });
+    board.sec_levels.push(SecurityLevel {
+        security: 10,
+        is_enabled: true,
+        time_per_day: 60,
+        ..Default::default()
+    });
     board.users.new_user(User {
-        name: "USAGE TEST".into(), security_level: 10,
-        account: Some(AccountUserInf { starting_balance: 100.0, ..Default::default() }),
+        name: "USAGE TEST".into(),
+        security_level: 10,
+        account: Some(AccountUserInf {
+            starting_balance: 100.0,
+            ..Default::default()
+        }),
         ..Default::default()
     });
     let user = board.users[0].clone();
@@ -67,14 +76,26 @@ fn balance(state: &mut IcyBoardState, amount: f64) {
 
 fn command(kind: CommandType, parameter: &str) -> Command {
     Command {
-        keyword: "PAID".into(), charge_per_use: 3.0, charge_per_minute: 2.0,
-        actions: vec![CommandAction { command_type: kind, parameter: parameter.into(), ..Default::default() }],
+        keyword: "PAID".into(),
+        charge_per_use: 3.0,
+        charge_per_minute: 2.0,
+        actions: vec![CommandAction {
+            command_type: kind,
+            parameter: parameter.into(),
+            ..Default::default()
+        }],
         ..Default::default()
     }
 }
 
 fn door(path: &str) -> Door {
-    Door { name: "GAME".into(), path: path.into(), charge_per_use: 7.0, charge_per_minute: 4.0, ..Default::default() }
+    Door {
+        name: "GAME".into(),
+        path: path.into(),
+        charge_per_use: 7.0,
+        charge_per_minute: 4.0,
+        ..Default::default()
+    }
 }
 
 async fn output(peer: &mut ChannelConnection) -> String {
@@ -273,7 +294,11 @@ fn cmdlst_import_widens_two_packed_ieee_floats_in_use_minute_order() {
 fn doorslst_import_accepts_old_and_optional_rate_columns() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("doors.lst");
-    std::fs::write(&path, "OLD,,10,0,0,C:\\DOOR,0,N\nNEW,,10,0,0,C:\\DOOR,0,Y, 1.25 , 2.5 ,0\nONE,,10,0,0,C:\\DOOR,0,Y,3.75\n").unwrap();
+    std::fs::write(
+        &path,
+        "OLD,,10,0,0,C:\\DOOR,0,N\nNEW,,10,0,0,C:\\DOOR,0,Y, 1.25 , 2.5 ,0\nONE,,10,0,0,C:\\DOOR,0,Y,3.75\n",
+    )
+    .unwrap();
     let list = DoorList::import_pcboard(&path).unwrap();
     assert_eq!(list.len(), 3);
     assert_eq!((list[0].charge_per_use, list[0].charge_per_minute), (0.0, 0.0));
@@ -285,7 +310,10 @@ fn doorslst_import_accepts_old_and_optional_rate_columns() {
 async fn command_multiple_actions_bill_once_and_disabled_or_selection_only_are_free() {
     let (_root, mut state, _peer) = fixture(true).await;
     let mut cmd = command(CommandType::QuitMenu, "");
-    cmd.actions.push(CommandAction { command_type: CommandType::ExitMenus, ..Default::default() });
+    cmd.actions.push(CommandAction {
+        command_type: CommandType::ExitMenus,
+        ..Default::default()
+    });
     state.dispatch_command("PAID", &cmd).await.unwrap();
     assert!(state.quit_menu && state.exit_menus);
     assert_eq!(account(&state).debit_tpu, 3.0);
@@ -336,7 +364,10 @@ async fn minute_rounding_and_error_disconnect_settlement_use_tpu_and_exact_activ
             assert_eq!(state.session.login_date, login);
             let audit = std::fs::read(root.path().join("usage.dbf")).unwrap();
             assert!(audit.windows(activity.len()).any(|bytes| bytes == activity.as_bytes()));
-            assert_eq!(audit.windows(minute_activity.len()).any(|bytes| bytes == minute_activity.as_bytes()), minutes > 0);
+            assert_eq!(
+                audit.windows(minute_activity.len()).any(|bytes| bytes == minute_activity.as_bytes()),
+                minutes > 0
+            );
         }
     }
 }
@@ -381,7 +412,10 @@ async fn door_denial_password_cancel_selection_and_setup_failures_are_free() {
     assert!(state.run_door(&list, &game, 0).await.is_err()); // invalid DOS directory
     game.door_type = DoorType::BBSlink;
     assert!(state.run_door(&list, &game, 0).await.is_err()); // no server account
-    state.session.current_conference.doors = Some(Arc::new(DoorList { doors: vec![game], accounts: vec![] }));
+    state.session.current_conference.doors = Some(Arc::new(DoorList {
+        doors: vec![game],
+        accounts: vec![],
+    }));
     assert!(!state.run_named_door("ABSENT").await.unwrap());
     state.session.tokens.push_back("99".into());
     state.open_door().await.unwrap();
@@ -392,12 +426,18 @@ async fn door_denial_password_cancel_selection_and_setup_failures_are_free() {
 async fn invalid_door_or_failed_spawn_does_not_charge_its_invoking_command() {
     let (root, mut state, _peer) = fixture(true).await;
     let game = door(root.path().join("missing").to_str().unwrap());
-    state.session.current_conference.doors = Some(Arc::new(DoorList { doors: vec![game.clone()], accounts: vec![] }));
+    state.session.current_conference.doors = Some(Arc::new(DoorList {
+        doors: vec![game.clone()],
+        accounts: vec![],
+    }));
     state.dispatch_command("PAID", &command(CommandType::Door, "ABSENT")).await.unwrap();
     assert!(state.dispatch_command("PAID", &command(CommandType::Door, "GAME")).await.is_err());
     let mut denied = game;
     denied.securiy_level = SecurityExpression::from_req_security(50);
-    state.session.current_conference.doors = Some(Arc::new(DoorList { doors: vec![denied], accounts: vec![] }));
+    state.session.current_conference.doors = Some(Arc::new(DoorList {
+        doors: vec![denied],
+        accounts: vec![],
+    }));
     state.dispatch_command("PAID", &command(CommandType::Door, "GAME")).await.unwrap();
     assert_eq!(account(&state).debit_tpu, 0.0);
 }
@@ -410,7 +450,10 @@ async fn missing_or_corrupt_ppe_and_invalid_menu_script_selection_are_free() {
     state.run_door(&DoorList::default(), &game, 0).await.unwrap();
     std::fs::write(&path, b"not an executable").unwrap();
     state.run_door(&DoorList::default(), &game, 0).await.unwrap();
-    state.dispatch_command("PAID", &command(CommandType::Menu, root.path().join("missing").to_str().unwrap())).await.unwrap();
+    state
+        .dispatch_command("PAID", &command(CommandType::Menu, root.path().join("missing").to_str().unwrap()))
+        .await
+        .unwrap();
     state.dispatch_command("PAID", &command(CommandType::Script, "999")).await.unwrap();
     assert_eq!(account(&state).debit_tpu, 0.0);
 }
@@ -420,7 +463,10 @@ async fn missing_or_corrupt_ppe_and_invalid_menu_script_selection_are_free() {
 async fn started_local_door_bills_once_and_only_explicit_command_rates_add_to_it() {
     let (_root, mut state, _peer) = fixture(true).await;
     let game = door("/bin/true");
-    state.session.current_conference.doors = Some(Arc::new(DoorList { doors: vec![game.clone()], accounts: vec![] }));
+    state.session.current_conference.doors = Some(Arc::new(DoorList {
+        doors: vec![game.clone()],
+        accounts: vec![],
+    }));
     let mut cmd = command(CommandType::Door, "GAME");
     cmd.charge_per_use = 0.0;
     cmd.charge_per_minute = 0.0;
@@ -441,7 +487,10 @@ async fn started_local_door_bills_once_and_only_explicit_command_rates_add_to_it
 #[tokio::test]
 async fn multiple_door_actions_charge_each_launch_but_the_command_only_once() {
     let (_root, mut state, _peer) = fixture(true).await;
-    state.session.current_conference.doors = Some(Arc::new(DoorList { doors: vec![door("/bin/true")], accounts: vec![] }));
+    state.session.current_conference.doors = Some(Arc::new(DoorList {
+        doors: vec![door("/bin/true")],
+        accounts: vec![],
+    }));
     let mut cmd = command(CommandType::Door, "GAME");
     cmd.actions.push(cmd.actions[0].clone());
     state.dispatch_command("PAID", &cmd).await.unwrap();
@@ -463,7 +512,10 @@ async fn command_handler_io_error_keeps_use_charge_and_stops_later_actions() {
     let (_root, mut state, peer) = fixture(true).await;
     drop(peer);
     let mut cmd = command(CommandType::PrintText, "Output to disconnected caller");
-    cmd.actions.push(CommandAction { command_type: CommandType::QuitMenu, ..Default::default() });
+    cmd.actions.push(CommandAction {
+        command_type: CommandType::QuitMenu,
+        ..Default::default()
+    });
     assert!(state.dispatch_command("PAID", &cmd).await.is_err());
     assert_eq!(account(&state).debit_tpu, 3.0);
     assert!(!state.quit_menu);

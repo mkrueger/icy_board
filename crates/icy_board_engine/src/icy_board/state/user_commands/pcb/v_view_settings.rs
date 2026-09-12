@@ -20,7 +20,10 @@ impl IcyBoardState {
         }
 
         self.new_line().await?;
-        if self.page_line_limit().is_some_and(|limit| self.session.disp_options.num_lines_printed + SETTINGS_LINES >= limit) {
+        if self
+            .page_line_limit()
+            .is_some_and(|limit| self.session.disp_options.num_lines_printed + SETTINGS_LINES >= limit)
+        {
             self.press_enter().await?;
         }
 

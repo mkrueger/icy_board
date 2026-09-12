@@ -6,8 +6,8 @@ use regex::Regex;
 
 use crate::icy_board::state::Session;
 
-use super::read_command::{ReadCommand, user_search};
 use super::message_security::{may_read_header, requires_read_password};
+use super::read_command::{ReadCommand, user_search};
 
 /// The default lets every message through.
 #[derive(Clone)]

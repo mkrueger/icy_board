@@ -23,18 +23,31 @@ impl IcyBoardState {
     /// finished_files only retains names/paths and resets its timing at finish.
     /// Batch CPS includes partial files, so it cannot safely fund that rebate.
     pub(crate) async fn accounting_download_free(&mut self, path: &Path) -> Res<bool> {
-        let mut directory = self.session.current_conference.directories.as_ref()
+        let mut directory = self
+            .session
+            .current_conference
+            .directories
+            .as_ref()
             .and_then(|directories| directories.iter().find(|area| Some(area.path.as_path()) == path.parent()))
             .cloned();
         if directory.is_none() {
             // A caller can queue files, then join another conference.
-            directory = self.get_board().await.conferences.iter()
+            directory = self
+                .get_board()
+                .await
+                .conferences
+                .iter()
                 .filter_map(|conference| conference.directories.as_ref())
                 .flat_map(|directories| directories.iter())
-                .find(|area| Some(area.path.as_path()) == path.parent()).cloned();
+                .find(|area| Some(area.path.as_path()) == path.parent())
+                .cloned();
         }
-        let Some(directory) = directory else { return Ok(false); };
-        if directory.is_free { return Ok(true); }
+        let Some(directory) = directory else {
+            return Ok(false);
+        };
+        if directory.is_free {
+            return Ok(true);
+        }
         let files = self.get_filebase(&directory.path, &directory.metadata_path).await?;
         let files = files.lock().await;
         let name = path.file_name().unwrap_or_default().to_string_lossy();
@@ -44,7 +57,9 @@ impl IcyBoardState {
     /// TRANSFER.C estimates fractional KiB and normal-rate time, including
     /// earlier queued files. A free file still consumes online time.
     pub(crate) async fn accounting_download_estimate(&mut self, path: &Path, bytes: u64) -> Res<f64> {
-        if !self.accounting_active() { return Ok(0.0); }
+        if !self.accounting_active() {
+            return Ok(0.0);
+        }
         let free = self.accounting_download_free(path).await?;
         let seconds = limits::seconds_for_transfer(bytes, self.get_bps().max(0) as u32);
         Ok(download_estimate(&self.accounting_rates(), bytes, seconds, free))
@@ -54,7 +69,9 @@ impl IcyBoardState {
         let mut reserved = 0.0;
         let mut seen = std::collections::HashSet::new();
         for path in self.session.flagged_files.clone() {
-            if path == except || !seen.insert(path.clone()) { continue; }
+            if path == except || !seen.insert(path.clone()) {
+                continue;
+            }
             if let Ok(metadata) = path.metadata() {
                 reserved += self.accounting_download_estimate(&path, metadata.len()).await?;
             }
@@ -65,7 +82,9 @@ impl IcyBoardState {
     /// TRANSFER.C's generated MSGCAP/QWKCAP packets are NOCOST/FreeFile.
     /// They still cost online time; StopClockOnCap is not in the live schema.
     pub(crate) fn accounting_capture_transfer_estimate(&self, bytes: u64) -> f64 {
-        if !self.accounting_active() { return 0.0; }
+        if !self.accounting_active() {
+            return 0.0;
+        }
         let seconds = limits::seconds_for_transfer(bytes, self.get_bps().max(0) as u32);
         download_estimate(&self.accounting_rates(), bytes, seconds, true)
     }
@@ -161,7 +180,11 @@ impl IcyBoardState {
                 self.finish_download_batch(&offered, &state, "Local", cps).await?;
                 if state.send_state.errors > 0 {
                     self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
-                    self.println(TerminalTarget::Both, "Some files were not copied (existing destination or unreadable source). Unsent files remain flagged.").await?;
+                    self.println(
+                        TerminalTarget::Both,
+                        "Some files were not copied (existing destination or unreadable source). Unsent files remain flagged.",
+                    )
+                    .await?;
                 }
                 if goodbye_after_dl {
                     self.goodbye().await?;
@@ -316,7 +339,11 @@ impl IcyBoardState {
     async fn download_names(&mut self, goodbye: &mut bool, batch: bool) -> Res<bool> {
         let input = self
             .input_field(
-                if batch { IceText::FileNameToDownloadBatch } else { IceText::FileNameToDownload },
+                if batch {
+                    IceText::FileNameToDownloadBatch
+                } else {
+                    IceText::FileNameToDownload
+                },
                 60,
                 &MASK_ASCII,
                 "hlpd",
@@ -486,7 +513,9 @@ impl IcyBoardState {
                 }
             }
             let charge = self.accounting_download_estimate(&path, size).await?;
-            if self.accounting_insufficient(charge, reserved).await? { continue; }
+            if self.accounting_insufficient(charge, reserved).await? {
+                continue;
+            }
             reserved += charge;
             seconds_so_far += seconds;
             so_far.accept(size, free);
@@ -626,7 +655,11 @@ const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
 
 fn download_estimate(rates: &crate::icy_board::accounting_cfg::AccountingConfig, bytes: u64, seconds: i64, free: bool) -> f64 {
-    let files = if free { 0.0 } else { rates.charge_per_download_file + rates.charge_per_download_bytes * (bytes as f64 / 1024.0) };
+    let files = if free {
+        0.0
+    } else {
+        rates.charge_per_download_file + rates.charge_per_download_bytes * (bytes as f64 / 1024.0)
+    };
     files + rates.charge_per_time * seconds as f64 / 60.0
 }
 
