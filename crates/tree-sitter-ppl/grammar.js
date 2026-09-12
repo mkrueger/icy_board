@@ -89,7 +89,7 @@ const BUILTIN_TYPES = [
   'INTEGER', 'INT', 'LONG', 'ULONG', 'MONEY', 'MSGAREAID', 'REAL', 'SBYTE', 'SDWORD', 'SHORT', 'STRING',
   'SWORD', 'TIME', 'UBYTE', 'UDWORD', 'UNSIGNED', 'UWORD', 'WORD',
   'AUDIO', 'SURFACE',
-  'AREA', 'BOARD', 'CONFERENCE', 'CONTACT', 'DIRECTORY', 'DOOR', 'ERROR', 'EVENT', 'GFX', 'HTTP', 'HTTPREQUEST', 'HTTPRESPONSE', 'MACROS', 'MARGINS', 'MSG', 'MSGHEADER', 'PALETTE', 'PASSWORD', 'REGEX', 'REGEXMATCH', 'REGEXOPTIONS', 'STRINGCOMPARISON', 'SESSION', 'TERMINAL', 'USER', 'TERMINFO', 'TERMINPUT',
+  'AREA', 'BOARD', 'CONFERENCE', 'CONTACT', 'DIRECTORY', 'DOOR', 'ERROR', 'EVENT', 'FILEENTRY', 'FILEPAGE', 'GFX', 'HTTP', 'HTTPREQUEST', 'HTTPRESPONSE', 'MACROS', 'MARGINS', 'MSG', 'MSGHEADER', 'PALETTE', 'PASSWORD', 'REGEX', 'REGEXMATCH', 'REGEXOPTIONS', 'STRINGCOMPARISON', 'SESSION', 'TERMINAL', 'USER', 'TERMINFO', 'TERMINPUT',
   'CHECKSUM', 'ERRCODE', 'ERRKIND', 'EVENTKIND', 'GFXBACKEND', 'HTTPMETHOD', 'MOUSEACTION', 'MOUSEBUTTON', 'MOUSEMODE', 'MOUSETRACKING', 'EDITORMODE', 'MSGFIELD',
 ];
 
@@ -141,6 +141,7 @@ module.exports = grammar({
     [$.predefined_call, $._name_from_keyword],
     [$.predefined_call],
     [$.return_statement],
+    [$.for_statement],
     [$.procedure_call, $._primary_expression],
     [$.member_call, $._primary_expression],
   ],
@@ -449,7 +450,7 @@ module.exports = grammar({
       endKw('LOOP'),
     ),
 
-    for_statement: $ => prec.right(seq(
+    for_statement: $ => seq(
       kw('FOR'),
       field('variable', $.identifier),
       '=',
@@ -459,8 +460,8 @@ module.exports = grammar({
       optional(seq(kw('STEP'), field('step', $._expression))),
       field('body', repeat($._statement)),
       choice(kw('NEXT'), endKw('FOR')),
-      optional(field('variable_end', $.identifier)),
-    )),
+      optional(prec.dynamic(1, field('variable_end', $.identifier))),
+    ),
 
     foreach_statement: $ => seq(
       kw('FOREACH'),

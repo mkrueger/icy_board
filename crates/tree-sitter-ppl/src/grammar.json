@@ -1734,6 +1734,30 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[fF][iI][lL][eE][eE][nN][tT][rR][yY]"
+            }
+          },
+          "named": false,
+          "value": "FILEENTRY"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[fF][iI][lL][eE][pP][aA][gG][eE]"
+            }
+          },
+          "named": false,
+          "value": "FILEPAGE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[gG][fF][xX]"
             }
           },
@@ -3081,167 +3105,167 @@
       ]
     },
     "for_statement": {
-      "type": "PREC_RIGHT",
-      "value": 0,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "ALIAS",
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
             "content": {
-              "type": "TOKEN",
-              "content": {
-                "type": "PATTERN",
-                "value": "[fF][oO][rR]"
-              }
-            },
-            "named": false,
-            "value": "FOR"
-          },
-          {
-            "type": "FIELD",
-            "name": "variable",
-            "content": {
-              "type": "SYMBOL",
-              "name": "identifier"
+              "type": "PATTERN",
+              "value": "[fF][oO][rR]"
             }
           },
-          {
-            "type": "STRING",
-            "value": "="
-          },
-          {
-            "type": "FIELD",
-            "name": "start",
+          "named": false,
+          "value": "FOR"
+        },
+        {
+          "type": "FIELD",
+          "name": "variable",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "FIELD",
+          "name": "start",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
             "content": {
-              "type": "SYMBOL",
-              "name": "_expression"
+              "type": "PATTERN",
+              "value": "[tT][oO]"
             }
           },
-          {
-            "type": "ALIAS",
-            "content": {
-              "type": "TOKEN",
-              "content": {
-                "type": "PATTERN",
-                "value": "[tT][oO]"
-              }
-            },
-            "named": false,
-            "value": "TO"
-          },
-          {
-            "type": "FIELD",
-            "name": "end",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_expression"
-            }
-          },
-          {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SEQ",
-                "members": [
-                  {
-                    "type": "ALIAS",
+          "named": false,
+          "value": "TO"
+        },
+        {
+          "type": "FIELD",
+          "name": "end",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "TOKEN",
                     "content": {
-                      "type": "TOKEN",
-                      "content": {
-                        "type": "PATTERN",
-                        "value": "[sS][tT][eE][pP]"
-                      }
-                    },
-                    "named": false,
-                    "value": "STEP"
-                  },
-                  {
-                    "type": "FIELD",
-                    "name": "step",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_expression"
+                      "type": "PATTERN",
+                      "value": "[sS][tT][eE][pP]"
                     }
+                  },
+                  "named": false,
+                  "value": "STEP"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "step",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_expression"
                   }
-                ]
-              },
-              {
-                "type": "BLANK"
-              }
-            ]
-          },
-          {
-            "type": "FIELD",
-            "name": "body",
-            "content": {
-              "type": "REPEAT",
-              "content": {
-                "type": "SYMBOL",
-                "name": "_statement"
-              }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
             }
-          },
-          {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "ALIAS",
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "REPEAT",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_statement"
+            }
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "TOKEN",
                 "content": {
-                  "type": "TOKEN",
-                  "content": {
-                    "type": "PATTERN",
-                    "value": "[nN][eE][xX][tT]"
-                  }
-                },
-                "named": false,
-                "value": "NEXT"
+                  "type": "PATTERN",
+                  "value": "[nN][eE][xX][tT]"
+                }
               },
-              {
-                "type": "ALIAS",
+              "named": false,
+              "value": "NEXT"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "TOKEN",
                 "content": {
-                  "type": "TOKEN",
-                  "content": {
-                    "type": "SEQ",
-                    "members": [
-                      {
-                        "type": "PATTERN",
-                        "value": "[eE][nN][dD]"
-                      },
-                      {
-                        "type": "PATTERN",
-                        "value": "[ \\t]*"
-                      },
-                      {
-                        "type": "PATTERN",
-                        "value": "[fF][oO][rR]"
-                      }
-                    ]
-                  }
-                },
-                "named": false,
-                "value": "ENDFOR"
-              }
-            ]
-          },
-          {
-            "type": "CHOICE",
-            "members": [
-              {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "PATTERN",
+                      "value": "[eE][nN][dD]"
+                    },
+                    {
+                      "type": "PATTERN",
+                      "value": "[ \\t]*"
+                    },
+                    {
+                      "type": "PATTERN",
+                      "value": "[fF][oO][rR]"
+                    }
+                  ]
+                }
+              },
+              "named": false,
+              "value": "ENDFOR"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "PREC_DYNAMIC",
+              "value": 1,
+              "content": {
                 "type": "FIELD",
                 "name": "variable_end",
                 "content": {
                   "type": "SYMBOL",
                   "name": "identifier"
                 }
-              },
-              {
-                "type": "BLANK"
               }
-            ]
-          }
-        ]
-      }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
     },
     "foreach_statement": {
       "type": "SEQ",
@@ -6473,6 +6497,9 @@
     ],
     [
       "return_statement"
+    ],
+    [
+      "for_statement"
     ],
     [
       "procedure_call",

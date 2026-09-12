@@ -1,4 +1,6 @@
 use super::{run_ppl, run_ppl_at_boundary};
+use crate::icy_board::state::virtual_screen::VirtualScreen;
+use icy_engine::{IceMode, Position, Size, TextPane};
 
 #[test]
 fn a_url_macro_wraps_its_label_in_osc_8() {
@@ -17,8 +19,20 @@ fn a_url_followed_immediately_by_a_color_macro_closes_both_cleanly() {
     assert_eq!(
         output,
         "\x1b[1;30mMap: \x1b]8;;https://www.openstreetmap.org/copyright\x1b\\OpenStreetMap\x1b]8;;\x1b\\ / \
-         \x1b]8;;https://opentopomap.org/credits\x1b\\OpenTopoMap\x1b]8;;\x1b\\\x1b[0m\n\x1b[37mnext"
+         \x1b]8;;https://opentopomap.org/credits\x1b\\OpenTopoMap\x1b]8;;\x1b\\\x1b[0m\n\x1b[1;37mnext"
     );
+
+    let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+    screen.write_bytes(output.replace('\n', "\r\n").as_bytes());
+    assert_eq!(screen.buffer.size(), Size::new(80, 25));
+    for (row, text, color) in [(0, "Map: OpenStreetMap / OpenTopoMap", 0x08), (1, "next", 0x0F)] {
+        for (column, character) in text.chars().enumerate() {
+            let position = Position::new(column as i32, row);
+            let cell = screen.buffer.char_at(position);
+            assert_eq!(cell.ch, character, "{position:?}");
+            assert_eq!(cell.attribute.as_u8(IceMode::Blink), color, "{position:?}");
+        }
+    }
 }
 
 #[test]

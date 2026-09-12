@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn s1_all_catalog_placeholders_bind_without_replacing_live_objects() {
         let registry = parser::icy_board_registry();
-        assert_eq!(24, TYPES.len());
+        assert_eq!(26, TYPES.len());
         for &(id, name, _) in TYPES {
             for rank in 1..=3 {
                 let placeholder = VariableType::UserData(id as u32).create_empty_value();
@@ -484,7 +484,7 @@ mod tests {
 
     #[tokio::test]
     async fn s1_invalid_native_objects_do_not_grant_access_or_open_message_files() {
-        use crate::icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_MSG};
+        use crate::icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_FILE, ERR_KIND_MSG};
 
         let mut state = state().await;
         state.session.cur_security = 255;
@@ -496,12 +496,17 @@ mod tests {
             let value = vm.type_default(VariableType::UserData(id as u32)).unwrap();
             let receiver = runtime_object(object(&value).as_ref(), id as u32).unwrap();
             for (name, function) in &registry.get_type_from_id(id as u32).unwrap().functions {
+                vm.clear_error();
                 let result = receiver.call_function(&mut vm, name, &[]).await.unwrap();
+                assert_eq!(function.return_type, result.vtype, "{id}.{name}");
+                assert_eq!(function.return_rank, result.get_dimensions(), "{id}.{name}");
                 if function.return_type == VariableType::Boolean {
                     assert!(!result.as_bool(), "{id}.{name}");
                 } else {
-                    assert_eq!(ERR_KIND_MSG, vm.last_error.kind, "{id}.{name}");
+                    let kind = if id == parser::FILE_DIRECTORY_ID { ERR_KIND_FILE } else { ERR_KIND_MSG };
+                    assert_eq!(kind, vm.last_error.kind, "{id}.{name}");
                     assert_eq!(ERR_INVALID, vm.last_error.code, "{id}.{name}");
+                    assert!(vm.error_pending, "{id}.{name}");
                 }
             }
         }

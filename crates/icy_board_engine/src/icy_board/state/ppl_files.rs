@@ -110,6 +110,11 @@ impl UserDataValue for PplFilePage {
 }
 
 pub async fn find(directory: &FileDirectory, vm: &mut VirtualMachine<'_>, arguments: &[VariableValue]) -> crate::Res<VariableValue> {
+    let Some(query) = arguments.first() else {
+        vm.set_error(PplError::new(ERR_KIND_FILE, ERR_INVALID, "missing file search query"));
+        return Ok(PplFilePage::default().value());
+    };
+    let query = query.as_string();
     let current = {
         let board = vm.icy_board_state.get_board().await;
         board.conferences.get(directory.conference_number).and_then(|conference| {
@@ -121,7 +126,6 @@ pub async fn find(directory: &FileDirectory, vm: &mut VirtualMachine<'_>, argume
             ))
         })
     };
-    let query = arguments[0].as_string();
     let after = arguments.get(1).map_or(0, VariableValue::as_long);
     let limit = arguments.get(2).map_or(15, VariableValue::as_int);
     let error = if !directory.valid

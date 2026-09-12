@@ -64,6 +64,74 @@ fn every_source_in_the_repository_parses() {
 }
 
 #[test]
+fn file_host_types_parse_and_highlight_as_builtins() {
+    use tree_sitter::StreamingIterator;
+
+    let spellings = ["FILEENTRY", "fileentry", "FileEntry", "FILEPAGE", "filepage", "FilePage"];
+    let source = spellings
+        .iter()
+        .enumerate()
+        .map(|(index, name)| format!("{name} value{index}\n"))
+        .collect::<String>();
+    let language = tree_sitter_ppl::LANGUAGE.into();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).unwrap();
+    let tree = parser.parse(&source, None).unwrap();
+    assert!(!tree.root_node().has_error(), "{}", tree.root_node().to_sexp());
+    assert_eq!(tree.root_node().named_child_count(), spellings.len());
+    for (index, spelling) in spellings.iter().enumerate() {
+        let declaration = tree.root_node().named_child(index as u32).unwrap();
+        let type_node = declaration.child_by_field_name("type").unwrap();
+        assert_eq!(type_node.kind(), "builtin_type", "{spelling}");
+        assert_eq!(type_node.utf8_text(source.as_bytes()).unwrap(), *spelling);
+    }
+
+    let query = tree_sitter::Query::new(&language, tree_sitter_ppl::HIGHLIGHTS_QUERY).unwrap();
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut highlighted_types = Vec::new();
+    while let Some(query_match) = matches.next() {
+        for capture in query_match.captures {
+            if query.capture_names()[capture.index as usize] == "type.builtin" {
+                highlighted_types.push(capture.node.utf8_text(source.as_bytes()).unwrap());
+            }
+        }
+    }
+    assert_eq!(highlighted_types, spellings);
+}
+
+#[test]
+fn for_terminators_do_not_consume_the_following_assignment() {
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_ppl::LANGUAGE.into()).unwrap();
+    for (terminator, variable_end) in [("NEXT", None), ("NEXT index", Some("index")), ("ENDFOR", None), ("END FOR", None)] {
+        for target in ["selected", "item.flag"] {
+            let source = format!("FOR index = 0 TO 3\n    PRINT index\n{terminator}\n    {target} = 0\n");
+            let tree = parser.parse(&source, None).unwrap();
+            let root = tree.root_node();
+            assert!(!root.has_error(), "{source}: {}", root.to_sexp());
+            assert_eq!(root.named_child_count(), 2, "{source}: {}", root.to_sexp());
+            let loop_node = root.named_child(0).unwrap();
+            assert_eq!(loop_node.kind(), "for_statement");
+            assert_eq!(
+                loop_node
+                    .child_by_field_name("variable_end")
+                    .map(|node| node.utf8_text(source.as_bytes()).unwrap()),
+                variable_end,
+                "{source}"
+            );
+            let assignment = root.named_child(1).unwrap();
+            assert_eq!(assignment.kind(), "assignment_statement", "{source}");
+            assert_eq!(
+                assignment.child_by_field_name("left").unwrap().utf8_text(source.as_bytes()).unwrap(),
+                target,
+                "{source}"
+            );
+        }
+    }
+}
+
+#[test]
 fn s1_host_and_dynamic_record_fields_parse_with_all_ranks() {
     let source = r#";$LANGVERSION 400
 TYPE Entry

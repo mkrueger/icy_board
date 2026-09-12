@@ -2457,6 +2457,14 @@
     "named": false
   },
   {
+    "type": "FILEENTRY",
+    "named": false
+  },
+  {
+    "type": "FILEPAGE",
+    "named": false
+  },
+  {
     "type": "FLOAT",
     "named": false
   },

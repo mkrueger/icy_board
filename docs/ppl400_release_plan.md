@@ -1361,6 +1361,10 @@ drei fehlgeschlagene Tests. Die Befunde liegen bei
 der Gesamtlauf ist ausdrücklich nicht vollständig grün. Er erfolgte vor dem
 abschließenden zusätzlichen Test des nativen Antwortdateipfads.
 
+Die drei damaligen Befunde sind inzwischen reproduziert und korrigiert;
+der aktuelle Nachweis und die separat geprüften Grammatikbefunde stehen unter
+[Regressionen 2026-09-12](#regressionen-2026-09-12).
+
 **Grenzen:** Kooperative PPE-Kanäle innerhalb eines BBS-Prozesses, keine
 Betriebssystem-Sperre gegen externe Programme, DOS-Doors, weitere BBS-Prozesse
 oder Rechner. Direkte Dateioperationen (`DELETE`/`RENAME`/`COPY`) nehmen nicht
@@ -1549,9 +1553,10 @@ Geometrie wurden dabei nicht separat protokolliert.
 **Noch offen:** Manuelle Clientversionen/-geometrien für SyncTERM, icy_term und
 ein einfaches ANSI-Terminal; JXL-Paint, abweichende Fonts/Zellmaße und
 Pixelgrößenänderungen ohne logisches Resize sind nicht nachgewiesen. Der
-umfassende Engine-Library-Lauf wurde in diesem Schritt nicht wiederholt;
-die drei zuvor dokumentierten Fehler wurden nicht bearbeitet. Die erfolgreiche
-lokale Wiederholungsprobe ersetzt keine vollständige E3-Client-Matrix.
+umfassende Engine-Library-Lauf wurde im Paint-Schritt nicht wiederholt;
+die drei zuvor dokumentierten Fehler wurden erst im separaten
+[Regressionsschritt](#regressionen-2026-09-12) bearbeitet. Die erfolgreiche lokale
+Wiederholungsprobe ersetzt keine vollständige E3-Client-Matrix.
 
 - Maus und Tastatur in einer Eventschleife.
 - Resize-fähiges Layout und synchronisierte Ausgabe.
@@ -1600,6 +1605,105 @@ F1–F6 nicht kommentarlos aus dem Pflichtumfang streichen.
 - Test-Exitcodes erhalten; bei Shell-Pipelines `pipefail` verwenden.
 - Nur tatsächlich ausgeführte Tests als bestanden melden; Blockaden und nicht
   getestete Clientpfade ausdrücklich benennen.
+
+### Regressionen 2026-09-12
+
+**Freigabe und Umfang:** Ausgehend von `cb4a662b` hat der Benutzer die drei
+bekannten Engine-Testfehler zur Reproduktion und gezielten Korrektur sowie
+anschließende Engine-Läufe in EN/DE freigegeben. Alle drei Fehler wurden vor
+der jeweiligen Korrektur erneut mit dem einzelnen Test reproduziert.
+
+- `Directory.Find` prüft die erforderliche Suchanfrage vor dem Zugriff auf
+  das erste Argument. Ein direkter Hostaufruf ohne Argumente liefert nun
+  einen ungültigen `FilePage` und `File/Invalid` statt eines Panics.
+  Der Hostdefault-Test prüft für Dateioperationen die File-Fehlerdomäne und
+  löscht den Fehlerstatus zwischen direkten Aufrufen. Andernfalls bewahrt
+  `set_error` absichtlich den ersten Fehler des vermeintlich selben Statements.
+  Rückgabetyp, Dimension und neu gesetzter Fehlerstatus werden mitgeprüft.
+- Der Katalogtest erwartet 26 statt 24 Hosttypen: `FileEntry` und `FilePage`
+  waren bereits registriert. Die Bindungs- und Identitätsprüfungen für alle
+  Typen in ein- bis dreidimensionalen Arrays bleiben erhalten und bestehen.
+- Der Hyperlink-Test erwartet für `@X0F` korrekt `ESC[1;37m`: Nach dem
+  vorangegangenen Reset wäre `ESC[37m` nicht hellweiß. Die Farbausgabe selbst
+  wurde nicht geändert. Neben der exakten Ausgabe einschließlich beider
+  OSC-8-Abschlüsse prüft der Test jetzt gerenderte Zeichen und DOS-Farben auf
+  einem 80×25-Terminal. Dabei wird die CRLF-Normalisierung des Testhelpers
+  vor dem Replay rückgängig gemacht.
+
+**Validierung:** Die drei gezielten Tests bestehen. Anschließend wurde
+`CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine --no-fail-fast --quiet`
+in getrennten Prozessen mit `LANG`/`LC_ALL` auf `en_US.UTF-8` bzw. `de_DE.UTF-8`
+und passendem `LANGUAGE` ausgeführt. Die Library besteht in beiden Prozessen
+mit jeweils **1966 bestandenen, 0 fehlgeschlagenen und 14 ignorierten Tests**.
+Die ignorierten Tests gelten nicht als bestanden. Formatprüfung der drei
+geänderten Rust-Dateien und `git diff --check` bestehen ebenfalls.
+
+**Zwischenstand vor dem Grammatik-Abgleich:** Beide vollständigen Engine-Läufe scheiterten
+ausschließlich im Integrationstest `grammars_know_every_type_name` aus
+`editor_grammars`: `FILEENTRY` und `FILEPAGE` fehlen in `grammar.js`.
+Das Ziel hat jeweils sechs bestandene und einen fehlgeschlagenen Test;
+alle übrigen ausgeführten Engine-Testziele bestehen. Der nachfolgende
+TextMate-Typvergleich dieses Tests wird wegen der ersten Assertion nicht
+erreicht und ist damit noch nicht nachgewiesen. Die Grammatikdateien wurden
+in diesem auf drei Regressionen begrenzten Schritt nicht geändert.
+Der anschließend separat freigegebene Abgleich ist unten dokumentiert.
+
+**Grammatik-Abgleich, separat freigegeben am 2026-09-12:** `FILEENTRY` und
+`FILEPAGE` wurden in Tree-sitter und TextMate ergänzt. Der gezielte
+Katalogtest reproduzierte zunächst die Tree-sitter-Lücke und nach deren
+Korrektur dieselbe Lücke in TextMate; mit beiden Ergänzungen besteht er.
+Die eingecheckten Dateien `parser.c`, `grammar.json` und `node-types.json`
+wurden mit Tree-sitter 0.25.10 regeneriert. Eine zweite Generierung ergibt
+identische SHA-256-Prüfsummen für alle drei Artefakte.
+
+Der neue Parser-/Highlight-Test prüft beide Typen in Groß-, Klein- und
+Mischschreibung als `builtin_type` und `type.builtin`. Mit dem alten
+generierten Parser schlug er fehl (`type_identifier` statt `builtin_type`),
+mit dem neuen besteht er. Alle 34 Tree-sitter-Korpusfälle und beide
+Rust-Library-Tests einschließlich Query-Kompilierung bestehen. TextMate-JSON,
+Rust-Testformatierung und `git diff --check` sind ebenfalls geprüft.
+
+Die vollständigen Engine-Läufe mit obigem Befehl wurden danach in EN/DE
+wiederholt: **Alle Engine-Testziele bestehen**, einschließlich der sieben
+Tests aus `editor_grammars`; die Library weiterhin mit 1966 bestandenen,
+0 fehlgeschlagenen und 14 ignorierten Tests je Sprachprozess.
+
+**Tree-sitter-Befund vor der Folgekorrektur:** Der separate Lauf
+`cargo test-low -p tree-sitter-ppl --quiet` hatte drei bestandene und einen
+fehlgeschlagenen Repository-Test. `every_source_in_the_repository_parses`
+findet Fehler in zwei von 333 Quellen: `language_core.pps:42:9` unter
+`crates/icy_board_engine/tests/stored_ppe` und `ppe/files/src/main.pps:135:13`.
+Beide Fehler sind mit den unveränderten Parserartefakten aus `cb4a662b` in
+einem temporären Verzeichnis an exakt denselben Stellen reproduziert.
+Sie wurden nicht durch die Typ-Ergänzung verursacht. Nach dem gescheiterten
+Repository-Test wurden die Rust-Doctests dieses Crates damals nicht ausgeführt.
+
+**FOR-Abschlusskorrektur, separat freigegeben am 2026-09-12:** Beide
+Originalfehler haben dieselbe Ursache: Die rechtsassoziative FOR-Regel band
+den Namen der nächsten Zuweisung vorzeitig als optionalen Abschlussnamen an
+`NEXT`. Bei `item.flag = TRUE` blieb dadurch der Punkt übrig, bei
+`selected = 0` wurde eine falsche Deklaration begonnen. Ein neuer Strukturtest
+reproduzierte den Fehler unabhängig von den beiden vollständigen Quellen.
+
+Die FOR-Regel verwendet jetzt einen gezielten GLR-Konflikt statt statischer
+Rechtsassoziativität. Beide Parsewege bleiben verfügbar; eine dynamische
+Gewichtung bevorzugt einen gültigen expliziten Abschlussnamen, etwa
+`NEXT index`, ohne Folgezuweisungen zu verschlucken. Der Regressionstest
+prüft acht Kombinationen aus `NEXT`, `NEXT index`, `ENDFOR`, `END FOR`
+und einfacher bzw. Member-Zuweisung. Er verlangt zwei getrennte Anweisungen,
+den richtigen Abschlussnamen und das unveränderte Zuweisungsziel.
+Die PPE-Quellen und der Compiler wurden nicht geändert.
+
+Die Parserartefakte wurden erneut mit Tree-sitter 0.25.10 generiert; eine
+weitere Generierung liefert identische SHA-256-Prüfsummen. Der vollständige
+Tree-sitter-Crate-Lauf besteht nun mit **2 Library-Tests, 5 Repository-Tests
+und 1 Doctest**, ohne Fehler oder ignorierte Tests. Der Repositorylauf mit
+333 gefundenen Quellen besteht einschließlich der beiden Originalfälle.
+Alle **34 Korpusfälle** und die jeweils **7 Editorgrammatik-Tests in EN/DE**
+bestehen ebenfalls. Rust-Testformatierung, Diagnosen und `git diff --check`
+sind sauber. Die vollständigen Engine-Läufe wurden in diesem reinen
+Parser-Schritt nicht wiederholt; ihr vorheriger Nachweis steht oben.
+Das gesamte Release-Gate bleibt offen, ebenso E1-Abnahme und E3-Client-Matrix.
 
 ### Go/No-Go-Checkliste
 
