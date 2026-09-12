@@ -22,10 +22,8 @@ INTEGER textColors[7]
 INTEGER columns, rows, canvasColumns, canvasRows, cursorX, cursorY
 INTEGER cellWidth, cellHeight, pixelWidth, pixelHeight
 INTEGER eventCount
-STRING language
 
 InitColors()
-GETTOKEN language
 STARTDISP FNS
 CLS
 
@@ -70,7 +68,7 @@ EXIT
 :PaintError
 ON ERROR OFF
 Cleanup()
-PRINT Label("Paint error", "Paint-Fehler")
+PRINT "Paint error"
 STOP
 
 PROCEDURE InitColors()
@@ -392,9 +390,9 @@ PROCEDURE DrawHeader(STRING backend)
         TextAt(2 + colorIndex * 2, 2, STRING(colorIndex + 1) + " ")
     NEXT
     COLOR 7
-    TextAt(20, 2, Label("Color ", "Farbe ") + STRING(selected + 1))
-    TextAt(2, 3, Label("Clear   Quit", "Loeschen   Ende"))
-    IF backend <> "ANSI" TextAt(30, 2, Label("Brush ", "Pinsel ") + STRING(brushSize) + "  - +")
+    TextAt(20, 2, "Color " + STRING(selected + 1))
+    TextAt(2, 3, "Clear   Quit")
+    IF backend <> "ANSI" TextAt(30, 2, "Brush " + STRING(brushSize) + "  - +")
 ENDPROC
 
 FUNCTION HandleToolbar(INTEGER column, INTEGER row) BOOLEAN
@@ -404,7 +402,7 @@ FUNCTION HandleToolbar(INTEGER column, INTEGER row) BOOLEAN
         RETURN TRUE
     ENDIF
     IF row = 1 & Terminal.Gfx.Backend <> GfxBackend.None THEN
-        INTEGER minusColumn = 31 + Label("Brush ", "Pinsel ").Len() + STRING(brushSize).Len()
+        INTEGER minusColumn = 31 + "Brush ".Len() + STRING(brushSize).Len()
         IF column = minusColumn THEN
             ChangeBrush(-1)
             RETURN TRUE
@@ -414,7 +412,7 @@ FUNCTION HandleToolbar(INTEGER column, INTEGER row) BOOLEAN
         ENDIF
     ENDIF
     IF row = 2 THEN
-        IF column >= 1 & column < 1 + Label("Clear", "Loeschen").Len() THEN
+        IF column >= 1 & column < 1 + "Clear".Len() THEN
             IF Terminal.Gfx.Backend = GfxBackend.None THEN
                 ClearAnsi()
             ELSE
@@ -422,8 +420,8 @@ FUNCTION HandleToolbar(INTEGER column, INTEGER row) BOOLEAN
             ENDIF
             RETURN TRUE
         ENDIF
-        INTEGER quitColumn = 4 + Label("Clear", "Loeschen").Len()
-        IF column >= quitColumn & column < quitColumn + Label("Quit", "Ende").Len() THEN
+        INTEGER quitColumn = 4 + "Clear".Len()
+        IF column >= quitColumn & column < quitColumn + "Quit".Len() THEN
             running = FALSE
             RETURN TRUE
         ENDIF
@@ -437,8 +435,3 @@ PROCEDURE TextAt(INTEGER column, INTEGER row, STRING text)
     ANSIPOS column, row
     PRINT LEFT(text, available)
 ENDPROC
-
-FUNCTION Label(STRING english, STRING german) STRING
-    IF Lower(language) = "de" RETURN german
-    RETURN english
-ENDFUNC

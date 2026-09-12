@@ -171,19 +171,19 @@ async fn fixture(program: &str) -> (tempfile::TempDir, IcyBoardState, Client, Pa
 
 #[tokio::test]
 async fn e3_paint_ansi_draw_erase_resize_and_exit() {
-    for language in ["en", "de"] {
+    for caller_token in ["en", "de"] {
         let program = source().replacen(
             "Cleanup()\nEXIT",
-            "STRING remaining\nGETTOKEN remaining\nPRINT \"REMAINING:\", remaining\nCleanup()\nEXIT",
+            "STRING remaining\nGETTOKEN remaining\nPRINT \"REMAINING:\", remaining\nGETTOKEN remaining\nPRINT \":\", remaining\nCleanup()\nEXIT",
             1,
         );
         let (_root, mut state, mut client, path) = fixture(&program).await;
-        state.session.tokens.push_back(language.into());
+        state.session.tokens.push_back(caller_token.into());
         state.session.tokens.push_back("caller token".into());
         let drive = async {
             client.frame().await;
             assert!(client.line(0, 80).starts_with("Paint"));
-            assert!(client.line(1, 80).contains(if language == "de" { "Farbe 1" } else { "Color 1" }));
+            assert!(client.line(1, 80).contains("Color 1"));
             client.send(b"2").await;
             client.frame().await;
             client.send(b" ").await;
@@ -226,9 +226,12 @@ async fn e3_paint_ansi_draw_erase_resize_and_exit() {
             .expect("paint stalled");
         assert!(result.unwrap());
         assert_clean(&mut state);
-        tokio::time::timeout(Duration::from_secs(3), client.through(b"REMAINING:caller token"))
-            .await
-            .unwrap();
+        tokio::time::timeout(
+            Duration::from_secs(3),
+            client.through(format!("REMAINING:{caller_token}:caller token").as_bytes()),
+        )
+        .await
+        .unwrap();
         assert!(state.session.tokens.is_empty());
         tokio::time::timeout(Duration::from_secs(3), subsequent_input(_root.path(), &mut state, &mut client))
             .await
@@ -238,10 +241,10 @@ async fn e3_paint_ansi_draw_erase_resize_and_exit() {
 
 #[tokio::test]
 async fn e3_paint_sixel_keyboard_text_mouse_and_resize() {
-    for language in ["en", "de"] {
+    for caller_token in ["en", "de"] {
         for pixel_mouse in [false, true] {
             let (root, mut state, mut client, path) = fixture(&source()).await;
-            state.session.tokens.push_back(language.into());
+            state.session.tokens.push_back(caller_token.into());
             client.send(b"\x1b[<1;4c\x1b[6;16;8t\x1b[4;400;640t").await;
             let drive = async {
                 client.frame().await;
@@ -269,22 +272,22 @@ async fn e3_paint_sixel_keyboard_text_mouse_and_resize() {
                 client.frame().await;
                 let stroke = client.pixel(if pixel_mouse { 40 } else { 44 }, local_row);
                 assert!(stroke[0] > stroke[1], "stroke={stroke:?}");
-                client.capture(&format!("paint-{language}-80x25-pixels-{pixel_mouse}.png"));
+                client.capture(&format!("paint-{caller_token}-80x25-pixels-{pixel_mouse}.png"));
                 client.send(b"+").await;
                 client.frame().await;
-                assert!(client.line(1, 80).contains(if language == "de" { "Pinsel 9" } else { "Brush 9" }));
-                let minus = if language == "de" { 39 } else { 38 };
+                assert!(client.line(1, 80).contains("Brush 9"));
+                let minus = 38;
                 client
                     .mouse(0, if pixel_mouse { minus * 8 } else { minus }, if pixel_mouse { 16 } else { 1 })
                     .await;
                 client.frame().await;
-                assert!(client.line(1, 80).contains(if language == "de" { "Pinsel 7" } else { "Brush 7" }));
+                assert!(client.line(1, 80).contains("Brush 7"));
                 client.resize(132, 43).await;
                 client.frame().await;
                 let image = client.image();
                 assert_eq!(image.width(), 1024);
                 assert!(image.picture_data[0] > image.picture_data[1]);
-                client.capture(&format!("paint-{language}-132x43-pixels-{pixel_mouse}.png"));
+                client.capture(&format!("paint-{caller_token}-132x43-pixels-{pixel_mouse}.png"));
                 client.resize(1, 1).await;
                 client.frame().await;
                 assert!(client.screen.buffer.buffer.layers.iter().all(|layer| layer.sixels.is_empty()));

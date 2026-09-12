@@ -898,8 +898,8 @@ Terminal.EndUpdate()
 ```
 
 The bundled [Paint PPE](../ppe/paint/src/paint.pps) exercises these APIs as an
-interactive application. Build it with `pplc ppe/paint/ppl.toml --mono` and pass
-`de` or `en` as its first argument. Arrow keys move the drawing point, Space
+interactive application. Build it with `pplc ppe/paint/ppl.toml --mono`; it uses
+English labels and takes no arguments. Arrow keys move the drawing point, Space
 draws, Delete/Backspace erases, `1` through `8` select colors, `C` clears, and
 `Q`/Escape exits. Graphics also supports freehand mouse strokes, right-button
 erasing, and brush sizing with the wheel or `+`/`-`. Toolbar actions are clickable.
@@ -909,7 +909,7 @@ is unavailable. It retains a bounded image while resizing the visible area:
 128 by 64 ANSI cells or 1280 by 1024 RGBA pixels. ANSI is not pixel-equivalent
 to graphics, and the backend is selected only at startup. No saving or audio is
 included. Automated tests cover ANSI and Sixel output, both mouse coordinate
-modes, English/German, resizing and cleanup. The user accepted Paint for the
+modes, resizing and cleanup. The user accepted Paint for the
 beta; a versioned client-matrix report and the automatically selected JXL path
 remain unverified for this PPE.
 
@@ -1581,8 +1581,8 @@ It does not automatically mark the highlighted file. Completion or cancellation
 returns to the same browser view; an empty batch uses the normal filename prompt.
 No new download API is involved.
 
-The browser expects only its optional language argument. If additional caller
-tokens remain, it refuses `D` with a status message and leaves them untouched:
+The browser uses English labels and takes no arguments. If caller tokens
+remain, it refuses `D` with a status message and leaves them untouched:
 legacy `COMMAND` consumes the shared token queue, and `TOKENIZE` cannot restore
 arbitrary tokens losslessly. Marking and browsing remain available in that case.
 
@@ -2007,12 +2007,12 @@ the manifest), install `ppe/ledit/target/icboard/ledit.ppe` in the board, and us
 [message.external_editor]
 mode = "Ppe"
 path = "ppe/ledit.ppe"
-arguments = "de"
+arguments = ""
 drop_file = "None"
 timeout_seconds = 900
 ```
 
-Use `en` for English labels. The user's full-screen editor preference must be
+The editor uses English labels. The user's full-screen editor preference must be
 enabled. `ledit` receives the header and draft from the board, including prepared
 reply quotes. Ctrl+S saves; Ctrl+A or Escape aborts. Arrow keys, Home/End,
 Page Up/Down, Enter, Backspace and Delete edit the body. The board owns header
@@ -2026,8 +2026,7 @@ binary scratch file in the exchange directory for UTF-8 input. Incoming text is
 displayed without executing its control characters or `@` macros. Empty saves
 are treated as aborts. The `message_api_ledit_standalone_editor_contract` test
 compiles the editor source and exercises Post/Edit/Reply independently of any
-reader, checking persisted JAM data and rendered 80x25 output in English and
-German.
+reader, checking persisted JAM data and rendered 80x25 output.
 
 DOS requires the assets installed by `icbsetup dos-image`. Each invocation uses
 a temporary copy of the installation and fresh exchange files in `C:\DOOR`.

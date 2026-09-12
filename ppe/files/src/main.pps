@@ -2,7 +2,7 @@
 
 CONST INTEGER PAGE_ROWS = 15
 CONST INTEGER FIRST_ROW = 5
-STRING language, query, previousQuery
+STRING query, previousQuery
 DIRECTORY directories[]
 INTEGER directoryIndexes[]
 INTEGER count = 0
@@ -26,7 +26,6 @@ INTEGER descriptionOffset = 0
 TERMINPUT input = Terminal.Input
 
 BEGIN
-    GETTOKEN language
     directories = Session.Conference.Directories
     directoryIndexes.Redim(directories.Len())
     FilterDirectories()
@@ -96,11 +95,6 @@ BEGIN
     EXIT
 END
 
-FUNCTION Label(STRING english, STRING german) STRING
-    IF language.ToLower() = "de" RETURN german
-    RETURN english
-ENDFUNC
-
 PROCEDURE PrintText(STRING text)
     STRING clean = ""
     INTEGER index
@@ -148,7 +142,7 @@ PROCEDURE Draw()
     COLOR @X0B
     PRINTLN "+", STRING.Repeat("-", 76), "+"
     PRINT "| "
-    PrintText(Left(Label("Files", "Dateien") + " / " + Session.Conference.Name, 74))
+    PrintText(Left("Files / " + Session.Conference.Name, 74))
     PRINTLN " |"
     PRINTLN "+", STRING.Repeat("-", 76), "+"
     IF viewingFiles THEN
@@ -159,12 +153,12 @@ PROCEDURE Draw()
         DrawDetails()
         ANSIPOS 2, 23
         COLOR @X07
-        PRINT Label("Enter Files   Esc Back", "Enter Dateien   Esc Zurueck")
+        PRINT "Enter Files   Esc Back"
         RETURN
     ENDIF
     ANSIPOS 2, 4
     COLOR @X07
-    PRINT Label(" No.  Directory                                         Download    New", " Nr.  Verzeichnis                                       Download    Neu")
+    PRINT " No.  Directory                                         Download    New"
     INTEGER row
     FOR row = 0 TO PAGE_ROWS - 1
         INTEGER item = firstVisible + row
@@ -181,27 +175,27 @@ PROCEDURE Draw()
         PRINT Right(STRING(directory.Number + 1), 4), " "
         PrintText(Left(directory.Name, 48))
         PRINT " ", Left(DownloadStatus(directory), 11)
-        IF directory.HasNewFiles PRINT Label("Yes", "Ja")
+        IF directory.HasNewFiles PRINT "Yes"
     NEXT
     IF count = 0 THEN
         ANSIPOS 3, FIRST_ROW
         COLOR @X07
-        PRINT Label("No accessible directories found.", "Keine zugaenglichen Verzeichnisse gefunden.")
+        PRINT "No accessible directories found."
     ENDIF
     ANSIPOS 2, 21
     COLOR @X0B
-    PRINT Label("Directories: ", "Verzeichnisse: "), count
+    PRINT "Directories: ", count
     IF count > 0 PRINT "   ", selected + 1, "/", count
     ANSIPOS 2, 22
     COLOR @X07
-    PRINT Label("Search: ", "Suche: ")
+    PRINT "Search: "
     PrintText(Left(query, 60))
     ANSIPOS 2, 23
     IF searching THEN
-        PRINT Label("Enter Apply   Esc Cancel", "Enter Uebernehmen   Esc Abbruch")
-        ANSIPOS 2 + Label("Search: ", "Suche: ").Len() + query.Len(), 22
+        PRINT "Enter Apply   Esc Cancel"
+        ANSIPOS 2 + "Search: ".Len() + query.Len(), 22
     ELSE
-        PRINT Label("Enter Details   F Search   R Reset   Esc Exit", "Enter Details   F Suche   R Zuruecksetzen   Esc Ende")
+        PRINT "Enter Details   F Search   R Reset   Esc Exit"
     ENDIF
 ENDPROC
 
@@ -259,7 +253,7 @@ PROCEDURE HandleFiles(EVENT keyEvent)
     flagStatus = ""
     IF keyEvent.Text.ToUpper() = "D" THEN
         IF TOKCOUNT() > 0 THEN
-            flagStatus = Label("Download unavailable: pending caller arguments.", "Download nicht moeglich: offene Aufrufer-Argumente.")
+            flagStatus = "Download unavailable: pending caller arguments."
             RETURN
         ENDIF
         input.Release()
@@ -272,18 +266,18 @@ PROCEDURE HandleFiles(EVENT keyEvent)
     IF keyEvent.Text.ToUpper() = "M" THEN
         IF files.Len() > 0 THEN
             IF activeDirectory.Flag(files[fileSelected].Name) THEN
-                flagStatus = Label("Marked: ", "Markiert: ") + files[fileSelected].Name
+                flagStatus = "Marked: " + files[fileSelected].Name
             ELSE
                 ERROR failure = Error.Last()
                 SELECT CASE failure.Code
                 CASE ErrCode.Denied
-                    flagStatus = Label("Marking denied.", "Markieren nicht erlaubt.")
+                    flagStatus = "Marking denied."
                 CASE ErrCode.Limit
-                    flagStatus = Label("Batch limit reached.", "Markierungslimit erreicht.")
+                    flagStatus = "Batch limit reached."
                 CASE ErrCode.Unavailable
-                    flagStatus = Label("File unavailable.", "Datei nicht verfuegbar.")
+                    flagStatus = "File unavailable."
                 CASE ELSE
-                    flagStatus = Label("Unable to mark file.", "Datei konnte nicht markiert werden.")
+                    flagStatus = "Unable to mark file."
                 ENDSELECT
             ENDIF
         ENDIF
@@ -372,25 +366,25 @@ PROCEDURE DrawFiles()
         NEXT
         IF entry.Description.Len() = 0 THEN
             ANSIPOS 3, 9
-            PRINT Label("No description.", "Keine Beschreibung.")
+            PRINT "No description."
         ENDIF
         ANSIPOS 2, 21
-        IF entry.DescriptionTruncated PRINT Label("Description shortened", "Beschreibung gekuerzt")
+        IF entry.DescriptionTruncated PRINT "Description shortened"
         ANSIPOS 2, 22
         PrintText(Left(flagStatus, 76))
         ANSIPOS 2, 23
-        PRINT Label("Up/Down Scroll  PgUp/PgDn Page  M Mark  D Download  Esc Back", "Auf/Ab Scrollen  Bild auf/ab Seite  M Markieren  D Download  Esc Zurueck")
+        PRINT "Up/Down Scroll  PgUp/PgDn Page  M Mark  D Download  Esc Back"
         RETURN
     ENDIF
     IF !filePage.Valid THEN
         ANSIPOS 3, 6
-        PRINT Label("File index unavailable or access denied.", "Dateiindex nicht verfuegbar oder Zugriff gesperrt.")
+        PRINT "File index unavailable or access denied."
     ELSEIF files.Len() = 0 THEN
         ANSIPOS 3, 6
         IF filePage.HasMore THEN
-            PRINT Label("Search continues on the next page.", "Suche wird auf der naechsten Seite fortgesetzt.")
+            PRINT "Search continues on the next page."
         ELSE
-            PRINT Label("No files found.", "Keine Dateien gefunden.")
+            PRINT "No files found."
         ENDIF
     ELSE
         INTEGER listRow
@@ -410,28 +404,28 @@ PROCEDURE DrawFiles()
     ENDIF
     ANSIPOS 2, 21
     COLOR @X0B
-    PRINT Label("Page: ", "Seite: "), pageNumber + 1, "   ", files.Len(), Label(" files", " Dateien")
-    IF filePage.HasMore PRINT Label("   More >", "   Weiter >")
+    PRINT "Page: ", pageNumber + 1, "   ", files.Len(), " files"
+    IF filePage.HasMore PRINT "   More >"
     ANSIPOS 2, 22
     COLOR @X07
     IF flagStatus.Len() > 0 THEN
         PrintText(Left(flagStatus, 76))
     ELSE
-        PRINT Label("Search: ", "Suche: ")
+        PRINT "Search: "
         PrintText(Left(fileQuery, 60))
     ENDIF
     ANSIPOS 2, 23
     IF fileSearching THEN
-        PRINT Label("Enter Apply   Esc Cancel", "Enter Uebernehmen   Esc Abbruch")
-        ANSIPOS 2 + Label("Search: ", "Suche: ").Len() + fileQuery.Len(), 22
+        PRINT "Enter Apply   Esc Cancel"
+        ANSIPOS 2 + "Search: ".Len() + fileQuery.Len(), 22
     ELSE
-        PRINT Label("Enter Details  M Mark  D Download  F Search  R Refresh  Esc Back", "Enter Details  M Markieren  D Download  F Suche  R Neu  Esc Zurueck")
+        PRINT "Enter Details  M Mark  D Download  F Search  R Refresh  Esc Back"
     ENDIF
 ENDPROC
 
 FUNCTION DownloadStatus(DIRECTORY directory) STRING
-    IF !directory.CanDownload() RETURN Label("Denied", "Gesperrt")
-    RETURN Label("Allowed", "Erlaubt")
+    IF !directory.CanDownload() RETURN "Denied"
+    RETURN "Allowed"
 ENDFUNC
 
 PROCEDURE DrawDetails()
@@ -441,21 +435,21 @@ PROCEDURE DrawDetails()
     PrintText(Left(directory.Name, 72))
     ANSIPOS 3, 7
     COLOR @X07
-    PRINT Label("Directory number: ", "Verzeichnisnummer: "), directory.Number + 1
+    PRINT "Directory number: ", directory.Number + 1
     ANSIPOS 3, 9
     PRINT "Download: ", DownloadStatus(directory)
     ANSIPOS 3, 10
-    PRINT Label("Free downloads: ", "Kostenlose Downloads: ")
+    PRINT "Free downloads: "
     IF directory.IsFree THEN
-        PRINT Label("Yes", "Ja")
+        PRINT "Yes"
     ELSE
-        PRINT Label("No", "Nein")
+        PRINT "No"
     ENDIF
     ANSIPOS 3, 11
-    PRINT Label("New files: ", "Neue Dateien: ")
+    PRINT "New files: "
     IF directory.HasNewFiles THEN
-        PRINT Label("Yes", "Ja")
+        PRINT "Yes"
     ELSE
-        PRINT Label("No", "Nein")
+        PRINT "No"
     ENDIF
 ENDPROC

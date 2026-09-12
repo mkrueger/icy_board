@@ -13,7 +13,7 @@ INTEGER cursorColumn = 0
 INTEGER firstVisible = 0
 BOOLEAN editing = TRUE
 BOOLEAN saveMessage = FALSE
-STRING workDir, language
+STRING workDir
 STRING messageInfo[5]
 INTEGER inputBytes = 0
 INTEGER expectedBytes = 0
@@ -21,7 +21,6 @@ TERMINPUT input = Terminal.Input
 
 BEGIN
     GETTOKEN workDir
-    GETTOKEN language
     IF workDir = "" THEN
         input.Release()
         STOP
@@ -30,7 +29,7 @@ BEGIN
 
     IF !LoadDraft() THEN
         input.Release()
-        PRINTLN Label("Draft exceeds 200 lines or 76 columns. Not saved.", "Entwurf hat mehr als 200 Zeilen oder 76 Spalten. Nicht gespeichert.")
+        PRINTLN "Draft exceeds 200 lines or 76 columns. Not saved."
         STOP
     ENDIF
     FCREATE 2, workDir + "/KEYBUF", O_WR, S_DN
@@ -64,16 +63,11 @@ BEGIN
     ERROR failure = Error.Last()
     ON ERROR OFF
     input.Release()
-    PRINT Label("Editor error. Not saved: ", "Editorfehler. Nicht gespeichert: ")
+    PRINT "Editor error. Not saved: "
     PrintText(failure.Message)
     PRINTLN
     STOP
 END
-
-FUNCTION Label(STRING english, STRING german) STRING
-    IF language.ToLower() = "de" RETURN german
-    RETURN english
-ENDFUNC
 
 FUNCTION DisplayText(STRING text) STRING
     STRING visible = ""
@@ -344,12 +338,12 @@ PROCEDURE DrawEditor(STRING recipient, STRING subject)
     COLOR @X0B
     STRING border = "+" + STRING.Repeat("-", EDIT_WIDTH) + "+"
     PRINTLN border
-    PRINT Label("| To   : ", "| An   : ")
+    PRINT "| To   : "
     PrintText(Left(recipient + Space(56), 56))
     PRINTLN "LiQUiD Edit |"
-    PRINT Label("| Subj : ", "| Betr.: ")
+    PRINT "| Subj : "
     PrintText(Left(subject + Space(43), 43))
-    PRINTLN Label("^A Abort  ^S Save        |", "^A Abbruch ^S Speichern  |")
+    PRINTLN "^A Abort  ^S Save        |"
     PRINTLN border
     INTEGER row
     FOR row = FIRST_EDIT_ROW TO LAST_EDIT_ROW

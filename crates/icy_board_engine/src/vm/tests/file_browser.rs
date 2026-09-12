@@ -132,10 +132,7 @@ async fn read_frame(peer: &mut ChannelConnection, screen: &mut VirtualScreen) ->
 }
 
 fn assert_frame(rows: &[String], language: &str, scenario: &str) {
-    assert!(
-        rows[1].starts_with(if language == "de" { "| Dateien / E1 @CLS@" } else { "| Files / E1 @CLS@" }),
-        "{language}/{scenario}: {rows:?}"
-    );
+    assert!(rows[1].starts_with("| Files / E1 @CLS@"), "{language}/{scenario}: {rows:?}");
     for (row, text) in rows.iter().enumerate() {
         assert!(!text.contains("HIDDEN DIRECTORY"), "{language}/{scenario}: {rows:?}");
         assert!(!text.contains("private-path-"), "{language}/{scenario}: {rows:?}");
@@ -278,7 +275,7 @@ async fn e1_file_browser_download_command_returns_to_browser() {
                 board.config.paths.transfer_log = root.path().join("transfer.log");
             }
             if scenario != "pending" {
-                state.session.tokens.truncate(1);
+                state.session.tokens.clear();
             }
             state.session.batch_limit = 10;
             state.session.bytes_remaining = -1;
@@ -329,10 +326,7 @@ async fn e1_file_browser_download_command_returns_to_browser() {
                     }
                     "pending" => {
                         assert_frame(&rows, language, scenario);
-                        assert!(
-                            rows[21].contains(if language == "de" { "Aufrufer-Argumente" } else { "caller arguments" }),
-                            "{rows:?}"
-                        );
+                        assert!(rows[21].contains("caller arguments"), "{rows:?}");
                     }
                     "denied" => {
                         assert_frame(&rows, language, scenario);
@@ -382,7 +376,7 @@ async fn e1_file_browser_download_command_returns_to_browser() {
             }
             assert_eq!(
                 state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
-                if scenario == "pending" { vec!["caller argument"] } else { vec![] }
+                if scenario == "pending" { vec![language, "caller argument"] } else { vec![] }
             );
             assert_eq!(state.session.security_violations, i32::from(scenario == "denied"));
             assert_eq!(state.session.current_conference_number, 0);
@@ -430,14 +424,9 @@ async fn e1_file_browser_marks_without_downloading() {
                     peer.send(keys).await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, "flag");
-                    let expected = match (language, allowed) {
-                        ("de", true) => "Markiert: @HANGUP@ @CLS@.txt",
-                        (_, true) => "Marked: @HANGUP@ @CLS@.txt",
-                        ("de", false) => "Markieren nicht erlaubt.",
-                        (_, false) => "Marking denied.",
-                    };
+                    let expected = if allowed { "Marked: @HANGUP@ @CLS@.txt" } else { "Marking denied." };
                     assert_eq!(rows[21].trim(), expected, "{rows:?}");
-                    assert!(rows[22].contains(if language == "de" { "M Markieren" } else { "M Mark" }));
+                    assert!(rows[22].contains("M Mark"));
                 }
                 for _ in 0..3 {
                     peer.send(b"\x1b").await.unwrap();
@@ -460,7 +449,10 @@ async fn e1_file_browser_marks_without_downloading() {
             .unwrap();
             assert!(result && completed);
             assert_eq!(state.session.flagged_files, if allowed { vec![previous, file] } else { vec![previous] });
-            assert_eq!(state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(), ["caller argument"]);
+            assert_eq!(
+                state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
+                [language, "caller argument"]
+            );
             assert!(!state.session.request_logoff);
             assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_downloads, 0);
         }
@@ -556,7 +548,7 @@ async fn e1_legacy_download_selection_is_conference_wide() {
 }
 
 #[tokio::test]
-async fn e1_directory_browser_call_passes_language_as_tokens() {
+async fn e1_directory_browser_call_ignores_language_token() {
     let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ppe/files/src/main.pps")).unwrap();
     let browser = super::compile(&source).to_buffer().unwrap();
     for language in ["en", "de"] {
@@ -649,7 +641,7 @@ async fn e1_file_browser_pages_search_and_descriptions() {
                     peer.send(b"fneedle\r").await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);
-                    assert!(rows[5].contains(if language == "de" { "Suche wird" } else { "Search continues" }), "{rows:?}");
+                    assert!(rows[5].contains("Search continues"), "{rows:?}");
                     peer.send(b"\x1b[6~").await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);
@@ -665,19 +657,14 @@ async fn e1_file_browser_pages_search_and_descriptions() {
                     peer.send(b"\x1b[6~").await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);
-                    assert!(rows[5].contains(if language == "de" { "Keine Dateien" } else { "No files" }), "{rows:?}");
+                    assert!(rows[5].contains("No files"), "{rows:?}");
                     peer.send(b"f\x08\x08\x08\x08\x08\x08\rr").await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);
                     assert!(rows[4].starts_with(" >file0000.txt"), "{rows:?}");
                 } else {
                     assert!(
-                        rows[5].contains(match (language, scenario) {
-                            ("de", "empty-index") => "Keine Dateien",
-                            (_, "empty-index") => "No files",
-                            ("de", _) => "Dateiindex nicht verfuegbar",
-                            _ => "File index unavailable",
-                        }),
+                        rows[5].contains(if scenario == "empty-index" { "No files" } else { "File index unavailable" }),
                         "{rows:?}"
                     );
                     peer.send(b"\r\x1b[6~\x1b[5~").await.unwrap();
@@ -707,7 +694,10 @@ async fn e1_file_browser_pages_search_and_descriptions() {
             assert!(result && completed, "{language}/{scenario}");
             assert!(!state.session.request_logoff);
             assert_eq!(state.session.current_conference_number, 0);
-            assert_eq!(state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(), ["caller argument"]);
+            assert_eq!(
+                state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
+                [language, "caller argument"]
+            );
         }
     }
 }
@@ -726,11 +716,7 @@ async fn e1_directory_browser_rendering_and_navigation() {
                 let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
                 let rows = read_frame(&mut peer, &mut screen).await;
                 assert_frame(&rows, language, scenario);
-                let no_results = if language == "de" {
-                    "Keine zugaenglichen Verzeichnisse gefunden."
-                } else {
-                    "No accessible directories found."
-                };
+                let no_results = "No accessible directories found.";
                 if scenario != "browse" {
                     assert!(rows[4].contains(no_results), "{language}/{scenario}: {rows:?}");
                     assert!(rows[20].trim_end().ends_with(": 0"), "{rows:?}");
@@ -779,18 +765,15 @@ async fn e1_directory_browser_rendering_and_navigation() {
                     match phase {
                         0 | 2 => {
                             assert!(rows[18].starts_with(" >  17 Directory 015"), "{rows:?}");
-                            assert!(rows[18].contains(if language == "de" { "Gesperrt" } else { "Denied" }), "{rows:?}");
+                            assert!(rows[18].contains("Denied"), "{rows:?}");
                             assert!(rows[20].contains("16/1001"), "{rows:?}");
                         }
                         1 => {
                             assert!(rows[4].contains("Directory 015"), "{rows:?}");
                             assert!(rows[6].trim_end().ends_with(": 17"), "{rows:?}");
-                            assert!(
-                                rows[8].contains(if language == "de" { "Download: Gesperrt" } else { "Download: Denied" }),
-                                "{rows:?}"
-                            );
-                            assert!(rows[9].trim_end().ends_with(if language == "de" { ": Ja" } else { ": Yes" }), "{rows:?}");
-                            assert!(rows[10].trim_end().ends_with(if language == "de" { ": Ja" } else { ": Yes" }), "{rows:?}");
+                            assert!(rows[8].contains("Download: Denied"), "{rows:?}");
+                            assert!(rows[9].trim_end().ends_with(": Yes"), "{rows:?}");
+                            assert!(rows[10].trim_end().ends_with(": Yes"), "{rows:?}");
                         }
                         3 => {
                             assert!(rows[18].contains("@HANGUP@ @CLS@ Gr\u{fc}\u{df}e"), "{rows:?}");
@@ -801,8 +784,8 @@ async fn e1_directory_browser_rendering_and_navigation() {
                             assert!(rows[20].contains("1001   1/1001"), "{rows:?}");
                         }
                         5 | 8 | 12 | 14 | 19 => {
-                            assert!(rows[21].contains(if language == "de" { "Suche" } else { "Search" }), "{rows:?}");
-                            assert!(rows[22].contains(if language == "de" { "Esc Abbruch" } else { "Esc Cancel" }), "{rows:?}");
+                            assert!(rows[21].contains("Search"), "{rows:?}");
+                            assert!(rows[22].contains("Esc Cancel"), "{rows:?}");
                         }
                         6 | 13 | 16 => {
                             assert!(rows[4].starts_with(" >1001 Directory 999"), "{rows:?}");
@@ -843,7 +826,10 @@ async fn e1_directory_browser_rendering_and_navigation() {
             assert_eq!(visited, if scenario == "browse" { 22 } else { 1 }, "{language}/{scenario}");
             assert!(!state.session.request_logoff, "{language}/{scenario}");
             assert_eq!(state.session.current_conference_number, 0);
-            assert_eq!(state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(), ["caller argument"]);
+            assert_eq!(
+                state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
+                [language, "caller argument"]
+            );
         }
     }
 }

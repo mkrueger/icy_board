@@ -726,10 +726,10 @@ async fn message_api_liquid_read_real_package() {
                                             .collect::<String>()
                                     })
                                     .collect::<Vec<_>>();
-                                assert!(rows[1].starts_with(if editor_language == "de" { "| An   : ALICE" } else { "| To   : ALICE" }), "{rows:?}");
+                                assert!(rows[1].starts_with("| To   : ALICE"), "{rows:?}");
                                 assert!(rows[1].contains("LiQUiD Edit"), "{rows:?}");
                                 assert!(rows[2].contains("Original subject"), "{rows:?}");
-                                assert!(rows[2].contains(if editor_language == "de" { "^A Abbruch ^S Speichern" } else { "^A Abort  ^S Save" }), "{rows:?}");
+                                assert!(rows[2].contains("^A Abort  ^S Save"), "{rows:?}");
                                 assert!(rows[4..22].iter().any(|row| row.contains("Original body")), "{rows:?}");
                                 for (row, text) in rows.iter().enumerate().take(23) {
                                     assert_eq!(text.chars().nth(77), Some(if matches!(row, 0 | 3 | 22) { '+' } else { '|' }), "{rows:?}");
@@ -1014,7 +1014,7 @@ async fn message_api_ledit_standalone_editor_contract() {
     let editor_source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ppe/ledit/src/ledit.pps")).unwrap();
     let editor = crate::vm::tests::compile(&editor_source);
     let editor_bytes = editor.to_buffer().unwrap();
-    for language in ["en", "de"] {
+    for language in ["", "de"] {
         for scenario in [
             "edit",
             "abort",
@@ -1125,16 +1125,10 @@ EXIT
                         );
                     }
                     if phase == 0 {
-                        assert!(
-                            rows[1].starts_with(if language == "de" { "| An   : ALICE" } else { "| To   : ALICE" }),
-                            "{rows:?}"
-                        );
+                        assert!(rows[1].starts_with("| To   : ALICE"), "{rows:?}");
                         assert!(rows[1].contains("LiQUiD Edit"), "{rows:?}");
                         assert!(rows[2].contains("Original subject"), "{rows:?}");
-                        assert!(
-                            rows[2].contains(if language == "de" { "^A Abbruch ^S Speichern" } else { "^A Abort  ^S Save" }),
-                            "{rows:?}"
-                        );
+                        assert!(rows[2].contains("^A Abort  ^S Save"), "{rows:?}");
                         if scenario == "scroll" {
                             assert!(rows[4].contains("Line 01"), "{rows:?}");
                             assert!(rows[21].contains("Line 18"), "{rows:?}");
