@@ -410,6 +410,70 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn a5_local_terminal_unicode_cells_across_packets() {
+        let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+        let mut screen = TextScreen::new((80, 25));
+        screen.buffer.buffer_type = icy_engine::BufferType::Unicode;
+        screen.set_unicode_width(true);
+        let screen = Arc::new(Mutex::new(screen));
+        let generation = Arc::new(AtomicU64::new(0));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen.clone(), generation.clone());
+
+        for label in ["Width", "Breite"] {
+            for (width, height) in [(80, 25), (132, 43)] {
+                for (text, edge, tail, cursor) in [
+                    ("AB", "A", "B|", 2),
+                    ("\u{e4}\u{f6}", "\u{e4}", "\u{f6}|", 2),
+                    ("\u{e4}", "\u{e4}", "|", 1),
+                    ("a\u{308}", "a\u{308}", "|", 1),
+                    ("\u{754c}\u{96ea}", " ", "\u{754c}\u{96ea}|", 5),
+                    ("\u{1f469}\u{200d}\u{1f4bb}", " ", "\u{1f469}\u{200d}\u{1f4bb}|", 3),
+                ] {
+                    let packet = format!(
+                        "\x1b[8;{height};{width}t\x1b[2J\x1b[H{label}\x1b[4;3H{text}|\x1b[{};{width}H{text}|",
+                        height - 1
+                    );
+                    for byte in packet.bytes() {
+                        let previous_generation = generation.load(Ordering::Acquire);
+                        board_connection.send(&[byte]).await.unwrap();
+                        tokio::time::timeout(Duration::from_secs(1), async {
+                            while generation.load(Ordering::Acquire) == previous_generation {
+                                tokio::task::yield_now().await;
+                            }
+                        })
+                        .await
+                        .unwrap();
+                    }
+
+                    let screen = screen.lock().unwrap();
+                    let context = format!("{label}, {width}x{height}, {text:?}");
+                    let cell = |position| {
+                        if screen.is_grapheme_continuation(position) {
+                            String::new()
+                        } else if let Some((text, _)) = screen.grapheme_at(position) {
+                            text.to_owned()
+                        } else {
+                            screen.char_at(position).ch.to_string()
+                        }
+                    };
+                    let row = |row| (0..width).map(|column| cell(Position::new(column, row))).collect::<String>();
+                    assert_eq!(screen.buffer.terminal_state.size(), Size::new(width, height), "{context}");
+                    assert_eq!((screen.width(), screen.height()), (width, height), "{context}");
+                    assert_eq!(row(0).trim_end(), label, "{context}");
+                    assert_eq!(row(3).trim_end(), format!("  {text}|"), "{context}");
+                    assert_eq!(cell(Position::new(width - 1, height - 2)), edge, "{context}");
+                    assert_eq!(row(height - 1).trim_end(), tail, "{context}");
+                    assert_eq!(screen.caret.position(), Position::new(cursor, height - 1), "{context}");
+                }
+            }
+        }
+
+        drop(tx);
+        drop(board_connection);
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
     async fn a5_local_terminal_renders_resize_and_edge_in_one_packet() {
         let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
         let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));

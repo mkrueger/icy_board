@@ -805,6 +805,8 @@ impl IcyBoardState {
     /// Door output goes straight to the terminals, so the screens have to be told what
     /// went past them - as CP437, which is what a door emits.
     fn track_door_output(&mut self, bytes: &[u8]) {
+        self.user_screen.buffer.set_unicode_width(false);
+        self.sysop_screen.buffer.set_unicode_width(false);
         for byte in bytes {
             let ch = CP437_TO_UNICODE[*byte as usize];
             let _ = self.user_screen.print_char(ch);
@@ -2795,6 +2797,8 @@ impl IcyBoardState {
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
         let user_is_utf8 = self.session.term_caps.is_utf8;
+        self.user_screen.buffer.set_unicode_width(user_is_utf8);
+        self.sysop_screen.buffer.set_unicode_width(false);
         let mut buf = [0; 4];
 
         for c in data {
@@ -2932,6 +2936,8 @@ impl IcyBoardState {
     }
 
     pub(crate) async fn write_terminal_bytes(&mut self, target: TerminalTarget, user_bytes: &[u8], sysop_bytes: &[u8]) -> Res<()> {
+        self.user_screen.buffer.set_unicode_width(self.session.term_caps.is_utf8);
+        self.sysop_screen.buffer.set_unicode_width(false);
         if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
             self.user_screen.write_bytes(user_bytes);
         }
@@ -4720,6 +4726,32 @@ mod screen_tests {
         screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink)
     }
 
+    #[tokio::test]
+    async fn a5_unicode_width_follows_byte_output_and_door_encoding() {
+        let (mut state, _peer) = graphics_state().await;
+        state.session.term_caps.is_utf8 = true;
+        state.write_terminal_bytes(TerminalTarget::Both, b"a", b"a").await.unwrap();
+        state
+            .write_terminal_bytes(TerminalTarget::Both, "\u{308}\u{754c}|".as_bytes(), b"..|")
+            .await
+            .unwrap();
+        assert_eq!(state.user_screen.buffer.grapheme_at(icy_engine::Position::default()), Some(("a\u{308}", 1)));
+        assert_eq!(state.user_screen.buffer.grapheme_at(icy_engine::Position::new(1, 0)), Some(("\u{754c}", 2)));
+        assert_eq!(state.user_screen.buffer.caret.position(), icy_engine::Position::new(4, 0));
+        assert!(!state.sysop_screen.buffer.unicode_width());
+        assert_eq!(state.sysop_screen.buffer.caret.position(), icy_engine::Position::new(4, 0));
+
+        state.track_door_output(&[b'\r', b'\n', 0xcd]);
+        assert!(!state.user_screen.buffer.unicode_width());
+        assert_eq!(state.user_screen.buffer.char_at(icy_engine::Position::new(0, 1)).ch, '\u{2550}');
+        assert_eq!(state.user_screen.buffer.caret.position(), icy_engine::Position::new(1, 1));
+        state.print(TerminalTarget::Both, "\u{754c}|").await.unwrap();
+        assert!(state.user_screen.buffer.unicode_width());
+        assert_eq!(state.user_screen.buffer.grapheme_at(icy_engine::Position::new(1, 1)), Some(("\u{754c}", 2)));
+        assert_eq!(state.user_screen.buffer.caret.position(), icy_engine::Position::new(4, 1));
+        assert_eq!(state.sysop_screen.buffer.caret.position(), icy_engine::Position::new(3, 1));
+    }
+
     #[test]
     fn s5_ppe_output_matches_rendered_utf8_and_cp437_screens() {
         use crate::{
@@ -4777,8 +4809,12 @@ mod screen_tests {
                     } else {
                         output.iter().map(|byte| CP437_TO_UNICODE[*byte as usize]).collect()
                     };
-                    for (virtual_screen, rendered_text) in [(&state.user_screen, rendered_text.as_str()), (&state.sysop_screen, cp437_text.as_str())] {
+                    for (virtual_screen, rendered_text, unicode_width) in [
+                        (&state.user_screen, rendered_text.as_str(), utf8),
+                        (&state.sysop_screen, cp437_text.as_str(), false),
+                    ] {
                         let mut rendered = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+                        rendered.buffer.set_unicode_width(unicode_width);
                         rendered.write_bytes(format!("\x1b[8;{height};{width}t").as_bytes());
                         rendered.write_bytes(rendered_text.as_bytes());
                         assert_eq!(virtual_screen.buffer.caret.position(), rendered.buffer.caret.position());
@@ -4789,6 +4825,11 @@ mod screen_tests {
                                     virtual_screen.buffer.char_at(position).ch,
                                     rendered.buffer.char_at(position).ch,
                                     "{width}x{height}, utf8={utf8}, {position:?}"
+                                );
+                                assert_eq!(virtual_screen.buffer.grapheme_at(position), rendered.buffer.grapheme_at(position));
+                                assert_eq!(
+                                    virtual_screen.buffer.is_grapheme_continuation(position),
+                                    rendered.buffer.is_grapheme_continuation(position)
                                 );
                             }
                         }

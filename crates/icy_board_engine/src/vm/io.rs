@@ -3,6 +3,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{BufRead, Cursor, Read, Result, Seek, SeekFrom, Write},
     path::Path,
+    sync::{Arc, Mutex, Weak},
     time::SystemTime,
 };
 
@@ -23,6 +24,10 @@ pub trait PCBoardIO: Send {
     /// am - desired access mode for the file
     /// sm - desired share mode for the file
     fn fappend(&mut self, channel: i32, file: &str);
+
+    fn fappend_with_share(&mut self, channel: i32, file: &str, _share_mode: i32) {
+        self.fappend(channel, file);
+    }
 
     /// Creates a new file
     /// channel - integer expression with the channel to use for the file
@@ -95,6 +100,14 @@ pub trait PCBoardIO: Send {
 
     fn fclose(&mut self, channel: i32) -> Res<()>;
 
+    fn close_all(&mut self) {
+        for channel in 0..MAX_FILE_CHANNELS {
+            if self.is_open(channel) {
+                let _ = self.fclose(channel);
+            }
+        }
+    }
+
     /// .
     ///
     /// # Errors
@@ -141,9 +154,60 @@ pub trait PCBoardIO: Send {
     }
 }
 
+struct FileShare {
+    identity: same_file::Handle,
+    access: i32,
+    denied: i32,
+}
+
+static FILE_SHARES: Mutex<Vec<Weak<FileShare>>> = Mutex::new(Vec::new());
+
+fn open_shared(file_name: &Path, mode: i32, share_mode: i32) -> Result<(File, Arc<FileShare>)> {
+    let access = if mode == O_APPEND {
+        2
+    } else {
+        match mode & 0x03 {
+            O_RD => 1,
+            O_WR => 2,
+            _ => 3,
+        }
+    };
+    let file = if mode == O_APPEND {
+        OpenOptions::new().append(true).create(true).open(file_name)?
+    } else {
+        OpenOptions::new()
+            .read(access & 1 != 0)
+            .write(access & 2 != 0)
+            .create(access & 2 != 0)
+            .truncate(false)
+            .open(file_name)?
+    };
+    let share = Arc::new(FileShare {
+        identity: same_file::Handle::from_file(file.try_clone()?)?,
+        access,
+        denied: share_mode & 0x03,
+    });
+    let mut shares = FILE_SHARES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    shares.retain(|share| share.strong_count() > 0);
+    if shares
+        .iter()
+        .filter_map(Weak::upgrade)
+        .any(|existing| existing.identity == share.identity && (existing.access & share.denied != 0 || share.access & existing.denied != 0))
+    {
+        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "file sharing conflict"));
+    }
+    shares.push(Arc::downgrade(&share));
+    drop(shares);
+    if mode != O_APPEND && mode & 0x03 == O_WR {
+        file.set_len(0)?;
+    }
+    Ok((file, share))
+}
+
 struct FileChannel {
     file: Option<Box<File>>,
     reader: Option<Cursor<String>>,
+    share: Option<Arc<FileShare>>,
     _content: Vec<u8>,
     err: bool,
     /// Set alongside `err` for a real failure, left alone at end of file.
@@ -155,6 +219,7 @@ impl FileChannel {
         FileChannel {
             file: None,
             reader: None,
+            share: None,
             _content: Vec::new(),
             err: false,
             failure: None,
@@ -180,9 +245,10 @@ impl DiskIO {
         let mut first_chan = FileChannel::new();
 
         if let Some(answer_file) = answer_file {
-            match File::create(answer_file) {
-                Ok(file) => {
+            match open_shared(answer_file, O_WR, 0) {
+                Ok((file, share)) => {
                     first_chan.file = Some(Box::new(file));
+                    first_chan.share = Some(share);
                 }
                 // A PPE that cannot record its answers still runs; channel 0 reports the error.
                 Err(err) => {
@@ -220,9 +286,19 @@ impl DiskIO {
 
 impl PCBoardIO for DiskIO {
     fn fappend(&mut self, channel: i32, file_name: &str) {
-        if let Err(err) = self.fopen(channel, file_name, O_APPEND, 0) {
+        self.fappend_with_share(channel, file_name, 0);
+    }
+
+    fn fappend_with_share(&mut self, channel: i32, file_name: &str, share_mode: i32) {
+        if let Err(err) = self.fopen(channel, file_name, O_APPEND, share_mode) {
             log::error!("error appending file: {err}");
         }
+    }
+
+    fn close_all(&mut self) {
+        self.channels.clear();
+        self.operation_succeeded = false;
+        self.operation_failure = None;
     }
 
     fn fcreate(&mut self, channel: i32, file_name: &str, _am: i32, sm: i32) {
@@ -289,7 +365,7 @@ impl PCBoardIO for DiskIO {
         failure.map_or_else(|| succeeded.then_some(Ok(())), |failure| Some(Err(failure)))
     }
 
-    fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
+    fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, sm: i32) -> Res<()> {
         // PCBoard's openChan set an error flag and carried on - a channel already in use or a
         // file that would not open never stopped a PPE. See SCREXEC.CPP.
         if self.is_open(channel) {
@@ -297,24 +373,15 @@ impl PCBoardIO for DiskIO {
             return Ok(());
         }
 
-        // PCBoard masks the access mode to two bits, and dosfopen creates a missing file for any write mode.
-        let file = if mode == O_APPEND {
-            OpenOptions::new().append(true).create(true).open(file_name)
-        } else {
-            match mode & 0x03 {
-                O_RD => File::open(file_name),
-                O_WR => File::create(file_name),
-                // Read-write mode: preserve existing content, only create if missing.
-                _ => OpenOptions::new().read(true).write(true).create(true).truncate(false).open(file_name),
-            }
-        };
+        let file = open_shared(Path::new(file_name), mode, sm);
         match file {
-            Ok(handle) => {
+            Ok((handle, share)) => {
                 self.channels.insert(
                     channel,
                     FileChannel {
                         file: Some(Box::new(handle)),
                         reader: None,
+                        share: Some(share),
                         _content: Vec::new(),
                         err: false,
                         failure: None,
@@ -382,6 +449,7 @@ impl PCBoardIO for DiskIO {
             let mut buf = Vec::new();
             if let Err(err) = f.read_to_end(&mut buf) {
                 chan.fail(format!("can't read channel {channel}: {err}"));
+                chan.file = Some(f);
                 return Ok(String::new());
             }
             match read_data_with_encoding_detection(&buf) {
@@ -392,6 +460,7 @@ impl PCBoardIO for DiskIO {
                 Err(err) => {
                     log::error!("can't decode channel {channel}: {err}");
                     chan.fail(format!("can't decode channel {channel}: {err}"));
+                    chan.file = Some(f);
                     return Ok(String::new());
                 }
             }
@@ -566,6 +635,7 @@ impl PCBoardIO for DiskIO {
             Some(chan) if chan.file.is_some() || chan.reader.is_some() => {
                 chan.file = None;
                 chan.reader = None;
+                chan.share = None;
                 chan.err = false;
                 self.operation_succeeded = true;
             }
@@ -596,6 +666,171 @@ mod tests {
 
     use super::{DiskIO, PCBoardIO};
     use tempfile::TempDir;
+
+    #[cfg(unix)]
+    #[test]
+    fn a6_answer_file_preserves_native_path_and_participates_in_sharing() {
+        use std::os::unix::ffi::OsStringExt;
+        let root = TempDir::new().unwrap();
+        let path = root.path().join(std::ffi::OsString::from_vec(b"answers-\xff".to_vec()));
+        let alias = root.path().join("answers");
+        let mut answers = DiskIO::new(".", Some(&path));
+        assert!(!answers.ferr(0));
+        answers.fwrite(0, b"kept").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"kept");
+        std::os::unix::fs::symlink(&path, &alias).unwrap();
+        let mut other = DiskIO::new(".", None);
+        other.fopen(1, alias.to_str().unwrap(), 0, 3).unwrap();
+        assert!(other.ferr(1));
+        answers.close_all();
+        other.fopen(1, alias.to_str().unwrap(), 0, 3).unwrap();
+        assert!(!other.ferr(1));
+    }
+
+    #[test]
+    fn a6_share_lifetime_covers_cached_reads_close_and_drop() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("shared.dat");
+        let path = path.to_str().unwrap();
+        std::fs::write(path, b"one\ntwo\n").unwrap();
+        let mut first = DiskIO::new(".", None);
+        let mut second = DiskIO::new(".", None);
+        let mut writer = DiskIO::new(".", None);
+        first.fopen(1, path, 0, 2).unwrap();
+        second.fopen(1, path, 0, 2).unwrap();
+        assert!(!first.ferr(1));
+        assert!(!second.ferr(1));
+        assert_eq!(first.fget(1).unwrap(), "one");
+        assert_eq!(first.fget(1).unwrap(), "two");
+        assert_eq!(first.fget(1).unwrap(), "");
+        assert!(first.ferr(1));
+        writer.fcreate(1, path, 1, 0);
+        assert!(writer.ferr(1));
+        first.fclose(1).unwrap();
+        writer.fcreate(1, path, 1, 0);
+        assert!(writer.ferr(1));
+        drop(second);
+        writer.fcreate(1, path, 1, 3);
+        assert!(!writer.ferr(1));
+        writer.fwrite(1, b"unchanged").unwrap();
+        writer.fget(1).unwrap();
+        assert!(writer.ferr(1));
+        first.fopen(1, path, 0, 0).unwrap();
+        assert!(first.ferr(1));
+        writer.fclose(1).unwrap();
+        first.fopen(1, path, 0, 0).unwrap();
+        assert!(!first.ferr(1));
+        assert_eq!(first.fget(1).unwrap(), "unchanged");
+    }
+
+    #[test]
+    fn a6_share_modes_apply_to_append_and_failed_opens() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("append.dat");
+        let path = path.to_str().unwrap();
+        let mut owner = DiskIO::new(".", None);
+        let mut other = DiskIO::new(".", None);
+        owner.fappend_with_share(1, path, 3);
+        owner.fwrite(1, b"original").unwrap();
+        other.fappend(1, path);
+        assert!(other.ferr(1));
+        assert!(!other.is_open(1));
+        assert_eq!(std::fs::read(path).unwrap(), b"original");
+        owner.fclose(1).unwrap();
+        other.fappend_with_share(1, path, 1);
+        assert!(!other.ferr(1));
+        owner.fappend_with_share(1, path, 1);
+        assert!(!owner.ferr(1));
+        owner.fwrite(1, b"-a").unwrap();
+        other.fwrite(1, b"-b").unwrap();
+        other.fopen(2, path, 0, 0).unwrap();
+        assert!(other.ferr(2));
+        assert_eq!(std::fs::read(path).unwrap(), b"original-a-b");
+        owner.close_all();
+        other.close_all();
+        owner.fopen(1, path, 0, 3).unwrap();
+        assert!(!owner.ferr(1));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a6_share_modes_follow_symlinks_hardlinks_and_relative_components() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("data");
+        std::fs::write(&path, b"preserved").unwrap();
+        let symlink = root.path().join("symbolic");
+        let hardlink = root.path().join("hard");
+        std::os::unix::fs::symlink(&path, &symlink).unwrap();
+        std::fs::hard_link(&path, &hardlink).unwrap();
+        let mut owner = DiskIO::new(".", None);
+        owner.fopen(1, path.to_str().unwrap(), 0, 3).unwrap();
+        for alias in [symlink, hardlink, root.path().join(".").join("data")] {
+            let mut other = DiskIO::new(".", None);
+            other.fcreate(1, alias.to_str().unwrap(), 1, 0);
+            assert!(other.ferr(1), "{}", alias.display());
+            assert_eq!(std::fs::read(&path).unwrap(), b"preserved");
+        }
+    }
+
+    #[test]
+    fn a6_share_acquisition_is_atomic_between_threads() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("lock");
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let handles = (0..8)
+            .map(|_| {
+                let path = path.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let mut io = DiskIO::new(".", None);
+                    barrier.wait();
+                    io.fopen(1, path.to_str().unwrap(), 2, 3).unwrap();
+                    let acquired = !io.ferr(1);
+                    barrier.wait();
+                    acquired
+                })
+            })
+            .collect::<Vec<_>>();
+        let acquired = handles.into_iter().map(|handle| usize::from(handle.join().unwrap())).sum::<usize>();
+        assert_eq!(acquired, 1);
+        let mut io = DiskIO::new(".", None);
+        io.fopen(1, path.to_str().unwrap(), 2, 3).unwrap();
+        assert!(!io.ferr(1));
+    }
+
+    #[test]
+    fn a6_share_modes_check_both_access_directions_before_truncating() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("shared.dat");
+        let path = path.to_str().unwrap();
+        for first_mode in 0..=2 {
+            for first_share in 0..=3 {
+                for second_mode in 0..=2 {
+                    for second_share in 0..=3 {
+                        std::fs::write(path, b"preserved").unwrap();
+                        let mut first = DiskIO::new(root.path().to_str().unwrap(), None);
+                        let mut second = DiskIO::new(root.path().to_str().unwrap(), None);
+                        first.fopen(1, path, first_mode, first_share).unwrap();
+                        assert!(!first.ferr(1));
+                        let before = std::fs::read(path).unwrap();
+                        let access = |mode| match mode {
+                            0 => 1,
+                            1 => 2,
+                            _ => 3,
+                        };
+                        let denied = access(first_mode) & second_share != 0 || access(second_mode) & first_share != 0;
+                        second.fopen(1, path, second_mode, second_share).unwrap();
+                        let context = format!("first={first_mode}/{first_share}, second={second_mode}/{second_share}");
+                        assert_eq!(second.ferr(1), denied, "{context}");
+                        assert_eq!(second.is_open(1), !denied, "{context}");
+                        if denied {
+                            assert_eq!(std::fs::read(path).unwrap(), before, "{context}");
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// `PCBoard`'s openChan set the error flag when the file would not open, and the PPE
     /// carried on to look at FERR itself.

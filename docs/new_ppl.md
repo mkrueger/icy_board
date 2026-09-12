@@ -583,6 +583,83 @@ these now remain unchanged, matching the original source. Opcode signatures
 and string-storage limits are unchanged. Neither form removes general macros
 such as `@CLS@` or ANSI escape sequences; this is not a safe-output filter.
 
+**Text length and terminal cells:** `LEN(text)` and `text.Len()` count Unicode
+scalar values, not grapheme clusters or visible terminal columns. `LEFT(text, 1)`
+and `text.Substring(0, 1)` select one scalar value. For `a` followed by U+0308
+(combining diaeresis), this selects only `a`; `text.Substring(1, 1)` returns the
+combining mark alone. These are not cell-aware cropping operations. String
+length also does not account for the interpretation of ANSI sequences or ATX
+codes during output.
+
+The UTF-8 caller screen and local TUI use grapheme-aware display cells. The
+following cases are checked through serialized PPE execution and rendering:
+
+| Input | `LEN` / `Len()` | UTF-8 screen-model cells | CP437 wire text | Local UTF-8 TUI frame |
+| :--- | :--- | :--- | :--- | :--- |
+| `AB` | 2 | 2 | `AB` | `AB` |
+| `äö` | 2 | 2 | `äö` (bytes 84/94 hex) | `äö` |
+| `ä` (U+00E4) | 1 | 1 | `ä` (byte 84 hex) | `ä` |
+| `a` + U+0308 | 2 | 1 | `a.` | One combined grapheme in one cell |
+| U+754C U+96EA (CJK) | 2 | 4 | `..` | Two wide graphemes, two cells each |
+
+UTF-8 output preserves the original input scalars without normalization. CP437
+output substitutes `.` for unmappable scalars and retains its one-cell layout.
+The UTF-8 caller screen and local terminal use the opt-in Unicode cell model
+from `icy_tools` revision `588230b0`; the TUI renders complete graphemes and
+skips their continuation cells. A wide grapheme clipped by the host viewport
+is left blank rather than drawn partially. The CP437 sysop mirror and DOS-door
+tracking retain the legacy cell mode; their coordinates can differ from a
+UTF-8 caller's coordinates.
+
+Tests cover serialized PPE execution, output bytes and screen replay for both
+encodings, `SAVESCRN`/`RESTSCRN`, plus the local UTF-8 terminal thread and final
+TUI frame. The frame test also executes and reloads a real PPE. Each uses
+explicit English/German labels, 80x25 and 132x43 BBS geometries, and samples
+inside the screen and at the right edge. The TUI frame test provides two extra
+host rows for the status bar. Host-terminal glyphs/fonts and remote clients
+were not visually tested; their Unicode widths may differ from this model.
+No width/cropping API or change to existing string operations is implied.
+
+**UTF-8 layout contract:** UTF-8 layout uses
+display-cell widths instead of one cell per scalar. ASCII and precomposed
+umlauts occupy one cell each; `a` followed by U+0308 occupies one cell together;
+each of the wide CJK characters above occupies two cells. Combining marks
+attached to a base character do not advance the cursor. The BBS screen model,
+local terminal parser and final TUI must agree on cursor positions, wrapping
+and overwriting.
+
+CP437 mapping and its one-cell layout remain unchanged, including `.` for
+unmappable input. Existing string operations remain scalar-based, with no
+implicit normalization or new width/cropping API.
+
+The agreed UTF-8 edge-case rules are:
+
+- Combining marks without a base use U+25CC (dotted circle) as a display-only
+	carrier in one cell; the original character sequence remains unchanged.
+- Ambiguous-width characters use the narrow, one-cell convention regardless
+	of the English/German locale.
+- Grapheme clusters, including emoji/ZWJ and variation sequences, are handled
+	together. Width follows `unicode-width`, not summed scalar widths;
+	fully-qualified emoji ZWJ sequences occupy two cells.
+- Packet boundaries and separate `PRINT` calls do not split a grapheme.
+	Explicit cursor movement or erasing ends attachment to the previously
+	output grapheme. SGR color changes allow attachment and keep the base
+	character's attributes.
+- When a wide grapheme does not fit, automatic wrapping moves it as a whole
+	to the next line. With automatic wrapping disabled, a one-cell `.` replaces
+	it instead.
+- Overwriting or erasing any occupied part of a wide grapheme removes the
+	whole grapheme without shifting neighboring text. ANSI DCH still shifts
+	neighboring cells; ECH/EL/ED do not.
+
+The display model caps each grapheme at 4096 UTF-8 bytes; further extending
+scalars are ignored by the display only, not by the PPE string or wire output.
+Classic `SCRTEXT` is unchanged: it reads one stored character per requested
+cell, so combining tails are absent and wide continuation cells read as spaces.
+It is not a grapheme-preserving screen extraction API. `SAVESCRN`/`RESTSCRN`
+preserve the grapheme display through the Unicode snapshot path.
+These rules do not establish host-font or remote-client compatibility.
+
 The `STRING` type name also provides operations that do not belong to one value:
 
 ```PPL
@@ -716,6 +793,51 @@ destination unchanged and reports through both `FERR(channel)` and
 functions, procedures, tables, host objects or dynamic record fields. Unsupported
 layouts are rejected even if an offending array is empty, before any record
 bytes are read or written. Runtime usability does not imply serializability.
+
+Transactional reading protects the destination value, not a file update or a
+multi-node read/modify/write operation. A PPE can put a version header before
+its record and reject an unknown version before decoding positional fields.
+This is an application convention, not automatic schema migration.
+
+For a single writer, the tested settings example writes to a separate temporary
+file in the destination directory, checks errors before closing it, and uses
+`RENAME` to publish it without first deleting the previous file. On Linux, the
+old file survives the tested creation, write and rename failures and `STOP`
+before publication. A stopped run can leave a temporary file behind.
+This is not a power-loss durability guarantee: `FFLUSH` currently calls
+`File::flush`, not `sync_all` or a directory sync.
+
+**File sharing between nodes:** `FOPEN`, `FCREATE` and `FAPPEND` enforce their
+share mode against other PPE file channels in the same BBS process. `S_DN`
+denies neither access, `S_DR` denies reading, `S_DW` denies writing, and `S_DB`
+denies both. A new open must satisfy both the existing channel's deny mode and
+its own deny mode against existing access. An append channel counts as a writer.
+Conflicts return immediately through `FERR(channel)` and `Error.Last()`
+(`ErrKind.File`, `ErrCode.IO`); the rejected channel stays closed, and a rejected
+writer does not truncate the file. No automatic waiting or retry is performed.
+
+Sharing uses file identity rather than just path spelling, including symlink
+and hardlink aliases. `FGET` buffering, EOF and reading `FERR` do not release a
+channel's share reservation. `FCLOSE` releases it; all channels are closed on
+PPE completion, `STOP`, runtime error, disconnect or cancellation of the run.
+PPL signatures, constants and positional record formats are unchanged.
+
+For a read/modify/write transaction, all participating PPEs must open the same
+stable, separate lock file with `O_RW, S_DB` **before reading the settings**.
+Keep that channel open while reading and validating the versioned data,
+modifying the record, writing a separate temporary file and publishing it with
+`RENAME`. Release the lock only after checking the rename result. After a lock
+conflict, retry by acquiring the lock and re-reading the current settings, not
+by saving a previously read record. The two-node regression now preserves both
+increments (20 to 22).
+
+The lock file remains on disk; its existence is not the lock. Do not delete or
+replace it, and do not use the replaceable settings file itself as the lock.
+Only PPE channel opens participate in this sharing protocol: direct filesystem
+operations such as `DELETE`, `RENAME` or `COPY` do not acquire these reservations.
+This is cooperative coordination inside one BBS process, not an OS lock against
+external tools, DOS doors, another BBS process or another machine. It adds no
+power-loss durability guarantee and no automatic schema migration.
 
 ### Board objects
 

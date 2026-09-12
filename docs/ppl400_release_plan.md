@@ -1075,6 +1075,139 @@ Keine Implementierung und kein Beta-Abnahmeblocker; vorhandene PPE-Schutzroutine
 bleiben bestehen. Textbreite, zellgenaues Kürzen und Pixelverträge sind damit
 noch nicht entschieden oder zur Umsetzung freigegeben.
 
+**Freigegebene Textbreiten-Bestandsprüfung (2026-09-11):** Nur Tests und
+Dokumentation, keine neue API und keine Änderung an Renderer, `LEN`, `LEFT`
+oder `Substring`. Die fünf Proben sind ASCII, Umlaute, ein vorgefertigtes `ä`,
+`a` mit U+0308 und zwei breite CJK-Zeichen. Explizite EN-/DE-Beschriftungen und
+80x25/132x43 werden jeweils im Bildschirminneren und an der rechten Kante geprüft.
+
+Der neue Engine-Test besteht mit 40 Fällen über serialisierte PPEs,
+UTF-8-/CP437-Ausgabebytes, Caller-Bildschirm und Replay der Ausgabe. `LEN` und
+`.Len()` zählen Codepoints; `LEFT` und `Substring` können Basiszeichen und
+kombinierende Zeichen trennen. Nicht vorhandene Substring-Positionen bleiben
+wie bisher mit Leerzeichen aufgefüllt. UTF-8 erhält die Proben; CP437 bildet
+Umlaute ab und ersetzt nicht darstellbare Codepoints durch `.`.
+
+Weitere 20 Fälle bestehen über den tatsächlichen lokalen UTF-8-Terminal-Thread:
+Auch dort belegt jeder Codepoint eine Zelle, einschließlich kombinierender
+Zeichen und CJK. Der finale TUI-Frame wurde separat mit weiteren 20 Fällen über
+`Tui::ui` und Ratatuis Test-Backend geprüft, mit zwei zusätzlichen Host-Zeilen
+für die Statusleiste. Dabei zeigt sich eine konkrete Einschränkung: ASCII und
+vorgefertigte Umlaute bleiben erhalten; der isolierte kombinierende Codepoint
+und die breiten CJK-Zeichen fehlen im Frame. Die Einzelzeichen-Ausgabe mit
+einer Spalte Platz lässt deren Zellen leer, während nachfolgende Marker ihre
+Codepoint-Positionen behalten. Die Tests charakterisierten diesen damaligen Ist-Zustand,
+keine gewünschte universelle Unicode-Semantik.
+
+Die Ergebnismatrix steht im String-Abschnitt von `new_ppl.md`. Sichtbare Glyphen
+im Host-Terminal, Fonts und manuelle Remote-Client-Vergleiche sind nicht geprüft.
+Eine Renderkorrektur, ein allgemeiner Zellbreiten-/Kürzungsvertrag und
+Pixelverträge benötigten zu diesem Zeitpunkt gesonderte Besprechung und Freigabe;
+`Terminal.WriteText` bleibt vertagt. Keine vollständige A5-/E3-Abnahme.
+
+**Anschließende Zielentscheidung des Benutzers (2026-09-11): echte
+Unicode-Zellbreiten für UTF-8.** Der begrenzte Ein-Zellen-Vertrag mit sichtbarem
+Ersatz wurde nicht gewählt. Dies legte zunächst den Zielvertrag fest, noch ohne
+Freigabe für die Renderer-Implementierung. Die obige Bestandsmatrix beschreibt
+den Zustand vor der unten dokumentierten Integration.
+
+- CP437 bleibt unverändert: eine Zelle pro ausgegebenem Zeichen und `.` als
+  Ersatz für nicht darstellbare Eingabe.
+- Unter UTF-8 belegen ASCII und vorgefertigte Umlaute je eine Zelle;
+  Basiszeichen plus kombinierende Zeichen werden gemeinsam dargestellt.
+  `a` mit U+0308 belegt insgesamt eine Zelle, ein breites CJK-Zeichen zwei.
+- Cursor und ANSI-Koordinaten beziehen sich auf Zellen. Bildschirmmodell,
+  lokaler Terminal-Thread und TUI müssen dieselben Regeln für Cursorfortschritt,
+  Umbruch und Überschreiben verwenden; eine reine Ratatui-Korrektur genügt nicht.
+- `LEN`, `.Len()`, `LEFT` und `Substring` behalten ihre Codepoint-Semantik.
+  Keine implizite Normalisierung und keine neue Breiten-/Kürzungs-API.
+
+**Anschließend bestätigte UTF-8-Randfallregeln (2026-09-11):**
+
+- Kombinierende Zeichen ohne Basis erhalten U+25CC (gepunkteter Kreis) als
+  rein visuellen Träger in einer Zelle. Die Originalzeichenfolge bleibt erhalten.
+- Mehrdeutige Zeichenbreiten gelten als schmal, also eine Zelle, unabhängig
+  von EN/DE.
+- Grapheme einschließlich Emoji-/ZWJ-/Variantenfolgen werden gemeinsam
+  behandelt. Die Breite folgt `unicode-width`, nicht addierten
+  Codepoint-Breiten; vollständig qualifizierte Emoji-ZWJ-Folgen belegen zwei Zellen.
+- Paket- und `PRINT`-Grenzen trennen ein Graphem nicht. Explizite
+  Cursorbewegungen oder Löschen beenden die Zuordnung zum vorherigen
+  ausgegebenen Graphem.
+- Bei Platzmangel wird ein breites Graphem mit automatischem Umbruch als
+  Ganzes in die nächste Zeile verschoben. Ohne automatischen Umbruch wird
+  es stattdessen durch einen einspaltigen Punkt ersetzt.
+- Überschreiben oder Löschen einer belegten Teilzelle entfernt das gesamte
+  breite Graphem, ohne Nachbartext zu verschieben.
+
+**Anschließend freigegeben und integriert (2026-09-11):** Der Benutzer hat
+Änderung und Push im regulären `icy_tools`-Repository und danach die
+IcyBoard-Integration freigegeben. Alle vier Engine-/Parser-Abhängigkeiten sind
+auf `588230b0` gebunden. Die neue Revision benötigt auch den dort geprüften
+`unarc-rs`-Stand `e3c98114`; der ViewData-Adapter wurde an die neue Callback-
+Signatur angepasst. Cargo-Checkouts wurden nicht verändert.
+
+UTF-8-Caller und lokales Terminal aktivieren den Graphem-/Zellmodus mit
+`unicode-segmentation` 1.13.3 und `unicode-width` 0.2.2. CP437, Sysop-Spiegel
+und DOS-Ausgabe behalten den Ein-Zellen-Modus. Das TUI liest vollständige
+Grapheme, überspringt Fortsetzungszellen und zeichnet keine am Host-Viewport
+abgeschnittenen breiten Grapheme. SGR darf eine Graphemfolge fortsetzen und
+behält deren Basisattribute. DCH verschiebt weiterhin Nachbarzellen;
+ECH/EL/ED löschen ohne Verschieben.
+
+Die aktualisierte PPE-Matrix besteht mit 40 Fällen einschließlich
+`SAVESCRN`/`RESTSCRN`, UTF-8-/CP437-Bytes, Bildschirm-Replay und unveränderter
+Codepoint-Semantik der Stringoperationen. 24 Fälle prüfen den tatsächlichen
+Terminal-Thread mit einzeln verarbeiteten Bytes einschließlich Emoji-ZWJ.
+32 Fälle führen ein serialisiertes PPE über getrennte `PRINT`-Aufrufe bis zum
+Ratatui-Frame aus und vergleichen den Caller- mit dem lokalen Bildschirm.
+Alle Matrizen verwenden explizite EN-/DE-Beschriftungen und 80x25/132x43.
+Der Frame-Test prüft außerdem verwaiste kombinierende Zeichen, schmale
+mehrdeutige Zeichen und einen abgeschnittenen Viewport; reguläre Frames
+enthalten die beiden Statuszeilen. Beim Drei-Spalten-Test war deren Inhalt
+zunächst ausgeschaltet, weil die normale Statusleiste dort einen unabhängigen
+arithmetischen Unterlauf hatte (siehe Folgekorrektur unten). Direkte Byteausgabe und DOS-/UTF-8-Moduswechsel
+sowie exakte S5-Ausgabe und Sysop-Replay bestehen ebenfalls.
+
+Die zuvor im regulären Engine-Repository ausgeführten 297 Tests (16 bestehende
+ignoriert) decken zusätzlich Variantenfolgen, Umbruch ohne Autowrap, breite
+Überschreib-/Löschbereiche, Einfügen, Scrollen und Resize ab. Die Anzeige begrenzt
+ein Graphem auf 4096 UTF-8-Bytes; Originalstring und Ausgabebytes bleiben davon
+unberührt. `SCRTEXT` bleibt bewusst unverändert bei einem gespeicherten Zeichen
+pro Zelle: keine kombinierenden Enden, Leerzeichen für breite Fortsetzungszellen.
+Eine neue Graphem-Projektion dieser klassischen API ist nicht festgelegt.
+
+Abschließend bestanden sieben A5-, 14 Bildschirm- und 74 Terminal-Tests der
+IcyBoard-Engine sowie sieben lokale Terminal-Thread-Tests. Drei lokale A5-
+und 17 TUI-/Sixel-Tests bestanden jeweils in getrennten EN-/DE-Prozessen
+(überlappende Testgruppen). `cargo check --workspace` und der Neubau von
+`icboard` bestanden ebenfalls; die geänderten Rust-Dateien sind formatiert.
+
+**Statusleisten-Folgekorrektur (2026-09-11):** Der Drei-Spalten-PPE-/Frame-Test
+reproduzierte den Unterlauf mit wieder aktivierter Statusleiste und besteht
+nach der Korrektur ohne Ausnahme. Alle vier Statusansichten begrenzen ihre
+Ausgabe auf das verfügbare Rechteck, einschließlich leerer und einzeiliger
+Flächen. Zeiten erscheinen nur bei ausreichend Platz; Text, Hilfe und Zeiten
+bekommen getrennte Spaltenbereiche. Ein eigener Renderingtest besteht mit
+360 Kombinationen aus EN-/DE-Beschriftungen, 15 Breiten von 0 bis 132 Spalten,
+drei Höhen und vier Statusansichten. Er prüft versetzte Rechtecke, unveränderte
+Zellen außerhalb der Statusleiste sowie Hilfe-/Zeitpositionen bei Normalbreite.
+Alle 18 lokalen TUI-/Sixel-Tests bestanden anschließend in getrennten EN-/DE-
+Prozessen; `icboard` wurde neu gebaut und `git diff --check` blieb ohne Befund.
+
+**Manuelle Rückmeldung des Benutzers (2026-09-11):** Die Darstellung scheint
+remote zu funktionieren; der Benutzer hält den aktuellen Unicode-Layoutstand
+für ausreichend. Dies gilt als positive Remote-Stichprobe, nicht als Nachweis
+der vollständigen Client-/Font-/Geometriematrix. Konkreter Client, Font und
+Prüffälle wurden nicht angegeben; ein separater visueller lokaler Hosttest
+ist nicht dokumentiert. Ein zusätzliches Abnahme-PPE wird vorerst nicht erstellt.
+
+Die automatisierten Tests und diese Rückmeldung ergeben keine universelle
+Host-/Remote-Client-Garantie. CP437-Sysop- und UTF-8-
+Caller-Koordinaten müssen nicht identisch sein. Pixelverträge, Breiten-/Kürzungs-
+APIs und `Terminal.WriteText` werden nicht erweitert. Keine vollständige
+A5-/E3-Abnahme und kein Commit/Push der IcyBoard-Integration in diesem Schritt.
+
 **Besprechen:** Connection-Fähigkeiten versus aktuelle Größe; Resize-Ereignisse;
 Zell-/Pixelkoordinaten; sichtbare Textbreite; ANSI-/ATX-bewusstes Layout;
 sichere Ausgabe fremder Texte ohne Steuersequenzinterpretation.
@@ -1085,6 +1218,93 @@ funktionieren gemäß beschlossenem Umfang. Nicht unterstützte Sixel-/JXL-Funkt
 werden nicht still als gleichwertig behandelt.
 
 ### A6 — PPE-eigene Datenhaltung und Utilities
+
+**Freigegebener Abnahmefall und Bestandsprüfung (2026-09-11):** PPE-Einstellungen
+pro Benutzer, zunächst ausschließlich mit vorhandenen APIs. Keine neue Runtime-
+oder API-Implementierung in diesem Schritt. Die Probe verwendet einen expliziten
+Versionsheader vor einem Record mit Zeilenzahl, Suchtext und Sortierrichtung;
+Dateipfade und Versionskonvention werden vom PPE gewählt, nicht durch einen
+neuen verwalteten Datenbereich bereitgestellt.
+
+Drei neue Tests laufen über serialisierte PPEs und echte Dateioperationen:
+
+- Zehn Ladefälle mit expliziten EN-/DE-Bezeichnungen: gültige, fehlende,
+  fremdversionierte, beschädigte und abgeschnittene Dateien. Fehlende/ungültige
+  Daten behalten die Standardwerte; unbekannte Versionen werden vor dem
+  positionsabhängigen Record-Lesen abgewiesen. Keine automatische Migration.
+- Neue PPE-Läufe lesen den zuvor gespeicherten Stand; getrennte Benutzerdateien
+  bleiben unabhängig. Das Muster Temp-Datei im Zielverzeichnis, Fehlerprüfung,
+  Schließen und `RENAME` erhält unter Linux die vorherige Datei bytegenau bei
+  fehlgeschlagener Temp-Datei-Erstellung, Schreiben über einen Read-only-Kanal
+  (Header und Record separat), fehlender Rename-Quelle und `STOP` vor dem Rename.
+  Eine solche Unterbrechung lässt eine Temp-Datei zurück; ein nachfolgender
+  erfolgreicher Lauf mit demselben Temp-Pfad funktioniert. Keine Prüfung von
+  Prozessabsturz, Stromausfall, vollem Dateisystem oder Windows-Ersetzungssemantik.
+- Zwei gleichzeitig laufende PPE-Sitzungen desselben Benutzers auf zwei Nodes
+  wurden über Terminal-Eingabeereignisse deterministisch verschachtelt. Beide
+  öffneten dieselbe Datei trotz `S_DB`, lasen den Wert 20 und speicherten je 21.
+  Beide meldeten Erfolg; der Endstand war 21 statt 22. Diese ursprüngliche
+  Charakterisierung wurde durch die folgende Sperrregression ersetzt.
+
+Alle zehn Tests der betroffenen Record-I/O-Gruppe bestanden, einschließlich
+der drei neuen A6-Tests. Der damalige `DiskIO`-Pfad ignorierte den Share-Modus;
+`FFLUSH` ruft lediglich `File::flush` auf. Das getestete Temp-/Rename-Muster
+ersetzt daher weder eine Sperre über Lesen, Ändern und Veröffentlichen noch
+einen Vertrag für dauerhafte Speicherung bei Stromausfall.
+
+**Freigegebener Sperrvertrag und Umsetzung (2026-09-12):** Der Benutzer hat
+die Share-Korrektur und eine stabile, separate Sperrdatei für die gesamte
+Transaktion freigegeben. `FOPEN`, `FCREATE` und `FAPPEND` prüfen nun die
+Zugriffs-/Deny-Kombination in beiden Richtungen für alle PPE-Kanäle im selben
+BBS-Prozess. Konflikte warten nicht, sondern melden `FERR` und
+`Error.Last()` mit `ErrKind.File`/`ErrCode.IO`; eine verweigerte Schreiböffnung
+kürzt die Datei nicht. Die portable Dateiidentität liefert `same-file`.
+PPE-Signaturen, Share-Konstanten und Record-Formate bleiben unverändert.
+
+Die Share-Reservierung gehört zum Kanal, nicht zum temporären Dateileser:
+`FGET`-Pufferung, EOF und `FERR` geben sie nicht frei. `FCLOSE`, Verwerfen von
+`DiskIO` und der Cleanup des äußeren PPE-Aufrufs geben sie frei. Der Cleanup
+läuft auch bei `STOP`, echtem VM-Fehler, Disconnect und Future-Abbruch.
+
+Der Zwei-Node-Test erwirbt jetzt eine separate Sperrdatei vor dem Lesen und
+behält sie bis nach dem Temp-Datei-/Rename-Schritt. Der zweite Node erhält
+zunächst einen kontrollierten Konflikt, liest nach Freigabe neu und speichert
+22 statt 21. Die Sperrdatei bleibt bestehen; alle beteiligten PPEs müssen
+dieselbe Sperrdatei verwenden, ohne sie zu ersetzen oder
+zu löschen. Das Einstellungs-Speichermuster verwendet dieselbe Sperrkonvention.
+
+Die 15 bestandenen `DiskIO`-Tests enthalten eine 144-Fälle-Matrix, Schutz vor
+Kürzung, kompatible Mehrfachleser, gepufferte Textleser, EOF, Lesefehler,
+Append, Close/Drop, Symlink-/Hardlink-/Pfadaliase und gleichzeitige Vergabe aus
+acht Threads. Zwölf Record-I/O-Tests bestehen einschließlich Zwei-Node-
+Transaktion, aller fünf PPE-Cleanup-Ausgänge mit weiterlebendem `DiskIO`,
+echtem `FAPPEND` und bisherigen Einstellungs-/Fehlerfällen.
+
+Zusätzlich ist der native, nicht UTF-8-kodierte Antwortdateipfad unter Unix
+geprüft, einschließlich Share-Konflikt über einen Alias. Abschließend bestehen
+alle elf A6-Tests in getrennten EN-/DE-Prozessen. Der Engine-Check ohne
+Default-Features und der Neubau von `icboard` bestehen ebenfalls.
+
+Der umfassendere Engine-Library-Lauf ergab 1957 bestandene, 14 ignorierte und
+drei fehlgeschlagene Tests. Die Befunde liegen bei
+`s1_all_catalog_placeholders_bind_without_replacing_live_objects` (24 erwartet,
+26 Hosttypen vorhanden),
+`s1_invalid_native_objects_do_not_grant_access_or_open_message_files`
+(leere Argumentliste in `ppl_files::find`) und
+`a_url_followed_immediately_by_a_color_macro_closes_both_cleanly`
+(`ESC[1;37m` statt `ESC[37m`). Diese Stellen wurden im A6-Schritt nicht geändert;
+der Gesamtlauf ist ausdrücklich nicht vollständig grün. Er erfolgte vor dem
+abschließenden zusätzlichen Test des nativen Antwortdateipfads.
+
+**Grenzen:** Kooperative PPE-Kanäle innerhalb eines BBS-Prozesses, keine
+Betriebssystem-Sperre gegen externe Programme, DOS-Doors, weitere BBS-Prozesse
+oder Rechner. Direkte Dateioperationen (`DELETE`/`RENAME`/`COPY`) nehmen nicht
+am Share-Protokoll teil. Eine Sperre nur auf der ersetzten Datendatei genügt
+nicht. Stromausfallfestigkeit und Windows-Ausführung sind nicht geprüft;
+`FFLUSH` bleibt ohne fsync-Vertrag. Der freigegebene Mehrnode-Einstellungsfall
+ist damit im geprüften Prozessumfang umgesetzt, nicht automatisch ganz A6
+abgenommen. JSON, zusätzliche File-Objekte, UTC-Zeitpunkte und asynchrones HTTP
+werden weiterhin nicht erweitert.
 
 **Besprechen:** Was für die Abnahme wirklich benötigt wird: JSON, PPE-eigener
 Datenbereich, atomisches Speichern, Mehrnode-Koordination, Schema-Versionen.

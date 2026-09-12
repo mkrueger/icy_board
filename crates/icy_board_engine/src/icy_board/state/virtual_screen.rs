@@ -49,7 +49,7 @@ impl CommandSink for TerminalScreenSink<'_> {
         icy_engine::ScreenSink::new(self.0).emit_igs(command);
     }
 
-    fn emit_view_data(&mut self, command: icy_parser_core::ViewDataCommand) -> bool {
+    fn emit_view_data(&mut self, command: icy_parser_core::ViewDataCommand) {
         icy_engine::ScreenSink::new(self.0).emit_view_data(command)
     }
 

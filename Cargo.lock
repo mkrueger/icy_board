@@ -4117,6 +4117,7 @@ dependencies = [
  "rand_core 0.6.4",
  "regex",
  "reqwest",
+ "same-file",
  "semver",
  "serde",
  "serde_with",
@@ -4210,7 +4211,7 @@ dependencies = [
 [[package]]
 name = "icy_engine"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=588230b0d3561d9c49a9d179e20f06cf99862344#588230b0d3561d9c49a9d179e20f06cf99862344"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",
@@ -4241,6 +4242,8 @@ dependencies = [
  "serde",
  "thiserror 2.0.20",
  "unarc-rs",
+ "unicode-segmentation",
+ "unicode-width",
  "utf8parse",
  "zip",
  "zstd",
@@ -4249,7 +4252,7 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=588230b0d3561d9c49a9d179e20f06cf99862344#588230b0d3561d9c49a9d179e20f06cf99862344"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -4271,6 +4274,7 @@ dependencies = [
  "opus",
  "parking_lot",
  "regex",
+ "reqwest",
  "rfd",
  "rodio",
  "rust-embed",
@@ -4288,7 +4292,7 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui_macros"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=588230b0d3561d9c49a9d179e20f06cf99862344#588230b0d3561d9c49a9d179e20f06cf99862344"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4298,7 +4302,7 @@ dependencies = [
 [[package]]
 name = "icy_engine_scripting"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=588230b0d3561d9c49a9d179e20f06cf99862344#588230b0d3561d9c49a9d179e20f06cf99862344"
 dependencies = [
  "codepages",
  "icy_engine",
@@ -4347,7 +4351,7 @@ dependencies = [
 [[package]]
 name = "icy_parser_core"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=588230b0d3561d9c49a9d179e20f06cf99862344#588230b0d3561d9c49a9d179e20f06cf99862344"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",
@@ -5697,9 +5701,9 @@ dependencies = [
 
 [[package]]
 name = "lzma-rust2"
-version = "0.19.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c1bf3331fb5cf60f2ef15b63361f6cc39492a5d94c096053c395515e17d147f"
+checksum = "5e2a88783b84d2d67ef2791778a9e76bfb68b8017aaf6c9d7d5f2626a478b16c"
 
 [[package]]
 name = "mac_address"
@@ -9283,9 +9287,9 @@ dependencies = [
 
 [[package]]
 name = "sevenz-rust2"
-version = "0.21.5"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cabfe266b357df6e7aa8d0c9bb11eac1fd0ed049f6318455bf55345d9de6c3b5"
+checksum = "cb967eb8b29410e61e8c9005058fcfd5889d0b827856beb25529c73dfc86a98a"
 dependencies = [
  "aes",
  "bzip2",
@@ -9293,7 +9297,7 @@ dependencies = [
  "crc32fast",
  "getrandom 0.4.3",
  "js-sys",
- "lzma-rust2 0.19.0",
+ "lzma-rust2 0.20.1",
  "ppmd-rust",
  "sha2 0.11.0",
  "wasm-bindgen",
@@ -11073,8 +11077,8 @@ dependencies = [
 
 [[package]]
 name = "unarc-rs"
-version = "0.6.2"
-source = "git+https://github.com/mkrueger/unarc-rs#03b012e609c5b5cd62ef2a6468ce6bf3ec11bed4"
+version = "0.6.3"
+source = "git+https://github.com/mkrueger/unarc-rs#e3c981149198225d738d80e463d80c34b6386a5d"
 dependencies = [
  "bitstream-io",
  "blowfish",

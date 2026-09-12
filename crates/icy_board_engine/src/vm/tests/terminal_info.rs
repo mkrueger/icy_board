@@ -1,6 +1,166 @@
 use super::{compile_errors_with_runtime, run_ppl};
 
 #[tokio::test]
+async fn a5_unicode_cells_through_serialized_ppe_and_wire() {
+    use crate::{
+        icy_board::{
+            IcyBoard,
+            bbs::BBS,
+            state::{IcyBoardState, virtual_screen::VirtualScreen},
+            user_base::User,
+        },
+        vm::{DiskIO, run},
+    };
+    use codepages::tables::CP437_TO_UNICODE;
+    use icy_engine::{Position, TextPane};
+    use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
+    use std::sync::Arc;
+
+    let cases: [(&str, &str, &str, &[u8]); 5] = [
+        ("ascii", "AB", "AB", b"AB"),
+        ("umlauts", "\u{e4}\u{f6}", "\u{e4}\u{f6}", &[0x84, 0x94]),
+        ("precomposed", "\u{e4}", "\u{e4}", &[0x84]),
+        ("combining", "a\u{308}", "a.", b"a."),
+        ("wide", "\u{754c}\u{96ea}", "..", b".."),
+    ];
+    for label in ["Width", "Breite"] {
+        for utf8 in [true, false] {
+            for (width, height) in [(80, 25), (132, 43)] {
+                let root = tempfile::tempdir().unwrap();
+                let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+                let mut board = IcyBoard::new();
+                board.root_path = root.path().into();
+                board.default_display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+                board.users.new_user(User {
+                    name: "WIDTH".into(),
+                    ..Default::default()
+                });
+                let user = board.users[0].clone();
+                let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+                let nodes = bbs.lock().await.open_connections.clone();
+                let (mut peer, connection) = ChannelConnection::create_pair();
+                let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+                state.session.current_user = Some(user);
+                state.session.cur_user_id = 0;
+                state.session.time_limit = 30;
+                state.session.page_len = 0;
+                state.session.term_caps.is_utf8 = utf8;
+                let mut io = DiskIO::new(root.path().to_str().unwrap(), None);
+                for (name, text, cp437_text, cp437_bytes) in cases {
+                    let first = text.chars().next().unwrap();
+                    let second = text.chars().nth(1).unwrap_or(' ');
+                    let source = format!(
+                        r#"
+STARTDISP FNS
+PRINT CHR(27), "[8;{height};{width}t"
+CLS
+STRING text = "{text}"
+ANSIPOS 1, 1
+PRINT "{label}:{name}"
+ANSIPOS 1, 2
+PRINT LEN(text), ":", text.Len(), ":", LEFT(text, 1) = "{first}", ":", text.Substring(1, 1) = "{second}"
+ANSIPOS 3, 4
+PRINT text, "|"
+ANSIPOS 3, 6
+PRINT LEFT(text, 1), "|"
+ANSIPOS 3, 7
+PRINT text.Substring(1, 1), "|"
+SAVESCRN
+CLS
+RESTSCRN
+ANSIPOS {width}, {last_row}
+PRINT text, "|"
+EXIT
+"#,
+                        last_row = height - 1
+                    );
+                    let executable = super::compile(&source);
+                    assert!(run(&root.path().join("width.ppe"), &executable, &mut io, &mut state).await.unwrap());
+                    let mut output = Vec::new();
+                    loop {
+                        let mut buffer = [0; 4096];
+                        let count = peer.try_read(&mut buffer).await.unwrap();
+                        if count == 0 {
+                            break;
+                        }
+                        output.extend_from_slice(&buffer[..count]);
+                    }
+                    let expected_wire = if utf8 { text.as_bytes() } else { cp437_bytes };
+                    assert!(
+                        output.windows(expected_wire.len()).any(|part| part == expected_wire),
+                        "{label}/{utf8}/{width}/{name}: {output:?}"
+                    );
+                    let mut replay = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+                    replay.buffer.set_unicode_width(utf8);
+                    if utf8 {
+                        replay.write_bytes(&output);
+                    } else {
+                        for byte in &output {
+                            replay.print_char(CP437_TO_UNICODE[*byte as usize]).unwrap();
+                        }
+                    }
+                    let expected_text = if utf8 { text } else { cp437_text };
+                    for (screen_name, screen) in [("board", state.display_screen()), ("wire", &replay)] {
+                        let row = |row| {
+                            (0..width)
+                                .map(|column| {
+                                    let position = Position::new(column, row);
+                                    if screen.buffer.is_grapheme_continuation(position) {
+                                        String::new()
+                                    } else if let Some((text, _)) = screen.buffer.grapheme_at(position) {
+                                        text.to_owned()
+                                    } else {
+                                        screen.buffer.char_at(position).ch.to_string()
+                                    }
+                                })
+                                .collect::<String>()
+                        };
+                        let context = format!("{label}/utf8={utf8}/{width}x{height}/{name}/{screen_name}");
+                        assert_eq!(row(0).trim_end(), format!("{label}:{name}"), "{context}");
+                        let codepoints = text.chars().count();
+                        assert_eq!(row(1).trim_end(), format!("{codepoints}:{codepoints}:1:1"), "{context}");
+                        assert_eq!(row(3).trim_end(), format!("  {expected_text}|"), "{context}");
+                        assert_eq!(row(5).trim_end(), format!("  {}|", expected_text.chars().next().unwrap()), "{context}");
+                        let substring = if utf8 && name == "combining" {
+                            "\u{25cc}\u{308}".to_owned()
+                        } else {
+                            expected_text.chars().nth(1).unwrap_or(' ').to_string()
+                        };
+                        assert_eq!(row(6).trim_end(), format!("  {substring}|"), "{context}");
+                        let cells = if utf8 && name == "combining" {
+                            1
+                        } else if utf8 && name == "wide" {
+                            4
+                        } else {
+                            codepoints as i32
+                        };
+                        assert_eq!(screen.buffer.char_at(Position::new(2 + cells, 3)).ch, '|', "{context}");
+                        let (edge, tail, cursor) = if utf8 && name == "wide" {
+                            (' ', format!("{text}|"), 5)
+                        } else if utf8 && name == "combining" {
+                            assert_eq!(screen.buffer.grapheme_at(Position::new(width - 1, height - 2)), Some((text, 1)), "{context}");
+                            ('a', "|".to_owned(), 1)
+                        } else {
+                            (
+                                expected_text.chars().next().unwrap(),
+                                format!("{}|", expected_text.chars().skip(1).collect::<String>()),
+                                codepoints as i32,
+                            )
+                        };
+                        assert_eq!(screen.buffer.char_at(Position::new(width - 1, height - 2)).ch, edge, "{context}");
+                        assert_eq!(row(height - 1).trim_end(), tail, "{context}");
+                        assert_eq!(screen.buffer.caret.position(), Position::new(cursor, height - 1), "{context}");
+                        assert_eq!(screen.buffer.unicode_width(), utf8, "{context}");
+                    }
+                    assert_eq!(state.session.term_caps.term_size, (width as u16, height as u16));
+                    assert!(!state.session.request_logoff);
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn a5_telnet_resize_wakes_ppe_and_preserves_input_and_idle_time() {
     use crate::{
         icy_board::{

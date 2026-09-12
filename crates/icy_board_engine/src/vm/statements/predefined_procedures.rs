@@ -186,7 +186,7 @@ pub async fn fappend(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let am = vm.eval_expr(&args[2]).await?.as_int();
     let sm = vm.eval_expr(&args[3]).await?.as_int();
     let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
-    vm.io.fappend(channel, &file);
+    vm.io.fappend_with_share(channel, &file, sm);
     Ok(())
 }
 

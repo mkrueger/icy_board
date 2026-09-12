@@ -128,6 +128,7 @@ struct RenderedImage {
 fn new_terminal_screen() -> TextScreen {
     let mut screen = TextScreen::new(LOCAL_SCREEN_SIZE);
     screen.buffer.buffer_type = BufferType::Unicode;
+    screen.set_unicode_width(true);
     screen
 }
 
@@ -497,7 +498,11 @@ impl Tui {
         if self.display_visible {
             for y in 0..area.height as i32 {
                 for x in 0..area.width as i32 {
-                    let c = screen.char_at((x, y + screen.first_visible_line()).into());
+                    let position = (x, y + screen.first_visible_line()).into();
+                    if screen.is_grapheme_continuation(position) {
+                        continue;
+                    }
+                    let c = screen.char_at(position);
                     let mut fg = c.attribute.foreground();
                     if c.attribute.is_bold() {
                         fg += 8;
@@ -508,8 +513,19 @@ impl Tui {
                     if c.attribute.is_blinking() {
                         s = s.slow_blink();
                     }
-                    let span = Span::from(screen.buffer.buffer_type.convert_to_unicode(c.ch).to_string()).style(s);
-                    frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
+                    let (text, cell_width) = if let Some((text, cell_width)) = screen.grapheme_at(position) {
+                        (text.to_owned(), cell_width as u16)
+                    } else {
+                        (screen.buffer.buffer_type.convert_to_unicode(c.ch).to_string(), 1)
+                    };
+                    let remaining = area.width - x as u16;
+                    let (text, cell_width) = if cell_width > remaining {
+                        (" ".repeat(remaining as usize), remaining)
+                    } else {
+                        (text, cell_width)
+                    };
+                    let span = Span::from(text).style(s);
+                    frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, cell_width);
                 }
             }
         }
@@ -588,6 +604,9 @@ impl Tui {
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {
+        if area.is_empty() {
+            return;
+        }
         frame.buffer_mut().set_style(area, Style::new().bg(DOS_LIGHT_GRAY));
 
         if let Some(prompt) = self.pending_confirmation.and_then(confirmation_prompt) {
@@ -600,16 +619,28 @@ impl Tui {
             return;
         }
 
+        let mut draw_line = |column: u16, row: u16, line: &Line<'_>, width: u16| {
+            if column < area.width && row < area.height {
+                frame.buffer_mut().set_line(area.x + column, area.y + row, line, width.min(area.width - column));
+            }
+        };
         match self.status_bar {
             0 => {
                 let connection = "Local";
+                let min_on = (Utc::now() - status_bar_info.logon_time).num_minutes();
+                let elapsed = format!("{:<3} {}", min_on, status_bar_info.logon_time.format("%H:%M"));
+                let clock = Utc::now().format("%H:%M").to_string();
+                let elapsed_column = area.width.checked_sub(elapsed.len() as u16 + 2).filter(|column| *column > 0);
+                let clock_column = area.width.checked_sub(clock.len() as u16 + 2).filter(|column| *column > 0);
+                let first_line_width = elapsed_column.unwrap_or(area.width);
+                let second_line_width = clock_column.unwrap_or(area.width);
 
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(format!("({}) {} - {}", connection, status_bar_info.user_name, status_bar_info.city,))
                         .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+                draw_line(0, 0, &line, first_line_width.min(45));
 
                 let graphics = match status_bar_info.graphics_mode {
                     GraphicsMode::Ctty => "N",
@@ -632,41 +663,26 @@ impl Tui {
                     ))
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
-                let len = STATUS_HELP.len() as u16;
-                frame.buffer_mut().set_span(
-                    area.x + 45,
-                    area.y,
-                    &Span::from(STATUS_HELP).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
-                    len,
+                draw_line(0, 1, &line, second_line_width);
+                draw_line(
+                    45,
+                    0,
+                    &Line::from(STATUS_HELP).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    first_line_width.saturating_sub(45),
                 );
 
-                let min_on = (Utc::now() - status_bar_info.logon_time).num_minutes();
-
-                let time = format!("{:<3} {}", min_on, status_bar_info.logon_time.format("%H:%M"));
-                let len = time.len() as u16;
-                frame.buffer_mut().set_span(
-                    area.x + area.width - len - 2,
-                    area.y,
-                    &Span::from(time).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
-                    len,
-                );
-
-                let time = format!("{}", Utc::now().format("%H:%M"));
-                let len = time.len() as u16;
-                frame.buffer_mut().set_span(
-                    area.x + area.width - len - 2,
-                    area.y + 1,
-                    &Span::from(time).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
-                    len,
-                );
+                for (row, column, time) in [(0, elapsed_column, elapsed), (1, clock_column, clock)] {
+                    if let Some(column) = column {
+                        draw_line(column, row, &Line::from(time).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)), area.width);
+                    }
+                }
             }
             1 => {
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
                     Span::from(" Alt-> X=OS".to_string()).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+                draw_line(0, 0, &line, area.width);
             }
             2 => {
                 let line = Line::from(vec![
@@ -677,13 +693,13 @@ impl Tui {
                     ))
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+                draw_line(0, 0, &line, area.width);
 
                 let line = Line::from(vec![
                     Span::from(format!("  C1: {:40} C2: {:40}", status_bar_info.cmt1, status_bar_info.cmt2))
                         .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
+                draw_line(0, 1, &line, area.width);
             }
             3 => {
                 let line = Line::from(vec![
@@ -694,7 +710,7 @@ impl Tui {
                     ))
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
+                draw_line(0, 0, &line, area.width);
 
                 let line = Line::from(vec![
                     Span::from(format!(
@@ -706,7 +722,7 @@ impl Tui {
                     ))
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
-                frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
+                draw_line(0, 1, &line, area.width);
             }
             _ => {}
         }
@@ -971,6 +987,222 @@ mod sixel_tests {
     use super::*;
     use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     use icy_parser_core::{AnsiParser, CommandParser};
+
+    fn test_tui() -> Tui {
+        let (tx, _receiver) = mpsc::channel(1);
+        Tui {
+            sysop_mode: false,
+            screen: Arc::new(std::sync::Mutex::new(new_terminal_screen())),
+            tx,
+            screen_generation: Arc::new(AtomicU64::new(0)),
+            status_bar: 0,
+            handle: Arc::new(Mutex::new(Vec::new())),
+            node: 0,
+            node_state: Arc::new(Mutex::new(Vec::new())),
+            rendered_sixels: Vec::new(),
+            image_picker: None,
+            rendered_images: Vec::new(),
+            rendered_image_context: None,
+            host_mouse_capture: false,
+            host_pixel_mouse: false,
+            display_visible: true,
+            pending_confirmation: None,
+            local_picker_requests: None,
+            local_picker: None,
+        }
+    }
+
+    #[test]
+    fn a5_statusbar_stays_inside_small_and_offset_rectangles() {
+        let mut tui = test_tui();
+        for label in ["User", "Benutzer"] {
+            for width in [0, 1, 2, 3, 7, 8, 11, 12, 44, 45, 46, 60, 79, 80, 132] {
+                for height in [0, 1, 2] {
+                    for mode in 0..4 {
+                        tui.status_bar = mode;
+                        let area = Rect::new(2, 1, width, height);
+                        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(width + 4, height + 2)).unwrap();
+                        terminal
+                            .draw(|frame| {
+                                for cell in &mut frame.buffer_mut().content {
+                                    cell.set_symbol(".");
+                                }
+                                tui.draw_statusbar(
+                                    frame,
+                                    area,
+                                    StatusBarInfo {
+                                        user_name: label.repeat(30),
+                                        city: label.repeat(30),
+                                        logon_time: Utc::now(),
+                                        ..Default::default()
+                                    },
+                                );
+                            })
+                            .unwrap();
+                        let buffer = terminal.backend().buffer();
+                        let context = format!("{label}/{width}x{height}/mode={mode}");
+                        for row in 0..height + 2 {
+                            for column in 0..width + 4 {
+                                if !area.contains((column, row).into()) {
+                                    assert_eq!(buffer[(column, row)].symbol(), ".", "{context}/{column},{row}");
+                                }
+                            }
+                        }
+                        if width > 0 && height > 0 {
+                            assert_eq!(buffer[(area.x, area.y)].symbol(), "1", "{context}");
+                        }
+                        if mode == 0 && width == 3 && height > 0 {
+                            let row = (0..width).map(|column| buffer[(area.x + column, area.y)].symbol()).collect::<String>();
+                            assert_eq!(row, "1(L", "{context}");
+                        }
+                        if mode == 0 && width >= 80 && height > 0 {
+                            let help = (45..45 + STATUS_HELP.len() as u16)
+                                .map(|column| buffer[(area.x + column, area.y)].symbol())
+                                .collect::<String>();
+                            assert_eq!(help, STATUS_HELP, "{context}");
+                            for row in 0..height {
+                                assert_eq!(buffer[(area.right() - 5, area.y + row)].symbol(), ":", "{context}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a5_local_tui_unicode_cells() {
+        use icy_board_engine::{
+            compiler::{PPECompiler, workspace::Workspace},
+            executable::Executable,
+            icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState, user_base::User},
+            parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+            vm::{DiskIO, run},
+        };
+        use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
+
+        let root = tempfile::tempdir().unwrap();
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let mut board = IcyBoard::new();
+        board.root_path = root.path().into();
+        board.default_display_text = icy_board_engine::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+        board.users.new_user(User {
+            name: "WIDTH".into(),
+            ..Default::default()
+        });
+        let user = board.users[0].clone();
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (mut peer, connection) = ChannelConnection::create_pair();
+        let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(board)), nodes, node, Box::new(connection)).await;
+        state.session.current_user = Some(user);
+        state.session.cur_user_id = 0;
+        state.session.time_limit = 30;
+        state.session.page_len = 0;
+        state.session.term_caps.is_utf8 = true;
+        let mut io = DiskIO::new(root.path().to_str().unwrap(), None);
+        let tui = test_tui();
+
+        for label in ["Width", "Breite"] {
+            for (width, height) in [(80, 25), (132, 43)] {
+                for (text, rendered, edge, tail, cells) in [
+                    ("AB", "AB", "A", "B|", 2),
+                    ("\u{e4}\u{f6}", "\u{e4}\u{f6}", "\u{e4}", "\u{f6}|", 2),
+                    ("\u{e4}", "\u{e4}", "\u{e4}", "|", 1),
+                    ("a\u{308}", "a\u{308}", "a\u{308}", "|", 1),
+                    ("\u{754c}\u{96ea}", "\u{754c} \u{96ea} ", " ", "\u{754c} \u{96ea} |", 4),
+                    (
+                        "\u{1f469}\u{200d}\u{1f4bb}",
+                        "\u{1f469}\u{200d}\u{1f4bb} ",
+                        " ",
+                        "\u{1f469}\u{200d}\u{1f4bb} |",
+                        2,
+                    ),
+                    ("\u{308}", "\u{25cc}\u{308}", "\u{25cc}\u{308}", "|", 1),
+                    ("\u{b7}", "\u{b7}", "\u{b7}", "|", 1),
+                ] {
+                    let first = text.chars().next().unwrap();
+                    let rest = text.chars().skip(1).collect::<String>();
+                    let source = format!(
+                        r#"
+STARTDISP FNS
+PRINT CHR(27), "[8;{height};{width}t"
+CLS
+ANSIPOS 1, 1
+PRINT "{label}"
+ANSIPOS 3, 4
+PRINT "{first}"
+PRINT "{rest}", "|"
+ANSIPOS {width}, {last_row}
+PRINT "{first}"
+PRINT "{rest}", "|"
+EXIT
+"#,
+                        last_row = height - 1
+                    );
+                    let registry = UserTypeRegistry::icy_board_registry();
+                    let errors = Arc::new(std::sync::Mutex::new(ErrorReporter::default()));
+                    let mut workspace = Workspace::default();
+                    workspace.package.runtime = Some(400);
+                    workspace.set_default_language_version(Some(400));
+                    let ast = parse_ast(root.path().join("width.pps"), errors.clone(), &source, &registry, Encoding::Utf8, &workspace);
+                    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+                    compiler.compile(&[&ast]);
+                    assert!(errors.lock().unwrap().errors.is_empty());
+                    let path = root.path().join("width.ppe");
+                    std::fs::write(&path, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
+                    let executable = Executable::read_file(&path, false).unwrap();
+                    assert!(run(&path, &executable, &mut io, &mut state).await.unwrap());
+                    let mut parser = AnsiParser::default();
+                    loop {
+                        let mut packet = [0; 4096];
+                        let count = peer.try_read(&mut packet).await.unwrap();
+                        if count == 0 {
+                            break;
+                        }
+                        for byte in &packet[..count] {
+                            icy_board_engine::icy_board::state::virtual_screen::parse_into_screen(&mut parser, &mut tui.screen.lock().unwrap(), &[*byte]);
+                        }
+                    }
+                    let backend = ratatui::backend::TestBackend::new(width, height + STATUS_ROWS);
+                    let mut terminal = Terminal::new(backend).unwrap();
+                    terminal.draw(|frame| tui.ui(frame, StatusBarInfo::default())).unwrap();
+
+                    let buffer = terminal.backend().buffer();
+                    let context = format!("{label}, {width}x{height}, {text:?}");
+                    let row = |row| (0..width).map(|column| buffer[(column, row)].symbol()).collect::<String>();
+                    assert_eq!(row(0).trim_end(), label, "{context}");
+                    assert_eq!(row(3).trim_end(), format!("  {rendered}|"), "{context}");
+                    assert_eq!(buffer[(2 + cells, 3)].symbol(), "|", "{context}");
+                    assert_eq!(buffer[(width - 1, height - 2)].symbol(), edge, "{context}");
+                    assert_eq!(row(height - 1).trim_end(), tail, "{context}");
+                    let screen = tui.screen.lock().unwrap();
+                    assert_eq!(screen.caret.position(), state.display_screen().buffer.caret.position(), "{context}");
+                    for row in 0..i32::from(height) {
+                        for column in 0..i32::from(width) {
+                            let position = icy_engine::Position::new(column, row);
+                            assert_eq!(
+                                screen.grapheme_at(position),
+                                state.display_screen().buffer.grapheme_at(position),
+                                "{context}/{position:?}"
+                            );
+                            assert_eq!(
+                                screen.char_at(position),
+                                state.display_screen().buffer.char_at(position),
+                                "{context}/{position:?}"
+                            );
+                        }
+                    }
+                    drop(screen);
+                    if cells > 1 && edge == " " {
+                        let mut clipped = Terminal::new(ratatui::backend::TestBackend::new(3, height + STATUS_ROWS)).unwrap();
+                        clipped.draw(|frame| tui.ui(frame, StatusBarInfo::default())).unwrap();
+                        assert_eq!(clipped.backend().buffer()[(2, 3)].symbol(), " ", "clipped {context}");
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn monitor_screen_renders_cp437_box_drawing_as_unicode() {

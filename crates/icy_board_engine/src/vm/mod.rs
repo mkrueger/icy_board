@@ -1449,6 +1449,13 @@ impl VirtualMachine<'_> {
 /// Runs a PPE. Answers `false` when the program gave up with STOP, which is what tells a
 /// script questionnaire to drop the answers it collected.
 pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoardIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {
+    struct FileCleanup<'a>(&'a mut dyn PCBoardIO);
+    impl Drop for FileCleanup<'_> {
+        fn drop(&mut self) {
+            self.0.close_all();
+        }
+    }
+    let files = FileCleanup(io);
     match PPEScript::from_ppe_file(prg) {
         Ok(script) => {
             let mut label_table = HashMap::new();
@@ -1465,7 +1472,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             let reg = crate::parser::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
 
-            let mut vm = VirtualMachine::new(file_name, &reg, io, icy_board_state);
+            let mut vm = VirtualMachine::new(file_name, &reg, &mut *files.0, icy_board_state);
             vm.script = script;
             vm.commands = commands;
             vm.variable_table = prg.variable_table.clone();
