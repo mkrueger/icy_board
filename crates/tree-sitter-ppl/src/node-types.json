@@ -2281,6 +2281,10 @@
     "named": false
   },
   {
+    "type": "BULLETIN",
+    "named": false
+  },
+  {
     "type": "BYTE",
     "named": false
   },
@@ -2686,6 +2690,10 @@
   },
   {
     "type": "SURFACE",
+    "named": false
+  },
+  {
+    "type": "SURVEY",
     "named": false
   },
   {

@@ -258,6 +258,8 @@ fn board_object_type_ids_are_compact() {
         ("MSGHEADER", 55),
         ("FILEENTRY", 56),
         ("FILEPAGE", 57),
+        ("BULLETIN", 60),
+        ("SURVEY", 61),
     ];
 
     for (name, id) in expected {
@@ -272,6 +274,34 @@ fn board_object_type_ids_are_compact() {
         expected.len(),
         "a board object was added without freezing its id"
     );
+}
+
+#[test]
+fn bulletin_and_news_member_ids_are_appended() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let conference = &registry.types[&(super::CONFERENCE_ID as u32)];
+    for (name, id) in [("HasAccess", 13), ("CanPost", 14), ("CanAttach", 15), ("Bulletins", 16), ("NewsFile", 17)] {
+        assert_eq!(conference.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id));
+    }
+    let bulletin = &registry.types[&(super::BULLETIN_ID as u32)];
+    for (id, name) in ["Number", "Valid", "Path", "HasAccess"].into_iter().enumerate() {
+        assert_eq!(bulletin.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id));
+    }
+    assert_eq!(bulletin.id_table.len(), 4);
+}
+
+#[test]
+fn intro_and_survey_member_ids_are_appended() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let conference = &registry.types[&(super::CONFERENCE_ID as u32)];
+    for (name, id) in [("Bulletins", 16), ("NewsFile", 17), ("IntroFile", 18), ("Surveys", 19)] {
+        assert_eq!(conference.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id));
+    }
+    let survey = &registry.types[&(super::SURVEY_ID as u32)];
+    for (id, name) in ["Number", "Valid", "Path", "AnswerFile", "HasAccess"].into_iter().enumerate() {
+        assert_eq!(survey.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id));
+    }
+    assert_eq!(survey.id_table.len(), 5);
 }
 
 #[test]

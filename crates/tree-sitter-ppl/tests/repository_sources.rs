@@ -67,7 +67,20 @@ fn every_source_in_the_repository_parses() {
 fn file_host_types_parse_and_highlight_as_builtins() {
     use tree_sitter::StreamingIterator;
 
-    let spellings = ["FILEENTRY", "fileentry", "FileEntry", "FILEPAGE", "filepage", "FilePage"];
+    let spellings = [
+        "FILEENTRY",
+        "fileentry",
+        "FileEntry",
+        "FILEPAGE",
+        "filepage",
+        "FilePage",
+        "BULLETIN",
+        "bulletin",
+        "Bulletin",
+        "SURVEY",
+        "survey",
+        "Survey",
+    ];
     let source = spellings
         .iter()
         .enumerate()

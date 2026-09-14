@@ -169,6 +169,7 @@ fn validity_members_follow_the_documented_rule() {
     let expected: BTreeMap<String, Vec<&str>> = [
         ("Area", vec!["Valid"]),
         ("Audio", vec!["Valid"]),
+        ("Bulletin", vec!["Valid"]),
         ("Conference", vec!["Valid"]),
         ("Directory", vec!["Valid"]),
         ("Door", vec!["Valid"]),
@@ -180,6 +181,7 @@ fn validity_members_follow_the_documented_rule() {
         ("Regex", vec!["Valid"]),
         ("RegexMatch", vec!["Success"]),
         ("Surface", vec!["Valid"]),
+        ("Survey", vec!["Valid"]),
         ("User", vec!["Valid"]),
     ]
     .into_iter()

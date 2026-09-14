@@ -26,6 +26,10 @@ TYPE Conference (30)
    13 func   HasAccess() -> Boolean
    14 func   CanPost() -> Boolean
    15 func   CanAttach() -> Boolean
+   16 getter Bulletins: Bulletin[1]
+   17 getter NewsFile: UnboundedString
+   18 getter IntroFile: UnboundedString
+   19 getter Surveys: Survey[1]
 
 TYPE Area (31)
     0 getter Name: UnboundedString
@@ -383,6 +387,19 @@ TYPE FilePage (57)
     1 getter Entries: FileEntry[1]
     2 getter NextAfter: Long
     3 getter HasMore: Boolean
+
+TYPE Bulletin (60)
+    0 getter Number: Integer
+    1 getter Valid: Boolean
+    2 getter Path: UnboundedString
+    3 func   HasAccess() -> Boolean
+
+TYPE Survey (61)
+    0 getter Number: Integer
+    1 getter Valid: Boolean
+    2 getter Path: UnboundedString
+    3 getter AnswerFile: UnboundedString
+    4 func   HasAccess() -> Boolean
 
 ENUM Checksum (2147483634)
   CRC32=0, MD5=1, SHA256=2

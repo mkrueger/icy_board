@@ -1,11 +1,11 @@
 use i18n_embed_fl::fl;
 use icy_board_ppl::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
 use icy_board_ppl::parser::{
-    AUDIO_ID, BOARD_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
-    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
+    AUDIO_ID, BOARD_ID, BULLETIN_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID,
+    EVENT_ID, EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
     HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
-    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, TERM_INFO_ID,
-    TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry,
+    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, SURVEY_ID,
+    TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry,
 };
 use std::fmt::Write as _;
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
@@ -176,6 +176,10 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == CONFERENCE_ID as u32 => {
             get_sig_hint(Signature::new("CONFERENCE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-conference"))
         }
+        VariableType::UserData(id) if id == BULLETIN_ID as u32 => {
+            get_sig_hint(Signature::new("BULLETIN".to_string()), fl!(LANGUAGE_LOADER, "hint-type-bulletin"))
+        }
+        VariableType::UserData(id) if id == SURVEY_ID as u32 => get_sig_hint(Signature::new("SURVEY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-survey")),
         VariableType::UserData(id) if id == MESSAGE_AREA_ID as u32 => get_sig_hint(Signature::new("AREA".to_string()), fl!(LANGUAGE_LOADER, "hint-type-area")),
         VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u32 => {
             get_sig_hint(Signature::new("DIRECTORY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-directory"))
@@ -445,8 +449,24 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
                 Some(fl!(LANGUAGE_LOADER, "hint-member-conference-options"))
             }
             "password" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-password")),
-            "directories" | "areas" | "doors" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-collections")),
+            "directories" | "areas" | "doors" | "bulletins" | "surveys" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-collections")),
+            "newsfile" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-newsfile")),
+            "introfile" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-introfile")),
             "hasaccess" | "canpost" | "canattach" => Some(fl!(LANGUAGE_LOADER, "hint-member-conference-access")),
+            _ => None,
+        };
+    }
+    if id == BULLETIN_ID as u32 {
+        return match member.to_ascii_lowercase().as_str() {
+            "number" | "valid" | "path" => Some(fl!(LANGUAGE_LOADER, "hint-member-bulletin-metadata")),
+            "hasaccess" => Some(fl!(LANGUAGE_LOADER, "hint-member-bulletin-access")),
+            _ => None,
+        };
+    }
+    if id == SURVEY_ID as u32 {
+        return match member.to_ascii_lowercase().as_str() {
+            "number" | "valid" | "path" | "answerfile" => Some(fl!(LANGUAGE_LOADER, "hint-member-survey-metadata")),
+            "hasaccess" => Some(fl!(LANGUAGE_LOADER, "hint-member-survey-access")),
             _ => None,
         };
     }

@@ -11,7 +11,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::VariableValue,
-    icy_board::state::ppl_array::{area_array_value, directory_array_value, door_array_value},
+    icy_board::state::ppl_array::{area_array_value, bulletin_array_value, directory_array_value, door_array_value, survey_array_value},
 };
 
 use super::{
@@ -413,6 +413,10 @@ pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::syn
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 pub static CAN_POST: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanPost".to_string()));
 pub static CAN_ATTACH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanAttach".to_string()));
+pub static BULLETINS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Bulletins".to_string()));
+pub static NEWS_FILE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("NewsFile".to_string()));
+pub static INTRO_FILE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IntroFile".to_string()));
+pub static SURVEYS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Surveys".to_string()));
 
 #[async_trait(?Send)]
 impl UserDataValue for Conference {
@@ -455,6 +459,18 @@ impl UserDataValue for Conference {
         }
         if *name == *DOORS {
             return Ok(door_array_value(self.doors.clone().unwrap_or_default()));
+        }
+        if *name == *BULLETINS {
+            return Ok(bulletin_array_value(self));
+        }
+        if *name == *NEWS_FILE {
+            return Ok(VariableValue::new_unbounded_string(self.news_file.to_string_lossy().to_string()));
+        }
+        if *name == *INTRO_FILE {
+            return Ok(VariableValue::new_unbounded_string(self.intro_file.to_string_lossy().to_string()));
+        }
+        if *name == *SURVEYS {
+            return Ok(survey_array_value(self));
         }
 
         log::error!("Invalid user data call on Conference ({name})");

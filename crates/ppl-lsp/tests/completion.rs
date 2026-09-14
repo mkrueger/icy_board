@@ -153,6 +153,40 @@ fn a_board_object_offers_fields_and_methods() {
     assert!(items.contains(&"Name".to_string()), "{items:?}");
     assert!(items.contains(&"HasAccess".to_string()), "{items:?}");
     assert!(items.contains(&"Doors".to_string()), "{items:?}");
+    assert!(items.contains(&"Bulletins".to_string()), "{items:?}");
+    assert!(items.contains(&"NewsFile".to_string()), "{items:?}");
+    assert!(items.contains(&"IntroFile".to_string()), "{items:?}");
+    assert!(items.contains(&"Surveys".to_string()), "{items:?}");
+}
+
+#[test]
+fn bulletin_and_news_completion_includes_documentation() {
+    let items = complete("Board.Conferences[0].Bulletins[0].");
+    for member in ["Number", "Valid", "Path", "HasAccess"] {
+        assert!(items.contains(&member.to_string()), "{member}: {items:?}");
+    }
+    for (source, member) in [
+        ("Board.Conferences[0].", "NewsFile"),
+        ("BULLETIN item\nitem.", "Path"),
+        ("BULLETIN item\nitem.", "HasAccess"),
+    ] {
+        let text = completion_documentation(source, member);
+        assert!(text.contains("DISPFILE"), "{member}: {text}");
+    }
+}
+
+#[test]
+fn intro_and_survey_completion_includes_documentation() {
+    for source in ["Board.Conferences[0].Surveys[0].", "SURVEY item\nitem."] {
+        let items = complete(source);
+        for member in ["Number", "Valid", "Path", "AnswerFile", "HasAccess"] {
+            assert!(items.contains(&member.to_string()), "{member}: {items:?}");
+            let text = completion_documentation(source, member);
+            assert!(text.contains("QUEST"), "{member}: {text}");
+        }
+    }
+    let text = completion_documentation("Session.Conference.", "IntroFile");
+    assert!(text.contains("DISPFILE"), "{text}");
 }
 
 #[test]

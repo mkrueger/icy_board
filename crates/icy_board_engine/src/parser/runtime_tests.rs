@@ -10,9 +10,11 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
     let metadata = UserTypeRegistry::icy_board_registry();
     assert_eq!(runtime.registered_types, metadata.registered_types);
     assert_eq!(runtime.enums(), metadata.enums());
-    assert_eq!(runtime.types.len(), 26);
+    assert_eq!(runtime.types.len(), 28);
     for (id, count) in [
-        (CONFERENCE_ID, 16),
+        (CONFERENCE_ID, 20),
+        (BULLETIN_ID, 4),
+        (SURVEY_ID, 5),
         (MESSAGE_AREA_ID, 15),
         (FILE_DIRECTORY_ID, 11),
         (DOOR_ID, 7),

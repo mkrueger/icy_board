@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn s1_all_catalog_placeholders_bind_without_replacing_live_objects() {
         let registry = parser::icy_board_registry();
-        assert_eq!(26, TYPES.len());
+        assert_eq!(28, TYPES.len());
         for &(id, name, _) in TYPES {
             for rank in 1..=3 {
                 let placeholder = VariableType::UserData(id as u32).create_empty_value();

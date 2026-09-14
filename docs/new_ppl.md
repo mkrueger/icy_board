@@ -1402,6 +1402,10 @@ an empty conference object, so its properties can still be read.
 | `Directories` | `DIRECTORY[]` | The file directories of the conference |
 | `Areas` | `AREA[]` | The message areas of the conference |
 | `Doors` | `DOOR[]` | The doors of the conference |
+| `Bulletins` | `BULLETIN[]` | The configured bulletins, in their configured order |
+| `NewsFile` | `STRING` | Configured news display-file path, empty when none is configured |
+| `IntroFile` | `STRING` | Configured introduction display-file path, empty when none is configured |
+| `Surveys` | `SURVEY[]` | The configured surveys, in their configured order |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can join the conference |
 | `CanPost()` | `BOOLEAN` | Whether the current caller may write a message |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may attach a file |
@@ -1460,6 +1464,94 @@ without saying what unlocks it:
 CONFERENCE conf = Board.Conferences[0]
 
 IF conf.Password <> "" PRINTLN conf.Name, " needs a password"
+```
+
+### Bulletins and News (4.00)
+
+`Conference.Bulletins` returns an ordinary read-only array snapshot, available
+from both `Board.Conferences[index]` and `Session.Conference`.
+
+| Bulletin member | Type | Description |
+| :--- | :--- | :--- |
+| `Number` | `INTEGER` | Zero-based index; add one for the native BBS bulletin number |
+| `Valid` | `BOOLEAN` | Whether this is a configured entry, not whether its file exists |
+| `Path` | `STRING` | Configured display-file path |
+| `HasAccess()` | `BOOLEAN` | Checks the current session against the snapshot's conference and bulletin security rules |
+
+An absent bulletin list is an empty array. An out-of-range index returns an
+invalid bulletin with an empty path and `HasAccess() = FALSE`. Paths and entries
+are not automatically filtered by access. `HasAccess()` does not check file
+existence or command-level permissions; the PPE controls access to its own UI.
+
+News are one display file per conference, not a separate article collection.
+`NewsFile` reads only the configured path, with an empty string for an
+unconfigured or invalid conference. Reading either property performs no file I/O
+and does not change the caller's conference or read timestamps. Use the existing
+`DISPFILE` statement for normal BBS display-file processing, including encoding,
+display variants, macros and paging:
+
+```PPL
+CONFERENCE conf = Session.Conference
+BULLETIN item
+
+FOREACH item IN conf.Bulletins
+	IF item.HasAccess() DISPFILE item.Path, 0
+ENDFOREACH
+
+IF conf.HasAccess() THEN
+	IF conf.NewsFile <> "" DISPFILE conf.NewsFile, 0
+ENDIF
+```
+
+These are read-only interfaces; they do not modify or save configuration.
+
+### Introduction and Surveys (4.00)
+
+`Conference.IntroFile` is the configured introduction display-file path, with
+an empty string for an unconfigured or invalid conference. Like `NewsFile`,
+reading it performs no file I/O. Check `conf.HasAccess()` before displaying it
+with `DISPFILE conf.IntroFile, 0`.
+
+`Conference.Surveys` is an ordinary read-only array snapshot, available from
+both `Board.Conferences[index]` and `Session.Conference`, like `Bulletins`.
+
+| Survey member | Type | Description |
+| :--- | :--- | :--- |
+| `Number` | `INTEGER` | Zero-based index; add one for the native BBS S menu |
+| `Valid` | `BOOLEAN` | Whether this is a configured entry, not whether its files exist |
+| `Path` | `STRING` | Configured questionnaire-file path |
+| `AnswerFile` | `STRING` | Configured answer-file path, not the answers themselves |
+| `HasAccess()` | `BOOLEAN` | Checks the current session against the snapshot's conference and survey security rules |
+
+An absent list is an empty array. An out-of-range index returns an invalid
+survey with empty paths and `HasAccess() = FALSE`. Entries are not automatically
+filtered; the PPE must check access before offering them. As with bulletins,
+the check does not test file existence or command-level permissions.
+
+For an entry from the **current session conference**, `QUEST item.Number`
+starts the existing questionnaire workflow. `QUEST` uses the current conference,
+not the conference from which an arbitrary saved survey snapshot was obtained.
+The read-only properties never read or change answers; explicitly running
+`QUEST` may collect and append answers under the existing BBS rules. `DISPFILE`
+only displays a file and does not interpret questionnaire prompts.
+
+This exposes the existing IcyBoard questionnaires, not a fully PCBoard-compatible
+interpreter. Currently IcyBoard separates the introduction at a line beginning
+with `*****`, while PCBoard consumes five header lines. A missing answer file
+currently causes display-only behavior instead of creating the answer file.
+PCBoard's semicolon text lines and `%`/`!` questionnaire directives are not
+handled equivalently. `QUEST` currently indexes from zero in IcyBoard, whereas
+PCBoard uses one-based questionnaire numbers. This read-only API does not change
+those interpreter behaviors.
+
+```PPL
+CONFERENCE conf = Session.Conference
+IF conf.HasAccess() THEN
+	IF conf.IntroFile <> "" DISPFILE conf.IntroFile, 0
+ENDIF
+
+SURVEY item = conf.Surveys[0]
+IF item.HasAccess() QUEST item.Number
 ```
 
 ### Filebase Search (4.00)

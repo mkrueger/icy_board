@@ -15,11 +15,13 @@ pub fn icy_board_registry() -> UserTypeRegistry {
 fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     use crate::compiler::user_data::UserData;
     use crate::icy_board::{
+        bulletins::PplBulletin,
         conferences::Conference,
         doors::Door,
         file_directory::FileDirectory,
         message_area::MessageArea,
         state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user},
+        surveys::PplSurvey,
     };
 
     fn bind<T: UserData>(registry: &mut UserTypeRegistry, id: usize) {
@@ -28,6 +30,8 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
         members.empty_value = T::EMPTY_VALUE;
     }
     bind::<Conference>(&mut registry, CONFERENCE_ID);
+    bind::<PplBulletin>(&mut registry, BULLETIN_ID);
+    bind::<PplSurvey>(&mut registry, SURVEY_ID);
     bind::<MessageArea>(&mut registry, MESSAGE_AREA_ID);
     bind::<FileDirectory>(&mut registry, FILE_DIRECTORY_ID);
     bind::<ppl_files::PplFileEntry>(&mut registry, FILE_ENTRY_ID);

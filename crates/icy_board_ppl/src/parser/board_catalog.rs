@@ -1,8 +1,9 @@
 use super::{
-    AUDIO_ID, BOARD_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID, EVENT_KIND_ENUM_ID,
-    FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID,
-    MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID,
-    REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
+    AUDIO_ID, BOARD_ID, BULLETIN_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
+    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
+    HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
+    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, SURVEY_ID, TERM_INFO_ID, TERM_INPUT_ID,
+    TERMINAL_ID, USER_ID,
 };
 use crate::{
     compiler::user_data::UserDataMemberRegistry,
@@ -36,6 +37,8 @@ pub const TYPES: &[(usize, &str, Option<FuncOpCode>)] = &[
     (REGEX_MATCH_ID, "RegexMatch", None),
     (FILE_ENTRY_ID, "FileEntry", None),
     (FILE_PAGE_ID, "FilePage", None),
+    (BULLETIN_ID, "Bulletin", None),
+    (SURVEY_ID, "Survey", None),
 ];
 
 fn n(name: &str) -> unicase::Ascii<String> {
@@ -400,6 +403,23 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             for name in ["HasAccess", "CanPost", "CanAttach"] {
                 registry.add_function(n(name), Vec::new(), V::Boolean);
             }
+            registry.add_array_property(n("Bulletins"), V::UserData(BULLETIN_ID as u32), 1);
+            registry.add_property(n("NewsFile"), V::UnboundedString, false);
+            registry.add_property(n("IntroFile"), V::UnboundedString, false);
+            registry.add_array_property(n("Surveys"), V::UserData(SURVEY_ID as u32), 1);
+        }
+        BULLETIN_ID => {
+            registry.add_property(n("Number"), V::Integer, false);
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_property(n("Path"), V::UnboundedString, false);
+            registry.add_function(n("HasAccess"), Vec::new(), V::Boolean);
+        }
+        SURVEY_ID => {
+            registry.add_property(n("Number"), V::Integer, false);
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_property(n("Path"), V::UnboundedString, false);
+            registry.add_property(n("AnswerFile"), V::UnboundedString, false);
+            registry.add_function(n("HasAccess"), Vec::new(), V::Boolean);
         }
         MESSAGE_AREA_ID => {
             registry.add_property(n("Name"), V::UnboundedString, false);

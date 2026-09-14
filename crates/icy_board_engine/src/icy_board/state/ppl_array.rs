@@ -3,9 +3,55 @@ use std::sync::Arc;
 use crate::{
     compiler::user_data::user_data_value,
     executable::{VariableType, VariableValue},
-    icy_board::{conferences::Conference, doors::DoorList, file_directory::DirectoryList, message_area::AreaList},
-    parser::{CONFERENCE_ID, DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
+    icy_board::{bulletins::PplBulletin, conferences::Conference, doors::DoorList, file_directory::DirectoryList, message_area::AreaList, surveys::PplSurvey},
+    parser::{BULLETIN_ID, CONFERENCE_ID, DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SURVEY_ID},
 };
+
+pub fn bulletin_array_value(conference: &Conference) -> VariableValue {
+    VariableValue::new_vector(
+        VariableType::UserData(BULLETIN_ID as u32),
+        conference
+            .bulletins
+            .iter()
+            .flat_map(|list| list.iter())
+            .enumerate()
+            .map(|(number, bulletin)| {
+                user_data_value(
+                    PplBulletin {
+                        number,
+                        valid: conference.valid,
+                        bulletin: bulletin.clone(),
+                        conference_security: conference.required_security.clone(),
+                    },
+                    BULLETIN_ID,
+                )
+            })
+            .collect(),
+    )
+}
+
+pub fn survey_array_value(conference: &Conference) -> VariableValue {
+    VariableValue::new_vector(
+        VariableType::UserData(SURVEY_ID as u32),
+        conference
+            .surveys
+            .iter()
+            .flat_map(|list| list.iter())
+            .enumerate()
+            .map(|(number, survey)| {
+                user_data_value(
+                    PplSurvey {
+                        number,
+                        valid: conference.valid,
+                        survey: survey.clone(),
+                        conference_security: conference.required_security.clone(),
+                    },
+                    SURVEY_ID,
+                )
+            })
+            .collect(),
+    )
+}
 
 pub fn area_array_value(items: Arc<AreaList>, conference: usize) -> VariableValue {
     VariableValue::new_vector(
