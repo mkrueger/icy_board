@@ -1847,9 +1847,7 @@ impl VariableValue {
                     VariableType::Money => pcb_money_string(self.data.money_value),
                     VariableType::Float => self.data.float_value.to_string(),
                     VariableType::Double => self.data.double_value.to_string(),
-                    VariableType::Time => {
-                        format!("{}", IcbTime::from_pcboard(self.data.time_value))
-                    }
+                    VariableType::Time => IcbTime::format_pcboard(self.data.time_value),
                     VariableType::Byte => self.data.byte_value.to_string(),
                     VariableType::Word => self.data.word_value.to_string(),
                     VariableType::SByte => self.data.sbyte_value.to_string(),
@@ -1909,14 +1907,14 @@ impl VariableValue {
     pub fn new_date(reg_date: i32) -> VariableValue {
         VariableValue {
             vtype: VariableType::Date,
-            data: VariableData::from_int(reg_date),
+            data: VariableData::from_int(reg_date as u16 as i32),
             generic_data: GenericVariableData::None,
         }
     }
     pub fn new_time(reg_date: i32) -> VariableValue {
         VariableValue {
             vtype: VariableType::Time,
-            data: VariableData::from_int(reg_date),
+            data: VariableData::from_int(reg_date % 86400),
             generic_data: GenericVariableData::None,
         }
     }
@@ -2134,15 +2132,13 @@ impl VariableValue {
             VariableType::Date => {
                 data.date_value = match self.vtype {
                     VariableType::String | VariableType::BigStr | VariableType::UnboundedString => date_from_string(&self.as_string()),
-                    _ => self.as_int() as u32,
+                    _ => self.as_int() as u16 as u32,
                 };
             }
-            // An EDATE holds the same julian a DATE does, it only shows itself as YYMM.DD.
-            // PCBoard does not read a date out of a string here, it answers 0.
             VariableType::EDate => {
                 data.edate_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => 0,
-                    _ => self.as_int() as u32,
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => edate_from_string(&self.as_string()),
+                    _ => self.as_int() as u16 as u32,
                 };
             }
             VariableType::Integer | VariableType::MessageAreaID => {
@@ -2158,9 +2154,9 @@ impl VariableValue {
             VariableType::Bytes => unreachable!(),
             VariableType::Time => {
                 data.time_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => IcbTime::parse(&self.as_string()).to_pcboard_time(),
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => IcbTime::parse_pcboard(&self.as_string()),
                     _ => self.as_int(),
-                };
+                } % 86400;
             }
             VariableType::Byte => {
                 data.byte_value = self.as_byte();
@@ -2245,7 +2241,20 @@ fn pcb_money_string(cents: i32) -> String {
 
 /// A date a PPE hands over as text, or 0 when it is not one.
 fn date_from_string(str: &str) -> u32 {
-    IcbDate::try_parse(str).map_or(0, |date| date.to_pcboard_date().max(0) as u32)
+    let [month, day, year] = crate::datetime::pcboard_date_parts(str);
+    let parts = crate::datetime::pcboard_date_parts(&format!("{month:02}{day:02}{year:02}"));
+    u32::from(crate::datetime::pcboard_date_from_parts(parts))
+}
+
+fn edate_from_string(value: &str) -> u32 {
+    let (left, right) = value.split_once('.').unwrap_or((value, ""));
+    let left = (crate::datetime::signed_decimal(left.as_bytes()).0 as i16 % 10000) as u16;
+    let mut right = crate::datetime::signed_decimal(right.as_bytes()).0 as u16;
+    while right >= 100 {
+        right /= 10;
+    }
+    let parts = crate::datetime::pcboard_date_parts(&format!("{:02}-{right:02}-{:02}", left % 100, left / 100));
+    u32::from(crate::datetime::pcboard_date_from_parts(parts))
 }
 
 /// `PCBoard` reads money as dollars and keeps cents, cutting off anything finer.
@@ -2289,39 +2298,39 @@ fn pcb_edate_string(date: u32) -> String {
 
 /// A DDATE shows the same julian as CCYYMMDD, with stars where the year will not fit.
 fn pcb_ddate_string(date: i32) -> String {
-    if date <= 0 {
+    let julian = date.wrapping_add(2415020);
+    if julian <= 0 {
         return " ".repeat(8);
     }
-    let parsed = IcbDate::from_pcboard(date as u32);
-    let year = full_year(&parsed);
-    if !(0..=9999).contains(&year) {
+    let ordinal = julian - 1721425;
+    if ordinal == -365 {
+        return "00000100".to_string();
+    }
+    let Some(parsed) = chrono::NaiveDate::from_num_days_from_ce_opt(ordinal - i32::from(ordinal <= 0)) else {
+        return "****0000".to_string();
+    };
+    use chrono::Datelike;
+    if parsed.year() > 9999 {
         return "****0000".to_string();
     }
-    format!("{year:04}{:02}{:02}", parsed.month(), parsed.day())
+    if parsed.year() < 0 {
+        return format!("****{:02}{:02}", parsed.month(), parsed.day());
+    }
+    format!("{:04}{:02}{:02}", parsed.year(), parsed.month(), parsed.day())
 }
 
 /// A DDATE reads a date out of CCYYMMDD text and keeps the julian for it.
 fn ddate_from_string(str: &str) -> i32 {
-    let digits: String = str.chars().filter(char::is_ascii_digit).collect();
-    if digits.len() != 8 {
-        return 0;
+    let bytes = str.as_bytes();
+    let Some(bytes) = bytes.get(..8) else { return -2415021 };
+    let year = crate::datetime::signed_decimal(&bytes[..4]).0;
+    let month = crate::datetime::signed_decimal(&bytes[4..6]).0;
+    let day = crate::datetime::signed_decimal(&bytes[6..8]).0;
+    if year < 0 {
+        return -2415021;
     }
-    let year = digits[0..4].parse::<u16>().unwrap_or(0);
-    let month = digits[4..6].parse::<u8>().unwrap_or(0);
-    let day = digits[6..8].parse::<u8>().unwrap_or(0);
-    if month == 0 || day == 0 {
-        return 0;
-    }
-    IcbDate::new(month, day, year).to_pcboard_date()
-}
-
-/// A date unpacked from `PCBoard`'s format carries only two year digits.
-fn full_year(date: &IcbDate) -> i32 {
-    match date.year() {
-        year if year >= 100 => year as i32,
-        year if year < 79 => 2000 + year as i32,
-        year => 1900 + year as i32,
-    }
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(year, month as u32, day as u32).map_or(-2415021, |date| date.num_days_from_ce() - 693595 + i32::from(year == 0))
 }
 
 /// .

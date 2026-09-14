@@ -531,15 +531,52 @@ fn test_an_edate_shows_the_date_as_yymm_dd() {
     assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT TOINTEGER(e)"), "35138");
 }
 
-/// `PCBoard` does not read a date out of a string for an EDATE, it answers 0.
 #[test]
-fn test_an_edate_does_not_read_a_date_out_of_a_string() {
+fn test_an_edate_requires_yymm_dd_text() {
     assert_eq!(run_ppl("PRINT TOEDATE(\"03-15-96\")"), "0000.00");
+    assert_eq!(run_ppl("PRINT TOEDATE(\"9603.15\")"), "9603.15");
 }
 
 #[test]
 fn test_toddate_converts_a_date() {
     assert_eq!(run_ppl("PRINT TODDATE(MKDATE(1994, 5, 27))"), "19940527");
+}
+
+#[test]
+fn pcboard_datetime_parts_and_time_validation() {
+    let output = run_ppl(
+        r#"
+        PRINTLN YEAR(MKDATE(1996, 3, 15)), "|", DOW(MKDATE(1996, 3, 15))
+        PRINTLN "[", TIMEAP(TOTIME("14:22:36")), "]"
+        PRINTLN VALTIME("00:00:00"), "|", VALTIME("12:34"), "|", VALTIME("25:61:99")
+        "#,
+    );
+    assert_eq!(output, "1996|5\n[ 2:22:36 PM]\n1|1|0\n");
+}
+
+#[test]
+fn pcboard_datetime_oracle_fixture() {
+    let source = include_str!("../../../../../compat/datetime.pps");
+    for version in [340, 400] {
+        let source = if version == 400 {
+            source.replace(";$LANGVERSION 340", ";$LANGVERSION 400").replace("\nEND\n", "\nEXIT\n")
+        } else {
+            source.to_string()
+        };
+        let actual = run_ppl(&source);
+        let expected = include_str!("../../../../../compat/datetime.out");
+        assert_eq!(actual.lines().count(), expected.lines().count());
+        for (actual, expected) in actual.lines().zip(expected.lines()) {
+            assert_eq!(actual, expected, "language {version}");
+        }
+        assert_eq!(actual, expected, "language {version}");
+    }
+}
+
+#[test]
+fn pcboard_datetime_invalid_memory_access_is_not_emulated() {
+    assert_eq!(run_ppl("PRINTLN TOINTEGER(MKDATE(2024, 13, 32)), \"|\", DOW(MKDATE(2100, 2, 29))"), "0|6\n");
+    assert_eq!(run_ppl("PRINTLN VALDATE(\"1\u{20ac}2345\")"), "0\n");
 }
 
 #[test]

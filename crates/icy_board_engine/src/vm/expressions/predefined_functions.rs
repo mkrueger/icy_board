@@ -1188,36 +1188,49 @@ pub async fn u_msgwr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn year(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).year() as i32))
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    let year = if var == 0 { 0 } else { IcbDate::from_pcboard(var as u32).year() as i32 };
+    Ok(VariableValue::new_int(year + if var > 36524 { 2000 } else { 1900 }))
 }
 pub async fn month(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).month() as i32))
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    Ok(VariableValue::new_int(if var == 0 {
+        0
+    } else {
+        IcbDate::from_pcboard(var as u32).month() as i32
+    }))
 }
 pub async fn day(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).day() as i32))
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    Ok(VariableValue::new_int(if var == 0 {
+        0
+    } else {
+        IcbDate::from_pcboard(var as u32).day() as i32
+    }))
 }
 pub async fn dow(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbDate::from_pcboard(var as u32).day_of_week() as i32))
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    Ok(VariableValue::new_int(i32::from(var % 7)))
 }
 pub async fn hour(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_hour() as i32))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_hour())
 }
 pub async fn min(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_minute() as i32))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_minute())
 }
 pub async fn sec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(IcbTime::from_pcboard(var).get_second() as i32))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_second())
 }
 pub async fn timeap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_string(IcbTime::from_pcboard(var).to_string()))
+    let time = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time);
+    let hour = time.get_hour().as_int();
+    let period = if hour < 12 { "AM" } else { "PM" };
+    let civil_hour = if hour % 12 == 0 { 12 } else { hour % 12 };
+    Ok(VariableValue::new_string(format!(
+        "{civil_hour:2}:{:02}:{:02} {period}",
+        time.get_minute().as_int(),
+        time.get_second().as_int()
+    )))
 }
 pub async fn ver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(1540))
@@ -1316,12 +1329,13 @@ pub async fn ppepath(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn valdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let date = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_bool(!IcbDate::parse(&date).is_empty()))
+    let [month, day, year] = icy_board_ppl::datetime::pcboard_date_parts(&date);
+    Ok(VariableValue::new_bool((1..=12).contains(&month) && (1..=31).contains(&day) && year <= 99))
 }
 
 pub async fn valtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let time = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_bool(!IcbTime::parse(&time).is_empty()))
+    Ok(VariableValue::new_bool(IcbTime::is_valid_pcboard(&time)))
 }
 
 pub async fn pcbnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1936,8 +1950,7 @@ pub async fn mkdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     let month = vm.eval_expr(&args[1]).await?.as_int();
     let day = vm.eval_expr(&args[2]).await?.as_int();
 
-    let date = IcbDate::new(month as u8, day as u8, year as u16);
-    Ok(VariableValue::new(VariableType::Date, VariableData::from_int(date.to_pcboard_date())))
+    Ok(VariableValue::new_date(i32::from(icy_board_ppl::datetime::pcboard_mkdate(year, month, day))))
 }
 
 pub async fn curcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

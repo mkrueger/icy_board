@@ -497,15 +497,14 @@ impl UserDataValue for PplZipWriter {
                     archive.timestamp = match arguments.len() {
                         0 => None,
                         2 => {
-                            let date = crate::datetime::IcbDate::from_pcboard(arguments[0].as_int() as u32);
-                            let year = date.year() + if date.year() < 79 { 2000 } else { 1900 };
+                            let date = crate::datetime::IcbDate::from_pcboard_full(arguments[0].as_int() as u32);
                             let seconds = arguments[1].as_int();
                             if !(0..86400).contains(&seconds) {
                                 return Err(invalid("Invalid ZIP time"));
                             }
                             Some(
                                 DateTime::from_date_and_time(
-                                    year,
+                                    date.year(),
                                     date.month() as u8,
                                     date.day() as u8,
                                     (seconds / 3600) as u8,

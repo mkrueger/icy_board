@@ -1,6 +1,43 @@
 use crate::vm::tests::{compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn pcboard_datetime_user_fields_persist_full_years() {
+    use crate::icy_board::{IcyBoardSerializer, user_base::UserBase};
+    use chrono::Datelike;
+
+    for source in [
+        r#"
+Session.User.BirthDate = MKDATE(1996, 3, 15)
+Session.User.ExpirationDate = MKDATE(2079, 1, 1)
+Session.User.PasswordExpires = MKDATE(2024, 2, 29)
+PRINTLN Error.Last().OK
+PRINTLN YEAR(Session.User.BirthDate), "|", YEAR(Session.User.ExpirationDate), "|", YEAR(Session.User.PasswordExpires)
+"#,
+        r#"
+GETUSER
+U_BIRTHDATE = "03-15-96"
+U_EXPDATE = MKDATE(2079, 1, 1)
+U_PWDEXP = MKDATE(2024, 2, 29)
+PUTUSER
+Session.User.City = "saved"
+GETUSER
+PRINTLN 1
+PRINTLN YEAR(U_BIRTHDATE), "|", YEAR(U_EXPDATE), "|", YEAR(U_PWDEXP)
+"#,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let user_file = directory.path().join("users.toml");
+        let output = run_ppl_on(source, |board| board.config.paths.user_file = user_file.clone());
+        assert_eq!(output, "1\n1996|2079|2024\n");
+        let saved = UserBase::load(&user_file).unwrap();
+        assert_eq!(saved[0].birth_date.year(), 1996);
+        assert_eq!(saved[0].expiration_date.year(), 2079);
+        assert_eq!(saved[0].password.expire_date.year(), 2024);
+        assert_eq!(saved[0].password.expire_date.day(), 29);
+    }
+}
+
+#[test]
 fn api_review_user_mutations_roll_back_when_persistence_fails() {
     use crate::icy_board::user_base::{Password, UserContact};
 

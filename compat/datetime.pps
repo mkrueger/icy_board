@@ -1,0 +1,188 @@
+;$LANGVERSION 340
+DECLARE PROCEDURE DateValue(INTEGER value)
+DECLARE PROCEDURE MakeDate(INTEGER year, INTEGER month, INTEGER day)
+DECLARE PROCEDURE DateText(STRING value)
+DECLARE PROCEDURE TimeText(STRING value)
+DECLARE PROCEDURE TimeValue(INTEGER value)
+DECLARE PROCEDURE DDateText(STRING value)
+DECLARE PROCEDURE EDateText(STRING value)
+DECLARE PROCEDURE DateDomain()
+DECLARE PROCEDURE OracleVersion()
+
+STARTDISP 1
+PRINTLN "---BEGIN---"
+OracleVersion()
+DateValue(0)
+DateValue(1)
+DateValue(59)
+DateValue(60)
+DateValue(61)
+DateValue(35138)
+DateValue(36524)
+DateValue(36525)
+DateValue(65379)
+DateValue(65380)
+DateValue(65535)
+DateValue(65536)
+DateValue(-1)
+DateValue(2147483647)
+MakeDate(0, 1, 1)
+MakeDate(24, 1, 2)
+MakeDate(78, 12, 31)
+MakeDate(79, 1, 1)
+MakeDate(1900, 1, 1)
+MakeDate(1978, 12, 31)
+MakeDate(1979, 1, 1)
+MakeDate(1996, 3, 15)
+MakeDate(2000, 2, 29)
+MakeDate(2024, 1, 2)
+MakeDate(2024, 2, 31)
+MakeDate(2024, 0, 0)
+MakeDate(2078, 12, 31)
+MakeDate(2079, 1, 1)
+MakeDate(2100, 2, 29)
+MakeDate(2100, 3, 1)
+DateText("")
+DateText("0")
+DateText("01-01-24")
+DateText("03-15-96")
+DateText("02-31-2024")
+DateText("13-01-2024")
+DateText("01-01-abc")
+DateText("01/02/2024")
+DateText("01.02.2024")
+DateText("01 02 2024")
+DateText("010224")
+DateText("01022024")
+DateText("20240102")
+DateText("00-00-00")
+DateText("-1-01-24")
+DateText(" 01-02-24 ")
+DateText("01-02-24junk")
+DateText("01-02-1978")
+DateText("01-02-2079")
+TimeText("")
+TimeText("00:00:00")
+TimeText("12:34")
+TimeText("14:22:36")
+TimeText("23:59:59")
+TimeText("24:00:00")
+TimeText("25:61:99")
+TimeText("-1:00:00")
+TimeText("12:34:56junk")
+TimeText("12 34 56")
+TimeText("12.34.56")
+TimeText("1:2:3")
+TimeText("12:34:56:78")
+TimeText("12:34 PM")
+TimeText(" 12:34:56 ")
+TimeText("abc")
+TimeText(":")
+TimeText("::")
+TimeText("12:")
+TimeText("12::34")
+TimeText(":12:34")
+TimeText("12:34:")
+TimeText("+1:+2:+3")
+TimeText(" 1: 2: 3")
+TimeText("1:2:3 ")
+TimeText("2147483648:0:0")
+TimeText("65536:65536:65536")
+TimeValue(-1)
+TimeValue(-3600)
+TimeValue(0)
+TimeValue(1)
+TimeValue(43200)
+TimeValue(51756)
+TimeValue(86399)
+TimeValue(86400)
+TimeValue(90061)
+TimeValue(2147483647)
+TimeValue(-2147483647 - 1)
+DDateText("00000101")
+DDateText("00000229")
+DDateText("00000301")
+DDateText("00001231")
+DDateText("00010101")
+DDateText("00010229")
+DDateText("19000228")
+DDateText("19000229")
+DDateText("19000301")
+DDateText("20000229")
+DDateText("20240231")
+DDateText("21000228")
+DDateText("21000229")
+DDateText("21000301")
+DDateText("24000229")
+DDateText("99991231")
+DDateText("20240101junk")
+DDateText("+0010101")
+DDateText("abcd0101")
+DDateText("    0101")
+DateText("02-31-24")
+DateText("1a2b24")
+EDateText("9603.15")
+EDateText("2401.0299")
+EDateText("0000.00")
+DateValue(-693959)
+DateValue(-693960)
+DateValue(-693595)
+DateValue(-693596)
+DateValue(-2415020)
+DateValue(-2415019)
+DateDomain()
+PRINTLN "---END---"
+END
+
+PROCEDURE DateValue(INTEGER value)
+    PRINTLN "d", value, "=", TOINTEGER(TODATE(value)), "|", YEAR(value), "|", MONTH(value), "|", DAY(value), "|", DOW(value), "|[", TODDATE(value), "]|", TOEDATE(value)
+ENDPROC
+
+PROCEDURE MakeDate(INTEGER year, INTEGER month, INTEGER day)
+    DATE value
+    value = MKDATE(year, month, day)
+    PRINTLN "m", year, ",", month, ",", day, "=", TOINTEGER(value), "|", YEAR(value), "|", MONTH(value), "|", DAY(value), "|", DOW(value)
+ENDPROC
+
+PROCEDURE DateText(STRING value)
+    PRINTLN "s[", value, "]=", VALDATE(value), "|", TOINTEGER(TODATE(value)), "|", TOINTEGER(TODDATE(value)), "|", TOINTEGER(TOEDATE(value))
+ENDPROC
+
+PROCEDURE TimeText(STRING value)
+    PRINTLN "t[", value, "]=", VALTIME(value), "|", TOINTEGER(TOTIME(value)), "|[", TOTIME(value), "]"
+ENDPROC
+
+PROCEDURE TimeValue(INTEGER value)
+    PRINTLN "v", value, "=", HOUR(value), "|", MIN(value), "|", SEC(value), "|[", TIMEAP(value), "]|[", TOTIME(value), "]"
+ENDPROC
+
+PROCEDURE DDateText(STRING value)
+    PRINTLN "q[", value, "]=", TOINTEGER(TODDATE(value)), "|[", TODDATE(value), "]"
+ENDPROC
+
+PROCEDURE OracleVersion()
+    PRINTLN "oracle=", VER()
+ENDPROC
+
+PROCEDURE EDateText(STRING value)
+    PRINTLN "e[", value, "]=", TOINTEGER(TOEDATE(value)), "|[", TOEDATE(value), "]"
+ENDPROC
+
+PROCEDURE DateDomain()
+    INTEGER value, partsHash, textHash, roundtripHash
+    STRING text
+    partsHash = 0
+    textHash = 0
+    roundtripHash = 0
+    FOR value = 0 TO 65535
+        partsHash = partsHash * 33 + YEAR(value)
+        partsHash = partsHash * 33 + MONTH(value)
+        partsHash = partsHash * 33 + DAY(value)
+        partsHash = partsHash * 33 + DOW(value)
+        text = TODDATE(value)
+        textHash = textHash * 33 + TOINTEGER(text)
+        text = TODATE(value)
+        roundtripHash = roundtripHash * 33 + TOINTEGER(TODATE(text))
+    NEXT
+    PRINTLN "domain=65536|", partsHash, "|", textHash, "|", roundtripHash
+ENDPROC

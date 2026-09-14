@@ -357,7 +357,7 @@ impl UserDataValue for PplUser {
             return Ok(());
         }
         let text = || val.as_string();
-        let date = || IcbDate::from_pcboard(val.as_int() as u32).to_utc_date_time();
+        let date = || IcbDate::from_pcboard_full(val.as_int() as u32).to_utc_date_time();
 
         if *name == *ALIAS {
             user.alias = text();

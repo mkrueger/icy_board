@@ -136,6 +136,11 @@ IF !archive.SetTimestamp(fixedDate, fixedTime) THEN
     EXIT
 ENDIF
 archive.AddFile("tree/source.txt", "named.txt")
+IF !archive.SetTimestamp(MKDATE(2079, 1, 1), 0) THEN
+    PRINTLN Error.Last().Message
+    EXIT
+ENDIF
+archive.AddBytes(TOBYTES("future"), "future.txt")
 archive.SetPermissions()
 archive.SetTimestamp()
 archive.SetCompression(ZipMethod.Deflate)
@@ -151,7 +156,7 @@ EXIT
     let file = std::fs::File::open(root.path().join("test.zip")).unwrap_or_else(|error| panic!("{error}: {rows:?}"));
     let mut zip = zip::ZipArchive::new(file).unwrap();
     assert_eq!(zip.comment(), "Gr\u{fc}\u{df}e".as_bytes());
-    assert_eq!(zip.len(), 5);
+    assert_eq!(zip.len(), 6);
     assert_eq!(zip.by_name("first.txt").unwrap().compression(), zip::CompressionMethod::Stored);
     let entry = zip.by_name("named.txt").unwrap();
     assert_eq!(entry.compression(), zip::CompressionMethod::Deflated);
@@ -161,6 +166,10 @@ EXIT
         zip::DateTime::from_date_and_time(2024, 1, 2, 12, 34, 56).unwrap()
     );
     drop(entry);
+    assert_eq!(
+        zip.by_name("future.txt").unwrap().last_modified().unwrap(),
+        zip::DateTime::from_date_and_time(2079, 1, 1, 0, 0, 0).unwrap()
+    );
     assert!(zip.by_name("folder/empty/").unwrap().is_dir());
     assert_eq!(zip.by_name("folder/source.txt").unwrap().unix_mode().unwrap() & 0o777, 0o644);
 }

@@ -57,6 +57,44 @@ SDL_VIDEODRIVER=dummy flatpak run com.dosbox_x.DOSBox-X -silent -exit \
 "Source compilation complete" and emits an empty program — a silent failure, so
 always check that the resulting `.PPE` is a plausible size.
 
+### Date/time runtime oracle without a serial connection
+
+```sh
+python3 compat/datetime_oracle.py
+CARGO_INCREMENTAL=0 cargo test-low -p icy_board_engine --lib pcboard_datetime_ --locked
+```
+
+`datetime_oracle.py` clones `~/dos/PCB` into a private temporary directory,
+compiles the authored `datetime.pps` with PPLC 3.40, and runs PCBoard's `/PPE:`
+entry point. Only the clone is mounted in DOSBox-X. The fixture's `PRINTLN`
+output is redirected to a DOS file with `FPUTLN`; no login, modem, or live BBS
+configuration changes are needed. The harness checks the completion marker,
+output boundaries and line count, and fingerprints the live installation.
+Captures, compiler output and hashes are retained under `target/datetime-oracle/`.
+It terminates only its own child process group on timeout.
+
+`datetime.out` was captured from PCBoard 15.4/M on 2026-09-14: 120 result lines,
+including three wrapping checksums over all 65,536 DATE values (date parts and
+weekday, DDATE text, and DATE text roundtrips). The VM test compares the same
+fixture in language modes 340 and 400. This covers the installed original's
+American date order and colon time separator, not every DOS country setting.
+
+The governing source paths are `pcb-libs/SOURCE/MISC/JULIAN.C` (`breakdate`,
+`datetojulian`, `juliantodate`) and `pcb-main/SOURCE/PPL/{VAR,EVALP}.CPP`
+(coercions, validation, `TIMEAP`, `MKDATE`). DDATE delegates to CodeBase routines
+whose implementation is absent from this source tree; its fixed-width parsing,
+Gregorian dates, year-zero anomaly and signed Julian offset are oracle-tested.
+VALDATE deliberately keeps the original coarse month/day/year checks, including
+acceptance of February 31 with a two-digit year. VALTIME and TOTIME deliberately
+retain their different parsing rules and signed overflow behavior.
+
+An initial probe also tried `MKDATE(2024, 13, 32)`. Its original implementation
+reads outside a local array; the observed result is not a portable date rule.
+IcyBoard returns zero for out-of-array MKDATE months instead of emulating an
+arbitrary memory read. DATE parsing retains the observed contiguous two-row day
+table behavior for months 13..24; larger indices return zero. Unicode input must
+not panic. These safety boundaries are not claims of identical undefined behavior.
+
 ### 2. Runtime oracle — a live BBS session over TCP
 
 DOSBox-X bridges the DOS serial port to a socket and `bbs_session.py` speaks to

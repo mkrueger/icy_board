@@ -382,8 +382,8 @@ impl VirtualMachine<'_> {
             self.variable_table
                 .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr));
             self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()));
-            let day = &cur_user.birth_date;
-            self.variable_table.set_value(U_BIRTHDATE, VariableValue::new_string(day.to_string()));
+            self.variable_table
+                .set_value(U_BIRTHDATE, VariableValue::new_date(IcbDate::from_utc(&cur_user.birth_date).to_pcboard_date()));
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
@@ -433,7 +433,7 @@ impl VirtualMachine<'_> {
         field!(
             U_EXPDATE,
             cur_user.expiration_date,
-            IcbDate::from_pcboard(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time()
+            IcbDate::from_pcboard_full(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time()
         );
         field!(U_SEC, cur_user.security_level, self.variable_table.get_value(U_SEC).as_int() as u8);
         field!(U_PAGELEN, cur_user.page_len, self.variable_table.get_value(U_PAGELEN).as_int() as u16);
@@ -481,7 +481,7 @@ impl VirtualMachine<'_> {
         field!(
             U_PWDEXP,
             cur_user.password.expire_date,
-            IcbDate::from_pcboard(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time()
+            IcbDate::from_pcboard_full(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time()
         );
 
         // U_ACCOUNT is not loaded or stored by PCBoard.
@@ -491,7 +491,8 @@ impl VirtualMachine<'_> {
             field!(
                 U_BIRTHDATE,
                 cur_user.birth_date,
-                IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time()
+                IcbDate::from_pcboard_full(self.variable_table.get_value(U_BIRTHDATE).clone().convert_to(VariableType::Date).as_int() as u32)
+                    .to_utc_date_time()
             );
             string!(U_EMAIL, cur_user.email);
             string!(U_WEB, cur_user.web);
