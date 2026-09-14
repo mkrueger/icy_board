@@ -183,6 +183,7 @@ fn validity_members_follow_the_documented_rule() {
         ("Surface", vec!["Valid"]),
         ("Survey", vec!["Valid"]),
         ("User", vec!["Valid"]),
+        ("ZipWriter", vec!["Valid"]),
     ]
     .into_iter()
     .map(|(name, mut members)| {

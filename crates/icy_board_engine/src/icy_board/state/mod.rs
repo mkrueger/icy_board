@@ -62,6 +62,7 @@ pub mod ppl_terminal_control;
 pub mod ppl_terminal_info;
 pub mod ppl_terminal_input;
 pub mod ppl_user;
+pub mod ppl_zip;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;

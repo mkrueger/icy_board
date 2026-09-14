@@ -2147,6 +2147,66 @@
           },
           "named": false,
           "value": "MSGFIELD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[zZ][iI][pP]"
+            }
+          },
+          "named": false,
+          "value": "ZIP"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[zZ][iI][pP][wW][rR][iI][tT][eE][rR]"
+            }
+          },
+          "named": false,
+          "value": "ZIPWRITER"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[zZ][iI][pP][mM][eE][tT][hH][oO][dD]"
+            }
+          },
+          "named": false,
+          "value": "ZIPMETHOD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[zZ][iI][pP]64[mM][oO][dD][eE]"
+            }
+          },
+          "named": false,
+          "value": "ZIP64MODE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[zZ][iI][pP][eE][nN][cC][oO][dD][iI][nN][gG]"
+            }
+          },
+          "named": false,
+          "value": "ZIPENCODING"
         }
       ]
     },

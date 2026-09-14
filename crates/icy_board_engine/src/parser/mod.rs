@@ -20,7 +20,7 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
         doors::Door,
         file_directory::FileDirectory,
         message_area::MessageArea,
-        state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user},
+        state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user, ppl_zip},
         surveys::PplSurvey,
     };
 
@@ -50,13 +50,25 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     bind::<ppl_http::PplHttpResponse>(&mut registry, HTTP_RESPONSE_ID);
     bind::<ppl_regex::PplRegex>(&mut registry, REGEX_ID);
     bind::<ppl_regex::PplRegexMatch>(&mut registry, REGEX_MATCH_ID);
+    bind::<ppl_zip::PplZip>(&mut registry, ZIP_ID);
+    bind::<ppl_zip::PplZipWriter>(&mut registry, ZIP_WRITER_ID);
     // These facades otherwise dispatch into the live session even without a handle.
     macro_rules! inert {
         ($($id:ident),+ $(,)?) => {$(
             registry.types.get_mut(&($id as u32)).expect("builtin metadata missing").empty_value = Some(inert_value::<$id>);
         )+};
     }
-    inert!(TERM_INPUT_ID, TERMINAL_ID, GFX_ID, MARGINS_ID, PALETTE_ID, MACROS_ID, SESSION_ID, HTTP_ID);
+    inert!(
+        TERM_INPUT_ID,
+        TERMINAL_ID,
+        GFX_ID,
+        MARGINS_ID,
+        PALETTE_ID,
+        MACROS_ID,
+        SESSION_ID,
+        HTTP_ID,
+        ZIP_ID
+    );
     registry
 }
 

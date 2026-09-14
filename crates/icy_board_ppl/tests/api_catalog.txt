@@ -388,6 +388,25 @@ TYPE FilePage (57)
     2 getter NextAfter: Long
     3 getter HasMore: Boolean
 
+TYPE Zip (58)
+    0 func   static Create(path: UnboundedString, overwrite?: Boolean) -> ZipWriter
+
+TYPE ZipWriter (59)
+    0 getter Valid: Boolean
+    1 getter Method: ZipMethod
+    2 getter Level: Integer
+    3 func   SetCompression(method: ZipMethod, level?: Integer) -> Boolean
+    4 func   SetComment(text: UnboundedString, encoding?: ZipEncoding) -> Boolean
+    5 func   SetZip64(mode: Zip64Mode) -> Boolean
+    6 func   SetTimestamp(date?: Date, time?: Time) -> Boolean
+    7 func   SetPermissions(mode?: Integer) -> Boolean
+    8 func   AddFile(sourcePath: UnboundedString, entryName?: UnboundedString) -> Boolean
+    9 func   AddDirectory(entryName: UnboundedString) -> Boolean
+   10 func   AddTree(sourceDirectory: UnboundedString, prefix?: UnboundedString, recursive?: Boolean) -> Boolean
+   11 func   AddBytes(data: Bytes, entryName: UnboundedString) -> Boolean
+   12 func   Finish() -> Boolean
+   13 func   Abort() -> Boolean
+
 TYPE Bulletin (60)
     0 getter Number: Integer
     1 getter Valid: Boolean
@@ -400,6 +419,15 @@ TYPE Survey (61)
     2 getter Path: UnboundedString
     3 getter AnswerFile: UnboundedString
     4 func   HasAccess() -> Boolean
+
+ENUM ZipEncoding (2147483631)
+  Utf8=0, Cp437=1
+
+ENUM Zip64Mode (2147483632)
+  Auto=0, Never=1
+
+ENUM ZipMethod (2147483633)
+  Deflate=8, Stored=0
 
 ENUM Checksum (2147483634)
   CRC32=0, MD5=1, SHA256=2

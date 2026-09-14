@@ -1,0 +1,104 @@
+;$LANGVERSION 400
+
+STRING outputPath = "allfiles.txt"
+IF TOKCOUNT() > 0 GETTOKEN outputPath
+STRING temporaryPath = outputPath + "." + STRING(Session.Node) + ".tmp"
+CONFERENCE conf
+DIRECTORY fileDirectory
+FILEENTRY entry
+LONG fileCount = 0
+LONG totalBytes = 0
+LONG directoryCount = 0
+STRING failureMessage
+
+FCREATE 1, temporaryPath, O_WR, S_DB
+IF FERR(1) THEN
+    PrintStatus("Cannot create temporary file: " + temporaryPath)
+    EXIT
+ENDIF
+
+FPUTLN 1, Board.Name, " - All files"
+FPUTLN 1, "Generated: ", DATE(), " ", TIME()
+FPUTLN 1
+IF FERR(1) GOTO WriteFailed
+
+FOREACH conf IN Board.Conferences
+    IF !conf.HasAccess() CONTINUE
+    BOOLEAN conferenceWritten = FALSE
+    FOREACH fileDirectory IN conf.Directories
+        IF !fileDirectory.HasAccess() CONTINUE
+        IF !conferenceWritten THEN
+            FPUTLN 1, "============================================================"
+            FPUTLN 1, "Conference ", conf.Number, ": ", conf.Name
+            FPUTLN 1, "============================================================"
+            conferenceWritten = TRUE
+        ENDIF
+        FPUTLN 1
+        FPUTLN 1, "Directory ", fileDirectory.Number + 1, ": ", fileDirectory.Name
+        FPUTLN 1, "------------------------------------------------------------"
+        IF FERR(1) GOTO WriteFailed
+        directoryCount += 1
+        LONG after = 0
+        WHILE TRUE DO
+            FILEPAGE page = fileDirectory.Find("", after, 100)
+            IF !page.Valid THEN
+                ERROR failure = Error.Last()
+                failureMessage = "Cannot read file index: " + conf.Name + " / " + fileDirectory.Name + ": " + failure.Message
+                GOTO Failed
+            ENDIF
+            FOREACH entry IN page.Entries
+                FPUTLN 1, entry.Name, " | ", entry.Size, " bytes | ", entry.Date
+                IF entry.Description <> "" FPUTLN 1, entry.Description
+                IF entry.DescriptionTruncated FPUTLN 1, "[Description truncated by file index API]"
+                FPUTLN 1
+                IF FERR(1) GOTO WriteFailed
+                fileCount += 1
+                totalBytes += entry.Size
+            ENDFOREACH
+            IF !page.HasMore BREAK
+            after = page.NextAfter
+        ENDWHILE
+    ENDFOREACH
+ENDFOREACH
+
+FPUTLN 1, "============================================================"
+FPUTLN 1, "Total: ", fileCount, " files, ", totalBytes, " bytes, ", directoryCount, " directories"
+IF FERR(1) GOTO WriteFailed
+FFLUSH 1
+IF FERR(1) GOTO WriteFailed
+FCLOSE 1
+RENAME temporaryPath, outputPath
+ERROR publishError = Error.Last()
+IF !publishError.OK THEN
+    failureMessage = "Cannot publish file list: " + publishError.Message
+    GOTO Failed
+ENDIF
+PrintStatus("Created " + outputPath + ": " + STRING(fileCount) + " files.")
+EXIT
+
+:WriteFailed
+failureMessage = "Cannot write file list: " + temporaryPath
+:Failed
+FCLOSE 1
+DELETE temporaryPath
+PrintStatus(failureMessage)
+EXIT
+
+PROCEDURE PrintStatus(STRING text)
+    STRING clean = ""
+    INTEGER index
+    FOR index = 0 TO text.Len() - 1
+        STRING character = text.Substring(index, 1)
+        IF Asc(character) < 32 | Asc(character) = 127 THEN
+            clean += "."
+        ELSE
+            clean += character
+        ENDIF
+    NEXT
+    STRING parts[] = clean.Split("@")
+    FOR index = 0 TO parts.Len() - 1
+        IF index > 0 PRINT "@"
+        PRINT parts[index]
+    NEXT
+    PRINTLN
+ENDPROC

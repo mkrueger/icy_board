@@ -80,6 +80,21 @@ fn file_host_types_parse_and_highlight_as_builtins() {
         "SURVEY",
         "survey",
         "Survey",
+        "ZIP",
+        "zip",
+        "Zip",
+        "ZIPWRITER",
+        "zipwriter",
+        "ZipWriter",
+        "ZIPMETHOD",
+        "zipmethod",
+        "ZipMethod",
+        "ZIP64MODE",
+        "zip64mode",
+        "Zip64Mode",
+        "ZIPENCODING",
+        "zipencoding",
+        "ZipEncoding",
     ];
     let source = spellings
         .iter()

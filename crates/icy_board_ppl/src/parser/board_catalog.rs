@@ -3,7 +3,7 @@ use super::{
     EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
     HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
     MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, SURVEY_ID, TERM_INFO_ID, TERM_INPUT_ID,
-    TERMINAL_ID, USER_ID,
+    TERMINAL_ID, USER_ID, ZIP_ENCODING_ENUM_ID, ZIP_ID, ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
 };
 use crate::{
     compiler::user_data::UserDataMemberRegistry,
@@ -37,6 +37,8 @@ pub const TYPES: &[(usize, &str, Option<FuncOpCode>)] = &[
     (REGEX_MATCH_ID, "RegexMatch", None),
     (FILE_ENTRY_ID, "FileEntry", None),
     (FILE_PAGE_ID, "FilePage", None),
+    (ZIP_ID, "Zip", None),
+    (ZIP_WRITER_ID, "ZipWriter", None),
     (BULLETIN_ID, "Bulletin", None),
     (SURVEY_ID, "Survey", None),
 ];
@@ -47,6 +49,54 @@ fn n(name: &str) -> unicase::Ascii<String> {
 
 fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) {
     match id {
+        ZIP_ID => {
+            registry.add_named_static_function_with(
+                n("Create"),
+                vec![("path", V::UnboundedString), ("overwrite", V::Boolean)],
+                1,
+                V::UserData(ZIP_WRITER_ID as u32),
+            );
+        }
+        ZIP_WRITER_ID => {
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_property(n("Method"), V::UserData(ZIP_METHOD_ENUM_ID), false);
+            registry.add_property(n("Level"), V::Integer, false);
+            registry.add_named_function_with(
+                n("SetCompression"),
+                vec![("method", V::UserData(ZIP_METHOD_ENUM_ID)), ("level", V::Integer)],
+                1,
+                V::Boolean,
+            );
+            registry.add_named_function_with(
+                n("SetComment"),
+                vec![("text", V::UnboundedString), ("encoding", V::UserData(ZIP_ENCODING_ENUM_ID))],
+                1,
+                V::Boolean,
+            );
+            registry.add_named_function(n("SetZip64"), vec![("mode", V::UserData(ZIP64_MODE_ENUM_ID))], V::Boolean);
+            registry.add_named_function_with(n("SetTimestamp"), vec![("date", V::Date), ("time", V::Time)], 0, V::Boolean);
+            registry.add_named_function_with(n("SetPermissions"), vec![("mode", V::Integer)], 0, V::Boolean);
+            registry.add_named_function_with(
+                n("AddFile"),
+                vec![("sourcePath", V::UnboundedString), ("entryName", V::UnboundedString)],
+                1,
+                V::Boolean,
+            );
+            registry.add_named_function(n("AddDirectory"), vec![("entryName", V::UnboundedString)], V::Boolean);
+            registry.add_named_function_with(
+                n("AddTree"),
+                vec![
+                    ("sourceDirectory", V::UnboundedString),
+                    ("prefix", V::UnboundedString),
+                    ("recursive", V::Boolean),
+                ],
+                1,
+                V::Boolean,
+            );
+            registry.add_named_function(n("AddBytes"), vec![("data", V::Bytes), ("entryName", V::UnboundedString)], V::Boolean);
+            registry.add_function(n("Finish"), Vec::new(), V::Boolean);
+            registry.add_function(n("Abort"), Vec::new(), V::Boolean);
+        }
         USER_ID => {
             for name in [
                 "Alias",

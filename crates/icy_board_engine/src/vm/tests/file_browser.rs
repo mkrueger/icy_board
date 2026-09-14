@@ -114,6 +114,189 @@ async fn fixture(root: &Path, language: &str, scenario: &str) -> (IcyBoardState,
     (state, peer)
 }
 
+#[tokio::test]
+async fn zip_writer_ppe_roundtrip_and_settings() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut state, mut peer) = fixture(root.path(), "en", "empty").await;
+    std::fs::create_dir_all(root.path().join("tree/empty")).unwrap();
+    std::fs::write(root.path().join("tree/source.txt"), "Gr\u{fc}\u{df}e").unwrap();
+    let source = r#"
+ZIPWRITER archive = Zip.Create("test.zip")
+archive.SetComment("Grüße")
+archive.SetCompression(ZipMethod.Stored)
+archive.AddBytes(TOBYTES("first"), "first.txt")
+archive.SetCompression(ZipMethod.Deflate, 9)
+archive.SetCompression(ZipMethod.Deflate, 42)
+archive.SetPermissions(384)
+DATE fixedDate = MKDATE(2024, 1, 2)
+TIME fixedTime = 45296
+IF !archive.SetTimestamp(fixedDate, fixedTime) THEN
+    ERROR failure = Error.Last()
+    PRINTLN "ZIP timestamp: ", failure.Message
+    EXIT
+ENDIF
+archive.AddFile("tree/source.txt", "named.txt")
+archive.SetPermissions()
+archive.SetTimestamp()
+archive.SetCompression(ZipMethod.Deflate)
+archive.AddTree("tree", "folder")
+archive.Finish()
+EXIT
+"#;
+    let path = root.path().join("test.ppe");
+    std::fs::write(&path, super::compile(source).to_buffer().unwrap()).unwrap();
+    assert!(state.run_ppe(&path, None).await.unwrap());
+    let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+    let rows = read_frame(&mut peer, &mut screen).await;
+    let file = std::fs::File::open(root.path().join("test.zip")).unwrap_or_else(|error| panic!("{error}: {rows:?}"));
+    let mut zip = zip::ZipArchive::new(file).unwrap();
+    assert_eq!(zip.comment(), "Gr\u{fc}\u{df}e".as_bytes());
+    assert_eq!(zip.len(), 5);
+    assert_eq!(zip.by_name("first.txt").unwrap().compression(), zip::CompressionMethod::Stored);
+    let entry = zip.by_name("named.txt").unwrap();
+    assert_eq!(entry.compression(), zip::CompressionMethod::Deflated);
+    assert_eq!(entry.unix_mode().unwrap() & 0o777, 0o600);
+    assert_eq!(
+        entry.last_modified().unwrap(),
+        zip::DateTime::from_date_and_time(2024, 1, 2, 12, 34, 56).unwrap()
+    );
+    drop(entry);
+    assert!(zip.by_name("folder/empty/").unwrap().is_dir());
+    assert_eq!(zip.by_name("folder/source.txt").unwrap().unix_mode().unwrap() & 0o777, 0o644);
+}
+
+#[tokio::test]
+async fn allfiles_ppe_exports_all_pages_and_accessible_conferences() {
+    let source = include_str!("../../../../../ppe/allfiles.pps");
+    let executable = super::compile(source).to_buffer().unwrap();
+    for language in ["en", "de"] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = fixture(root.path(), language, "files").await;
+        state.session.language = language.into();
+        state.session.tokens.clear();
+        let output_name = if language == "de" { "catalog.txt" } else { "allfiles.txt" };
+        if language == "de" {
+            state.session.tokens.push_back(output_name.into());
+        }
+        let extra_path = root.path().join("other-files");
+        let metadata_path = root.path().join("other-index");
+        std::fs::create_dir(&extra_path).unwrap();
+        let file = extra_path.join("other.zip");
+        std::fs::write(&file, b"second").unwrap();
+        let mut base = dizbase::file_base::FileBase::open(&extra_path, &metadata_path).unwrap();
+        base.set_description(&file, "Gr\u{fc}\u{df}e\nSecond description line").unwrap();
+        drop(base);
+        let mut directories = DirectoryList::default();
+        directories.push(FileDirectory {
+            name: "Other files".into(),
+            path: extra_path,
+            metadata_path,
+            ..Default::default()
+        });
+        directories.push(FileDirectory {
+            name: "HIDDEN DIRECTORY".into(),
+            list_security: "FALSE".parse().unwrap(),
+            ..Default::default()
+        });
+        let conference = Conference {
+            name: "Second conference".into(),
+            is_public: true,
+            directories: Some(Arc::new(directories)),
+            ..Default::default()
+        };
+        {
+            let mut board = state.get_board().await;
+            board.conferences.push(conference.clone());
+            board.conferences.push(Conference {
+                name: "HIDDEN CONFERENCE".into(),
+                required_security: "FALSE".parse().unwrap(),
+                ..conference
+            });
+        }
+        let path = root.path().join("allfiles.ppe");
+        std::fs::write(&path, &executable).unwrap();
+        let output_path = root.path().join(output_name);
+        std::fs::write(&output_path, "previous list").unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(15), state.run_ppe(&path, None))
+                .await
+                .expect("allfiles export timed out")
+                .unwrap()
+        );
+        let output = std::fs::read_to_string(&output_path).unwrap();
+        assert!(output.starts_with('\u{feff}'), "export must retain UTF-8 encoding");
+        assert_eq!(output.matches(" bytes | ").count(), 1031, "{language}");
+        for number in 0..1030 {
+            assert_eq!(output.matches(&format!("file{number:04}.txt | ")).count(), 1, "{language}, file {number}");
+        }
+        assert!(output.contains("file0000.txt | 2147483648 bytes | "));
+        assert!(output.contains("needle description-only match"));
+        assert!(output.contains("@HANGUP@ @CLS@ Gr\u{fc}\u{df}e"));
+        assert!(output.contains("TAIL"), "long descriptions must not be limited to 255 characters");
+        assert!(output.contains("Conference 1: Second conference"));
+        assert!(output.contains("Directory 1: Other files"));
+        assert!(output.contains("other.zip | 6 bytes | "));
+        assert!(output.contains("Gr\u{fc}\u{df}e\nSecond description line"));
+        assert!(output.contains(&format!("Total: 1031 files, {} bytes, 2 directories", 2_147_483_648_i64 + 1029 * 10 + 6)));
+        assert!(!output.contains("HIDDEN"));
+        assert!(!output.contains("private-path"));
+        assert!(!output.contains("previous list"));
+        assert!(!state.session.request_logoff);
+        assert!(state.session.tokens.is_empty());
+        assert!(!root.path().join(format!("{output_name}.1.tmp")).exists());
+    }
+}
+
+#[tokio::test]
+async fn allfiles_ppe_handles_empty_and_denied_directories() {
+    let executable = super::compile(include_str!("../../../../../ppe/allfiles.pps")).to_buffer().unwrap();
+    for (scenario, directory_count) in [("empty-index", 1), ("locked", 0), ("empty", 0)] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = fixture(root.path(), "en", scenario).await;
+        state.session.tokens.clear();
+        let path = root.path().join("allfiles.ppe");
+        std::fs::write(&path, &executable).unwrap();
+        assert!(state.run_ppe(&path, None).await.unwrap());
+        let output = std::fs::read_to_string(root.path().join("allfiles.txt")).unwrap();
+        assert!(
+            output.contains(&format!("Total: 0 files, 0 bytes, {directory_count} directories")),
+            "{scenario}: {output}"
+        );
+        assert!(!output.contains("HIDDEN"));
+    }
+}
+
+#[tokio::test]
+async fn allfiles_ppe_preserves_previous_list_on_failure() {
+    let executable = super::compile(include_str!("../../../../../ppe/allfiles.pps")).to_buffer().unwrap();
+    for scenario in ["missing-index", "create-failed", "rename-failed"] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, mut peer) = fixture(root.path(), "en", if scenario == "missing-index" { scenario } else { "empty-index" }).await;
+        state.session.tokens.clear();
+        let path = root.path().join("allfiles.ppe");
+        std::fs::write(&path, &executable).unwrap();
+        let output_path = root.path().join("allfiles.txt");
+        let temporary_path = root.path().join("allfiles.txt.1.tmp");
+        let previous_path = if scenario == "rename-failed" {
+            std::fs::create_dir(&output_path).unwrap();
+            output_path.join("previous.txt")
+        } else {
+            output_path.clone()
+        };
+        std::fs::write(&previous_path, "previous list").unwrap();
+        if scenario == "create-failed" {
+            std::fs::create_dir(&temporary_path).unwrap();
+        }
+        assert!(state.run_ppe(&path, None).await.unwrap());
+        assert_eq!(std::fs::read_to_string(previous_path).unwrap(), "previous list", "{scenario}");
+        assert_eq!(temporary_path.exists(), scenario == "create-failed", "{scenario}");
+        let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+        let rows = read_frame(&mut peer, &mut screen).await;
+        assert!(rows.iter().any(|row| row.contains("Cannot ")), "{scenario}: {rows:?}");
+        assert!(!rows.iter().any(|row| row.contains("Created ")), "{scenario}: {rows:?}");
+    }
+}
+
 async fn read_frame(peer: &mut ChannelConnection, screen: &mut VirtualScreen) -> Vec<String> {
     loop {
         let mut packet = [0; 4096];

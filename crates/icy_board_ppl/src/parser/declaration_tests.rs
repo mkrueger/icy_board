@@ -258,6 +258,8 @@ fn board_object_type_ids_are_compact() {
         ("MSGHEADER", 55),
         ("FILEENTRY", 56),
         ("FILEPAGE", 57),
+        ("ZIP", 58),
+        ("ZIPWRITER", 59),
         ("BULLETIN", 60),
         ("SURVEY", 61),
     ];
@@ -409,6 +411,9 @@ fn builtin_enum_ids_leave_room_for_wide_record_ids() {
         ("RegexOptions", 244),
         ("StringComparison", 243),
         ("Checksum", 242),
+        ("ZipMethod", 241),
+        ("Zip64Mode", 240),
+        ("ZipEncoding", 239),
     ];
 
     for (name, id) in expected {

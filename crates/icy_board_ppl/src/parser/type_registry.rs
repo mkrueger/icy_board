@@ -89,6 +89,8 @@ pub const REGEX_MATCH_ID: usize = 54;
 pub const MSG_HEADER_ID: usize = 55;
 pub const FILE_ENTRY_ID: usize = 56;
 pub const FILE_PAGE_ID: usize = 57;
+pub const ZIP_ID: usize = 58;
+pub const ZIP_WRITER_ID: usize = 59;
 pub const BULLETIN_ID: usize = 60;
 pub const SURVEY_ID: usize = 61;
 
@@ -108,6 +110,9 @@ pub const HTTP_METHOD_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 10;
 pub const REGEX_OPTIONS_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 11;
 pub const STRING_COMPARISON_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 12;
 pub const CHECKSUM_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 13;
+pub const ZIP_METHOD_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 14;
+pub const ZIP64_MODE_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 15;
+pub const ZIP_ENCODING_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 16;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -127,7 +132,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 14;
+pub const BUILTIN_ENUM_COUNT: usize = 17;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = 65_536;
@@ -411,6 +416,9 @@ impl UserTypeRegistry {
         self.set_enum_domain(REGEX_OPTIONS_ENUM_ID, (0..64).collect());
         self.register_enum(STRING_COMPARISON_ENUM_ID, "StringComparison", &[("Ordinal", 0), ("OrdinalIgnoreCase", 1)]);
         self.register_enum(CHECKSUM_ENUM_ID, "Checksum", &[("CRC32", 0), ("MD5", 1), ("SHA256", 2)]);
+        self.register_enum(ZIP_METHOD_ENUM_ID, "ZipMethod", &[("Deflate", 8), ("Stored", 0)]);
+        self.register_enum(ZIP64_MODE_ENUM_ID, "Zip64Mode", &[("Auto", 0), ("Never", 1)]);
+        self.register_enum(ZIP_ENCODING_ENUM_ID, "ZipEncoding", &[("Utf8", 0), ("Cp437", 1)]);
     }
 
     /// Retain the existing builtin metadata without inventing member names.

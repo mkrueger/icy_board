@@ -2773,6 +2773,26 @@
     "named": false
   },
   {
+    "type": "ZIP",
+    "named": false
+  },
+  {
+    "type": "ZIP64MODE",
+    "named": false
+  },
+  {
+    "type": "ZIPENCODING",
+    "named": false
+  },
+  {
+    "type": "ZIPMETHOD",
+    "named": false
+  },
+  {
+    "type": "ZIPWRITER",
+    "named": false
+  },
+  {
     "type": "[",
     "named": false
   },

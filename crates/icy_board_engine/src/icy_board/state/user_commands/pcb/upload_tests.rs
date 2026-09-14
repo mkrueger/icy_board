@@ -833,6 +833,70 @@ async fn native_upload_command_retains_single_names_but_enabled_batch_describes_
 }
 
 #[tokio::test]
+async fn issue_27_upload_waits_for_sender_and_does_not_report_empty_batch_success() {
+    use icy_net::protocol::{Header, HeaderType, ZFrameType};
+
+    for empty_batch in [false, true] {
+        let (root, mut state, mut peer) = fixture("known description\r\r\r").await;
+        state.session.tokens.push_back("UPLOAD.BIN".into());
+        state.session.current_user.as_mut().unwrap().protocol = "Z".into();
+        state.get_board().await.config.file_transfer.promote_to_batch_transfers = true;
+        let source = root.path().join("UPLOAD.BIN");
+        std::fs::write(&source, b"delayed upload contents").unwrap();
+
+        timeout(Duration::from_secs(10), async {
+            let upload = state.upload_file();
+            tokio::pin!(upload);
+            let read_handshake = async {
+                let mut can_count = 0;
+                loop {
+                    if let Ok(Some(header)) = Header::read(&mut peer, &mut can_count).await
+                        && header.frame_type == ZFrameType::RIinit
+                    {
+                        break;
+                    }
+                }
+            };
+            tokio::select! {
+                result = &mut upload => panic!("upload exited before the sender was ready: {result:?}"),
+                () = read_handshake => {}
+            }
+            assert!(
+                timeout(Duration::from_secs(1), &mut upload).await.is_err(),
+                "upload did not wait for file selection"
+            );
+
+            let (result, ()) = tokio::join!(&mut upload, async {
+                if empty_batch {
+                    Header::empty(ZFrameType::Fin).write(&mut peer, HeaderType::Hex, false).await.unwrap();
+                    assert_eq!(Header::read(&mut peer, &mut 0).await.unwrap().unwrap().frame_type, ZFrameType::Fin);
+                    peer.send(b"OO").await.unwrap();
+                } else {
+                    let mut sender = Zmodem::new(1024);
+                    let mut transfer = sender.initiate_send(&mut peer, std::slice::from_ref(&source)).await.unwrap();
+                    while !transfer.is_finished {
+                        sender.update_transfer(&mut peer, &mut transfer).await.unwrap();
+                    }
+                }
+            });
+            result.unwrap();
+        })
+        .await
+        .expect("delayed upload command stalled");
+
+        let text = output(&mut peer).await;
+        assert_eq!(text.contains("Transfer Successful"), !empty_batch, "{text:?}");
+        assert_eq!(text.contains("Thanks for the file(s)"), !empty_batch, "{text:?}");
+        assert_eq!(text.contains("Transfer Aborted"), empty_batch, "{text:?}");
+        assert_eq!(root.path().join("public/UPLOAD.BIN").exists(), !empty_batch);
+        assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_uploads, u64::from(!empty_batch));
+        if !empty_batch {
+            assert_eq!(std::fs::read(root.path().join("public/UPLOAD.BIN")).unwrap(), b"delayed upload contents");
+        }
+    }
+}
+
+#[tokio::test]
 async fn paired_zmodem_receives_native_names_and_stops_no_batch_after_first_payload() {
     use icy_net::protocol::{Header, ZFrameType};
     for (limit, cancel_after_first) in [(1, false), (32000, false), (32000, true)] {
