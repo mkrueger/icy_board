@@ -99,6 +99,15 @@ mod tests {
             assert!(loader.get("hint-type-calendar-date").contains(calendar));
             assert!(loader.get("hint-type-clock-time").contains(empty));
             assert!(loader.get("hint-type-timestamp").contains(empty));
+            let clock = loader.get("hint-type-clock-time");
+            for term in [
+                "TIME - TIME",
+                "DOUBLE",
+                "TIME +/-",
+                if locale == "en" { "wraps at midnight" } else { "mit Tagesumbruch" },
+            ] {
+                assert!(clock.contains(term), "{locale}: {term}: {clock}");
+            }
             for key in [
                 "hint-temporal-empty",
                 "hint-temporal-parse",

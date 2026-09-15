@@ -258,6 +258,9 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             return Some(VariableValue::new_bool(result));
         }
         let right = binary.get_right_expression().visit(self)?;
+        if crate::executable::temporal::time_arithmetic_type(binary.get_op(), left.vtype, right.vtype).is_some() {
+            return crate::executable::temporal::time_arithmetic(binary.get_op(), &left, &right).ok();
+        }
         if left.vtype.is_temporal() || right.vtype.is_temporal() {
             if left.vtype != right.vtype {
                 return None;

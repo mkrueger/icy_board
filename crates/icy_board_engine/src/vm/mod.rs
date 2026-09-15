@@ -584,12 +584,16 @@ impl VirtualMachine<'_> {
     }
 
     fn apply_bin_op(op: BinOp, mut left: VariableValue, mut right: VariableValue) -> Res<VariableValue> {
+        if crate::executable::temporal::time_arithmetic_type(op, left.vtype, right.vtype).is_some() {
+            return crate::executable::temporal::time_arithmetic(op, &left, &right)
+                .map_err(|message| crate::executable::VMError::InvalidTemporalValue(message).into());
+        }
         if left.vtype.is_temporal() || right.vtype.is_temporal() {
             let comparable = |typ| crate::executable::temporal::widened_temporal_type(typ).unwrap_or(typ);
             let target = comparable(left.vtype);
             if target != comparable(right.vtype) || !matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq)
             {
-                return Err(crate::executable::VMError::InvalidTemporalValue("Temporal values only support same-type comparisons".into()).into());
+                return Err(crate::executable::VMError::InvalidTemporalValue("Unsupported temporal operator or operand types".into()).into());
             }
             left = left.convert_to(target)?;
             right = right.convert_to(target)?;

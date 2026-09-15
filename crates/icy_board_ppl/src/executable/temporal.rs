@@ -2,6 +2,48 @@ use chrono::{DateTime, Datelike, NaiveDate, NaiveTime, SecondsFormat, Timelike, 
 
 use super::{GenericVariableData, VariableType, VariableValue};
 
+pub fn time_arithmetic_type(op: crate::ast::BinOp, left: VariableType, right: VariableType) -> Option<VariableType> {
+    use crate::ast::BinOp;
+    use VariableType as V;
+    match (op, left, right) {
+        (BinOp::Sub, V::ClockTime, V::ClockTime | V::Time) | (BinOp::Sub, V::Time, V::ClockTime) => Some(V::Double),
+        (
+            BinOp::Add | BinOp::Sub,
+            V::ClockTime,
+            V::Integer | V::SWord | V::SByte | V::Byte | V::Word | V::Unsigned | V::Long | V::ULong | V::Float | V::Double,
+        ) => Some(V::ClockTime),
+        _ => None,
+    }
+}
+
+pub fn time_arithmetic(op: crate::ast::BinOp, left: &VariableValue, right: &VariableValue) -> Result<VariableValue, String> {
+    let result_type = time_arithmetic_type(op, left.vtype, right.vtype).ok_or("Unsupported TIME arithmetic")?;
+    let clock = |value: &VariableValue| -> Result<NaiveTime, String> {
+        match value.try_temporal_conversion(VariableType::ClockTime)?.temporal() {
+            Some(TemporalValue::Time(Some(time))) => Ok(time),
+            _ => Err("TIME arithmetic requires nonempty values".into()),
+        }
+    };
+    let start = clock(left)?;
+    if result_type == VariableType::Double {
+        let difference = start.signed_duration_since(clock(right)?);
+        return Ok(VariableValue::new_double(
+            difference.num_nanoseconds().ok_or("TIME difference out of range")? as f64 / 1_000_000_000.0,
+        ));
+    }
+    let seconds = match right.vtype {
+        VariableType::Float | VariableType::Double => right.as_double() % 86_400.0,
+        VariableType::ULong | VariableType::Unsigned => (right.as_ulong() % 86_400) as f64,
+        _ => (right.as_long() % 86_400) as f64,
+    };
+    if !seconds.is_finite() {
+        return Err("TIME offset must be finite".into());
+    }
+    let nanoseconds = (seconds * 1_000_000_000.0).round() as i64;
+    let offset = chrono::TimeDelta::nanoseconds(if op == crate::ast::BinOp::Sub { -nanoseconds } else { nanoseconds });
+    Ok(VariableValue::new_temporal(TemporalValue::Time(Some(start.overflowing_add_signed(offset).0))))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
 pub enum TemporalOp {
@@ -551,6 +593,74 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn temporal_time_arithmetic_preserves_fractional_seconds_and_wraps_shifts() {
+        use crate::ast::BinOp;
+        let clock = |text: &str| VariableValue::new_string(text.to_string()).convert_to(VariableType::ClockTime).unwrap();
+        let start = clock("23:59:59.750000001");
+        let later = clock("23:59:59.875000001");
+        let difference = time_arithmetic(BinOp::Sub, &later, &start).unwrap();
+        assert_eq!(difference.vtype, VariableType::Double);
+        assert_eq!(difference.as_double(), 0.125);
+        assert_eq!(
+            time_arithmetic(BinOp::Add, &start, &VariableValue::new_double(0.5)).unwrap(),
+            clock("00:00:00.250000001")
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Sub, &clock("00:00:00.25"), &VariableValue::new_double(0.5)).unwrap(),
+            clock("23:59:59.75")
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Sub, &clock("00:01:00"), &clock("23:59:00")).unwrap().as_double(),
+            -86280.0
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Add, &start, &VariableValue::new_double(-0.5)).unwrap(),
+            clock("23:59:59.250000001")
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Sub, &start, &VariableValue::new_double(-0.5)).unwrap(),
+            clock("00:00:00.250000001")
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Add, &start, &VariableValue::new_double(172800.5)).unwrap(),
+            clock("00:00:00.250000001")
+        );
+        let midnight = clock("00:00:00");
+        for count in [i64::MIN, i64::MAX] {
+            let expected = VariableValue::new_time(count.rem_euclid(86400) as i32)
+                .convert_to(VariableType::ClockTime)
+                .unwrap();
+            assert_eq!(time_arithmetic(BinOp::Add, &midnight, &VariableValue::new_long(count)).unwrap(), expected);
+        }
+        let largest_unsigned = VariableValue::new_unsigned(u64::MAX).convert_to(VariableType::ULong).unwrap();
+        let expected = VariableValue::new_time((u64::MAX % 86400) as i32).convert_to(VariableType::ClockTime).unwrap();
+        assert_eq!(time_arithmetic(BinOp::Add, &midnight, &largest_unsigned).unwrap(), expected);
+        assert_eq!(
+            time_arithmetic(BinOp::Sub, &clock("00:00:01.5"), &VariableValue::new_time(1))
+                .unwrap()
+                .as_double(),
+            0.5
+        );
+        assert_eq!(
+            time_arithmetic(BinOp::Sub, &VariableValue::new_time(1), &clock("00:00:01.5"))
+                .unwrap()
+                .as_double(),
+            -0.5
+        );
+        assert_eq!(time_arithmetic_type(BinOp::Sub, VariableType::Time, VariableType::Time), None);
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(time_arithmetic(BinOp::Add, &start, &VariableValue::new_double(invalid)).is_err());
+        }
+        let empty = VariableType::ClockTime.create_empty_value();
+        assert!(time_arithmetic(BinOp::Sub, &empty, &start).is_err());
+        assert!(time_arithmetic(BinOp::Sub, &start, &empty).is_err());
+        assert!(time_arithmetic(BinOp::Add, &empty, &VariableValue::new_int(1)).is_err());
+        for op in [BinOp::Add, BinOp::Mul, BinOp::Div, BinOp::Mod, BinOp::PoW] {
+            assert!(time_arithmetic(op, &start, &later).is_err());
+        }
     }
 
     #[test]

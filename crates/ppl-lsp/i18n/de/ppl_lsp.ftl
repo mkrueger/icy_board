@@ -52,7 +52,7 @@ hint-keyword-usage=Verwendung
 hint-const-builtin=Eine vordefinierte PPL-Konstante.
 
 hint-type-calendar-date=Validiertes Kalenderdatum ohne Zeitzone (PPL 400). ISO-Text YYYY-MM-DD und separater Leerwert. Kalendermethoden statt Ganzzahlarithmetik verwenden.
-hint-type-clock-time=Tageszeit ohne Zeitzone (PPL 400) mit Nanosekunden. Mitternacht ist nicht leer.
+hint-type-clock-time=Tageszeit ohne Zeitzone (PPL 400) mit Nanosekunden. Mitternacht ist nicht leer. TIME - TIME liefert vorzeichenbehaftete Sekunden als DOUBLE einschließlich Bruchteilen, ohne Tagesumbruch. TIME +/- numerische Sekunden verschiebt die Uhrzeit mit Tagesumbruch und Rundung auf die nächste Nanosekunde. Leere Operanden und nicht endliche Offsets lösen Fehler aus.
 hint-type-timestamp=UTC-Zeitpunkt (PPL 400) mit Nanosekunden und RFC3339-Text. Die Unix-Epoche ist nicht leer.
 hint-temporal-empty=Nur beim Leerwert wahr, nicht bei Mitternacht oder der Unix-Epoche.
 hint-temporal-parse=Liest ISO-Datums-/Zeittext. TIMESTAMP verlangt einen RFC3339-Offset und normalisiert auf UTC. Leerer Text ergibt den Leerwert; ungültige Eingaben lösen einen Fehler aus.

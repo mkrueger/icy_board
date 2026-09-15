@@ -52,7 +52,7 @@ hint-keyword-usage=Usage
 hint-const-builtin=A predefined PPL constant.
 
 hint-type-calendar-date=Validated calendar date without a timezone (PPL 400). ISO YYYY-MM-DD text; a separate empty value. Use calendar methods instead of integer arithmetic.
-hint-type-clock-time=Time of day without a timezone (PPL 400), with nanosecond precision. Midnight is not empty.
+hint-type-clock-time=Time of day without a timezone (PPL 400), with nanosecond precision. Midnight is not empty. TIME - TIME returns signed seconds as DOUBLE, including fractions, without wrapping. TIME +/- numeric seconds shifts the clock and wraps at midnight, rounding to the nearest nanosecond. Empty operands and non-finite offsets raise errors.
 hint-type-timestamp=UTC instant (PPL 400), with nanosecond precision and RFC3339 text. The Unix epoch is not empty.
 hint-temporal-empty=True only for the empty value, not midnight or the Unix epoch.
 hint-temporal-parse=Parses ISO date/time text. TIMESTAMP requires an RFC3339 offset and normalizes to UTC. Empty text yields an empty value; invalid input raises an error.

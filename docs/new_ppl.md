@@ -92,7 +92,34 @@ File codec failures use `FERR`/`Error.Last()` and preserve the destination.
 `Format` uses Chrono strftime directives, for example `%d-%m-%Y`. Invalid
 directives or components unavailable on the type are errors. Values of the
 same kind can be compared, including a native value against a legacy one; use
-methods instead of integer arithmetic or `INC`/`DEC`.
+methods for calendar and timestamp changes instead of integer arithmetic or
+`INC`/`DEC`.
+
+Native `TIME` supports these arithmetic operations:
+
+| Expression | Result |
+| --- | --- |
+| `later - earlier` (both `TIME`) | Signed seconds as `DOUBLE`, including fractional seconds |
+| `clock + seconds` | New `TIME`, shifted forward by the numeric seconds |
+| `clock - seconds` | New `TIME`, shifted backward by the numeric seconds |
+
+Offsets may be negative or fractional; shifts round to the nearest nanosecond
+and wrap at midnight. `+=` and `-=` also work. Differences do not wrap:
+`00:01:00 - 23:59:00` is `-86280` seconds. Use `TIMESTAMP` for elapsed time
+across dates. Empty operands and non-finite offsets raise errors. `TIME + TIME`,
+numeric-left arithmetic, multiplication, division, remainder and powers remain
+invalid. Mixed native/legacy `TIME` subtraction widens the legacy operand;
+pure legacy arithmetic is unchanged.
+
+```ppl
+TIME started = TIME.Now()
+TIME deadline = started + 60
+DOUBLE elapsed = TIME.Now() - started
+IF elapsed <= 60 THEN
+	PRINTLN "Within one minute"
+ENDIF
+```
+
 `CONST DATE value = "1983-09-15"` and analogous `TIME`/`TIMESTAMP`
 constants validate at compile time. Arrays, record fields and typed routine
 parameters/results preserve the value types.

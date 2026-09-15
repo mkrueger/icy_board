@@ -82,6 +82,9 @@ impl SemanticVisitor {
                 self.reject_bare_array_value(binary.get_right_expression());
                 return VariableType::None;
             }
+            if let Some(result) = crate::executable::temporal::time_arithmetic_type(binary.get_op(), left, right) {
+                return result;
+            }
             if comparable_temporal(left) == comparable_temporal(right)
                 && matches!(
                     binary.get_op(),

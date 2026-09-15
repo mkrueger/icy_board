@@ -6,6 +6,127 @@ use crate::executable::{EntryType, VariableType};
 use super::{compile, compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn temporal_time_arithmetic_executes_in_ppe() {
+    assert_eq!(
+        run_ppl(
+            r#"
+;$LANGVERSION 400
+TIME started = TIME.Parse("12:34:30.125")
+TIME finished = started + 59.5
+BYTE minutes = 1
+IF finished - started <= 60 * minutes THEN
+    PRINTLN "within limit"
+ENDIF
+PRINTLN finished - started, "|", started - finished
+finished += 1.25
+finished -= 0.5
+PRINTLN finished, "|", (finished - 60).Second
+TIME midnight = TIME.Parse("23:59:59.750000001") + 0.5
+PRINTLN midnight, "|", midnight - 0.5
+PRINTLN TIME.Parse("00:01:00") - TIME.Parse("23:59:00")
+CONST TIME baseline = "12:34:30.125"
+CONST TIME shifted = baseline + 59.5
+CONST DOUBLE elapsed = shifted - baseline
+PRINTLN shifted, "|", elapsed
+TIME current = TIME.Now()
+PRINTLN current - current
+"#
+        ),
+        "within limit\n59.5|-59.5\n12:35:30.375|30\n00:00:00.250000001|23:59:59.750000001\n-86280\n12:35:29.625|59.5\n0\n"
+    );
+}
+
+#[test]
+fn temporal_time_arithmetic_decompiled_sources_execute() {
+    let original = compile(
+        r#";$LANGVERSION 340
+TIME started, finished, current
+BYTE minutes
+minutes = 1
+IF (minutes) THEN
+    started = TOTIME("12:34:30")
+    KBDCHKOFF
+ENDIF
+finished = TOTIME("12:35:30")
+IF (finished - started <= 60 * minutes) PRINTLN "within limit"
+PRINTLN finished - started
+current = TIME()
+PRINTLN current - current
+END
+"#,
+    );
+    for language in [340, 400] {
+        for raw in [false, true] {
+            let (ast, issues) = crate::decompiler::decompile(original.clone(), raw, language).unwrap();
+            assert!(issues.is_empty());
+            let source = ast.to_string();
+            assert!(!source.contains("ToLegacy"), "{source}");
+            assert_eq!(run_ppl(&source), "within limit\n60\n0\n", "{source}");
+        }
+    }
+    let native = compile(
+        "TIME current = TIME.Now()\nPRINTLN current - current\nTIME started = TIME.Parse(\"12:34:30.125\")\nTIME finished = started + 0.5\nPRINTLN finished - started <= 60\nPRINTLN finished - started",
+    );
+    for raw in [false, true] {
+        let (ast, issues) = crate::decompiler::decompile(native.clone(), raw, 400).unwrap();
+        assert!(issues.is_empty());
+        let source = ast.to_string();
+        assert!(source.to_ascii_uppercase().contains("TIME.NOW()"), "{source}");
+        assert!(!source.contains("ToLegacy"), "{source}");
+        assert_eq!(run_ppl(&source), "0\n1\n0.5\n", "{source}");
+    }
+}
+
+#[test]
+fn temporal_time_arithmetic_rejects_invalid_operands() {
+    for expression in [
+        "clock + clock",
+        "clock * 2",
+        "clock / 2",
+        "clock % 2",
+        "clock ^ 2",
+        "2 + clock",
+        "2 - clock",
+        "clock + flag",
+        "clock + \"1\"",
+        "clock + DATE.Today()",
+        "clock - TIMESTAMP.Now()",
+        "-clock",
+        "clock + clocks",
+    ] {
+        let source = format!("TIME clock\nTIME clocks[1]\nBOOLEAN flag\nPRINT {expression}");
+        assert!(!compile_errors(&source).is_empty(), "{source}");
+    }
+    for expression in ["clock + 1", "clock - 1", "clock - TIME.Now()", "TIME.Now() - clock"] {
+        let source = format!("TIME clock\nPRINT {expression}");
+        let (result, _, ()) =
+            super::try_run_executable_collecting_inspected(compile(&source), |_| {}, &[], None, b"", false, super::TestPpeBoundary::Vm, |_| ());
+        assert!(
+            matches!(
+                result.unwrap_err().downcast_ref::<crate::executable::VMError>(),
+                Some(crate::executable::VMError::InvalidTemporalValue(_))
+            ),
+            "{source}"
+        );
+    }
+    use crate::{ast::BinOp, executable::VariableValue, vm::VirtualMachine};
+    let clock = VariableValue::new_time(43200).convert_to(VariableType::ClockTime).unwrap();
+    for seconds in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for operation in [BinOp::Add, BinOp::Sub] {
+            assert!(VirtualMachine::apply_bin_op(operation, clock.clone(), VariableValue::new_double(seconds)).is_err());
+        }
+    }
+    for seconds in [-1, 86400] {
+        let invalid = VariableValue {
+            vtype: VariableType::Time,
+            ..VariableValue::new_int(seconds)
+        };
+        assert!(VirtualMachine::apply_bin_op(BinOp::Sub, clock.clone(), invalid.clone()).is_err());
+        assert!(VirtualMachine::apply_bin_op(BinOp::Sub, invalid, clock.clone()).is_err());
+    }
+}
+
+#[test]
 fn temporal_legacy_comparisons_propagate_conversion_errors() {
     use crate::{ast::BinOp, executable::VariableValue, vm::VirtualMachine};
     let native = VariableValue::new_time(43200).convert_to(VariableType::ClockTime).unwrap();
