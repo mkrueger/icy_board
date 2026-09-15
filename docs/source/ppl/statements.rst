@@ -3979,8 +3979,10 @@ SOUND (1.00)
     * :PPL:`freq` – Frequency in hertz (0 to turn off)
 
   **Remarks**
-    Generates tones on local PC speaker only. No effect on remote computer. Works only with 
-    built-in speaker, not sound cards. Pass frequency in hertz to generate tone, or 0 to turn off.
+    Generates tones on the speaker of the machine the board runs on, not the caller's.
+    Heard when a terminal on that machine is showing the session - a local login, or a
+    sysop monitoring the node. Pass a frequency in hertz to gate the speaker on, or 0 to
+    turn it off; the tone holds until then. The speaker is silenced when the PPE ends.
 
   **Example**
 
@@ -4009,8 +4011,8 @@ SOUNDDELAY (3.20)
   :PPL:`STATEMENT SOUNDDELAY(INTEGER frequency, INTEGER duration)`
 
   **Parameters**
-    * :PPL:`frequency` – PC speaker tone frequency (legacy; ignored on some modern hosts)
-    * :PPL:`duration`  – Clock ticks to sound (~18 ticks = 1 second)
+    * :PPL:`frequency` – Speaker tone frequency in hertz
+    * :PPL:`duration`  – Hundredths of a second to sound (100 = 1 second)
 
   **Returns**
     None
@@ -4018,6 +4020,7 @@ SOUNDDELAY (3.20)
   **Description**
     Produces a tone for the specified duration. Introduced to replace the DOS two-step
     SOUND on / SOUND off sequence (not portable to OS/2 or modern systems) with a single call.
+    The call blocks while the tone sounds, as the original did.
 
   **Example**
 
@@ -4026,7 +4029,8 @@ SOUNDDELAY (3.20)
        IF (inputVal <> validVal) SOUNDDELAY 500,18
 
   **Notes**
-    May be a no-op on non-emulated systems. Consider providing a visual fallback.
+    Sounds on the board machine's speaker, under the same conditions as :PPL:`SOUND`.
+    A node nobody is watching stays silent, so provide a visual fallback as well.
 
 SPRINT (1.00)
 ~~~~~~~~~~~~~

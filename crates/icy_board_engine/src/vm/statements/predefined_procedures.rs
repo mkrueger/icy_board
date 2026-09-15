@@ -1591,8 +1591,15 @@ pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     }
     Ok(())
 }
+/// `SOUND freq` - gates the speaker on at `freq` until `SOUND 0`, as the original did
+/// with the 8253. The speaker is the board machine's, not the caller's.
 pub async fn sound(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::warn!("SOUND is not supported");
+    // The original masked the frequency to 16 bits.
+    let frequency = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() & 0xFFFF;
+    stop_speaker_tone(vm).await?;
+    if frequency > 0 {
+        start_speaker_tone(vm, frequency, None).await?;
+    }
     Ok(())
 }
 
@@ -3113,9 +3120,22 @@ pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
     Ok(())
 }
+/// `SOUNDDELAY freq, duration` - one tone, then silence. `duration` counts hundredths
+/// of a second: the original handed it to `mydelay`, which reads it that way, and the
+/// call blocked for exactly as long as it sounded.
 pub async fn sounddelay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    log::warn!("SOUNDDELAY is not supported");
-    Ok(())
+    let frequency = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() & 0xFFFF;
+    let hundredths = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
+    stop_speaker_tone(vm).await?;
+    if hundredths <= 0 {
+        return Ok(());
+    }
+    let milliseconds = (hundredths as u32).saturating_mul(10);
+    if frequency > 0 {
+        start_speaker_tone(vm, frequency, Some(milliseconds)).await?;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(u64::from(milliseconds))).await;
+    stop_speaker_tone(vm).await
 }
 
 pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -3395,6 +3415,45 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
         send_audio_apc(vm, &format!("Update;C={channel}")).await?;
     }
     Ok(())
+}
+
+/// The speaker `SOUND` drives. Channel 1 is outside the range `AUDIO` hands out, so a
+/// 4.00 PPE playing music on a local session keeps its channels.
+const SPEAKER_CHANNEL: u8 = 1;
+const SPEAKER_SLOT: u8 = 1;
+
+async fn send_speaker_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
+    let sequence = format!("\x1b_SyncTERM:A;{body}\x1b\\");
+    vm.icy_board_state.send_to_local_terminals(sequence.as_bytes()).await
+}
+
+/// Sounds `frequency` on the speaker of the machine the board runs on, holding it until
+/// something stops it when no length is given.
+async fn start_speaker_tone(vm: &mut VirtualMachine<'_>, frequency: i32, milliseconds: Option<u32>) -> Res<()> {
+    if !vm.icy_board_state.has_local_terminal().await {
+        return Ok(());
+    }
+    let frequency = frequency.clamp(20, 20_000);
+    let duration = match milliseconds {
+        Some(milliseconds) => format!("{milliseconds}ms"),
+        // Whole periods, so a held tone loops without a click, and at least a tenth of
+        // a second of them, so the loop is not a stutter at high frequencies.
+        None => format!("{}p", (frequency / 10).clamp(20, 2000)),
+    };
+    let looping = if milliseconds.is_none() { ";L" } else { "" };
+    send_speaker_apc(vm, &format!("Synth;S={SPEAKER_SLOT};W=SQ;F={frequency};T={duration}")).await?;
+    send_speaker_apc(vm, &format!("Queue;C={SPEAKER_CHANNEL};S={SPEAKER_SLOT}{looping}")).await?;
+    vm.icy_board_state.speaker_sounding = true;
+    Ok(())
+}
+
+/// Silences the speaker. Doing this to silence is not an error, as `nosound()` was not.
+async fn stop_speaker_tone(vm: &mut VirtualMachine<'_>) -> Res<()> {
+    if !vm.icy_board_state.speaker_sounding {
+        return Ok(());
+    }
+    vm.icy_board_state.speaker_sounding = false;
+    send_speaker_apc(vm, &format!("Flush;C={SPEAKER_CHANNEL};O=0")).await
 }
 
 /// `LOADAUDIO file$` - takes a channel for a file and answers the `AUDIO` holding it.

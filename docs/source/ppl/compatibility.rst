@@ -133,16 +133,6 @@ Substituted values
    * - Opcode
      - Answers with
      - Why
-   * - :PPL:`SOUND`
-     - nothing
-     - Sounds a tone on the PC speaker of the machine the board runs on, not
-       the caller's. On a DOS BBS that was the sysop's own machine sitting in
-       the room. There is no speaker to drive here, and a server beeping at an
-       empty room helps nobody. Use :PPL:`PRINT CHR(7)` to ring the *caller's*
-       terminal bell instead, which is almost always what a PPE actually wants.
-   * - :PPL:`SOUNDDELAY`
-     - nothing
-     - The same, with a duration.
    * - :PPL:`GETDRIVE`
      - `0`
      - The current DOS drive letter. There are no drive letters, so this
@@ -184,6 +174,14 @@ The FidoNet outbound queue is the other partial family: :PPL:`FDOQADD`,
 :PPL:`FDOQMOD` and :PPL:`FDOQDEL` queue and remove files and :PPL:`FDORDORG` and
 :PPL:`FDOQRD` read them back, but the crash flavour is ignored and only a single
 origin line is kept, as the FidoNet section above describes.
+
+:PPL:`SOUND` and :PPL:`SOUNDDELAY` drive the speaker of the machine the board
+runs on, never the caller's — the same as the original, where the tone came out
+of the sysop's own machine sitting in the room. They are heard when a terminal
+on that machine is showing the session: a local login, or a sysop monitoring the
+node. A node nobody is watching stays silent, which is the one thing a DOS board
+with its console always attached could not do. To reach the *caller* instead,
+print :PPL:`CHR(7)` or use the :PPL:`AUDIO` object.
 
 Differences worth knowing
 -------------------------

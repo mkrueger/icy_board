@@ -74,6 +74,9 @@ const GFX_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 /// probed together so no answer has to arrive from behind an upload.
 pub(crate) const SOUND_FORMATS: &[(i32, u32, u32)] = &[(1, 1, 2), (2, 2, 2), (3, 23, 2), (4, 32, 96), (5, 32, 100)];
 
+/// What `@BEEP@`, `BEEP` and `PRINT CHR(7)` all come down to.
+const BELL: char = '\x07';
+
 fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed: Duration) -> bool {
     !is_local && enabled && minutes > 0 && elapsed >= Duration::from_secs(u64::from(minutes) * 60)
 }
@@ -728,6 +731,10 @@ pub struct IcyBoardState {
 
     pub sound_active: [bool; 14],
 
+    /// Whether `SOUND` has the speaker gated on, so it can be silenced when the PPE
+    /// ends the way `nosound()` did.
+    pub(crate) speaker_sounding: bool,
+
     /// The file each `AUDIO` channel was loaded from, indexed by logical channel.
     ppl_audio: [Option<(String, crate::compiler::user_data::ResourceIdentity)>; 14],
 
@@ -891,6 +898,7 @@ impl IcyBoardState {
             media_upload_bytes: 0,
             sound_volume: [100; 14],
             sound_active: [false; 14],
+            speaker_sounding: false,
             ppl_audio: std::array::from_fn(|_| None),
             sound_formats: HashMap::new(),
             media_probed: false,
@@ -1406,6 +1414,9 @@ impl IcyBoardState {
             }
         }
         self.sound_active.fill(false);
+        if std::mem::take(&mut self.speaker_sounding) {
+            let _ = self.send_to_local_terminals(b"\x1b_SyncTERM:A;Flush;C=1;O=0\x1b\\").await;
+        }
         self.ppl_audio_notify.set_watching(false);
         self.reset_ppl_input_parsers();
         self.ppl_audio.fill(None);
@@ -2803,6 +2814,17 @@ impl IcyBoardState {
         let mut buf = [0; 4];
 
         for c in data {
+            // CP437 spells 0x07 as a bullet, so the bell has to skip the translation
+            // table it would otherwise be lost in - and it prints nothing either way.
+            if *c == BELL {
+                if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
+                    user_bytes.push(BELL as u8);
+                }
+                if target != TerminalTarget::User {
+                    sysop_bytes.push(BELL as u8);
+                }
+                continue;
+            }
             if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
                 if user_is_utf8 {
                     let _ = self.user_screen.print_char(*c);
@@ -4411,7 +4433,32 @@ impl IcyBoardState {
     }
 
     pub async fn bell(&mut self) -> Res<()> {
-        self.write_raw(TerminalTarget::Both, &['\x07']).await
+        self.write_raw(TerminalTarget::Both, &[BELL]).await
+    }
+
+    /// Whether a terminal on this machine is showing this session: a local login, or a
+    /// sysop watching the node. Nothing else has a speaker the board may use.
+    pub(crate) async fn has_local_terminal(&mut self) -> bool {
+        if self.session.is_local {
+            return true;
+        }
+        let node_state = self.node_state.lock().await;
+        node_state[self.node].as_ref().is_some_and(|state| state.sysop_connection.is_some())
+    }
+
+    /// Bytes only for a terminal attached to this machine. A remote caller never sees
+    /// them, because what they drive is the board's own speaker.
+    pub(crate) async fn send_to_local_terminals(&mut self, bytes: &[u8]) -> Res<()> {
+        if self.session.is_local {
+            return self.connection.send(bytes).await;
+        }
+        let mut node_state = self.node_state.lock().await;
+        if let Some(state) = node_state[self.node].as_mut()
+            && let Some(sysop_connection) = &mut state.sysop_connection
+        {
+            let _ = sysop_connection.send(bytes).await;
+        }
+        Ok(())
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
@@ -4725,6 +4772,101 @@ mod screen_tests {
 
     fn attribute_of(screen: &VirtualScreen) -> u8 {
         screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink)
+    }
+
+    /// CP437 spells 0x07 as a bullet, so a translated bell reaches the caller as a dot
+    /// and moves the caret with it.
+    #[tokio::test]
+    async fn the_bell_goes_out_as_a_bell_on_either_encoding() {
+        for utf8 in [true, false] {
+            let (mut state, mut peer) = graphics_state().await;
+            state.session.term_caps.is_utf8 = utf8;
+
+            state.bell().await.unwrap();
+
+            let mut buffer = [0; 8];
+            let size = peer.read(&mut buffer).await.unwrap();
+            assert_eq!(&buffer[..size], b"\x07", "utf8: {utf8}");
+            assert_eq!(state.user_screen.buffer.caret.position(), icy_engine::Position::default(), "utf8: {utf8}");
+            assert_eq!(state.sysop_screen.buffer.caret.position(), icy_engine::Position::default(), "utf8: {utf8}");
+        }
+    }
+
+    #[tokio::test]
+    async fn chr7_prints_a_bell_without_a_visible_character() {
+        use crate::{
+            compiler::{PPECompiler, workspace::Workspace},
+            parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+        };
+
+        for version in [340, 400] {
+            let registry = UserTypeRegistry::icy_board_registry();
+            let errors = Arc::new(std::sync::Mutex::new(ErrorReporter::default()));
+            let mut workspace = Workspace::default();
+            workspace.package.runtime = Some(version);
+            workspace.set_default_language_version(Some(version));
+            let source = "INTEGER bellCode\nbellCode = 7\nPRINT \"A\", CHR(7), CHR(bellCode), \"B\", ASC(CHR(bellCode))";
+            let ast = parse_ast(PathBuf::from("bell.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+            let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+            compiler.compile(&[&ast]);
+            assert!(errors.lock().unwrap().errors.is_empty());
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("bell.ppe");
+            std::fs::write(&path, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
+            let executable = crate::executable::Executable::read_file(&path, false).unwrap();
+
+            for utf8 in [false, true] {
+                for (width, height) in [(80, 25), (132, 43)] {
+                    let (mut state, mut peer) = graphics_state().await;
+                    state.session.term_caps.is_utf8 = utf8;
+                    state.set_terminal_size(width, height);
+                    let mut io = crate::vm::DiskIO::new(directory.path().to_str().unwrap(), None);
+                    crate::vm::run(&path, &executable, &mut io, &mut state).await.unwrap();
+                    let mut output = Vec::new();
+                    let mut buffer = [0; 128];
+                    loop {
+                        let size = peer.try_read(&mut buffer).await.unwrap();
+                        if size == 0 {
+                            break;
+                        }
+                        output.extend_from_slice(&buffer[..size]);
+                    }
+                    assert_eq!(output, b"A\x07\x07B7", "version={version}, utf8={utf8}, {width}x{height}");
+                    for screen in [&state.user_screen, &state.sysop_screen] {
+                        assert_eq!(screen.buffer.caret.position(), icy_engine::Position::new(3, 0));
+                        for (column, expected) in "AB7 ".chars().enumerate() {
+                            assert_eq!(screen.buffer.char_at(icy_engine::Position::new(column as i32, 0)).ch, expected);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The speaker `SOUND` drives belongs to the machine the board runs on, so it is
+    /// only addressed while someone is sitting in front of it.
+    #[tokio::test]
+    async fn the_speaker_is_only_addressed_while_a_terminal_is_attached() {
+        let (mut state, mut peer) = graphics_state().await;
+        let mut buffer = [0; 16];
+
+        state.session.is_local = false;
+        assert!(!state.has_local_terminal().await);
+        state.send_to_local_terminals(b"tone").await.unwrap();
+        assert_eq!(peer.try_read(&mut buffer).await.unwrap(), 0, "a remote caller was sent the board's speaker");
+
+        let (mut monitor, sysop_connection) = ChannelConnection::create_pair();
+        state.node_state.lock().await[state.node].as_mut().unwrap().sysop_connection = Some(sysop_connection);
+        assert!(state.has_local_terminal().await);
+        state.send_to_local_terminals(b"tone").await.unwrap();
+        let size = monitor.read(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..size], b"tone", "a monitoring sysop hears the node they are watching");
+        assert_eq!(peer.try_read(&mut buffer).await.unwrap(), 0, "the caller was sent the tone as well");
+
+        state.session.is_local = true;
+        state.send_to_local_terminals(b"tone").await.unwrap();
+        let size = peer.read(&mut buffer).await.unwrap();
+        assert_eq!(&buffer[..size], b"tone", "a local login is the console");
     }
 
     #[tokio::test]

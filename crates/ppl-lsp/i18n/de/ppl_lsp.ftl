@@ -980,7 +980,7 @@ hint-statement-fdoqdel=Entnimmt einen Eintrag aus der Ausgangswarteschlange
 
     @1 = Datensatznummer, gezählt von eins
 hint-statement-sounddelay=@1 = Frequenz, mit der der PC-Lautsprecher ertönen soll
-    @2 = Länge in Taktschritten (18 = 1 Sekunde), um den Lautsprecher eingeschaltet zu lassen
+    @2 = Länge in Hundertstelsekunden (100 = 1 Sekunde), um den Lautsprecher eingeschaltet zu lassen
 
     ### Hinweise
     Diese Funktion ersetzt die folgende Kombination:

@@ -230,6 +230,8 @@ pub fn start_update_thread(
 }
 
 async fn process_terminal_data(connection: &mut ConnectionThreadData, parser: &mut AnsiParser, screen: &Arc<Mutex<TextScreen>>, data: &[u8]) {
+    // Everything else the board sends is base64 or printable, so a bell byte is a bell.
+    let rang = data.contains(&0x07);
     if contains_sequence(data, b"\x1b[?1016$p") {
         let _ = connection.com.send(b"\x1b[?1016;1$y").await;
     }
@@ -280,6 +282,9 @@ async fn process_terminal_data(connection: &mut ConnectionThreadData, parser: &m
         if !handle_apc(connection, screen, &command).await {
             parse_screen(parser, screen, &whole);
         }
+    }
+    if rang && let Err(err) = connection.media.sound.beep() {
+        log::warn!("Local terminal bell failed: {err}");
     }
 }
 

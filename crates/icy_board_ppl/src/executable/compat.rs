@@ -28,7 +28,7 @@ impl ImplStatus {
 }
 
 /// Statements that exist but intentionally do nothing meaningful.
-pub const UNSUPPORTED_STATEMENTS: &[&str] = &["SOUND", "SOUNDDELAY"];
+pub const UNSUPPORTED_STATEMENTS: &[&str] = &[];
 
 /// Statements stubbed with `unimplemented_stmt!`.
 pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
@@ -47,7 +47,7 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
 ];
 
 /// Statements implemented but known to miss edge cases.
-pub const PARTIAL_STATEMENTS: &[&str] = &["DLOCK", "DLOCKR", "DLOCKG", "DUNLOCK", "FDOQMOD", "FDOQADD", "FDOQDEL"];
+pub const PARTIAL_STATEMENTS: &[&str] = &["DLOCK", "DLOCKR", "DLOCKG", "DUNLOCK", "FDOQMOD", "FDOQADD", "FDOQDEL", "SOUND", "SOUNDDELAY"];
 
 /// Functions that exist but intentionally return a placeholder.
 pub const UNSUPPORTED_FUNCTIONS: &[&str] = &["GETDRIVE", "SETDRIVE", "MODEM", "PEEKDW"];

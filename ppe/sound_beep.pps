@@ -1,0 +1,71 @@
+;$LANGVERSION 340
+
+STRING choice
+INTEGER tick
+
+STARTDISP FNS
+
+:Menu
+CLS
+PRINTLN "@X0FSound and Beep Test@X07"
+PRINTLN
+PRINTLN "B  PPL BEEP"
+PRINTLN "M  Display-file beep macro"
+PRINTLN "C  PRINT CHR(7)"
+PRINTLN "S  SOUND 440, held for up to two seconds"
+PRINTLN "D  SOUNDDELAY 660,50 (half a second)"
+PRINTLN "T  Three tones: 440, 660, 880 Hz"
+PRINTLN "X  Exit while sounding (PPE cleanup test)"
+PRINTLN "Q  Stop and quit"
+PRINTLN
+PRINT "Choice: "
+
+:ReadChoice
+choice = UPPER(INKEY())
+IF (choice = "") THEN
+    DELAY 1
+    GOTO ReadChoice
+ENDIF
+PRINTLN choice
+IF (choice = "Q" | choice = CHR(27)) THEN
+    SOUND 0
+    END
+ENDIF
+IF (choice = "B") THEN
+    BEEP
+ELSEIF (choice = "M") THEN
+    PRINT "@BEEP@"
+ELSEIF (choice = "C") THEN
+    PRINT CHR(7)
+ELSEIF (choice = "S") THEN
+    PRINTLN "440 Hz; any key stops early."
+    SOUND 440
+    FOR tick = 1 TO 36
+        IF (INKEY() <> "") GOTO StopTone
+        DELAY 1
+    NEXT tick
+    :StopTone
+    SOUND 0
+ELSEIF (choice = "D") THEN
+    SOUNDDELAY 660,50
+ELSEIF (choice = "T") THEN
+    SOUNDDELAY 440,25
+    SOUNDDELAY 660,25
+    SOUNDDELAY 880,50
+ELSEIF (choice = "X") THEN
+    PRINTLN "The tone should stop when this PPE exits."
+    SOUND 440
+    DELAY 9
+    END
+ELSE
+    GOTO Menu
+ENDIF
+PRINTLN
+PRINT "Test finished. Press any key for the menu."
+
+:WaitForKey
+IF (INKEY() = "") THEN
+    DELAY 1
+    GOTO WaitForKey
+ENDIF
+GOTO Menu

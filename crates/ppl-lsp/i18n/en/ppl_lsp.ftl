@@ -1046,7 +1046,7 @@ hint-statement-fdoqdel=
     @1 = record number, counted from one
 hint-statement-sounddelay=
     @1 = frequency at which to sound the PC speaker
-    @2 = length, in clock ticks (18 = 1 second), to leave the speaker on
+    @2 = length, in hundredths of a second (100 = 1 second), to leave the speaker on
 
     ### Remarks
     This function was added to replace the

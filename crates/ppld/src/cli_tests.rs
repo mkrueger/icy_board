@@ -106,7 +106,7 @@ fn cli_compatibility_summary_distinguishes_findings_from_errors() {
         (
             "sound",
             CompatibilitySummary {
-                unsupported: 1,
+                partial: 1,
                 ..Default::default()
             },
         ),
