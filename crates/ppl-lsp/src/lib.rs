@@ -151,6 +151,24 @@ mod tests {
     }
 
     #[test]
+    fn zip_help_is_localized_with_independent_loaders() {
+        let keys: Vec<_> = include_str!("../i18n/en/ppl_lsp.ftl")
+            .lines()
+            .filter_map(|line| line.split_once('=').map(|(key, _)| key))
+            .filter(|key| key.starts_with("hint-zip-") || key.starts_with("hint-type-zip") || key.starts_with("hint-param-zip-"))
+            .collect();
+        assert_eq!(keys.len(), 27);
+        for locale in ["en", "de"] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            for key in &keys {
+                let text = loader.get(key);
+                assert!(!text.is_empty() && text != *key, "{locale}: {key}: {text}");
+            }
+        }
+    }
+
+    #[test]
     fn a5_resize_help_is_localized_with_independent_loaders() {
         for (locale, changed, unchanged) in [
             ("en", "The logical text size changed", "remain unchanged"),

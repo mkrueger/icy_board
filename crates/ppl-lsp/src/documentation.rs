@@ -5,7 +5,7 @@ use icy_board_ppl::parser::{
     EVENT_ID, EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
     HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
     MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, SURVEY_ID,
-    TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry,
+    TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry, ZIP_ENCODING_ENUM_ID, ZIP_ID, ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
 };
 use std::fmt::Write as _;
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
@@ -190,6 +190,10 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == FILE_PAGE_ID as u32 => {
             get_sig_hint(Signature::new("FILEPAGE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-file-page"))
         }
+        VariableType::UserData(id) if id == ZIP_ID as u32 => get_sig_hint(Signature::new("ZIP".to_string()), fl!(LANGUAGE_LOADER, "hint-type-zip")),
+        VariableType::UserData(id) if id == ZIP_WRITER_ID as u32 => {
+            get_sig_hint(Signature::new("ZIPWRITER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-zip-writer"))
+        }
         VariableType::UserData(id) if id == DOOR_ID as u32 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
         VariableType::UserData(id) if id == CONTACT_ID as u32 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
         VariableType::UserData(id)
@@ -207,6 +211,9 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
                     | HTTP_METHOD_ENUM_ID
                     | REGEX_OPTIONS_ENUM_ID
                     | STRING_COMPARISON_ENUM_ID
+                    | ZIP_METHOD_ENUM_ID
+                    | ZIP64_MODE_ENUM_ID
+                    | ZIP_ENCODING_ENUM_ID
             ) =>
         {
             get_sig_hint(Signature::new("ENUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-enum-400"))
@@ -295,6 +302,32 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     let VariableType::UserData(id) = var_type else {
         return None;
     };
+    if id == ZIP_ID as u32 && name == "create" {
+        return Some(fl!(LANGUAGE_LOADER, "hint-zip-create"));
+    }
+    if id == ZIP_WRITER_ID as u32 {
+        return match name.as_str() {
+            "valid" => Some(fl!(LANGUAGE_LOADER, "hint-zip-valid")),
+            "method" | "level" => Some(fl!(LANGUAGE_LOADER, "hint-zip-compression-state")),
+            "setcompression" => Some(fl!(LANGUAGE_LOADER, "hint-zip-set-compression")),
+            "setcomment" => Some(fl!(LANGUAGE_LOADER, "hint-zip-set-comment")),
+            "setzip64" => Some(fl!(LANGUAGE_LOADER, "hint-zip-set-zip64")),
+            "setpermissions" => Some(fl!(LANGUAGE_LOADER, "hint-zip-set-permissions")),
+            "addfile" => Some(fl!(LANGUAGE_LOADER, "hint-zip-add-file")),
+            "adddirectory" => Some(fl!(LANGUAGE_LOADER, "hint-zip-add-directory")),
+            "addtree" => Some(fl!(LANGUAGE_LOADER, "hint-zip-add-tree")),
+            "addbytes" => Some(fl!(LANGUAGE_LOADER, "hint-zip-add-bytes")),
+            "finish" => Some(fl!(LANGUAGE_LOADER, "hint-zip-finish")),
+            "abort" => Some(fl!(LANGUAGE_LOADER, "hint-zip-abort")),
+            _ => None,
+        };
+    }
+    match (id, name.as_str()) {
+        (ZIP_METHOD_ENUM_ID, "deflate" | "stored") => return Some(fl!(LANGUAGE_LOADER, "hint-zip-method")),
+        (ZIP64_MODE_ENUM_ID, "auto" | "never") => return Some(fl!(LANGUAGE_LOADER, "hint-zip-64-mode")),
+        (ZIP_ENCODING_ENUM_ID, "utf8" | "cp437") => return Some(fl!(LANGUAGE_LOADER, "hint-zip-encoding")),
+        _ => {}
+    }
     if id == BOARD_ID as u32 && member.eq_ignore_ascii_case("Users") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-board-users"));
     }
@@ -743,6 +776,15 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
 /// hover and completion so the three views cannot drift apart.
 pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
+        "path" => "hint-param-zip-path",
+        "overwrite" => "hint-param-zip-overwrite",
+        "level" => "hint-param-zip-level",
+        "encoding" => "hint-param-zip-encoding",
+        "sourcepath" => "hint-param-zip-source-path",
+        "entryname" => "hint-param-zip-entry-name",
+        "sourcedirectory" => "hint-param-zip-source-directory",
+        "prefix" => "hint-param-zip-prefix",
+        "recursive" => "hint-param-zip-recursive",
         "timestamp" => "hint-param-timestamp",
         "date" => "hint-param-date",
         "time" => "hint-param-time",
@@ -1762,6 +1804,9 @@ mod test {
             REGEX_OPTIONS_ENUM_ID,
             STRING_COMPARISON_ENUM_ID,
             CHECKSUM_ENUM_ID,
+            icy_board_ppl::parser::ZIP_METHOD_ENUM_ID,
+            icy_board_ppl::parser::ZIP64_MODE_ENUM_ID,
+            icy_board_ppl::parser::ZIP_ENCODING_ENUM_ID,
         ] {
             let definition = registry.get_enum_from_id(id).unwrap();
             for (member, _) in &definition.variants {
