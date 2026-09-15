@@ -371,8 +371,7 @@ impl Executable {
 
         let code_data: &mut [u8] = &mut buffer[i..];
         let decrypted_data;
-        // 3.00 is written encrypted and run length encoded, so it has to be read that way too.
-        let data: &[u8] = if version >= 300 {
+        let data: &[u8] = if version >= 301 {
             let use_rle = real_size != code_size;
             decrypt_chunks(code_data, version, use_rle);
             if use_rle {
@@ -508,7 +507,7 @@ impl Executable {
 
         buffer.extend_from_slice(&u16::to_le_bytes(self.script_buffer.len() as u16 * 2));
         // in the very unlikely case the rle compressed buffer is larger than the original buffer
-        let use_rle = code_data.len() < script_buffer.len() && self.runtime >= 300;
+        let use_rle = code_data.len() < script_buffer.len() && self.runtime >= 301;
         if !use_rle {
             code_data = script_buffer;
         }
@@ -547,8 +546,34 @@ mod tests {
     use super::*;
     use crate::executable::OpCode;
 
-    /// Every runtime the compiler can emit has to be readable again, and 3.00 is the
-    /// first one that is written encrypted.
+    #[test]
+    fn version_300_is_plaintext_and_301_adds_encryption_and_rle() {
+        for runtime in [300, 301, 310] {
+            for words in [vec![OpCode::END as i16; 2048], vec![0; 2048]] {
+                let mut executable = Executable {
+                    runtime,
+                    script_buffer: words.clone(),
+                    ..Default::default()
+                };
+                executable.variable_table.set_version(runtime);
+                let plain: Vec<_> = words.iter().flat_map(|word| word.to_le_bytes()).collect();
+                let mut bytes = executable.to_buffer().unwrap();
+                let code = &bytes[HEADER_SIZE + 4..];
+                if runtime == 300 {
+                    assert_eq!(code, plain, "3.00 code must be stored verbatim");
+                } else {
+                    assert_ne!(code, plain, "version {runtime} must encrypt code");
+                    if words[0] == 0 {
+                        assert!(code.len() < plain.len(), "version {runtime} must compress zero runs");
+                    }
+                }
+                let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
+                assert_eq!(loaded.runtime, runtime);
+                assert_eq!(loaded.script_buffer, words);
+            }
+        }
+    }
+
     #[test]
     fn every_supported_runtime_survives_a_write_and_a_read() {
         for runtime in super::super::SUPPORTED_PPE_VERSIONS.iter().copied() {

@@ -78,6 +78,7 @@ fn cli_help_is_a_successful_early_exit() {
     assert!(!error.use_stderr());
     let help = icy_board_cli::command::<Cli>().render_help().to_string();
     assert!(help.contains("--runtime <runtime>"), "{help}");
+    assert!(help.contains("301"), "{help}");
     assert!(help.contains("--lang-version <lang-version>"), "{help}");
     assert!(help.contains("[file]"), "{help}");
 }

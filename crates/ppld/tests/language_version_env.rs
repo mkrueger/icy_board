@@ -20,6 +20,23 @@ fn without_overrides_the_stored_runtime_is_the_decompiler_default() {
 }
 
 #[test]
+fn version_301_fixtures_keep_their_language_directive() {
+    for name in ["test_pplc_301", "test_agsppc_301"] {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../icy_board_engine/tests/test_ppe/{name}.ppe"));
+        for explicit in [false, true] {
+            let mut command = ppld();
+            if explicit {
+                command.args(["--lang-version", "301"]);
+            }
+            let output = command.arg("-o").arg(&fixture).output().unwrap();
+            let text = String::from_utf8_lossy(&output.stdout);
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            assert!(text.contains(";$LANGVERSION 301"), "{name}: {text}");
+        }
+    }
+}
+
+#[test]
 fn the_environment_is_the_decompiler_default() {
     let output = ppld().env("PPL_LANG_VERSION", "350").arg("-o").arg(fixture()).output().unwrap();
     let text = String::from_utf8_lossy(&output.stdout);

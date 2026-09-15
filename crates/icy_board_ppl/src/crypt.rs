@@ -92,7 +92,7 @@ fn encrypt2(block: &mut [u8]) {
 
 #[allow(clippy::pedantic)]
 fn decrypt(block: &mut [u8], version: u16) {
-    if !(300..400).contains(&version) {
+    if !(301..400).contains(&version) {
         return;
     }
     if version >= 330 {
@@ -108,7 +108,7 @@ fn decrypt(block: &mut [u8], version: u16) {
 
 #[allow(clippy::pedantic)]
 fn encrypt(block: &mut [u8], version: u16) {
-    if !(300..400).contains(&version) {
+    if !(301..400).contains(&version) {
         return;
     }
     if version >= 340 {
@@ -209,9 +209,21 @@ mod tests {
     #[test]
     fn test_decrypt_simple() {
         let mut buffer: [u8; 11] = [188, 113, 184, 117, 181, 219, 236, 219, 189, 187, 189];
-        decrypt(&mut buffer, 300);
+        decrypt(&mut buffer, 301);
         let expected: [u8; 11] = [25, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0];
         assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn encryption_starts_at_version_301() {
+        let original = *b"legacy table entry";
+        for version in [100, 200, 300, 301, 310] {
+            let mut buffer = original;
+            encrypt_chunks(&mut buffer, version, false);
+            assert_eq!(buffer == original, version < 301, "version {version}");
+            decrypt_chunks(&mut buffer, version, false);
+            assert_eq!(buffer, original, "version {version}");
+        }
     }
 
     fn test_rle(data: &[u8]) {

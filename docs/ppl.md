@@ -201,8 +201,8 @@ are two different wishes.
 
 | | Command line | `ppl.toml` | Environment | What it controls |
 | :--- | :--- | :--- | :--- | :--- |
-| Runtime | `--runtime` | `[package] runtime` | | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400. |
-| Language | `--lang-version` | `[compiler] language_version` | `PPL_LANG_VERSION` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 310, 320, 330, 340, 350, 400. |
+| Runtime | `--runtime` | `[package] runtime` | | The PPE format written to disk. Valid: 100, 200, 300, 301, 310, 320, 330, 340, 400. |
+| Language | `--lang-version` | `[compiler] language_version` | `PPL_LANG_VERSION` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 301, 310, 320, 330, 340, 350, 400. |
 
 The runtime defaults to 400. The language defaults to the runtime version up to
 400, so the default pair is runtime 400 and language 400. A format-only runtime
@@ -210,6 +210,16 @@ bump therefore does not invent a new language version. A source directive wins
 over the command line, the command line wins over `ppl.toml`, and the manifest
 wins over `PPL_LANG_VERSION`. The environment is a personal default for loose
 sources.
+
+Version 301 is accepted directly, including `;$LANGVERSION 301` emitted by
+`ppld` for historical PPEs. The original PCBoard loader distinguishes 3.00 from
+3.01 at the file-format level: 3.00 is plain, while 3.01 adds encryption and
+optional zero-run packing. Version 3.10 (PCBoard 15.21) uses the same encryption
+scheme. All three retain the same 24 predefined user-variable slots. The
+current opcode and syntax catalogs introduce no separate 301 or 310 feature
+set; this is not a claim that the historical compiler releases had no bug fixes.
+The format boundary is covered by the
+[PPE codec tests](../crates/icy_board_ppl/src/executable/exec.rs).
 
 The language server reads the same sources, so the editor judges a file the way
 `pplc` will compile it. It has no command line, so for it a `;$LANGVERSION`

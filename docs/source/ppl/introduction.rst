@@ -215,6 +215,7 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
     * ``100`` - PCBoard 15.0
     * ``200`` - PCBoard 15.1
     * ``300`` - PCBoard 15.2
+    * ``301`` - PCBoard 15.2, encrypted PPE format
     * ``310`` - PCBoard 15.21
     * ``320`` - PCBoard 15.22
     * ``330`` - PCBoard 15.3
@@ -248,7 +249,7 @@ Compiled files are placed in version-specific directories under ``target/``:
 
 * ``target/pcboard_15.0/`` - For runtime version 100
 * ``target/pcboard_15.10/`` - For runtime version 200
-* ``target/pcboard_15.20/`` - For runtime version 300
+* ``target/pcboard_15.20/`` - For runtime versions 300 and 301
 * ``target/pcboard_15.21/`` - For runtime version 310
 * ``target/pcboard_15.22/`` - For runtime version 320
 * ``target/pcboard_15.30/`` - For runtime version 330

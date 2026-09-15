@@ -634,13 +634,13 @@ xx                  any other byte, as is
 Zero runs are frequent because opcodes and operands are 16 bit and most values
 are small, so every other byte tends to be zero.
 
-Packing is only used when it actually helps and only from runtime 300 on. If the
+Packing is only used when it actually helps and only from runtime 301 on. If the
 packed form would be larger than the original, the original is written instead —
 which is exactly why the reader has to compare sizes rather than trust a flag.
 
 ### Encryption
 
-Runtime 300 up to but not including 400. Below 300 nothing is encrypted, and 400
+Runtime 301 up to but not including 400. Up to 300 nothing is encrypted, and 400
 is written plain again.
 
 Encryption runs over chunks of 2047 bytes, each chunk on its own:

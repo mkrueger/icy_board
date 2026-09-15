@@ -134,7 +134,7 @@ impl Workspace {
         let path = match version {
             100 => "pcboard_15.0",
             200 => "pcboard_15.10",
-            300 => "pcboard_15.20",
+            300 | 301 => "pcboard_15.20",
             310 => "pcboard_15.21",
             320 => "pcboard_15.22",
             330 => "pcboard_15.30",
@@ -423,6 +423,15 @@ mod tests {
         parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations},
     };
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn version_301_uses_the_pcboard_target_directory() {
+        let workspace = Workspace {
+            file_name: PathBuf::from("example/ppl.toml"),
+            ..Default::default()
+        };
+        assert_eq!(workspace.target_path(301), PathBuf::from("example/target/pcboard_15.20"));
+    }
 
     fn package(path: &Path, name: &str, dependencies: BTreeMap<String, Dependency>) -> Workspace {
         fs::create_dir_all(path.join("src")).unwrap();

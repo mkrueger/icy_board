@@ -955,10 +955,18 @@ fn a_language_version_may_stand_below_comments_only() {
 }
 
 #[test]
+fn language_version_301_is_accepted() {
+    let source = ";$LANGVERSION 301\nPRINTLN \"legacy\"";
+    let (_, errors) = lex_all(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(Some(301), crate::parser::lexer::scan_language_version(source));
+}
+
+#[test]
 fn an_unknown_language_version_is_reported() {
     let (_, errors) = lex_all(";$LANGVERSION 999");
     assert_eq!(
-        vec!["Invalid $LANGVERSION '999', valid values are [100, 200, 300, 310, 320, 330, 340, 350, 400]".to_string()],
+        vec!["Invalid $LANGVERSION '999', valid values are [100, 200, 300, 301, 310, 320, 330, 340, 350, 400]".to_string()],
         errors
     );
 

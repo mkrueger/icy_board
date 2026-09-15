@@ -77,6 +77,49 @@ fn statement_argument_errors_point_to_the_statement() {
 }
 
 #[test]
+fn version_301_decompiled_sources_and_cli_options_compile() {
+    use icy_board_ppl::{decompiler::decompile, executable::Executable};
+
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["test_pplc_301", "test_agsppc_301"] {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../icy_board_engine/tests/test_ppe/{name}.ppe"));
+        let original = Executable::read_file(&fixture, false).unwrap();
+        assert_eq!(original.runtime, 301);
+        let (ast, _) = decompile(original, false, 301).unwrap();
+        let source = dir.path().join(format!("{name}.ppd"));
+        fs::write(&source, format!(";$LANGVERSION 301\n{ast}")).unwrap();
+        for runtime in [301, 400] {
+            let output = pplc().args(["--runtime", &runtime.to_string()]).arg(&source).output().unwrap();
+            assert!(
+                output.status.success(),
+                "{name}, {runtime}: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let executable = Executable::read_file(&source.with_extension("ppe"), false).unwrap();
+            assert_eq!(executable.runtime, runtime);
+        }
+    }
+    let source = dir.path().join("options.pps");
+    fs::write(&source, "PRINTLN \"301\"\n").unwrap();
+    for explicit in [false, true] {
+        let mut command = pplc();
+        if explicit {
+            command.args(["--lang-version", "301"]);
+        } else {
+            command.env("PPL_LANG_VERSION", "301");
+        }
+        let output = command.arg(&source).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
 fn invalid_versions_fail() {
     for option in ["--runtime", "--lang-version"] {
         let output = pplc().args([option, "999", "ignored.pps"]).output().unwrap();

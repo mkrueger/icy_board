@@ -72,7 +72,7 @@ The default workspace constructed in code has an empty name and version
 ``0.1.0``; loading a manifest still requires both keys.
 
 Output is under ``target/pcboard_15.0`` for 100, ``pcboard_15.10`` for 200,
-``pcboard_15.20`` for 300, ``pcboard_15.21`` for 310, ``pcboard_15.22`` for 320,
+``pcboard_15.20`` for 300 and 301, ``pcboard_15.21`` for 310, ``pcboard_15.22`` for 320,
 ``pcboard_15.30`` for 330 and ``pcboard_15.40`` for 340. Other target numbers use
 ``target/icboard``. These paths are relative to the manifest directory.
 

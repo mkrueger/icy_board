@@ -55,7 +55,17 @@ fn released_user_variable_layouts_are_frozen() {
 #[test]
 fn released_runtimes_keep_their_user_variable_prefix_lengths() {
     // 4.00 adds no predefined variable of its own; the user is reached as an object.
-    let expected = [(100, 23), (200, 23), (300, 24), (310, 24), (320, 24), (330, 24), (340, 29), (400, 29)];
+    let expected = [
+        (100, 23),
+        (200, 23),
+        (300, 24),
+        (301, 24),
+        (310, 24),
+        (320, 24),
+        (330, 24),
+        (340, 29),
+        (400, 29),
+    ];
     let actual: Vec<_> = SUPPORTED_PPE_VERSIONS
         .iter()
         .map(|runtime| {
