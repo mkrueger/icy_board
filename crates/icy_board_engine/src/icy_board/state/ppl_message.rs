@@ -6,8 +6,7 @@ use jamjam::jam::{attributes as jam_attributes, msg_header::JamMessageHeader};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    datetime::{IcbDate, IcbTime},
-    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
+    executable::{GenericVariableData, VariableData, VariableType, VariableValue, temporal::TemporalValue},
     icy_board::state::ppl_error::{ERR_FORMAT, ERR_IO, ERR_KIND_MSG, PplError},
     parser::MSG_ID,
     vm::expressions::predefined_functions::message_status,
@@ -234,20 +233,9 @@ impl UserDataValue for PplMessage {
         } else if *name == *STATUS {
             VariableValue::new_unbounded_string(self.status.clone())
         } else if *name == *DATE {
-            // A message that is not there has no date; zero is what prints as 00/00/00.
-            let date = if self.valid {
-                IcbDate::from_utc(&self.written_at()).to_pcboard_date()
-            } else {
-                0
-            };
-            VariableValue::new(VariableType::Date, VariableData::from_int(date))
+            VariableValue::new_temporal(TemporalValue::Date(self.valid.then(|| self.written_at().date_naive())))
         } else if *name == *TIME {
-            let time = if self.valid {
-                IcbTime::from_naive(self.written_at().naive_utc()).to_pcboard_time()
-            } else {
-                0
-            };
-            VariableValue::new(VariableType::Time, VariableData::from_int(time))
+            VariableValue::new_temporal(TemporalValue::Time(self.valid.then(|| self.written_at().time())))
         } else if *name == *REPLY_TO {
             VariableValue::new_long(i64::from(self.reply_to))
         } else if *name == *SIZE {

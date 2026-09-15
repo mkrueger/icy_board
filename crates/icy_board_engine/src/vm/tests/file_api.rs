@@ -20,12 +20,14 @@ fn a4_file_pages_roundtrip_metadata_permissions_and_defaults() {
 FILEENTRY missing
 FILEPAGE unset
 PRINTLN missing.Valid, ":", missing.Size, ":", unset.Valid, ":", unset.Entries.Len()
+PRINTLN missing.Date.IsEmpty, ":", missing.Timestamp.IsEmpty
 DIRECTORY directory = Board.Conferences[0].Directories[0]
 FILEPAGE page = directory.Find("TOOLS", 0, 1)
 ERROR failure = Error.Last()
 PRINTLN page.Valid, ":", failure.OK, ":", page.Entries.Len(), ":", page.HasMore
 FILEENTRY entry = page.Entries[0]
-PRINTLN entry.Valid, ":", entry.Name, ":", entry.Description, ":", entry.Size, ":", entry.Date > 0, ":", entry.DescriptionTruncated
+PRINTLN entry.Valid, ":", entry.Name, ":", entry.Description, ":", entry.Size, ":", !entry.Date.IsEmpty, ":", entry.DescriptionTruncated
+PRINTLN entry.Date = entry.Timestamp.UtcDate, ":", entry.Date.Year > 2000
 page = directory.Find("", page.NextAfter)
 PRINTLN page.Valid, ":", page.Entries.Len(), ":", page.HasMore
 page = directory.Find("absent")
@@ -94,7 +96,7 @@ EXIT
     );
     assert_eq!(
         output,
-        "0:0:0:0\n1:1:1:0\n1:large.zip:Useful tools:2147483648:1:0\n1:0:0\n1:0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n1:1\n"
+        "0:0:0:0\n1:1\n1:1:1:0\n1:large.zip:Useful tools:2147483648:1:0\n1:1\n1:0:0\n1:0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n0:1\n1:1\n"
     );
     assert!(!FileBase::database_path(root.path().join("missing")).exists());
 }

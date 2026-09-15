@@ -8,17 +8,21 @@ fn temporal_native_user_fields_preserve_utc_and_subseconds() {
     let output = run_ppl_on(
         r#"
         ;$LANGVERSION 400
-        Session.User.Birthday = DATE.Create(1883, 9, 15)
+        Session.User.BirthDate = DATE.Create(1883, 9, 15)
         Session.User.ExpiresAt = TIMESTAMP.Parse("2400-02-29T01:00:00.123456789+01:00")
         PRINTLN Error.Last().OK
         PRINTLN Session.User.Birthday, "|", Session.User.ExpiresAt
         PRINTLN Board.Users[0].Birthday, "|", Board.Users[0].ExpiresAt
+        PRINTLN Session.User.BirthDate.Year, "|", Board.Users[0].BirthDate.Year, "|", Session.User.ExpirationDate
+        PRINTLN Session.User.FirstDateOn = Session.User.FirstOn.UtcDate, Session.User.LastDateOn = Session.User.LastOn.UtcDate, Session.User.LastDirRead = Session.User.LastDirectoryRead.UtcDate
+        USER missing = Board.Users[-1]
+        PRINTLN missing.BirthDate.IsEmpty, missing.ExpirationDate.IsEmpty, missing.PasswordExpires.IsEmpty, missing.FirstDateOn.IsEmpty, missing.LastDateOn.IsEmpty, missing.LastDirRead.IsEmpty
     "#,
         |board| board.config.paths.user_file = user_file.clone(),
     );
     assert_eq!(
         output,
-        "1\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883-09-15|2400-02-29T00:00:00.123456789Z\n"
+        "1\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883|1883|2400-02-29\n111\n111111\n"
     );
     let saved = UserBase::load(&user_file).unwrap();
     assert_eq!(saved[0].birth_date.date_naive().to_string(), "1883-09-15");
@@ -32,9 +36,9 @@ fn pcboard_datetime_user_fields_persist_full_years() {
 
     for source in [
         r#"
-Session.User.BirthDate = MKDATE(1996, 3, 15).ToLegacy()
-Session.User.ExpirationDate = MKDATE(2079, 1, 1).ToLegacy()
-Session.User.PasswordExpires = MKDATE(2024, 2, 29).ToLegacy()
+Session.User.BirthDate = MKDATE(1996, 3, 15)
+Session.User.ExpirationDate = MKDATE(2079, 1, 1)
+Session.User.PasswordExpires = MKDATE(2024, 2, 29)
 PRINTLN Error.Last().OK
 PRINTLN YEAR(Session.User.BirthDate), "|", YEAR(Session.User.ExpirationDate), "|", YEAR(Session.User.PasswordExpires)
 "#,

@@ -64,8 +64,13 @@ hint-temporal-change=Returns a changed value without modifying the receiver. Inv
 hint-temporal-create=Constructs a validated value. FromUtc combines a DATE and TIME as UTC; FromUnix takes signed whole seconds since 1970-01-01T00:00:00Z.
 hint-temporal-component=Reads a component without changing the value. TIMESTAMP components are UTC; DayOfWeek uses Sunday=0. Empty values raise an error.
 hint-member-user-birthday=Native calendar birthday, without legacy year truncation. Writable on Session.User; empty values are rejected.
+hint-member-user-calendar=Native calendar DATE from the UTC expiry timestamp. Writable on Session.User; assigning a nonempty date stores midnight UTC. Errors leave the value unchanged and update Error.Last(). Invalid users return empty.
+hint-member-native-date=Read-only native calendar DATE from the stored UTC timestamp. Invalid objects return empty.
 hint-member-native-timestamp=Native UTC timestamp, retaining the precision of the backing data. Writable user expiry fields reject empty values. Invalid objects return empty.
 hint-member-zip-timestamp-utc=Sets the ZIP entry timestamp from UTC components (1980..2107). ZIP truncates subseconds and odd seconds. Empty resets the override; errors leave it unchanged.
+hint-member-zip-timestamp=Sets the ZIP entry timestamp from native nonempty DATE and TIME values (1980..2107). ZIP truncates subseconds and odd seconds. Omit both arguments to reset the override; errors leave it unchanged and update Error.Last().
+hint-param-date=Native nonempty calendar DATE, supplied together with time.
+hint-param-time=Native nonempty clock TIME, supplied together with date.
 hint-param-timestamp=UTC timestamp, or empty to clear the timestamp override.
 hint-type-boolean=unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
 hint-type-date=unsigned integer (2 bytes) PCBoard julian date (count of days since 1/1/1900) 
@@ -229,7 +234,7 @@ hint-member-event-modifiers=Whether the corresponding modifier was active for `E
 hint-member-msg-number=Message number, reply target, or stored body size from the read-only JAM header.
 hint-member-msg-valid=Whether this value names an existing message. Missing or out-of-range reads return an invalid `MSG` instead of failing the member chain.
 hint-member-msg-header=Read-only sender, recipient, subject, or status text from the message header.
-hint-member-msg-written=Message creation date or time; an invalid message returns zero.
+hint-member-msg-written=Native DATE or TIME component of the message's UTC creation timestamp. An invalid message returns an empty value, not midnight or a numeric zero.
 hint-member-msg-flags=Read-only message attribute derived from its JAM header.
 hint-member-msg-text=Loads and returns the message body on demand. I/O failures return an empty string and update `Error.Last()`.
 hint-member-contact-service=Name of the contact service, such as email, web, IRC or another configured service.
@@ -255,7 +260,7 @@ hint-member-directory-identity=Read-only file-directory name, configured number,
 hint-member-directory-options=Read-only storage path, free-download/new-file state, or protected password.
 hint-member-directory-access=Checks the current caller's security for directory access or downloading.
 hint-member-directory-find=Searches indexed file names and stored descriptions using a case-insensitive literal substring. Optional after defaults to 0 and limit to 15 (1..100). Each call examines at most 1024 rows; continue with NextAfter while HasMore, even after an empty page. Requires current conference/list access and an initialized index; does not scan or modify files. Error.Last() reports failure.
-hint-member-file-entry=Read-only snapshot. Id is the filebase cursor, Size is LONG bytes and Date is UTC. Description is limited to 16384 UTF-8 bytes; DescriptionTruncated reports clipping. Search examines only this prefix. An uninitialized entry has Valid=FALSE and empty/zero fields.
+hint-member-file-entry=Read-only snapshot. Id is the filebase cursor, Size is LONG bytes, Date is a native calendar DATE in UTC and Timestamp is a UTC TIMESTAMP. Description is limited to 16384 UTF-8 bytes; DescriptionTruncated reports clipping. Search examines only this prefix. An uninitialized entry has Valid=FALSE and empty/zero fields; its temporal fields are empty.
 hint-member-file-page=Read-only page. Entries contains at most 100 FILEENTRY values. NextAfter is passed to the same directory and query; HasMore means more index rows, not necessarily more matches. Valid=FALSE indicates failure. Pages are live reads, not a cross-call database snapshot.
 hint-member-door-identity=Read-only door name, configured number, or validity flag.
 hint-member-door-options=Read-only description, executable path, or protected password for this external program.

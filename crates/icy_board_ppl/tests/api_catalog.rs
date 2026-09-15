@@ -120,6 +120,45 @@ fn catalog() -> String {
 }
 
 #[test]
+fn the_host_api_has_no_legacy_value_types() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let check = |typ: VariableType| {
+        assert!(
+            !matches!(
+                typ,
+                VariableType::Date | VariableType::EDate | VariableType::DDate | VariableType::Time | VariableType::String | VariableType::BigStr
+            ),
+            "legacy type {typ:?} in the PPL 400 host API"
+        );
+    };
+    for &typ in registry.registered_types.values() {
+        if let VariableType::UserData(id) = typ {
+            if let Some(record) = registry.get_record_type_from_id(id) {
+                for (_, field) in &record.fields {
+                    check(field.variable_type);
+                }
+            }
+        }
+    }
+    for object in registry.types.values() {
+        for &typ in object.fields.values() {
+            check(typ);
+        }
+        for function in object.functions.values() {
+            check(function.return_type);
+            for &typ in &function.parameters {
+                check(typ);
+            }
+        }
+        for procedure in object.procedures.values() {
+            for &typ in &procedure.parameters {
+                check(typ);
+            }
+        }
+    }
+}
+
+#[test]
 fn the_host_api_matches_the_frozen_catalog() {
     let current = catalog();
     if std::env::var("UPDATE_API_CATALOG").is_ok() {

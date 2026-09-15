@@ -74,7 +74,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
                 V::Boolean,
             );
             registry.add_named_function(n("SetZip64"), vec![("mode", V::UserData(ZIP64_MODE_ENUM_ID))], V::Boolean);
-            registry.add_named_function_with(n("SetTimestamp"), vec![("date", V::Date), ("time", V::Time)], 0, V::Boolean);
+            registry.add_named_function_with(n("SetTimestamp"), vec![("date", V::CalendarDate), ("time", V::ClockTime)], 0, V::Boolean);
             registry.add_named_function_with(n("SetPermissions"), vec![("mode", V::Integer)], 0, V::Boolean);
             registry.add_named_function_with(
                 n("AddFile"),
@@ -125,10 +125,10 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             registry.add_property(n("Valid"), V::Boolean, false);
             registry.add_property(n("RecordNumber"), V::Integer, false);
             for name in ["BirthDate", "ExpirationDate", "PasswordExpires"] {
-                registry.add_property(n(name), V::Date, true);
+                registry.add_property(n(name), V::CalendarDate, true);
             }
             for name in ["FirstDateOn", "LastDateOn", "LastDirRead"] {
-                registry.add_property(n(name), V::Date, false);
+                registry.add_property(n(name), V::CalendarDate, false);
             }
             for name in ["PageLength", "SecurityLevel", "ExpiredSecurityLevel"] {
                 registry.add_property(n(name), V::Integer, true);
@@ -183,8 +183,8 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             for name in ["From", "To", "Subject", "Status"] {
                 registry.add_property(n(name), V::UnboundedString, false);
             }
-            registry.add_property(n("Date"), V::Date, false);
-            registry.add_property(n("Time"), V::Time, false);
+            registry.add_property(n("Date"), V::CalendarDate, false);
+            registry.add_property(n("Time"), V::ClockTime, false);
             registry.add_property(n("ReplyTo"), V::Long, false);
             registry.add_property(n("Size"), V::Long, false);
             for name in ["IsPrivate", "IsRead", "IsDeleted", "IsEcho", "NeedsPassword"] {
@@ -530,7 +530,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_property(n("Name"), V::UnboundedString, false);
             registry.add_property(n("Description"), V::UnboundedString, false);
             registry.add_property(n("Size"), V::Long, false);
-            registry.add_property(n("Date"), V::Date, false);
+            registry.add_property(n("Date"), V::CalendarDate, false);
             registry.add_property(n("DescriptionTruncated"), V::Boolean, false);
             registry.add_property(n("Timestamp"), V::Timestamp, false);
         }

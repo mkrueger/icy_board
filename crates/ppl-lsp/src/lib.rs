@@ -110,8 +110,13 @@ mod tests {
                 "hint-temporal-create",
                 "hint-temporal-component",
                 "hint-member-user-birthday",
+                "hint-member-user-calendar",
+                "hint-member-native-date",
                 "hint-member-native-timestamp",
                 "hint-member-zip-timestamp-utc",
+                "hint-member-zip-timestamp",
+                "hint-param-date",
+                "hint-param-time",
                 "hint-param-timestamp",
             ] {
                 let text = loader.get(key);
@@ -119,6 +124,19 @@ mod tests {
             }
             assert!(loader.get("hint-temporal-parse").contains("RFC3339"));
             assert!(loader.get("hint-member-zip-timestamp-utc").contains("1980..2107"));
+            assert!(loader.get("hint-member-zip-timestamp").contains("1980..2107"));
+            for key in [
+                "hint-member-user-calendar",
+                "hint-member-native-date",
+                "hint-member-msg-written",
+                "hint-member-file-entry",
+                "hint-param-date",
+            ] {
+                assert!(loader.get(key).contains("DATE"), "{locale}: {key}");
+            }
+            assert!(loader.get("hint-member-msg-written").contains("TIME"));
+            assert!(loader.get("hint-member-file-entry").contains("TIMESTAMP"));
+            assert!(loader.get("hint-param-time").contains("TIME"));
         }
     }
 

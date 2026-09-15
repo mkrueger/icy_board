@@ -136,10 +136,16 @@ IF !archive.SetTimestampUtc(TIMESTAMP.FromUtc(fixedDate, fixedTime)) THEN
     EXIT
 ENDIF
 archive.AddFile("tree/source.txt", "named.txt")
-IF !archive.SetTimestamp(MKDATE(2079, 1, 1).ToLegacy(), 0) THEN
+IF !archive.SetTimestamp(DATE.Create(2079, 1, 1), TIME.Parse("12:34:57.123456789")) THEN
     PRINTLN Error.Last().Message
     EXIT
 ENDIF
+DATE emptyDate
+TIME emptyTime
+IF archive.SetTimestamp(emptyDate, fixedTime) | Error.Last().Code <> ErrCode.Invalid EXIT
+IF archive.SetTimestamp(fixedDate, emptyTime) | Error.Last().Code <> ErrCode.Invalid EXIT
+IF archive.SetTimestamp(DATE.Create(1979, 12, 31), fixedTime) | Error.Last().Code <> ErrCode.Invalid EXIT
+IF archive.SetTimestamp(DATE.Create(2108, 1, 1), fixedTime) | Error.Last().Code <> ErrCode.Invalid EXIT
 archive.AddBytes(TOBYTES("future"), "future.txt")
 archive.SetPermissions()
 archive.SetTimestamp()
@@ -168,7 +174,7 @@ EXIT
     drop(entry);
     assert_eq!(
         zip.by_name("future.txt").unwrap().last_modified().unwrap(),
-        zip::DateTime::from_date_and_time(2079, 1, 1, 0, 0, 0).unwrap()
+        zip::DateTime::from_date_and_time(2079, 1, 1, 12, 34, 56).unwrap()
     );
     assert!(zip.by_name("folder/empty/").unwrap().is_dir());
     assert_eq!(zip.by_name("folder/source.txt").unwrap().unix_mode().unwrap() & 0o777, 0o644);

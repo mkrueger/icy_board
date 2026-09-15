@@ -516,22 +516,25 @@ impl UserDataValue for PplZipWriter {
                     Ok(())
                 }
                 "settimestamp" => {
+                    use crate::executable::temporal::TemporalValue;
+                    use chrono::{Datelike, Timelike};
                     archive.timestamp = match arguments.len() {
                         0 => None,
                         2 => {
-                            let date = crate::datetime::IcbDate::from_pcboard_full(arguments[0].as_int() as u32);
-                            let seconds = arguments[1].as_int();
-                            if !(0..86400).contains(&seconds) {
-                                return Err(invalid("Invalid ZIP time"));
-                            }
+                            let Some(TemporalValue::Date(Some(date))) = arguments[0].temporal() else {
+                                return Err(invalid("SetTimestamp requires a nonempty DATE"));
+                            };
+                            let Some(TemporalValue::Time(Some(time))) = arguments[1].temporal() else {
+                                return Err(invalid("SetTimestamp requires a nonempty TIME"));
+                            };
                             Some(
                                 DateTime::from_date_and_time(
-                                    date.year(),
+                                    u16::try_from(date.year()).map_err(|_| invalid("ZIP timestamp must be in 1980..2107"))?,
                                     date.month() as u8,
                                     date.day() as u8,
-                                    (seconds / 3600) as u8,
-                                    ((seconds / 60) % 60) as u8,
-                                    (seconds % 60) as u8,
+                                    time.hour() as u8,
+                                    time.minute() as u8,
+                                    time.second() as u8,
                                 )
                                 .map_err(|_| invalid("ZIP timestamp must be in 1980..2107"))?,
                             )

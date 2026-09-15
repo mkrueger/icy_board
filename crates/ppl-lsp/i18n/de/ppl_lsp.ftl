@@ -64,8 +64,13 @@ hint-temporal-change=Liefert einen geänderten Wert, ohne den Empfänger zu ver�
 hint-temporal-create=Erzeugt einen validierten Wert. FromUtc kombiniert DATE und TIME als UTC; FromUnix erwartet ganze Sekunden seit 1970-01-01T00:00:00Z mit Vorzeichen.
 hint-temporal-component=Liest eine Komponente, ohne den Wert zu ändern. TIMESTAMP-Komponenten sind UTC; DayOfWeek verwendet Sonntag=0. Leerwerte lösen einen Fehler aus.
 hint-member-user-birthday=Natives Kalendergeburtsdatum ohne Legacy-Jahresverkürzung. Bei Session.User schreibbar; Leerwerte werden abgewiesen.
+hint-member-user-calendar=Natives Kalenderdatum DATE aus dem UTC-Ablaufzeitstempel. Bei Session.User schreibbar; ein nicht leeres Datum wird als Mitternacht UTC gespeichert. Fehler lassen den Wert unverändert und aktualisieren Error.Last(). Ungültige Benutzer liefern leer.
+hint-member-native-date=Schreibgeschütztes natives Kalenderdatum DATE aus dem gespeicherten UTC-Zeitstempel. Ungültige Objekte liefern leer.
 hint-member-native-timestamp=Nativer UTC-Zeitstempel mit der Genauigkeit der gespeicherten Daten. Schreibbare Benutzerablauffelder weisen Leerwerte ab. Ungültige Objekte liefern leer.
 hint-member-zip-timestamp-utc=Setzt den ZIP-Zeitstempel aus UTC-Komponenten (1980..2107). ZIP schneidet Sekundenbruchteile und ungerade Sekunden ab. Leer entfernt die Vorgabe; Fehler lassen sie unverändert.
+hint-member-zip-timestamp=Setzt den ZIP-Zeitstempel aus nativen, nicht leeren DATE- und TIME-Werten (1980..2107). ZIP schneidet Sekundenbruchteile und ungerade Sekunden ab. Ohne beide Argumente wird die Vorgabe entfernt; Fehler lassen sie unverändert und aktualisieren Error.Last().
+hint-param-date=Natives, nicht leeres Kalenderdatum DATE, zusammen mit time angeben.
+hint-param-time=Native, nicht leere Uhrzeit TIME, zusammen mit date angeben.
 hint-param-timestamp=UTC-Zeitstempel oder leer zum Entfernen der Zeitstempelvorgabe.
 hint-type-boolean=Vorzeichenloser Zeichentyp (1 Byte): 0 = `FALSE`, sonst `TRUE`
 hint-type-date=Vorzeichenlose Ganzzahl (2 Bytes): julianisches PCBoard-Datum (Anzahl der Tage seit dem 1.1.1900)
@@ -231,7 +236,7 @@ hint-member-event-modifiers=Gibt an, ob der entsprechende Modifikator bei `Event
 hint-member-msg-number=Nachrichtennummer, Antwortziel oder gespeicherte Textgröße aus dem schreibgeschützten JAM-Kopf.
 hint-member-msg-valid=Gibt an, ob dieser Wert eine vorhandene Nachricht bezeichnet. Fehlende Nummern liefern ein ungültiges `MSG`, ohne die Memberkette abzubrechen.
 hint-member-msg-header=Schreibgeschützter Absender, Empfänger, Betreff oder Statustext aus dem Nachrichtenkopf.
-hint-member-msg-written=Erstellungsdatum beziehungsweise -zeit; eine ungültige Nachricht liefert null.
+hint-member-msg-written=Native DATE- oder TIME-Komponente des UTC-Erstellungszeitstempels. Eine ungültige Nachricht liefert einen leeren Wert, weder Mitternacht noch eine numerische Null.
 hint-member-msg-flags=Schreibgeschütztes Nachrichtenattribut aus dem JAM-Kopf.
 hint-member-msg-text=Lädt den Nachrichtentext bei Bedarf. E/A-Fehler liefern eine leere Zeichenfolge und aktualisieren `Error.Last()`.
 hint-member-contact-service=Name des Kontaktdienstes, etwa E-Mail, Web, IRC oder ein anderer konfigurierter Dienst.
@@ -257,7 +262,7 @@ hint-member-directory-identity=Schreibgeschützter Dateiverzeichnisname, konfigu
 hint-member-directory-options=Schreibgeschützter Speicherpfad, Gratisdownload-/Neue-Dateien-Status oder geschütztes Kennwort.
 hint-member-directory-access=Prüft die Sicherheit des aktuellen Anrufers für Verzeichniszugriff beziehungsweise Download.
 hint-member-directory-find=Sucht einen literalen Teilstring ohne Beachtung der Groß-/Kleinschreibung in indexierten Dateinamen und gespeicherten Beschreibungen. Optionales after ist zunächst 0, limit zunächst 15 (1..100). Pro Aufruf werden höchstens 1024 Datensätze geprüft; bei HasMore mit NextAfter fortsetzen, auch nach einer leeren Seite. Benötigt aktuelle Konferenz-/Listenrechte und einen initialisierten Index; scannt oder verändert keine Dateien. Error.Last() meldet Fehler.
-hint-member-file-entry=Schreibgeschützter Snapshot. Id ist der Filebase-Cursor, Size enthält Bytes als LONG und Date das UTC-Datum. Description ist auf 16384 UTF-8-Bytes begrenzt; DescriptionTruncated meldet die Kürzung. Die Suche berücksichtigt nur diesen Anfang. Ein uninitialisierter Eintrag hat Valid=FALSE und leere beziehungsweise Nullfelder.
+hint-member-file-entry=Schreibgeschützter Snapshot. Id ist der Filebase-Cursor, Size enthält Bytes als LONG, Date ein natives Kalenderdatum DATE in UTC und Timestamp einen UTC-TIMESTAMP. Description ist auf 16384 UTF-8-Bytes begrenzt; DescriptionTruncated meldet die Kürzung. Die Suche berücksichtigt nur diesen Anfang. Ein uninitialisierter Eintrag hat Valid=FALSE und leere beziehungsweise Nullfelder; seine Zeitfelder sind leer.
 hint-member-file-page=Schreibgeschützte Seite. Entries enthält höchstens 100 FILEENTRY-Werte. NextAfter wird an dasselbe Verzeichnis und dieselbe Suche übergeben; HasMore bedeutet weitere Indexzeilen, nicht zwingend weitere Treffer. Valid=FALSE bedeutet Fehler. Seiten sind aktuelle Lesezugriffe, kein Datenbank-Snapshot über mehrere Aufrufe.
 hint-member-door-identity=Schreibgeschützter Doorname, konfigurierte Nummer oder Gültigkeitsstatus.
 hint-member-door-options=Schreibgeschützte Beschreibung, Programmpfad oder geschütztes Kennwort dieses externen Programms.

@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
         state::ppl_error::{ERR_INVALID, ERR_IO, ERR_KIND_USER, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
@@ -214,8 +213,8 @@ impl UserDataValue for PplUser {
             }
         };
         let string = |value: &str| VariableValue::new_unbounded_string(value.to_string());
-        let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_date(IcbDate::from_utc(value).to_pcboard_date());
         use crate::executable::temporal::TemporalValue;
+        let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_temporal(TemporalValue::Date(self.valid(vm).then_some(value.date_naive())));
         let native = match name.as_str().to_ascii_lowercase().as_str() {
             "birthday" => Some(TemporalValue::Date(self.valid(vm).then_some(user.birth_date.date_naive()))),
             "expiresat" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.expiration_date))),
@@ -357,8 +356,11 @@ impl UserDataValue for PplUser {
         };
         use crate::executable::temporal::TemporalValue;
         let native_name = name.as_str().to_ascii_lowercase();
-        if matches!(native_name.as_str(), "birthday" | "expiresat" | "passwordexpiresat") {
-            let expected = if native_name == "birthday" {
+        if matches!(
+            native_name.as_str(),
+            "birthday" | "birthdate" | "expirationdate" | "passwordexpires" | "expiresat" | "passwordexpiresat"
+        ) {
+            let expected = if matches!(native_name.as_str(), "birthday" | "birthdate" | "expirationdate" | "passwordexpires") {
                 VariableType::CalendarDate
             } else {
                 VariableType::Timestamp
@@ -374,8 +376,8 @@ impl UserDataValue for PplUser {
                 return Ok(());
             };
             match native_name.as_str() {
-                "birthday" => user.birth_date = value,
-                "expiresat" => user.expiration_date = value,
+                "birthday" | "birthdate" => user.birth_date = value,
+                "expiresat" | "expirationdate" => user.expiration_date = value,
                 _ => user.password.expire_date = value,
             }
             Self::save_user(vm, user).await;
@@ -396,7 +398,6 @@ impl UserDataValue for PplUser {
             return Ok(());
         }
         let text = || val.as_string();
-        let date = || IcbDate::from_pcboard_full(val.as_int() as u32).to_utc_date_time();
 
         if *name == *ALIAS {
             user.alias = text();
@@ -430,12 +431,6 @@ impl UserDataValue for PplUser {
             user.sysop_comment = text();
         } else if *name == *PROTOCOL {
             user.protocol = text();
-        } else if *name == *BIRTH_DATE {
-            user.birth_date = date();
-        } else if *name == *EXPIRATION_DATE {
-            user.expiration_date = date();
-        } else if *name == *PASSWORD_EXPIRES {
-            user.password.expire_date = date();
         } else if *name == *PAGE_LENGTH {
             user.page_len = number as u16;
         } else if *name == *SECURITY_LEVEL {

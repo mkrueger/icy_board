@@ -6,8 +6,7 @@ use dizbase::file_base::{
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
-    datetime::IcbDate,
-    executable::{VariableData, VariableType, VariableValue},
+    executable::{VariableType, VariableValue},
     icy_board::file_directory::FileDirectory,
     parser::{FILE_ENTRY_ID, FILE_PAGE_ID},
     vm::VirtualMachine,
@@ -38,10 +37,7 @@ impl UserDataValue for PplFileEntry {
             "name" => VariableValue::new_unbounded_string(entry.map_or_else(String::new, |entry| entry.name.clone())),
             "description" => VariableValue::new_unbounded_string(entry.map_or_else(String::new, |entry| entry.description.clone())),
             "size" => VariableValue::new_long(entry.map_or(0, |entry| entry.size)),
-            "date" => VariableValue::new(
-                VariableType::Date,
-                VariableData::from_int(entry.map_or(0, |entry| IcbDate::from_utc(&entry.date).to_pcboard_date())),
-            ),
+            "date" => VariableValue::new_temporal(crate::executable::temporal::TemporalValue::Date(entry.map(|entry| entry.date.date_naive()))),
             "descriptiontruncated" => VariableValue::new_bool(entry.is_some_and(|entry| entry.description_truncated)),
             _ => return Err(format!("Unknown FILEENTRY property {name}").into()),
         })

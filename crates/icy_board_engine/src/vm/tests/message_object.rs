@@ -322,13 +322,17 @@ fn a_message_carries_the_date_it_was_written() {
     let output = run_ppl_with_messages(
         r#"
         AREA area = Board.Conferences[0].Areas[0]
-        PrintLn area.Read(1).Date <> "00/00/00"
-        PrintLn area.Read(99).Date
+        MSG message = area.Read(1)
+        PrintLn !message.Date.IsEmpty, !message.Time.IsEmpty, !message.WrittenAt.IsEmpty
+        PrintLn message.Date = message.WrittenAt.UtcDate, message.Time = message.WrittenAt.UtcTime
+        MSG missing = area.Read(99)
+        PrintLn missing.Date.IsEmpty, missing.Time.IsEmpty, missing.WrittenAt.IsEmpty
+        PrintLn "[", missing.Date, "][", missing.Time, "]"
         "#,
         MESSAGES,
     );
 
-    assert_eq!(output, "1\n00/00/00\n");
+    assert_eq!(output, "111\n11\n111\n[][]\n");
 }
 
 /// A message is what the area holds, not something a PPE may rewrite.

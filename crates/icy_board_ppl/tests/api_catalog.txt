@@ -262,12 +262,12 @@ TYPE User (48)
    18 getter DateFormat: UnboundedString
    19 getter Valid: Boolean
    20 getter RecordNumber: Integer
-   21 field  BirthDate: Date
-   22 field  ExpirationDate: Date
-   23 field  PasswordExpires: Date
-   24 getter FirstDateOn: Date
-   25 getter LastDateOn: Date
-   26 getter LastDirRead: Date
+   21 field  BirthDate: CalendarDate
+   22 field  ExpirationDate: CalendarDate
+   23 field  PasswordExpires: CalendarDate
+   24 getter FirstDateOn: CalendarDate
+   25 getter LastDateOn: CalendarDate
+   26 getter LastDirRead: CalendarDate
    27 field  PageLength: Integer
    28 field  SecurityLevel: Integer
    29 field  ExpiredSecurityLevel: Integer
@@ -309,8 +309,8 @@ TYPE Msg (49)
     3 getter To: UnboundedString
     4 getter Subject: UnboundedString
     5 getter Status: UnboundedString
-    6 getter Date: Date
-    7 getter Time: Time
+    6 getter Date: CalendarDate
+    7 getter Time: ClockTime
     8 getter ReplyTo: Long
     9 getter Size: Long
    10 getter IsPrivate: Boolean
@@ -386,7 +386,7 @@ TYPE FileEntry (56)
     2 getter Name: UnboundedString
     3 getter Description: UnboundedString
     4 getter Size: Long
-    5 getter Date: Date
+    5 getter Date: CalendarDate
     6 getter DescriptionTruncated: Boolean
     7 getter Timestamp: Timestamp
 
@@ -406,7 +406,7 @@ TYPE ZipWriter (59)
     3 func   SetCompression(method: ZipMethod, level?: Integer) -> Boolean
     4 func   SetComment(text: UnboundedString, encoding?: ZipEncoding) -> Boolean
     5 func   SetZip64(mode: Zip64Mode) -> Boolean
-    6 func   SetTimestamp(date?: Date, time?: Time) -> Boolean
+    6 func   SetTimestamp(date?: CalendarDate, time?: ClockTime) -> Boolean
     7 func   SetPermissions(mode?: Integer) -> Boolean
     8 func   AddFile(sourcePath: UnboundedString, entryName?: UnboundedString) -> Boolean
     9 func   AddDirectory(entryName: UnboundedString) -> Boolean

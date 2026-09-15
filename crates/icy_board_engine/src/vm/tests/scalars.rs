@@ -123,18 +123,19 @@ fn temporal_bytecode_operators_return_errors_without_panicking() {
 }
 
 #[test]
-fn temporal_legacy_host_field_assignment_returns_checked_error() {
-    let executable = compile("DATE value = DATE.Create(1983, 9, 15)\nSession.User.BirthDate = value\nPRINT \"UNREACHABLE\"");
-    let (result, output, ()) = super::try_run_executable_collecting_inspected(executable, |_| {}, &[], None, b"", false, super::TestPpeBoundary::Vm, |_| ());
-    let error = result.unwrap_err();
-    assert!(
-        matches!(
-            error.downcast_ref::<crate::executable::VMError>(),
-            Some(crate::executable::VMError::InvalidTemporalValue(_))
-        ),
-        "{error}"
+fn temporal_host_field_assignment_reports_invalid_without_mutation() {
+    let output = run_ppl(
+        r#"
+DATE original = Session.User.BirthDate
+Session.User.BirthDate = "not-a-date"
+PRINT Error.Last().Kind = ErrKind.User, Error.Last().Code = ErrCode.Invalid
+PRINT Session.User.BirthDate = original
+DATE emptyDate
+Session.User.BirthDate = emptyDate
+PRINT Error.Last().Code = ErrCode.Invalid, Session.User.BirthDate = original
+"#,
     );
-    assert!(!output.contains("UNREACHABLE"));
+    assert_eq!(output, "11111");
 }
 
 #[test]

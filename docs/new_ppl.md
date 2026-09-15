@@ -111,19 +111,34 @@ bridge. Free component functions (`YEAR`, `DOW`, `HOUR`, etc.) use modern
 components for modern arguments and retain their legacy path for legacy
 values, strings and numbers.
 
-Native Board access is additive, so existing stored host signatures stay valid:
+The PPL 400 Board/object API uses native types throughout, with no legacy
+date/time or bounded-string types in its host signatures:
 
-* `USER.Birthday` is a native DATE; `ExpiresAt` and `PasswordExpiresAt` are
-	UTC timestamps. These are writable on `Session.User`, require nonempty
-	values, and report persistence/validation failures through `Error.Last()`.
+* `USER.BirthDate` (also `Birthday`), `ExpirationDate` and `PasswordExpires`
+	are native DATE values. Writes on `Session.User` require nonempty dates and
+	store midnight UTC; persistence/validation failures update `Error.Last()`.
+* `USER.FirstDateOn`, `LastDateOn` and `LastDirRead` expose native DATE values
+	derived from the stored UTC timestamps.
+* `USER.ExpiresAt` and `PasswordExpiresAt` are writable UTC TIMESTAMP values.
+	They require nonempty values and preserve the full timestamp precision.
 * `USER.FirstOn`, `LastOn` and `LastDirectoryRead`, `MSG.WrittenAt` and
 	`FILEENTRY.Timestamp` expose UTC timestamps with the backing data's precision.
-* The existing `BirthDate`, `ExpirationDate`, `PasswordExpires`, `MSG.Date`,
-	`MSG.Time` and `FILEENTRY.Date` retain legacy signatures. Use explicit
-	`.ToLegacy()` when passing new dates to old APIs and statements.
+* `MSG.Date` and `FILEENTRY.Date` are native DATE values; `MSG.Time` is a native
+	TIME. Invalid User, Msg and FileEntry objects return empty temporal values.
+* `ZIPWRITER.SetTimestamp(date, time)` takes native, nonempty DATE and TIME
+	values. Omit both arguments to clear the override. Years must be 1980..2107;
+	ZIP discards subseconds and odd seconds. Invalid values leave it unchanged.
 * `ZIPWRITER.SetTimestampUtc(TIMESTAMP)` uses UTC components, permits years
 	1980..2107, and follows ZIP's two-second precision (subseconds and odd seconds
 	are discarded). Empty clears the override. Invalid values leave it unchanged.
+
+This deliberately changes the affected PPL 400 host import signatures. PPEs
+compiled against their previous legacy signatures must be recompiled. Remove
+`.ToLegacy()` from calls to these object members and use native TIME values
+instead of numeric seconds in `SetTimestamp`. Pre-400 PPEs, legacy free
+functions, statements and `GETUSER`/`PUTUSER` variables remain unchanged;
+use explicit legacy bridges when calling those APIs. `EVENT.Time` remains an
+elapsed millisecond counter, not a UTC timestamp.
 
 `TOBYTES(value)`, `FREAD`/`FWRITE` (size **13**) and binary record I/O use the
 stable representation described in [PPE format](ppe_format.md#temporal-values).

@@ -257,8 +257,16 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         return Some(LANGUAGE_LOADER.get(key));
     }
     let name = member.to_ascii_lowercase();
-    if var_type == VariableType::UserData(USER_ID as u32) && name == "birthday" {
+    if var_type == VariableType::UserData(USER_ID as u32) && matches!(name.as_str(), "birthday" | "birthdate") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-user-birthday"));
+    }
+    if var_type == VariableType::UserData(USER_ID as u32) {
+        if matches!(name.as_str(), "expirationdate" | "passwordexpires") {
+            return Some(fl!(LANGUAGE_LOADER, "hint-member-user-calendar"));
+        }
+        if matches!(name.as_str(), "firstdateon" | "lastdateon" | "lastdirread") {
+            return Some(fl!(LANGUAGE_LOADER, "hint-member-native-date"));
+        }
     }
     if (var_type == VariableType::UserData(USER_ID as u32)
         && matches!(name.as_str(), "expiresat" | "passwordexpiresat" | "firston" | "laston" | "lastdirectoryread"))
@@ -269,6 +277,9 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if var_type == VariableType::UserData(icy_board_ppl::parser::ZIP_WRITER_ID as u32) && name == "settimestamputc" {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-zip-timestamp-utc"));
+    }
+    if var_type == VariableType::UserData(icy_board_ppl::parser::ZIP_WRITER_ID as u32) && name == "settimestamp" {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-zip-timestamp"));
     }
     if var_type == VariableType::Bytes {
         return match member.to_ascii_lowercase().as_str() {
@@ -733,6 +744,8 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
 pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
         "timestamp" => "hint-param-timestamp",
+        "date" => "hint-param-date",
+        "time" => "hint-param-time",
         "area" => "hint-param-message-area",
         "original" => "hint-param-message-original",
         "header" => "hint-param-message-header",
