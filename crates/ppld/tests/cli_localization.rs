@@ -14,16 +14,18 @@ fn ppld(language: &str) -> Command {
 
 #[test]
 fn help_is_localized_and_successful_without_a_decompiler_banner() {
-    for (language, about, description) in [
+    for (language, about, description, version_default) in [
         (
             "en_US.UTF-8",
             "PCBoard Programming Language Decompiler",
             "output the disassembly instead of ppl",
+            "stored PPE runtime",
         ),
         (
             "de_DE.UTF-8",
             "Decompiler für die PCBoard-Programmiersprache",
             "Disassemblierung statt PPL ausgeben",
+            "gespeicherte PPE-Runtime",
         ),
     ] {
         let output = ppld(language).arg("--help").output().unwrap();
@@ -31,6 +33,7 @@ fn help_is_localized_and_successful_without_a_decompiler_banner() {
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         assert!(output.stderr.is_empty());
         assert!(help.contains(about) && help.contains(description), "{help}");
+        assert!(help.split_whitespace().collect::<Vec<_>>().join(" ").contains(version_default), "{help}");
         for flag in [
             "--raw",
             "--disassemble",

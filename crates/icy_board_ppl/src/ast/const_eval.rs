@@ -43,6 +43,9 @@ pub fn const_enum_value(expr: &Expression, lookup: ConstantLookup<'_>, enums: &[
 /// Only source 400 CONST declarations check numeric bounds; ordinary assignments
 /// and older source versions retain their historical conversions.
 pub fn convert_const_declaration(value: VariableValue, declared: VariableType, language: u16) -> Option<VariableValue> {
+    if declared.is_temporal() || value.vtype.is_temporal() {
+        return value.checked_temporal_assignment(declared).ok();
+    }
     if matches!(declared, VariableType::UserData(_)) {
         return (value.vtype == declared).then_some(value);
     }
@@ -52,7 +55,7 @@ pub fn convert_const_declaration(value: VariableValue, declared: VariableType, l
     // The parser retains the source STRING name until runtime type lowering.
     // Do not reintroduce the classic 256-character limit for source 400 CONSTs.
     if language >= 400 && declared == VariableType::String {
-        return Some(value.convert_to(VariableType::UnboundedString));
+        return value.convert_to(VariableType::UnboundedString).ok();
     }
     if language >= 400 {
         if matches!(declared, VariableType::Float | VariableType::Double) {
@@ -98,11 +101,11 @@ pub fn convert_const_declaration(value: VariableValue, declared: VariableType, l
                 VariableType::Long if value.as_str().is_none() => VariableValue::new_long(number as i64),
                 VariableType::ULong if value.as_str().is_none() => VariableValue::new_ulong(number as u64),
                 // Range validation is not a new rounding/string-parsing policy.
-                _ => value.convert_to(declared),
+                _ => value.convert_to(declared).ok()?,
             });
         }
     }
-    Some(value.convert_to(declared))
+    value.convert_to(declared).ok()
 }
 
 fn integer_constant(value: &VariableValue) -> Option<i128> {
@@ -130,10 +133,13 @@ fn integer_constant(value: &VariableValue) -> Option<i128> {
 
 /// The literal a value is written as, in the type its constant was declared with.
 pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> Option<Expression> {
+    if variable_type.is_temporal() {
+        return Some(ConstantExpression::create_empty_expression(Constant::Temporal(value.temporal()?)));
+    }
     let value = if matches!(variable_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         value.clone()
     } else {
-        value.clone().convert_to(variable_type)
+        value.clone().convert_to(variable_type).ok()?
     };
     // Preserve the declared type, rather than turning SWORD into INTEGER etc.
     // This matters for nominal enum casts and all typed argument checks.
@@ -202,6 +208,7 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
 
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
+            Constant::Temporal(value) => Some(VariableValue::new_temporal(*value)),
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
             Constant::Integer(i, _) => Some(VariableValue::new_int(*i)),
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
@@ -214,7 +221,7 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
 
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Option<VariableValue> {
         let value = unary.get_expression().visit(self)?;
-        if matches!(value.get_type(), VariableType::UserData(_)) {
+        if matches!(value.get_type(), VariableType::UserData(_)) || value.vtype.is_temporal() {
             return None;
         }
         // Large unsigned literals need a signed representation before checking
@@ -245,11 +252,26 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Option<VariableValue> {
         let left = binary.get_left_expression().visit(self)?;
         if !matches!(left.get_type(), VariableType::UserData(_))
+            && !left.vtype.is_temporal()
             && let Some(result) = binary.get_op().short_circuit_result(left.as_bool())
         {
             return Some(VariableValue::new_bool(result));
         }
         let right = binary.get_right_expression().visit(self)?;
+        if left.vtype.is_temporal() || right.vtype.is_temporal() {
+            if left.vtype != right.vtype {
+                return None;
+            }
+            return Some(VariableValue::new_bool(match binary.get_op() {
+                BinOp::Eq => left == right,
+                BinOp::NotEq => left != right,
+                BinOp::Lower => left < right,
+                BinOp::LowerEq => left <= right,
+                BinOp::Greater => left > right,
+                BinOp::GreaterEq => left >= right,
+                _ => return None,
+            }));
+        }
         if matches!(left.get_type(), VariableType::UserData(_)) || matches!(right.get_type(), VariableType::UserData(_)) {
             if left.get_type() != right.get_type() {
                 return None;
@@ -314,21 +336,24 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             };
         }
         let name = identifier.get_identifier().as_ref().to_ascii_uppercase();
+        if arguments.iter().any(|argument| argument.vtype.is_temporal()) {
+            return None;
+        }
         // TOINTEGER is the only ordinary function allowed to erase an enum's
         // nominal type. Folding must not introduce alternate cast/RGB bypasses.
         if name != "TOINTEGER" && arguments.iter().any(|argument| matches!(argument.vtype, VariableType::UserData(_))) {
             return None;
         }
         let alpha = match name.as_str() {
-            "TOINTEGER" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Integer)),
-            "TOSWORD" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::SWord)),
-            "TOSBYTE" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::SByte)),
-            "TOWORD" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Word)),
-            "TOBYTE" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Byte)),
-            "TOREAL" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Float)),
-            "TODREAL" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Double)),
-            "TOLONG" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Long)),
-            "TOULONG" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::ULong)),
+            "TOINTEGER" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Integer).ok(),
+            "TOSWORD" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::SWord).ok(),
+            "TOSBYTE" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::SByte).ok(),
+            "TOWORD" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Word).ok(),
+            "TOBYTE" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Byte).ok(),
+            "TOREAL" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Float).ok(),
+            "TODREAL" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Double).ok(),
+            "TOLONG" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::Long).ok(),
+            "TOULONG" if arguments.len() == 1 => return arguments[0].clone().convert_to(VariableType::ULong).ok(),
             "RGB" if arguments.len() == 3 => 255,
             "RGB" if arguments.len() == 4 => arguments[3].as_int(),
             _ => return None,

@@ -142,6 +142,8 @@ pub enum CompilationErrorType {
 
     #[error("Enums do not support arithmetic, unary operators or numeric FOR counters; convert explicitly with TOINTEGER first")]
     InvalidEnumOperation,
+    #[error("Invalid date/time operation; use explicit calendar or time methods")]
+    InvalidTemporalOperation,
 
     #[error("{0} cannot write an enum through an untyped VAR output; use an INTEGER temporary and an explicit checked enum conversion")]
     EnumUntypedOutput(String),
@@ -758,6 +760,15 @@ impl PPECompiler {
             return Err(CompilationErrorType::TooManyDeclarations(declaration_count, declaration_limit));
         }
         if self.runtime < 400 {
+            if self
+                .lookup_table
+                .variable_table
+                .get_entries()
+                .iter()
+                .any(|entry| entry.header.variable_type.is_temporal())
+            {
+                return Err(CompilationErrorType::BuiltinNeedsRuntime("Date/time storage".into(), 400));
+            }
             if self.lookup_table.variable_table.get_entries().iter().any(|entry| {
                 matches!(entry.header.variable_type, VariableType::UserData(type_id) if matches!(type_id as usize, crate::parser::FILE_ENTRY_ID | crate::parser::FILE_PAGE_ID))
             }) {

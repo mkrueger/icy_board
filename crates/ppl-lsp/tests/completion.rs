@@ -35,6 +35,32 @@ fn complete(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn temporal_completion_is_versioned_and_typed() {
+    let items = complete_items(";$LANGVERSION 400\nPRINT To");
+    for name in ["TOEDATE", "TODDATE"] {
+        let item = items.iter().find(|item| item.label.eq_ignore_ascii_case(name)).unwrap();
+        assert_eq!(item.tags, Some(vec![CompletionItemTag::DEPRECATED]));
+    }
+    assert!(items.iter().any(|item| item.label == "TIMESTAMP"));
+    assert!(!complete(";$LANGVERSION 340\nPRINT To").contains(&"TIMESTAMP".to_string()));
+    for (source, names) in [
+        (";$LANGVERSION 400\nDATE birthday\nbirthday.", vec!["Year", "WithYear", "ToLegacy", "IsEmpty"]),
+        (";$LANGVERSION 400\nTIMESTAMP.", vec!["Now", "Parse", "FromUtc", "FromUnix"]),
+        (";$LANGVERSION 400\nTIMESTAMP stamp\nstamp.UtcDate.", vec!["Year", "AddDays"]),
+    ] {
+        let items = complete_items(source);
+        for name in names {
+            let item = items
+                .iter()
+                .find(|item| item.label == name)
+                .unwrap_or_else(|| panic!("missing {name}: {source}"));
+            assert!(item.documentation.is_some(), "missing documentation for {name}");
+        }
+    }
+    assert!(!complete(";$LANGVERSION 340\nDATE birthday\nbirthday.").contains(&"WithYear".to_string()));
+}
+
+#[test]
 fn preprocessor_directives_and_variables_complete() {
     let directive_items = complete_items(";$");
     let directives: Vec<_> = directive_items.iter().map(|item| item.label.clone()).collect();

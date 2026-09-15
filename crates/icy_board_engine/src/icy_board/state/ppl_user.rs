@@ -215,6 +215,19 @@ impl UserDataValue for PplUser {
         };
         let string = |value: &str| VariableValue::new_unbounded_string(value.to_string());
         let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_date(IcbDate::from_utc(value).to_pcboard_date());
+        use crate::executable::temporal::TemporalValue;
+        let native = match name.as_str().to_ascii_lowercase().as_str() {
+            "birthday" => Some(TemporalValue::Date(self.valid(vm).then_some(user.birth_date.date_naive()))),
+            "expiresat" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.expiration_date))),
+            "passwordexpiresat" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.password.expire_date))),
+            "firston" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.stats.first_date_on))),
+            "laston" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.stats.last_on))),
+            "lastdirectoryread" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.date_last_dir_read))),
+            _ => None,
+        };
+        if let Some(value) = native {
+            return Ok(VariableValue::new_temporal(value));
+        }
 
         let value = if *name == *VALID {
             VariableValue::new_bool(self.valid(vm))
@@ -342,6 +355,32 @@ impl UserDataValue for PplUser {
         let Some(mut user) = self.writable_user(vm) else {
             return Ok(());
         };
+        use crate::executable::temporal::TemporalValue;
+        let native_name = name.as_str().to_ascii_lowercase();
+        if matches!(native_name.as_str(), "birthday" | "expiresat" | "passwordexpiresat") {
+            let expected = if native_name == "birthday" {
+                VariableType::CalendarDate
+            } else {
+                VariableType::Timestamp
+            };
+            let converted = val.try_temporal_conversion(expected);
+            let value = match converted.as_ref().ok().and_then(VariableValue::temporal) {
+                Some(TemporalValue::Date(Some(value))) => Some(value.and_hms_opt(0, 0, 0).unwrap().and_utc()),
+                Some(TemporalValue::Timestamp(Some(value))) => Some(value),
+                _ => None,
+            };
+            let Some(value) = value else {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "A valid nonempty date/time value is required"));
+                return Ok(());
+            };
+            match native_name.as_str() {
+                "birthday" => user.birth_date = value,
+                "expiresat" => user.expiration_date = value,
+                _ => user.password.expire_date = value,
+            }
+            Self::save_user(vm, user).await;
+            return Ok(());
+        }
         let number = val.as_int();
         let invalid_range = if *name == *PAGE_LENGTH && u16::try_from(number).is_err() {
             Some("PageLength must be between 0 and 65535")

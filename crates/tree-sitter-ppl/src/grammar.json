@@ -1398,6 +1398,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[tT][iI][mM][eE][sS][tT][aA][mM][pP]"
+            }
+          },
+          "named": false,
+          "value": "TIMESTAMP"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[iI][nN][tT][eE][gG][eE][rR]"
             }
           },

@@ -1,6 +1,7 @@
 ' Captured from real PCBoard 15.4/M via the compat/ oracle.
 ' Expected output in the matching .out file is PCBoard's actual behaviour,
 ' not ours - do not "fix" it to match icy_board.
+;$LANGVERSION 340
 MONEY m
 DATE d
 PRINTLN "---BEGIN---"

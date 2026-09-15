@@ -33,6 +33,7 @@ impl UserDataValue for PplFileEntry {
         let entry = self.0.as_ref();
         Ok(match name.as_str().to_ascii_lowercase().as_str() {
             "valid" => VariableValue::new_bool(entry.is_some()),
+            "timestamp" => VariableValue::new_temporal(crate::executable::temporal::TemporalValue::Timestamp(entry.map(|entry| entry.date))),
             "id" => VariableValue::new_long(entry.map_or(0, |entry| entry.id)),
             "name" => VariableValue::new_unbounded_string(entry.map_or_else(String::new, |entry| entry.name.clone())),
             "description" => VariableValue::new_unbounded_string(entry.map_or_else(String::new, |entry| entry.description.clone())),

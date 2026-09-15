@@ -104,7 +104,7 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 
 pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let arr = vm.eval_array_operand(&args[0]).await?;
-    let dim = vm.eval_expr(&args[1]).await?.as_int();
+    let dim = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
 
     if dim < 0 {
         return Ok(VariableValue::new_int(count_elements(&arr) as i32));
@@ -207,8 +207,8 @@ pub async fn upper(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 ///  the substring of `str`, "" if chars <= 0, Will add padding up to the full length specified
 pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
-    let mut pos = vm.eval_expr(&args[1]).await?.as_int() - 1; // 1 based
-    let chars = vm.eval_expr(&args[2]).await?.as_int();
+    let mut pos = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() - 1; // 1 based
+    let chars = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
@@ -237,8 +237,8 @@ pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 /// `str.Substring(start, len)`: a zero-based substring operation for PPL 400.
 pub async fn string_substring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
-    let mut pos = vm.eval_expr(&args[1]).await?.as_int();
-    let chars = vm.eval_expr(&args[2]).await?.as_int();
+    let mut pos = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
+    let chars = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_unbounded_string(String::new()));
     }
@@ -260,7 +260,7 @@ pub async fn string_substring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> 
 }
 
 pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let chars = vm.eval_expr(&args[1]).await?.as_int();
+    let chars = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
@@ -283,7 +283,7 @@ pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let chars = vm.eval_expr(&args[1]).await?.as_int();
+    let chars = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
@@ -304,7 +304,7 @@ pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn space(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let chars = vm.eval_expr(&args[0]).await?.as_int();
+    let chars = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
@@ -318,7 +318,7 @@ pub async fn ferr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn chr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let c = vm.eval_expr(&args[0]).await?.as_int();
+    let c = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     if c <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
@@ -373,7 +373,7 @@ fn char_offset(text: &str, index: i32) -> Option<usize> {
 pub async fn string_find_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?;
     let search = vm.eval_expr(&args[1]).await?;
-    let start = vm.eval_expr(&args[2]).await?.as_int();
+    let start = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     string_find_values(text.as_str().unwrap_or_default(), search.as_str().unwrap_or_default(), start)
 }
 
@@ -391,7 +391,7 @@ fn string_find_values(text: &str, search: &str, start: i32) -> Res<VariableValue
 pub async fn string_find_last_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
-    let start = vm.eval_expr(&args[2]).await?.as_int();
+    let start = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     string_find_last_values(&text, &search, start)
 }
 
@@ -478,7 +478,7 @@ pub async fn string_trim_end_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]
 
 pub async fn string_char_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let index = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let character = usize::try_from(index)
         .ok()
         .and_then(|index| text.chars().nth(index))
@@ -499,26 +499,26 @@ fn pad_string(text: String, width: i32, pad_char: char, left: bool) -> String {
 
 pub async fn string_pad_left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let width = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_unbounded_string(pad_string(text, width, ' ', true)))
 }
 
 pub async fn string_pad_left_char(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let width = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let pad_char = vm.eval_expr(&args[2]).await?.as_string().chars().next().unwrap_or(' ');
     Ok(VariableValue::new_unbounded_string(pad_string(text, width, pad_char, true)))
 }
 
 pub async fn string_pad_right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let width = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_unbounded_string(pad_string(text, width, ' ', false)))
 }
 
 pub async fn string_pad_right_char(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let width = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let pad_char = vm.eval_expr(&args[2]).await?.as_string().chars().next().unwrap_or(' ');
     Ok(VariableValue::new_unbounded_string(pad_string(text, width, pad_char, false)))
 }
@@ -526,8 +526,8 @@ pub async fn string_pad_right_char(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]
 /// `str.Remove(start, length)`: removes up to `length` zero-based characters starting at `start`.
 pub async fn string_remove(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let start = vm.eval_expr(&args[1]).await?.as_int();
-    let length = vm.eval_expr(&args[2]).await?.as_int();
+    let start = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
+    let length = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let chars: Vec<char> = text.chars().collect();
     if start < 0 || length <= 0 || start as usize >= chars.len() {
         return Ok(VariableValue::new_unbounded_string(chars.into_iter().collect()));
@@ -542,7 +542,7 @@ pub async fn string_remove(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
 /// `str.Insert(index, value)`: inserts `value` at the zero-based `index`, clamped to the string's length.
 pub async fn string_insert(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let index = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let value = vm.eval_expr(&args[2]).await?.as_string();
     let chars: Vec<char> = text.chars().collect();
     let index = index.clamp(0, chars.len() as i32) as usize;
@@ -559,7 +559,7 @@ pub async fn string_reverse(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
 
 pub async fn string_to_int(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let src = vm.eval_expr(&args[0]).await?.as_string();
-    let base = vm.eval_expr(&args[1]).await?.as_int();
+    let base = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(parse_radix(&src, base)))
 }
 
@@ -609,8 +609,8 @@ fn ignore_case_regex(vm: &mut VirtualMachine<'_>, pattern: &str, anchor_end: boo
 pub async fn string_find_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
-    let start = vm.eval_expr(&args[2]).await?.as_int();
-    let mode = vm.eval_expr(&args[3]).await?.as_int();
+    let start = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
+    let mode = vm.eval_expr(&args[3]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_int(-1));
     };
@@ -633,8 +633,8 @@ pub async fn string_find_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr
 pub async fn string_find_last_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
-    let start = vm.eval_expr(&args[2]).await?.as_int();
-    let mode = vm.eval_expr(&args[3]).await?.as_int();
+    let start = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
+    let mode = vm.eval_expr(&args[3]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_int(-1));
     };
@@ -662,7 +662,7 @@ pub async fn string_find_last_comparison(vm: &mut VirtualMachine<'_>, args: &[PP
 pub async fn string_contains_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
-    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_bool(false));
     };
@@ -681,7 +681,7 @@ pub async fn string_contains_comparison(vm: &mut VirtualMachine<'_>, args: &[PPE
 pub async fn string_starts_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let prefix = vm.eval_expr(&args[1]).await?.as_string();
-    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_bool(false));
     };
@@ -699,7 +699,7 @@ pub async fn string_starts_with_comparison(vm: &mut VirtualMachine<'_>, args: &[
 pub async fn string_ends_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let suffix = vm.eval_expr(&args[1]).await?.as_string();
-    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_bool(false));
     };
@@ -717,7 +717,7 @@ pub async fn string_ends_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PP
 pub async fn string_count_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
-    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_int(0));
     };
@@ -743,7 +743,7 @@ pub async fn string_equals(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
 pub async fn string_equals_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let left = vm.eval_expr(&args[0]).await?.as_string();
     let right = vm.eval_expr(&args[1]).await?.as_string();
-    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let Some(ignore_case) = string_comparison_mode(vm, mode) else {
         return Ok(VariableValue::new_bool(false));
     };
@@ -767,7 +767,7 @@ pub async fn string_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 pub async fn string_split_limit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let separator = vm.eval_expr(&args[1]).await?.as_string();
-    let limit = vm.eval_expr(&args[2]).await?.as_int();
+    let limit = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     string_split_values(vm, text, separator, limit)
 }
 
@@ -794,7 +794,7 @@ fn string_split_values(vm: &mut VirtualMachine<'_>, text: String, separator: Str
 
 pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let array = vm.eval_array_operand(&args[0]).await?;
-    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let index = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     vm.read_array_element(&array, index as usize, 0, 0)
 }
 
@@ -812,7 +812,7 @@ pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 
 pub async fn string_repeat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    let count = vm.eval_expr(&args[1]).await?.as_int();
+    let count = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     if count < 0 {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Repeat count cannot be negative"));
         return Ok(VariableValue::new_unbounded_string(String::new()));
@@ -1007,7 +1007,7 @@ pub async fn bytes_get_checksum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -
     let Some(bytes) = bytes_from_value(vm, &value, "Bytes.GetChecksum") else {
         return Ok(VariableValue::new_bytes(Vec::new()));
     };
-    let algorithm = vm.eval_expr(&args[1]).await?.as_int();
+    let algorithm = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let checksum = match algorithm {
         0 => calc_crc32(&bytes).to_be_bytes().to_vec(),
         1 => md5::compute(&bytes).0.to_vec(),
@@ -1069,7 +1069,7 @@ pub async fn trim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn random(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let upper = vm.eval_expr(&args[0]).await?.as_int();
+    let upper = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     if upper <= 0 {
         return Ok(VariableValue::new_int(0));
     }
@@ -1188,12 +1188,12 @@ pub async fn u_msgwr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn year(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date)?.checked_numeric()?.as_int() as u16;
     let year = if var == 0 { 0 } else { IcbDate::from_pcboard(var as u32).year() as i32 };
     Ok(VariableValue::new_int(year + if var > 36524 { 2000 } else { 1900 }))
 }
 pub async fn month(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date)?.checked_numeric()?.as_int() as u16;
     Ok(VariableValue::new_int(if var == 0 {
         0
     } else {
@@ -1201,7 +1201,7 @@ pub async fn month(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     }))
 }
 pub async fn day(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date)?.checked_numeric()?.as_int() as u16;
     Ok(VariableValue::new_int(if var == 0 {
         0
     } else {
@@ -1209,27 +1209,31 @@ pub async fn day(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     }))
 }
 pub async fn dow(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date).as_int() as u16;
+    let var = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date)?.checked_numeric()?.as_int() as u16;
     Ok(VariableValue::new_int(i32::from(var % 7)))
 }
 pub async fn hour(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_hour())
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time)?.get_hour())
 }
 pub async fn min(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_minute())
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time)?.get_minute())
 }
 pub async fn sec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time).get_second())
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time)?.get_second())
 }
 pub async fn timeap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let time = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time);
-    let hour = time.get_hour().as_int();
+    let time = vm
+        .eval_expr(&args[0])
+        .await?
+        .checked_legacy_temporal_conversion(VariableType::Time)
+        .map_err(crate::executable::VMError::InvalidTemporalValue)?;
+    let hour = time.get_hour().checked_numeric()?.as_int();
     let period = if hour < 12 { "AM" } else { "PM" };
     let civil_hour = if hour % 12 == 0 { 12 } else { hour % 12 };
     Ok(VariableValue::new_string(format!(
         "{civil_hour:2}:{:02}:{:02} {period}",
-        time.get_minute().as_int(),
-        time.get_second().as_int()
+        time.get_minute().checked_numeric()?.as_int(),
+        time.get_second().checked_numeric()?.as_int()
     )))
 }
 pub async fn ver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1344,7 +1348,7 @@ pub async fn pcbnode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn readline(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    let line = vm.eval_expr(&args[1]).await?.as_int();
+    let line = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let file_name = vm.resolve_file(&file_name).await;
 
     if let Ok(file) = read_with_encoding_detection(&file_name) {
@@ -1497,8 +1501,8 @@ pub async fn reges(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn b2w(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let low = vm.eval_expr(&args[0]).await?.as_int();
-    let hi = vm.eval_expr(&args[1]).await?.as_int();
+    let low = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let hi = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int((low & 0xFF) | ((hi & 0xFF) << 8)))
 }
 
@@ -1510,8 +1514,8 @@ pub async fn peekw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     unimplemented_function!("PEEKW", VariableValue::new_int(0));
 }
 pub async fn mkaddr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let seg = vm.eval_expr(&args[0]).await?.as_int();
-    let off = vm.eval_expr(&args[1]).await?.as_int();
+    let seg = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let off = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(seg.wrapping_mul(0x10000) | off))
 }
 pub async fn exist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1527,8 +1531,8 @@ pub async fn exist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 /// # Returns
 ///  A string representation of `int` in the specified base.
 pub async fn i2s(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let int = vm.eval_expr(&args[0]).await?.as_int();
-    let base = vm.eval_expr(&args[1]).await?.as_int();
+    let int = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let base = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let s = radix(int, base as u8).to_string();
     Ok(VariableValue::new_string(s))
 }
@@ -1557,7 +1561,7 @@ fn parse_radix(src: &str, base: i32) -> i32 {
 ///  An integer representation of `s` in the specified base.
 pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let src = vm.eval_expr(&args[0]).await?.as_string();
-    let base = vm.eval_expr(&args[1]).await?.as_int();
+    let base = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(parse_radix(&src, base)))
 }
 pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1632,30 +1636,30 @@ pub async fn gety(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn band(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let left = vm.eval_expr(&args[0]).await?.as_int();
-    let right = vm.eval_expr(&args[1]).await?.as_int();
+    let left = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let right = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(left & right))
 }
 
 pub async fn bor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let left = vm.eval_expr(&args[0]).await?.as_int();
-    let right = vm.eval_expr(&args[1]).await?.as_int();
+    let left = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let right = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(left | right))
 }
 
 pub async fn bxor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let left = vm.eval_expr(&args[0]).await?.as_int();
-    let right = vm.eval_expr(&args[1]).await?.as_int();
+    let left = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let right = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(left ^ right))
 }
 
 pub async fn bnot(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let val = vm.eval_expr(&args[0]).await?.as_int();
+    let val = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(!val))
 }
 
 pub async fn u_pwdhist(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let hist = vm.eval_expr(&args[0]).await?.as_int();
+    let hist = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     match hist {
         1..3 => {
             if let Some(pwd) = vm.user.password.prev_pwd.get(hist as usize - 1) {
@@ -1682,7 +1686,7 @@ pub async fn u_pwdtc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let option = vm.eval_expr(&args[0]).await?.as_int();
+    let option = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     match option {
         1 => {
             //  first date the user called the system
@@ -1757,31 +1761,31 @@ pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn abs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.abs())
+    Ok(vm.eval_expr(&args[0]).await?.checked_numeric()?.abs())
 }
 
 pub async fn sin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().sin()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().sin()))
 }
 
 pub async fn cos(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().cos()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().cos()))
 }
 
 pub async fn tan(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().tan()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().tan()))
 }
 
 pub async fn atan(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().atan()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().atan()))
 }
 
 pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().ln()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().ln()))
 }
 
 pub async fn sqrt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().sqrt()))
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double().sqrt()))
 }
 
 pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1822,7 +1826,7 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         log::error!("fileinf: empty filename");
         return Ok(VariableValue::new_int(0));
     }
-    let item = vm.eval_expr(&args[1]).await?.as_int();
+    let item = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
 
     let path = vm.resolve_file(&file).await;
     // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst without FA_DIREC, and if nothing
@@ -1946,9 +1950,9 @@ pub async fn ppename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn mkdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let year = vm.eval_expr(&args[0]).await?.as_int();
-    let month = vm.eval_expr(&args[1]).await?.as_int();
-    let day = vm.eval_expr(&args[2]).await?.as_int();
+    let year = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let month = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
+    let day = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
 
     Ok(VariableValue::new_date(i32::from(icy_board_ppl::datetime::pcboard_mkdate(year, month, day))))
 }
@@ -2028,7 +2032,7 @@ pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let (area, conf) = vm.eval_expr(&args[1]).await?.as_msg_id();
     let board = vm.icy_board_state.get_board().await;
     if let Some(user) = board.users.get(record as usize)
@@ -2058,9 +2062,9 @@ pub async fn dbglevel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let col = vm.eval_expr(&args[0]).await?.as_int() - 1;
-    let row = vm.eval_expr(&args[1]).await?.as_int() - 1;
-    let len = vm.eval_expr(&args[2]).await?.as_int();
+    let col = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() - 1;
+    let row = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() - 1;
+    let len = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let code = vm.eval_expr(&args[3]).await?.as_bool();
     let mut res = String::new();
 
@@ -2088,67 +2092,71 @@ pub async fn pagestat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn tobigstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::BigStr))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::BigStr)
 }
 
 pub async fn toboolean(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Boolean))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Boolean)
 }
 
 pub async fn tobyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Byte))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Byte)
 }
 
 pub async fn todate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date)
 }
 
 pub async fn todreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Double))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Double)
 }
 
 pub async fn toedate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::EDate))
+    Ok(vm
+        .eval_expr(&args[0])
+        .await?
+        .checked_legacy_temporal_conversion(VariableType::EDate)
+        .map_err(crate::executable::VMError::InvalidTemporalValue)?)
 }
 
 pub async fn tointeger(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Integer))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Integer)
 }
 
 pub async fn tomoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Money))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Money)
 }
 
 pub async fn toreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Float))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Float)
 }
 
 pub async fn tosbyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::SByte))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::SByte)
 }
 
 pub async fn tosword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::SWord))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::SWord)
 }
 
 pub async fn totime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time)
 }
 
 pub async fn tounsigned(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Unsigned))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Unsigned)
 }
 
 pub async fn tolong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Long))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Long)
 }
 
 pub async fn toulong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::ULong))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::ULong)
 }
 
 pub async fn toword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Word))
+    vm.eval_expr(&args[0]).await?.convert_to(VariableType::Word)
 }
 
 pub async fn mixed(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2161,7 +2169,7 @@ pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 }
 
 pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
 
     if let Some(session_user) = &vm.icy_board_state.session.current_user
         && let Some(flags) = session_user.conference_flags.get(&conf_num)
@@ -2173,7 +2181,7 @@ pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
 
     if let Some(session_user) = &vm.icy_board_state.session.current_user
         && let Some(flags) = session_user.conference_flags.get(&conf_num)
@@ -2185,7 +2193,7 @@ pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
 
     if let Some(session_user) = &vm.icy_board_state.session.current_user
         && let Some(flags) = session_user.conference_flags.get(&conf_num)
@@ -2197,7 +2205,7 @@ pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
 
     if let Some(session_user) = &vm.icy_board_state.session.current_user
         && let Some(flags) = session_user.conference_flags.get(&conf_num)
@@ -2209,7 +2217,7 @@ pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
 
     if let Some(session_user) = &vm.icy_board_state.session.current_user
         && let Some(flags) = session_user.conference_flags.get(&conf_num)
@@ -2282,7 +2290,7 @@ pub fn to_base_36(min_len: usize, number: i32) -> String {
 }
 
 pub async fn meganum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
+    let var = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_string(to_base_36(0, var)))
 }
 
@@ -2291,16 +2299,16 @@ pub async fn evttimeadj(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn isbitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let var = vm.eval_expr(&args[0]).await?.as_int();
-    let bit = vm.eval_expr(&args[1]).await?.as_int();
+    let var = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let bit = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
 
     Ok(VariableValue::new_bool(var & (1 << bit) != 0))
 }
 
 pub async fn fmtreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.as_double();
-    let field_width = vm.eval_expr(&args[1]).await?.as_int() as usize;
-    let decimal_places = vm.eval_expr(&args[2]).await?.as_int() as usize;
+    let value = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_double();
+    let field_width = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as usize;
+    let decimal_places = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int() as usize;
 
     // Format the number with the specified decimal places
     let formatted = format!("{value:.decimal_places$}");
@@ -2492,7 +2500,11 @@ pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     Ok(VariableValue::new_int(dbase::ops::dnext(vm, args).await?))
 }
 pub async fn toddate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::DDate))
+    Ok(vm
+        .eval_expr(&args[0])
+        .await?
+        .checked_legacy_temporal_conversion(VariableType::DDate)
+        .map_err(crate::executable::VMError::InvalidTemporalValue)?)
 }
 pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(dbase::ops::dcloseall(vm, args).await?))
@@ -2586,7 +2598,7 @@ pub async fn dchkstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn pcbaccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let field = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
 
     if let Some(accounting) = &vm.icy_board_state.get_board().await.config.accounting.accounting_config {
         match field {
@@ -2614,7 +2626,7 @@ pub async fn pcbaccount(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let field = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     match field {
         0 => {
             use crate::icy_board::accounting::AccountingMode;
@@ -2644,7 +2656,7 @@ pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let field = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     crate::vm::statements::predefined_procedures::refresh_accounting_user(vm);
 
     // Get or initialize user accounting data
@@ -2694,7 +2706,7 @@ pub async fn ripver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let field = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
 
     // Check if QWK limits are initialized for the user
     if vm.user.qwk_config.is_none() {
@@ -2741,8 +2753,8 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    let conf_field = vm.eval_expr(&args[1]).await?.as_int();
+    let conf_num = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int() as usize;
+    let conf_field = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
 
     get_confinfo(vm, conf_num, conf_field).await
 }
@@ -2822,18 +2834,21 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             5 => conference.private_uploads = value.as_bool(),
             6 => conference.private_msgs = value.as_bool(),
             7 => conference.echo_mail_in_conference = value.as_bool(),
-            8 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
-            9 => conference.add_conference_security = value.as_int(),
-            10 => conference.add_conference_time = value.as_int() as u16,
+            8 => {
+                conference.required_security =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.checked_numeric()?.as_int() as i64))
+            }
+            9 => conference.add_conference_security = value.checked_numeric()?.as_int(),
+            10 => conference.add_conference_time = value.checked_numeric()?.as_int() as u16,
             // message blocks
             // message file
             13 => conference.users_menu = PathBuf::from_str(&value.as_string())?,
             14 => conference.sysop_menu = PathBuf::from_str(&value.as_string())?,
             15 => conference.news_file = PathBuf::from_str(&value.as_string())?,
-            16 => conference.pub_upload_sort = value.as_int() as u8,
+            16 => conference.pub_upload_sort = value.checked_numeric()?.as_int() as u8,
             // public upload dir file
             18 => conference.pub_upload_location = PathBuf::from_str(&value.as_string())?,
-            19 => conference.private_upload_sort = value.as_int() as u8,
+            19 => conference.private_upload_sort = value.checked_numeric()?.as_int() as u8,
             // private upload dir file
             21 => conference.private_upload_location = PathBuf::from_str(&value.as_string())?,
             22 => conference.doors_menu = PathBuf::from_str(&value.as_string())?,
@@ -2849,26 +2864,38 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             32 => conference.is_read_only = value.as_bool(),
             // Field 33 is NoPrivateMsgs on PCBoard (not PrivMsgs / field 6).
             33 => conference.disallow_private_msgs = value.as_bool(),
-            34 => conference.sec_request_rr = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            34 => {
+                conference.sec_request_rr =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.checked_numeric()?.as_int() as i64))
+            }
             35 => conference.record_origin = value.as_bool(),
             36 => conference.prompt_for_routing = value.as_bool(),
             37 => conference.allow_aliases = value.as_bool(),
             38 => conference.show_intro_in_scan = value.as_bool(),
-            39 => conference.sec_write_message = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            39 => {
+                conference.sec_write_message =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.checked_numeric()?.as_int() as i64))
+            }
             40 => conference.password = Password::PlainText(value.as_string()),
             41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
             // reg flags
-            44 => conference.sec_attachments = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
-            45 => conference.carbon_list_limit = value.as_byte(),
+            44 => {
+                conference.sec_attachments =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.checked_numeric()?.as_int() as i64))
+            }
+            45 => conference.carbon_list_limit = value.checked_numeric()?.as_byte(),
             46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
             // old index
             48 => conference.long_to_names = value.as_bool(),
-            49 => conference.sec_carbon_copy = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
-            50 => conference.conference_type = ConferenceType::from_u8(value.as_byte()),
+            49 => {
+                conference.sec_carbon_copy =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.checked_numeric()?.as_int() as i64))
+            }
+            50 => conference.conference_type = ConferenceType::from_u8(value.checked_numeric()?.as_byte()),
             // export ptr
-            52 => conference.charge_time = value.as_double(),
-            53 => conference.charge_msg_read = value.as_double(),
-            54 => conference.charge_msg_write = value.as_double(),
+            52 => conference.charge_time = value.checked_numeric()?.as_double(),
+            53 => conference.charge_msg_read = value.checked_numeric()?.as_double(),
+            54 => conference.charge_msg_write = value.checked_numeric()?.as_double(),
             _ => (),
         }
     }
@@ -2908,7 +2935,7 @@ pub async fn instrr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 /// Pcboard numbered the records of its fido configuration from one, and an
 /// empty string is how it said that there is no such record.
 pub async fn fdordaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let board = vm.icy_board_state.get_board().await;
     let Some(aka) = record
         .checked_sub(1)
@@ -2921,7 +2948,7 @@ pub async fn fdordaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn fdordorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let board = vm.icy_board_state.get_board().await;
     // One origin line is configured here where pcboard kept a list of them.
     if record != 1 {
@@ -2931,7 +2958,7 @@ pub async fn fdordorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn fdordarea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let board = vm.icy_board_state.get_board().await;
     let mut found = 0;
     for conference in board.conferences.iter() {
@@ -2954,7 +2981,7 @@ pub async fn fdordarea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 /// Pcboard left this one empty, so what it answers is ours to decide: the file
 /// the queue holds under that number, and nothing when it holds none.
 pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let board = vm.icy_board_state.get_board().await;
     match queue::get(&board.ftn, record.max(0) as usize) {
         Ok(Some(file)) => Ok(VariableValue::new_string(file.to_string_lossy().to_string())),
@@ -2971,7 +2998,7 @@ pub async fn getdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn setdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let drive = vm.eval_expr(&args[0]).await?.as_int();
+    let drive = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_int(drive))
 }
 
@@ -2988,14 +3015,14 @@ pub async fn bd2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
 }
 
 pub async fn i2bs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let val = vm.eval_expr(&args[0]).await?.as_int();
+    let val = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let val = BasicReal::from(val);
     let a = val.bytes().iter().map(|c| *c as char).collect::<String>();
     Ok(VariableValue::new_string(a))
 }
 
 pub async fn i2bd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let val = vm.eval_expr(&args[0]).await?.as_unsigned() as i64;
+    let val = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_unsigned() as i64;
     let val = BasicDouble::from(val);
     let a = val.bytes().iter().map(|c| *c as char).collect::<String>();
     Ok(VariableValue::new_string(a))
@@ -3027,7 +3054,7 @@ pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     }
 }
 pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let field = vm.eval_expr(&args[0]).await?.as_int();
+    let field = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let value = vm.eval_expr(&args[1]).await?;
 
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
@@ -3062,8 +3089,8 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
-    let field_num = vm.eval_expr(&args[2]).await?.as_int();
-    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
+    let msg_num = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
     if let Some((cn, an, mn, header)) = &vm.cached_msg_header
         && conf_num == *cn
         && area_num == *an
@@ -3184,8 +3211,8 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     vm.invalidate_message_base();
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
-    let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
-    let field_num = vm.eval_expr(&args[2]).await?.as_int();
+    let msg_num = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let value = vm.eval_expr(&args[3]).await?.as_string();
 
     let Some(msg_base) = vm.message_base_path(conf_num, area_num).await else {
@@ -3263,8 +3290,8 @@ fn set_field(field_num: i32, header: &mut JamMessageHeader, value: &str) -> bool
 /// field contains `test`, or zero when the scan runs off the end.
 pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
-    let start_msg = vm.eval_expr(&args[1]).await?.as_int().max(0) as u32;
-    let field_num = vm.eval_expr(&args[2]).await?.as_int();
+    let start_msg = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int().max(0) as u32;
+    let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let test = vm.eval_expr(&args[3]).await?.as_string().to_uppercase();
 
     let Some(msg_base) = vm.message_base_path(conf_num, area_num).await else {
@@ -3286,8 +3313,8 @@ pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn area_id(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conference = vm.eval_expr(&args[0]).await?.as_int();
-    let area = vm.eval_expr(&args[1]).await?.as_int();
+    let conference = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let area = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(VariableValue::new_msg_id(conference, area))
 }
 
@@ -3345,11 +3372,11 @@ pub fn fix_casing(param: String) -> String {
 }
 
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let red = vm.eval_expr(&args[0]).await?.as_int();
-    let green = vm.eval_expr(&args[1]).await?.as_int();
-    let blue = vm.eval_expr(&args[2]).await?.as_int();
+    let red = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
+    let green = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
+    let blue = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let alpha = match args.get(3) {
-        Some(alpha) => vm.eval_expr(alpha).await?.as_int(),
+        Some(alpha) => vm.eval_expr(alpha).await?.checked_numeric()?.as_int(),
         None => 255,
     };
     Ok(VariableValue::new_unsigned(u64::from(crate::icy_board::state::ppl_graphics::rgba_value(
@@ -3377,7 +3404,7 @@ pub async fn session(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Var
 /// What `Type.Member(...)` is called on. The type id rides in the argument, so a new
 /// static member is only a registration and never reaches this.
 pub async fn static_receiver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let type_id = vm.eval_expr(&args[0]).await?.as_int();
+    let type_id = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let Ok(type_id) = u32::try_from(type_id) else {
         return Err(format!("invalid static receiver type {type_id}").into());
     };

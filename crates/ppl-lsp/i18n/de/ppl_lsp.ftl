@@ -51,6 +51,22 @@ hint-keyword-exit=Beendet das aktuelle PPE. In PPL 400 ersetzt diese kontextabh�
 hint-keyword-usage=Verwendung
 hint-const-builtin=Eine vordefinierte PPL-Konstante.
 
+hint-type-calendar-date=Validiertes Kalenderdatum ohne Zeitzone (PPL 400). ISO-Text YYYY-MM-DD und separater Leerwert. Kalendermethoden statt Ganzzahlarithmetik verwenden.
+hint-type-clock-time=Tageszeit ohne Zeitzone (PPL 400) mit Nanosekunden. Mitternacht ist nicht leer.
+hint-type-timestamp=UTC-Zeitpunkt (PPL 400) mit Nanosekunden und RFC3339-Text. Die Unix-Epoche ist nicht leer.
+hint-temporal-empty=Nur beim Leerwert wahr, nicht bei Mitternacht oder der Unix-Epoche.
+hint-temporal-parse=Liest ISO-Datums-/Zeittext. TIMESTAMP verlangt einen RFC3339-Offset und normalisiert auf UTC. Leerer Text ergibt den Leerwert; ungültige Eingaben lösen einen Fehler aus.
+hint-temporal-format=Formatiert mit Chrono-strftime-Direktiven wie %Y-%m-%d. Ungültige Direktiven oder fehlende Komponenten lösen einen Fehler aus. Leerwerte ergeben leeren Text.
+hint-temporal-legacy=Explizite Umwandlung in den Legacy-PPE-Wert. Bereichs- oder Präzisionsverlust wird abgewiesen; leer ergibt die Legacy-Null.
+hint-temporal-now=Aktuelles lokales Datum bzw. lokale Uhrzeit, bei TIMESTAMP der aktuelle UTC-Zeitpunkt.
+hint-temporal-until=Vorzeichenbehafteter Abstand vom Empfänger zum Argument in ganzen Tagen bzw. Sekunden. Sekundenbruchteile werden gegen null abgeschnitten; Leerwerte lösen einen Fehler aus.
+hint-temporal-change=Liefert einen geänderten Wert, ohne den Empfänger zu verändern. Ungültige Kalenderänderungen, Leerwerte und Überläufe lösen einen Fehler aus.
+hint-temporal-create=Erzeugt einen validierten Wert. FromUtc kombiniert DATE und TIME als UTC; FromUnix erwartet ganze Sekunden seit 1970-01-01T00:00:00Z mit Vorzeichen.
+hint-temporal-component=Liest eine Komponente, ohne den Wert zu ändern. TIMESTAMP-Komponenten sind UTC; DayOfWeek verwendet Sonntag=0. Leerwerte lösen einen Fehler aus.
+hint-member-user-birthday=Natives Kalendergeburtsdatum ohne Legacy-Jahresverkürzung. Bei Session.User schreibbar; Leerwerte werden abgewiesen.
+hint-member-native-timestamp=Nativer UTC-Zeitstempel mit der Genauigkeit der gespeicherten Daten. Schreibbare Benutzerablauffelder weisen Leerwerte ab. Ungültige Objekte liefern leer.
+hint-member-zip-timestamp-utc=Setzt den ZIP-Zeitstempel aus UTC-Komponenten (1980..2107). ZIP schneidet Sekundenbruchteile und ungerade Sekunden ab. Leer entfernt die Vorgabe; Fehler lassen sie unverändert.
+hint-param-timestamp=UTC-Zeitstempel oder leer zum Entfernen der Zeitstempelvorgabe.
 hint-type-boolean=Vorzeichenloser Zeichentyp (1 Byte): 0 = `FALSE`, sonst `TRUE`
 hint-type-date=Vorzeichenlose Ganzzahl (2 Bytes): julianisches PCBoard-Datum (Anzahl der Tage seit dem 1.1.1900)
 hint-type-ddate=

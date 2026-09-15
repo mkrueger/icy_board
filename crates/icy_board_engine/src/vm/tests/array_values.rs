@@ -428,8 +428,8 @@ async fn classic_static_flags_and_bare_array_decay_survive_dynamic_storage_chang
         let (_, table) = VariableTable::deserialize(version, &mut bytes).unwrap();
         let mut vm = VirtualMachine::new(PathBuf::from("flags.ppe"), &registry, &mut io, &mut state);
         vm.variable_table = table;
-        vm.variable_table.set_value(2, array(11, 12));
-        vm.variable_table.set_value(3, array(21, 22));
+        vm.variable_table.set_value(2, array(11, 12)).unwrap();
+        vm.variable_table.set_value(3, array(21, 22)).unwrap();
 
         vm.execute_statement(&PPECommand::Let(Box::new(PPEExpr::Value(2)), Box::new(PPEExpr::Value(3))))
             .await
@@ -451,10 +451,10 @@ async fn classic_static_flags_and_bare_array_decay_survive_dynamic_storage_chang
             if version < 400 {
                 assert_eq!(0, vm.variable_table.get_value(3).get_array_value(0, 0, 0).as_int());
             }
-            vm.variable_table.set_value(3, array(40 + depth as i32, 0));
+            vm.variable_table.set_value(3, array(40 + depth as i32, 0)).unwrap();
             vm.return_addresses.push(ReturnAddress::func_call(0, 1));
         }
-        vm.variable_table.set_value(2, array(55, 56));
+        vm.variable_table.set_value(2, array(55, 56)).unwrap();
         for restored in [41, 21] {
             vm.execute_statement(&PPECommand::EndProc).await.unwrap();
             assert_eq!(restored, vm.variable_table.get_value(3).get_array_value(0, 0, 0).as_int());

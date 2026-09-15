@@ -21,6 +21,7 @@ pub struct PreProcessorVisitor<'a> {
 impl AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'_> {
     fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
+            Constant::Temporal(_) => None,
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
             Constant::Integer(i, _) => Some(VariableValue::new_int(*i)),
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),

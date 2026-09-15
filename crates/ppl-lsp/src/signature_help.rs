@@ -246,6 +246,9 @@ pub fn get_signature_help_for_version(line_before_cursor: &str, visitor: &Semant
         builtin_statement(&call.name).into_iter().collect::<Vec<_>>()
     } else {
         let mut signatures = user_routine(visitor, &call.name).into_iter().collect::<Vec<_>>();
+        if signatures.is_empty() && language_version >= 400 && call.name.eq_ignore_ascii_case("TIMESTAMP") {
+            signatures.push(SignatureBuilder::new("TIMESTAMP", "(").finish(") TIMESTAMP"));
+        }
         if signatures.is_empty() {
             signatures = builtin_functions(&call.name);
         }

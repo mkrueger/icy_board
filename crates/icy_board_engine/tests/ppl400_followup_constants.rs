@@ -202,12 +202,12 @@ fn fractions_keep_the_existing_integer_conversion_policy() {
     ] {
         for number in [0.5, 1.5, 126.75] {
             let value = VariableValue::new_double(number);
-            assert_eq!(value.clone().convert_to(kind), convert_const_declaration(value, kind, 400).unwrap());
+            assert_eq!(value.clone().convert_to(kind).unwrap(), convert_const_declaration(value, kind, 400).unwrap());
         }
     }
     for kind in [VariableType::SByte, VariableType::SWord, VariableType::Integer] {
         let value = VariableValue::new_double(-1.5);
-        assert_eq!(value.clone().convert_to(kind), convert_const_declaration(value, kind, 400).unwrap());
+        assert_eq!(value.clone().convert_to(kind).unwrap(), convert_const_declaration(value, kind, 400).unwrap());
     }
     succeeds(
         &[(
@@ -235,7 +235,7 @@ fn legacy_const_wrapping_and_ordinary_assignments_remain_unchanged() {
         VariableType::Unsigned,
     ] {
         let value = VariableValue::new_int(65537);
-        assert_eq!(value.clone().convert_to(kind), convert_const_declaration(value, kind, 350).unwrap());
+        assert_eq!(value.clone().convert_to(kind).unwrap(), convert_const_declaration(value, kind, 350).unwrap());
     }
 }
 
@@ -325,7 +325,12 @@ fn declared_numeric_types_survive_substitution_before_checked_enum_casts() {
     ] {
         for statement in ["PRINT Bits(N)", "CONST Bits Member=Bits(N)"] {
             let diagnostic = if statement.starts_with("CONST") { "constant" } else { "INTEGER" };
-            rejects(&[("main.pps", &format!("{BITS}CONST {kind} N=1\n{statement}\n"))], 400, diagnostic);
+            let value = match kind {
+                "DATE" => "\"1983-09-15\"",
+                "TIME" => "\"12:34:56\"",
+                _ => "1",
+            };
+            rejects(&[("main.pps", &format!("{BITS}CONST {kind} N={value}\n{statement}\n"))], 400, diagnostic);
         }
     }
     for language in [350, 400] {

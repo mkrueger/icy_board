@@ -382,21 +382,28 @@ fn inferred_scalar_binary_types_match_runtime_arithmetic() {
         "LONG", "ULONG",
     ];
     let operators = ["+", "-", "*", "/", "%", "^", "=", "<>", "<", "<=", ">", ">=", "&", "|"];
-    let mut source = String::new();
-    for (index, ty) in types.iter().enumerate() {
-        source.push_str(&format!("{ty} operand{index}\n"));
-    }
-    for left in 0..types.len() {
-        for right in 0..types.len() {
-            for operator in operators {
-                source.push_str(&format!("PRINT operand{left} {operator} operand{right}\n"));
+    for language in [350, 400] {
+        let types: Vec<_> = types
+            .iter()
+            .copied()
+            .filter(|typ| if language == 400 { !matches!(*typ, "DATE" | "TIME") } else { *typ != "ULONG" })
+            .collect();
+        let mut source = format!(";$LANGVERSION {language}\n");
+        for (index, ty) in types.iter().enumerate() {
+            source.push_str(&format!("{ty} operand{index}\n"));
+        }
+        for left in 0..types.len() {
+            for right in 0..types.len() {
+                for operator in operators {
+                    source.push_str(&format!("PRINT operand{left} {operator} operand{right}\n"));
+                }
             }
         }
+        let (ast, mut visitor) = accepts(&source);
+        let mut check = CheckTypes(&mut visitor, 0);
+        ast.visit(&mut check);
+        assert_eq!(types.len() * types.len() * operators.len(), check.1);
     }
-    let (ast, mut visitor) = accepts(&source);
-    let mut check = CheckTypes(&mut visitor, 0);
-    ast.visit(&mut check);
-    assert_eq!(types.len() * types.len() * operators.len(), check.1);
 
     // Before 4.00 STRING denotes the bounded legacy string type.
     let (ast, mut visitor, errors) = analyze("STRING lhs, rhs\nPRINT lhs + rhs, lhs - rhs, lhs = rhs\n", 340, 400);

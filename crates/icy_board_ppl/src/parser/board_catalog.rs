@@ -96,6 +96,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             registry.add_named_function(n("AddBytes"), vec![("data", V::Bytes), ("entryName", V::UnboundedString)], V::Boolean);
             registry.add_function(n("Finish"), Vec::new(), V::Boolean);
             registry.add_function(n("Abort"), Vec::new(), V::Boolean);
+            registry.add_named_function(n("SetTimestampUtc"), vec![("timestamp", V::Timestamp)], V::Boolean);
         }
         USER_ID => {
             for name in [
@@ -169,6 +170,12 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             );
             registry.add_named_function(n("RemoveContact"), vec![("index", V::Integer)], V::Boolean);
             registry.add_named_function(n("SetNote"), vec![("index", V::Integer), ("text", V::UnboundedString)], V::Boolean);
+            registry.add_property(n("Birthday"), V::CalendarDate, true);
+            registry.add_property(n("ExpiresAt"), V::Timestamp, true);
+            registry.add_property(n("PasswordExpiresAt"), V::Timestamp, true);
+            for name in ["FirstOn", "LastOn", "LastDirectoryRead"] {
+                registry.add_property(n(name), V::Timestamp, false);
+            }
         }
         MSG_ID => {
             registry.add_property(n("Number"), V::Long, false);
@@ -185,6 +192,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
             }
             registry.add_function(n("Text"), Vec::new(), V::UnboundedString);
             registry.add_property(n("Header"), V::UserData(super::MSG_HEADER_ID as u32), false);
+            registry.add_property(n("WrittenAt"), V::Timestamp, false);
         }
         HTTP_ID => {
             registry.add_named_static_function(n("Get"), vec![("url", V::UnboundedString)], V::UserData(HTTP_RESPONSE_ID as u32));
@@ -524,6 +532,7 @@ pub fn register_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) 
             registry.add_property(n("Size"), V::Long, false);
             registry.add_property(n("Date"), V::Date, false);
             registry.add_property(n("DescriptionTruncated"), V::Boolean, false);
+            registry.add_property(n("Timestamp"), V::Timestamp, false);
         }
         FILE_PAGE_ID => {
             registry.add_property(n("Valid"), V::Boolean, false);

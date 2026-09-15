@@ -129,14 +129,14 @@ archive.SetCompression(ZipMethod.Deflate, 9)
 archive.SetCompression(ZipMethod.Deflate, 42)
 archive.SetPermissions(384)
 DATE fixedDate = MKDATE(2024, 1, 2)
-TIME fixedTime = 45296
-IF !archive.SetTimestamp(fixedDate, fixedTime) THEN
+TIME fixedTime = "12:34:56"
+IF !archive.SetTimestampUtc(TIMESTAMP.FromUtc(fixedDate, fixedTime)) THEN
     ERROR failure = Error.Last()
     PRINTLN "ZIP timestamp: ", failure.Message
     EXIT
 ENDIF
 archive.AddFile("tree/source.txt", "named.txt")
-IF !archive.SetTimestamp(MKDATE(2079, 1, 1), 0) THEN
+IF !archive.SetTimestamp(MKDATE(2079, 1, 1).ToLegacy(), 0) THEN
     PRINTLN Error.Last().Message
     EXIT
 ENDIF

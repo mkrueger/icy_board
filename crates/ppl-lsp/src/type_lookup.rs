@@ -2,7 +2,10 @@
 //! and hover can say what a record or a board object holds.
 
 use icy_board_ppl::{
-    executable::{FUNCTION_DEFINITIONS, VariableType},
+    executable::{
+        FUNCTION_DEFINITIONS, VariableType,
+        temporal::{temporal_builtin, temporal_members},
+    },
     parser::UserTypeRegistry,
     semantic::{ARRAY_MEMBERS, ARRAY_PROCEDURES, BYTES_MEMBERS, FunctionDeclaration, ReferenceType, STRING_MEMBERS, SemanticVisitor},
 };
@@ -58,6 +61,10 @@ pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_ppl:
 
 /// The type of a variable, or the return type of a routine, by name.
 pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableType> {
+    type_of_name_for_version(visitor, name, 400)
+}
+
+pub fn type_of_name_for_version(visitor: &SemanticVisitor, name: &str, language_version: u16) -> Option<VariableType> {
     let name = unicase::Ascii::new(name.to_string());
 
     for (reference_type, reference) in &visitor.references {
@@ -85,6 +92,12 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
             }
             return Some(reference.variable_type);
         }
+    }
+
+    if language_version >= 400
+        && let Some((_, _, typ)) = temporal_builtin(name.as_ref())
+    {
+        return Some(typ);
     }
 
     // A built-in function may be overloaded; the one answering an object wins,
@@ -129,11 +142,23 @@ pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<Vari
             .or(reference.implementation.as_ref())
             .is_some_and(|(_, declaration)| unicase::Ascii::new(declaration.token.clone()) == identifier)
     });
-    (!shadowed).then(|| visitor.type_registry.get_board_object(&identifier)).flatten()
+    (!shadowed)
+        .then(|| {
+            icy_board_ppl::parser::built_in_type(&identifier, 400)
+                .filter(|typ| typ.is_temporal())
+                .or_else(|| visitor.type_registry.get_board_object(&identifier))
+        })
+        .flatten()
 }
 
 /// The type a field of `var_type` has.
 pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, member: &str) -> Option<VariableType> {
+    if var_type.is_temporal() {
+        return temporal_members(var_type)
+            .iter()
+            .find(|definition| definition.name.eq_ignore_ascii_case(member))
+            .map(|definition| definition.result);
+    }
     if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         return STRING_MEMBERS
             .iter()
@@ -194,7 +219,7 @@ pub fn receiver_type(visitor: &SemanticVisitor, path: &[String]) -> Option<Recei
 
 pub fn receiver_type_for_version(visitor: &SemanticVisitor, path: &[String], language_version: u16) -> Option<ReceiverType> {
     let (first, rest) = path.split_first()?;
-    let mut result = ReceiverType::scalar(type_of_name(visitor, first)?);
+    let mut result = ReceiverType::scalar(type_of_name_for_version(visitor, first, language_version)?);
     let reference = visitor.references.iter().find(|(kind, reference)| {
         matches!(kind, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_))
             && reference
@@ -207,6 +232,7 @@ pub fn receiver_type_for_version(visitor: &SemanticVisitor, path: &[String], lan
     result.namespace = reference.is_none()
         && (visitor.type_registry.get_enum(&identifier).is_some()
             || visitor.type_registry.get_board_object(&identifier).is_some()
+            || (language_version >= 400 && result.variable_type.is_temporal())
             || matches!(first.to_ascii_uppercase().as_str(), "STRING" | "BIGSTR" | "BYTES"));
     result.callable = reference
         .is_some_and(|(kind, reference)| matches!(kind, ReferenceType::Function(_)) || reference.variable_type == VariableType::Function)
@@ -259,6 +285,13 @@ pub fn receiver_type_for_version(visitor: &SemanticVisitor, path: &[String], lan
         }
         if result.rank > 0 {
             return None;
+        }
+        if result.variable_type.is_temporal() && !result.namespace {
+            let field = temporal_members(result.variable_type)
+                .into_iter()
+                .find(|definition| definition.property && definition.name.eq_ignore_ascii_case(member))?;
+            result = ReceiverType::scalar(field.result);
+            continue;
         }
         let VariableType::UserData(id) = result.variable_type else { return None };
         let name = unicase::Ascii::new(member.clone());
@@ -313,10 +346,11 @@ pub fn ranked_type_name(registry: &UserTypeRegistry, typ: VariableType, rank: u8
 }
 
 pub fn scalar_type(typ: VariableType) -> bool {
-    matches!(
-        typ,
-        VariableType::String | VariableType::BigStr | VariableType::UnboundedString | VariableType::Bytes
-    )
+    typ.is_temporal()
+        || matches!(
+            typ,
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString | VariableType::Bytes
+        )
 }
 
 pub fn callable_member(registry: &UserTypeRegistry, receiver: ReceiverType, member: &str) -> Option<CallableMember> {
@@ -357,6 +391,30 @@ pub fn callable_member(registry: &UserTypeRegistry, receiver: ReceiverType, memb
         result.parameter_names.push("mask".into());
         result.required = 1;
         result.return_type = Some(VariableType::Boolean);
+        return Some(result);
+    }
+    if typ.is_temporal() {
+        let definition = temporal_members(typ)
+            .into_iter()
+            .find(|definition| definition.is_static == receiver.namespace && name == definition.name && !definition.property)?;
+        use icy_board_ppl::executable::temporal::TemporalOp;
+        let names: &[&str] = match definition.operation {
+            TemporalOp::ParseDate | TemporalOp::ParseTime | TemporalOp::ParseTimestamp => &["text"],
+            TemporalOp::CreateDate => &["year", "month", "day"],
+            TemporalOp::CreateTime => &["hour", "minute", "second"],
+            TemporalOp::FromUtc => &["date", "time"],
+            TemporalOp::FromUnix | TemporalOp::AddSeconds => &["seconds"],
+            TemporalOp::Format => &["format"],
+            TemporalOp::WithYear => &["year"],
+            TemporalOp::AddDays => &["days"],
+            TemporalOp::DaysUntil | TemporalOp::SecondsUntil => &["other"],
+            _ => &[],
+        };
+        result.parameter_names = names.iter().map(|name| (*name).into()).collect();
+        result.parameters = definition.arguments.to_vec();
+        result.parameter_ranks = vec![0; result.parameters.len()];
+        result.required = result.parameters.len();
+        result.return_type = Some(definition.result);
         return Some(result);
     }
     if scalar_type(typ) {
@@ -465,6 +523,9 @@ pub fn callable_detail(registry: &UserTypeRegistry, method: &CallableMember) -> 
 
 /// Everything that may follow a `.` on a value of this type.
 pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if var_type.is_temporal() {
+        return temporal_completion_members(registry, var_type, false);
+    }
     if registry.is_enum_type(var_type) {
         return vec![Member {
             name: "Has".to_string(),
@@ -501,6 +562,9 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
 }
 
 pub fn static_members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if var_type.is_temporal() {
+        return temporal_completion_members(registry, var_type, true);
+    }
     if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         return string_members(true);
     }
@@ -551,6 +615,26 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_ppl::compil
     }
     members.sort_by(|a, b| a.name.cmp(&b.name));
     members
+}
+
+fn temporal_completion_members(registry: &UserTypeRegistry, typ: VariableType, statik: bool) -> Vec<Member> {
+    temporal_members(typ)
+        .into_iter()
+        .filter(|member| member.is_static == statik)
+        .map(|member| Member {
+            name: member.name.to_string(),
+            detail: if member.property {
+                type_name(registry, member.result)
+            } else {
+                format!(
+                    "({}) {}",
+                    named_parameters(registry, member.arguments, &[], member.arguments.len()),
+                    type_name(registry, member.result)
+                )
+            },
+            kind: if member.property { MemberKind::Field } else { MemberKind::Method },
+        })
+        .collect()
 }
 
 pub fn string_members(statik: bool) -> Vec<Member> {

@@ -93,7 +93,7 @@ where
                 walk_encode(value, leaf)?;
             }
         }
-        GenericVariableData::None | GenericVariableData::String(_) => {
+        GenericVariableData::None | GenericVariableData::String(_) | GenericVariableData::Temporal(_) => {
             ensure_scalar_type(value.vtype)?;
             leaf(value);
         }
@@ -131,7 +131,9 @@ where
                 })
                 .collect::<Result<_, _>>()?,
         )),
-        GenericVariableData::None | GenericVariableData::String(_) | GenericVariableData::Enum(_) => return scalar(template),
+        GenericVariableData::None | GenericVariableData::String(_) | GenericVariableData::Enum(_) | GenericVariableData::Temporal(_) => {
+            return scalar(template);
+        }
         _ => return Err(format!("{} cannot be read from a record file", template.vtype)),
     };
     Ok(VariableValue {
@@ -186,6 +188,9 @@ fn unescape_text(value: &str) -> Result<String, String> {
 }
 
 fn encode_text_scalar(value: &VariableValue) -> String {
+    if value.vtype.is_temporal() {
+        return value.as_string();
+    }
     match value.vtype {
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => escape_text(&value.as_string()),
         VariableType::MessageAreaID => {
@@ -202,6 +207,9 @@ fn encode_text_scalar(value: &VariableValue) -> String {
 }
 
 fn decode_text_scalar(template: &VariableValue, text: &str, table: &VariableTable) -> Result<VariableValue, String> {
+    if let Some(empty) = template.vtype.empty_temporal() {
+        return empty.parse(text).map(VariableValue::new_temporal);
+    }
     let invalid = || format!("invalid {} value {text:?}", template.vtype);
     if matches!(template.generic_data, GenericVariableData::Enum(_)) {
         let number = text.parse::<i32>().map_err(|_| invalid())?;
@@ -261,6 +269,10 @@ fn decode_text_scalar(template: &VariableValue, text: &str, table: &VariableTabl
 }
 
 fn encode_binary_scalar(value: &VariableValue, output: &mut Vec<u8>) {
+    if let Some(temporal) = value.temporal() {
+        output.extend_from_slice(&temporal.encode());
+        return;
+    }
     if matches!(value.generic_data, GenericVariableData::Enum(_)) {
         output.extend_from_slice(&value.as_int().to_le_bytes());
         return;
@@ -311,6 +323,9 @@ fn read_exact<const N: usize>(input: &mut Cursor<&[u8]>) -> Result<[u8; N], Stri
 }
 
 fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>, table: &VariableTable) -> Result<VariableValue, String> {
+    if let Some(empty) = template.vtype.empty_temporal() {
+        return empty.decode(&read_exact::<13>(input)?).map(VariableValue::new_temporal);
+    }
     if matches!(template.generic_data, GenericVariableData::Enum(_)) {
         return decode_enum_scalar(template, i32::from_le_bytes(read_exact(input)?), table);
     }
@@ -376,6 +391,9 @@ fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>, tab
 }
 
 fn ensure_scalar_type(variable_type: VariableType) -> Result<(), String> {
+    if variable_type.is_temporal() {
+        return Ok(());
+    }
     match variable_type {
         VariableType::Boolean
         | VariableType::Unsigned

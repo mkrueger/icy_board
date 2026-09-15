@@ -21,7 +21,10 @@ static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
     ("STRING", VariableType::UnboundedString, 400),
     ("BOOLEAN", VariableType::Boolean, 100),
     ("DATE", VariableType::Date, 100),
+    ("DATE", VariableType::CalendarDate, 400),
     ("TIME", VariableType::Time, 100),
+    ("TIME", VariableType::ClockTime, 400),
+    ("TIMESTAMP", VariableType::Timestamp, 400),
     ("MONEY", VariableType::Money, 100),
     ("SDWORD", VariableType::Integer, 200),
     ("LONG", VariableType::Integer, 200),
@@ -68,4 +71,27 @@ pub fn built_in_type_names(lang_version: u16) -> Vec<&'static str> {
     names.sort_unstable();
     names.dedup();
     names
+}
+
+#[cfg(test)]
+mod temporal_tests {
+    use super::*;
+
+    #[test]
+    fn temporal_names_are_versioned_without_reusing_legacy_ids() {
+        for (name, legacy, modern, id) in [
+            ("DATE", VariableType::Date, VariableType::CalendarDate, 25),
+            ("TIME", VariableType::Time, VariableType::ClockTime, 26),
+        ] {
+            let name = unicase::Ascii::new(name.to_string());
+            assert_eq!(built_in_type(&name, 340), Some(legacy));
+            assert_eq!(built_in_type(&name, 400), Some(modern));
+            assert_eq!(u32::from(modern), id);
+            assert_ne!(u32::from(legacy), id);
+            assert_eq!(VariableType::from(u32::from(legacy) as u8), legacy);
+        }
+        let name = unicase::Ascii::new("TIMESTAMP".to_string());
+        assert_eq!(built_in_type(&name, 340), None);
+        assert_eq!(built_in_type(&name, 400), Some(VariableType::Timestamp));
+    }
 }

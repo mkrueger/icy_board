@@ -6,6 +6,267 @@ use crate::executable::{EntryType, VariableType};
 use super::{compile, compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn temporal_bytecode_numeric_arguments_and_conditions_return_errors() {
+    use crate::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEExpr, PPEScript};
+    for source in [
+        "DATE value\nPRINT value",
+        "PRINT DATE.Create(1983, 9, 15)",
+        "TIME value\nPRINT value",
+        "TIMESTAMP value\nPRINT value",
+    ] {
+        let executable = compile(&format!("{source}\nINTEGER numbers[1]\nPRINT numbers[0]"));
+        let script = PPEScript::from_ppe_file(&executable).unwrap();
+        let PPECommand::PredefinedCall(print, arguments) = &script.statements[0].command else {
+            panic!("PRINT expected")
+        };
+        let value = arguments[0].clone();
+        let PPECommand::PredefinedCall(_, array_arguments) = &script.statements[1].command else {
+            panic!("array PRINT expected")
+        };
+        let PPEExpr::Dim(array_id, _) = &array_arguments[0] else {
+            panic!("array access expected")
+        };
+        let mut commands = vec![PPECommand::IfNot(Box::new(value.clone()), 0)];
+        for opcode in [
+            FuncOpCode::ABS,
+            FuncOpCode::SPACE,
+            FuncOpCode::CHR,
+            FuncOpCode::RANDOM,
+            FuncOpCode::TOINTEGER,
+            FuncOpCode::TOREAL,
+            FuncOpCode::TOLONG64,
+            FuncOpCode::TOUNSIGNED,
+        ] {
+            commands.push(PPECommand::PredefinedCall(
+                print,
+                vec![PPEExpr::PredefinedFunctionCall(opcode.get_definition(), vec![value.clone()])],
+            ));
+        }
+        for opcode in [OpCode::COLOR, OpCode::DELAY] {
+            commands.push(PPECommand::PredefinedCall(opcode.get_definition(), vec![value.clone()]));
+        }
+        commands.push(PPECommand::PredefinedCall(print, vec![PPEExpr::Dim(*array_id, vec![value.clone()])]));
+        commands.push(PPECommand::Let(Box::new(PPEExpr::Dim(*array_id, vec![value.clone()])), Box::new(value.clone())));
+        commands.push(PPECommand::PredefinedCall(
+            print,
+            vec![PPEExpr::PredefinedFunctionCall(
+                FuncOpCode::TemporalCall.get_definition(),
+                vec![value.clone(); 5],
+            )],
+        ));
+        for command in commands {
+            let description = format!("{command:?}");
+            let mut invalid = executable.clone();
+            let mut invalid_script = script.clone();
+            invalid_script.statements[0].command = command;
+            invalid.in_memory_script = Some(invalid_script);
+            let invalid = Executable::from_buffer(&mut invalid.to_buffer().unwrap(), false).unwrap();
+            let (result, _, ()) = super::try_run_executable_collecting_inspected(invalid, |_| {}, &[], None, b"", false, super::TestPpeBoundary::Vm, |_| ());
+            let error = result.expect_err(&description);
+            assert!(
+                matches!(
+                    error.downcast_ref::<crate::executable::VMError>(),
+                    Some(crate::executable::VMError::InvalidTemporalValue(_))
+                ),
+                "{description}: {error}"
+            );
+        }
+    }
+}
+
+#[test]
+fn temporal_bytecode_operators_return_errors_without_panicking() {
+    use crate::ast::{BinOp, UnaryOp};
+    use crate::executable::{PPECommand, PPEExpr, PPEScript};
+    for source in ["DATE value\nPRINT value", "PRINT DATE.Create(1983, 9, 15)"] {
+        let executable = compile(source);
+        let script = PPEScript::from_ppe_file(&executable).unwrap();
+        let PPECommand::PredefinedCall(definition, arguments) = &script.statements[0].command else {
+            panic!("PRINT expected")
+        };
+        let value = arguments[0].clone();
+        let mut expressions = Vec::new();
+        for operation in [
+            BinOp::Add,
+            BinOp::Sub,
+            BinOp::Mul,
+            BinOp::Div,
+            BinOp::Mod,
+            BinOp::PoW,
+            BinOp::And,
+            BinOp::Or,
+            BinOp::ShortAnd,
+            BinOp::ShortOr,
+        ] {
+            expressions.push(PPEExpr::BinaryExpression(operation, Box::new(value.clone()), Box::new(value.clone())));
+        }
+        for operation in [UnaryOp::Plus, UnaryOp::Minus, UnaryOp::Not] {
+            expressions.push(PPEExpr::UnaryExpression(operation, Box::new(value.clone())));
+        }
+        for expression in expressions {
+            let description = format!("{expression:?}");
+            let mut invalid = executable.clone();
+            let mut invalid_script = script.clone();
+            invalid_script.statements[0].command = PPECommand::PredefinedCall(definition, vec![expression]);
+            invalid.in_memory_script = Some(invalid_script);
+            let (result, _, ()) = super::try_run_executable_collecting_inspected(invalid, |_| {}, &[], None, b"", false, super::TestPpeBoundary::Vm, |_| ());
+            let error = result.expect_err(&description);
+            assert!(
+                matches!(
+                    error.downcast_ref::<crate::executable::VMError>(),
+                    Some(crate::executable::VMError::InvalidTemporalValue(_))
+                ),
+                "{error}"
+            );
+        }
+    }
+}
+
+#[test]
+fn temporal_legacy_host_field_assignment_returns_checked_error() {
+    let executable = compile("DATE value = DATE.Create(1983, 9, 15)\nSession.User.BirthDate = value\nPRINT \"UNREACHABLE\"");
+    let (result, output, ()) = super::try_run_executable_collecting_inspected(executable, |_| {}, &[], None, b"", false, super::TestPpeBoundary::Vm, |_| ());
+    let error = result.unwrap_err();
+    assert!(
+        matches!(
+            error.downcast_ref::<crate::executable::VMError>(),
+            Some(crate::executable::VMError::InvalidTemporalValue(_))
+        ),
+        "{error}"
+    );
+    assert!(!output.contains("UNREACHABLE"));
+}
+
+#[test]
+fn temporal_conditions_require_explicit_boolean_values() {
+    for typ in ["DATE", "TIME", "TIMESTAMP"] {
+        for statement in [
+            "IF value PRINT 1",
+            "IF value GOTO done\n:done",
+            "IF value THEN\nPRINT 1\nENDIF",
+            "WHILE value PRINT 1",
+            "WHILE value DO\nBREAK\nENDWHILE",
+            "REPEAT\nPRINT 1\nUNTIL value",
+            "PRINT !value",
+            "PRINT value && TRUE",
+            "PRINT value || FALSE",
+        ] {
+            let source = format!("{typ} value\n{statement}");
+            assert!(
+                compile_errors(&source).iter().any(|error| error.contains("Invalid date/time operation")),
+                "{source}"
+            );
+        }
+        assert_eq!(run_ppl(&format!("{typ} value\nIF value.IsEmpty PRINT 1\nIF !TOBOOLEAN(value) PRINT 2")), "12");
+    }
+    assert_eq!(run_ppl(";$LANGVERSION 330\nDATE value\nvalue = 1\nIF (value) PRINT 1"), "1");
+}
+
+#[test]
+fn temporal_input_preserves_iso_date_and_fractional_seconds() {
+    let output = super::run_ppl_with_input(
+        "DATE birthday\nTIME clock\nINPUTDATE \"Date\", birthday, 7\nINPUTTIME \"Time\", clock, 7\nPRINTLN \"RESULT=\", birthday, \"|\", clock\n",
+        b"1883-09-15\r12:34:56.123456789\r",
+    );
+    assert!(output.contains("RESULT=1883-09-15|12:34:56.123456789"), "{output:?}");
+    let legacy = super::run_ppl_with_input(
+        ";$LANGVERSION 340\nDATE birthday\nTIME clock\nINPUTDATE \"Date\", birthday, 7\nINPUTTIME \"Time\", clock, 7\nPRINTLN \"RESULT=\", birthday, \"|\", clock\n",
+        b"09-15-83\r12:34:56\r",
+    );
+    assert!(legacy.contains("RESULT=09/15/83|12:34:56"), "{legacy:?}");
+}
+
+#[test]
+fn temporal_ppl400_constants_and_routines_use_checked_values() {
+    let source = r#"
+        ;$LANGVERSION 400
+        CONST DATE birthday = "1883-09-15"
+        CONST TIMESTAMP epoch = "1970-01-01T00:00:00Z"
+        PRINTLN birthday, "|", epoch.IsEmpty
+        PRINTLN NextDay(birthday)
+        EXIT
+        FUNCTION NextDay(DATE value) DATE
+            RETURN value.AddDays(1)
+        ENDFUNC
+    "#;
+    assert_eq!(run_ppl(source), "1883-09-15|0\n1883-09-16\n");
+    assert!(!compile_errors("CONST DATE invalid = \"2023-02-29\"\nPRINT invalid").is_empty());
+    assert!(!super::compile_errors_with_runtime("DATE value\nPRINT value", 340).is_empty());
+}
+
+#[test]
+fn temporal_ppl400_values_members_and_timestamp_roundtrip() {
+    assert_eq!(
+        run_ppl(
+            r#"
+        ;$LANGVERSION 400
+        DATE birthday
+        TIME clock
+        TIMESTAMP moment
+        PRINTLN birthday.IsEmpty, "|", clock.IsEmpty, "|", moment.IsEmpty
+        birthday = DATE.Create(1883, 9, 15)
+        clock = TIME.Parse("00:30:00.123456789")
+        moment = TIMESTAMP.FromUtc(birthday, clock)
+        PRINTLN birthday, "|", birthday.Year, "|", birthday.Month, "|", birthday.Day
+        PRINTLN birthday.WithYear(1983).Format("%d-%m-%Y")
+        PRINTLN moment, "|", moment.UtcDate, "|", moment.UtcTime, "|", moment.Nanosecond
+        PRINTLN YEAR(MKDATE(2400, 2, 29)), "|", DATE.Parse("2400-02-29").AddDays(1)
+        PRINTLN TIMESTAMP.FromUnix(0).IsEmpty
+    "#
+        ),
+        "1|1|1\n1883-09-15|1883|9|15\n15-09-1983\n1883-09-15T00:30:00.123456789Z|1883-09-15|00:30:00.123456789|123456789\n2400|2400-03-01\n0\n"
+    );
+}
+
+#[test]
+fn temporal_ppl400_arrays_records_and_legacy_bridge() {
+    assert_eq!(
+        run_ppl(
+            r#"
+        ;$LANGVERSION 400
+        TYPE Entry
+            DATE birthday
+            TIMESTAMP moment
+        ENDTYPE
+        Entry record
+        DATE dates[]
+        REDIM dates, 2
+        dates[0] = "1983-09-15"
+        record.birthday = dates[0]
+        record.moment = TIMESTAMP.Parse("1970-01-01T00:00:00Z")
+        PRINTLN dates[1].IsEmpty, "|", record.birthday, "|", record.moment.IsEmpty
+        PRINTLN record.birthday.ToLegacy(), "|", TODATE(record.birthday.ToLegacy())
+        TIME midnight
+        midnight = "00:00:00"
+        PRINTLN midnight.IsEmpty, "|", midnight.ToLegacy()
+    "#
+        ),
+        "1|1983-09-15|0\n09/15/83|1983-09-15\n0|00:00:00\n"
+    );
+}
+
+#[test]
+fn temporal_ppl400_invalid_operations_are_rejected() {
+    for source in [
+        "DATE value\nINTEGER values[1]\nPRINT values[value]",
+        "DATE value\nPRINT STRING.Repeat(\"x\", value)",
+        "DATE value\nPRINT User.Load(value)",
+        "DATE value\nvalue.Year = 1983",
+    ] {
+        assert!(!compile_errors(source).is_empty(), "{source}");
+    }
+    assert!(!compile_errors("CONST DATE value = \"2024-01-01\"\nCONST INTEGER broken = TOINTEGER(value)\nPRINT broken").is_empty());
+    assert!(!compile_errors("DATE value\nINC value").is_empty());
+    assert!(!compile_errors("CONST DATE value = \"2024-01-01\"\nCONST INTEGER broken = value + 1\nPRINT broken").is_empty());
+    assert!(!compile_errors("DATE dates[1]\nPRINT dates < dates").is_empty());
+    assert!(!compile_errors(";$LANGVERSION 400\nPRINT TOINTEGER(DATE.Today())").is_empty());
+    assert_eq!(run_ppl("PRINT TODDATE(DATE.Create(1994, 5, 27))"), "19940527");
+    assert_eq!(run_ppl("PRINT TODATE(TODDATE(DATE.Create(1994, 5, 27)))"), "1994-05-27");
+    assert!(!compile_errors(";$LANGVERSION 400\nDATE value\nPRINT value * 2").is_empty());
+    assert!(!compile_errors(";$LANGVERSION 400\nPRINT DATE.Create(2024, \"two\", 1)").is_empty());
+}
+
+#[test]
 fn ppl400_string_uses_unbounded_storage_without_changing_literal_encoding() {
     let executable = compile(
         ";$LANGVERSION 400\nDECLARE FUNCTION Echo(STRING input) STRING\nSTRING text\nSTRING values[]\ntext = Echo(\"literal\")\nPRINT text, values.Len()\nFUNCTION Echo(STRING input) STRING\n STRING local\n local = input\n RETURN local\nENDFUNC",
@@ -527,8 +788,8 @@ fn test_a_ddate_holds_the_julian_date_behind_its_ccyymmdd_text() {
 /// An EDATE holds that same julian and shows itself as YYMM.DD.
 #[test]
 fn test_an_edate_shows_the_date_as_yymm_dd() {
-    assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT e"), "9603.15");
-    assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT TOINTEGER(e)"), "35138");
+    assert_eq!(run_ppl(";$LANGVERSION 340\nEDATE e\ne = MKDATE(1996, 3, 15)\nPRINT e"), "9603.15");
+    assert_eq!(run_ppl(";$LANGVERSION 340\nEDATE e\ne = MKDATE(1996, 3, 15)\nPRINT TOINTEGER(e)"), "35138");
 }
 
 #[test]
@@ -557,36 +818,36 @@ fn pcboard_datetime_parts_and_time_validation() {
 #[test]
 fn pcboard_datetime_oracle_fixture() {
     let source = include_str!("../../../../../compat/datetime.pps");
-    for version in [340, 400] {
-        let source = if version == 400 {
-            source.replace(";$LANGVERSION 340", ";$LANGVERSION 400").replace("\nEND\n", "\nEXIT\n")
-        } else {
-            source.to_string()
-        };
-        let actual = run_ppl(&source);
-        let expected = include_str!("../../../../../compat/datetime.out");
-        assert_eq!(actual.lines().count(), expected.lines().count());
-        for (actual, expected) in actual.lines().zip(expected.lines()) {
-            assert_eq!(actual, expected, "language {version}");
-        }
-        assert_eq!(actual, expected, "language {version}");
-    }
+    let actual = run_ppl(source);
+    let expected = include_str!("../../../../../compat/datetime.out");
+    assert_eq!(actual.lines().count(), expected.lines().count());
+    assert_eq!(actual, expected);
+    assert!(
+        compile(source)
+            .variable_table
+            .get_entries()
+            .iter()
+            .all(|entry| !entry.header.variable_type.is_temporal())
+    );
 }
 
 #[test]
 fn pcboard_datetime_invalid_memory_access_is_not_emulated() {
-    assert_eq!(run_ppl("PRINTLN TOINTEGER(MKDATE(2024, 13, 32)), \"|\", DOW(MKDATE(2100, 2, 29))"), "0|6\n");
+    assert_eq!(
+        run_ppl(";$LANGVERSION 340\nPRINTLN TOINTEGER(MKDATE(2024, 13, 32)), \"|\", DOW(MKDATE(2100, 2, 29))"),
+        "0|6\n"
+    );
     assert_eq!(run_ppl("PRINTLN VALDATE(\"1\u{20ac}2345\")"), "0\n");
 }
 
 #[test]
 fn test_a_date_survives_the_trip_through_ddate_and_back() {
-    assert_eq!(run_ppl("PRINT TODATE(TODDATE(MKDATE(1994, 5, 27)))"), "05/27/94");
+    assert_eq!(run_ppl(";$LANGVERSION 340\nPRINT TODATE(TODDATE(MKDATE(1994, 5, 27)))"), "05/27/94");
 }
 
 #[test]
 fn test_a_ddate_variable_takes_a_date_by_assignment() {
-    assert_eq!(run_ppl("DDATE d\nd = MKDATE(2001, 12, 31)\nPRINT d"), "20011231");
+    assert_eq!(run_ppl(";$LANGVERSION 340\nDDATE d\nd = MKDATE(2001, 12, 31)\nPRINT d"), "20011231");
 }
 
 #[test]

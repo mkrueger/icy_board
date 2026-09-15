@@ -259,6 +259,43 @@ fn decompiled_source_declares_its_language() {
     assert_eq!(Some(";$LANGVERSION 340".to_string()), legacy.lines().next().map(str::to_string));
 }
 
+#[test]
+fn default_decompilation_recompiles_at_each_fixture_runtime() {
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_data");
+    let mut checked = 0;
+    for entry in fs::read_dir(directory).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|extension| extension != "ppe") {
+            continue;
+        }
+        let executable = Executable::read_file(&path, false).unwrap();
+        let runtime = executable.runtime;
+        let language = super::output_language_version(runtime, None, None);
+        for raw in [false, true] {
+            let (ast, _) = decompile(executable.clone(), raw, language).unwrap();
+            let mut output = output_visitor::OutputVisitor::default();
+            output.version = language;
+            ast.visit(&mut output);
+            assert_eq!(output.output.lines().next(), Some(format!(";$LANGVERSION {language}").as_str()));
+            compile_source(&output.output, runtime).unwrap_or_else(|error| panic!("{} raw={raw}: {error}\n{}", path.display(), output.output));
+        }
+        checked += 1;
+    }
+    assert!(checked > 0);
+}
+
+#[test]
+fn default_330_decompilation_does_not_emit_newer_loop_syntax() {
+    let source = ";$LANGVERSION 350\nINTEGER count\nWHILE count < 10 DO\nREPEAT\ncount = count + 1\nUNTIL count > 3\nLOOP\ncount = count + 1\nIF count > 6 BREAK\nENDLOOP\nENDWHILE\nPRINT count\nEND\n";
+    let executable = compile_source(source, 330).unwrap();
+    let language = super::output_language_version(executable.runtime, None, None);
+    let text = decompile_to_text(executable, language);
+    for keyword in ["REPEAT", "UNTIL", "ENDLOOP", "EXIT", "FOREACH"] {
+        assert!(!text.split_whitespace().any(|word| word == keyword), "{keyword}: {text}");
+    }
+    compile_source(&text, 330).unwrap_or_else(|error| panic!("{error}\n{text}"));
+}
+
 /// The loops 350 added are labels and jumps in the PPE, so they only come back as
 /// loops for a language that has them.
 #[test]

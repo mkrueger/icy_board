@@ -51,6 +51,22 @@ hint-keyword-exit=Terminates the current PPE. In PPL 400 this contextual stateme
 hint-keyword-usage=Usage
 hint-const-builtin=A predefined PPL constant.
 
+hint-type-calendar-date=Validated calendar date without a timezone (PPL 400). ISO YYYY-MM-DD text; a separate empty value. Use calendar methods instead of integer arithmetic.
+hint-type-clock-time=Time of day without a timezone (PPL 400), with nanosecond precision. Midnight is not empty.
+hint-type-timestamp=UTC instant (PPL 400), with nanosecond precision and RFC3339 text. The Unix epoch is not empty.
+hint-temporal-empty=True only for the empty value, not midnight or the Unix epoch.
+hint-temporal-parse=Parses ISO date/time text. TIMESTAMP requires an RFC3339 offset and normalizes to UTC. Empty text yields an empty value; invalid input raises an error.
+hint-temporal-format=Formats with Chrono strftime directives, such as %Y-%m-%d. Invalid directives or unavailable components raise an error. Empty values format as empty text.
+hint-temporal-legacy=Explicit conversion to the legacy PPE value. Rejects range or precision loss; empty becomes legacy zero.
+hint-temporal-now=Current local date/time, or current UTC instant for TIMESTAMP.
+hint-temporal-until=Signed distance from this value to the argument, in whole days or seconds. Fractional seconds truncate toward zero; empty values raise an error.
+hint-temporal-change=Returns a changed value without modifying the receiver. Invalid calendar changes, empty values and overflow raise an error.
+hint-temporal-create=Constructs a validated value. FromUtc combines a DATE and TIME as UTC; FromUnix takes signed whole seconds since 1970-01-01T00:00:00Z.
+hint-temporal-component=Reads a component without changing the value. TIMESTAMP components are UTC; DayOfWeek uses Sunday=0. Empty values raise an error.
+hint-member-user-birthday=Native calendar birthday, without legacy year truncation. Writable on Session.User; empty values are rejected.
+hint-member-native-timestamp=Native UTC timestamp, retaining the precision of the backing data. Writable user expiry fields reject empty values. Invalid objects return empty.
+hint-member-zip-timestamp-utc=Sets the ZIP entry timestamp from UTC components (1980..2107). ZIP truncates subseconds and odd seconds. Empty resets the override; errors leave it unchanged.
+hint-param-timestamp=UTC timestamp, or empty to clear the timestamp override.
 hint-type-boolean=unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
 hint-type-date=unsigned integer (2 bytes) PCBoard julian date (count of days since 1/1/1900) 
 hint-type-ddate=

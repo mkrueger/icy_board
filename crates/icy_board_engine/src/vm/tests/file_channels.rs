@@ -9,6 +9,30 @@ use super::{run_ppl, run_ppl_with_files};
 const CONTENT: &[u8] = b"first line\r\nsecond line\r\n";
 
 #[test]
+fn temporal_binary_channels_preserve_precision_and_reject_corruption() {
+    let output = run_ppl_with_files(
+        r#"
+        TIMESTAMP original = TIMESTAMP.Parse("1969-12-31T23:59:59.123456789Z")
+        TIMESTAMP result
+        FCREATE 1, "timestamp.bin", O_WR, S_DN
+        FWRITE 1, original, 13
+        PRINTLN Error.Last().OK
+        FCLOSE 1
+        FOPEN 1, "timestamp.bin", O_RD, S_DN
+        FREAD 1, result, 13
+        PRINTLN result = original, "|", result
+        FCLOSE 1
+        FOPEN 1, "bad.bin", O_RD, S_DN
+        FREAD 1, result, 13
+        PRINTLN !Error.Last().OK, "|", result = original
+        FCLOSE 1
+    "#,
+        &[("bad.bin", &[2; 13])],
+    );
+    assert_eq!(output, "1\n1|1969-12-31T23:59:59.123456789Z\n1|1\n");
+}
+
+#[test]
 fn a_file_that_is_not_there_reports_through_ferr() {
     let output = run_ppl(
         r#"

@@ -95,12 +95,16 @@ impl Connection for OutputSink {
 }
 
 fn compile(source: &str, optimize: bool) -> Executable {
+    compile_with_runtime(source, optimize, 400)
+}
+
+fn compile_with_runtime(source: &str, optimize: bool, runtime: u16) -> Executable {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let registry = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("roundtrip.pps")]);
-    workspace.package.runtime = Some(400);
-    workspace.set_default_language_version(Some(400));
+    workspace.package.runtime = Some(runtime);
+    workspace.set_default_language_version(Some(runtime));
     let ast = parse_ast(PathBuf::from("roundtrip.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, registry, errors.clone()).with_optimization(optimize);
     compiler.compile(&[&ast]);
@@ -243,6 +247,53 @@ fn assert_roundtrip(source: &str, expected: &str) {
     // Exercise BOTH raw modes and all optimization combinations even when an
     // earlier variant regresses, rather than hiding raw=true behind raw=false.
     assert!(failures.is_empty(), "Original:\n{source}\n{}", failures.join("\n\n"));
+}
+
+#[test]
+fn legacy_330_decompiler_roundtrip_preserves_dates_times_and_nested_loops() {
+    let source = r#"
+;$LANGVERSION 350
+DATE day
+TIME clock
+INTEGER count
+day = 42
+clock = 3661
+WHILE (count < 2) DO
+    REPEAT
+        day = day + 1
+        clock = clock + 1
+        count = count + 1
+    UNTIL count > 0
+ENDWHILE
+LOOP
+    IF (count == 2) BREAK
+    count = count + 1
+ENDLOOP
+PRINTLN TOINTEGER(day), "|", TOINTEGER(clock), "|", count
+"#;
+    for optimize in [false, true] {
+        let original = compile_with_runtime(source, optimize, 330);
+        let (baseline, _) = execute(&original, INSTRUCTION_LIMIT);
+        assert_eq!(baseline.result, Ok(()));
+        assert_eq!(baseline.output, "44|3663|2\n");
+        for raw in [false, true] {
+            let language = original.runtime;
+            let (ast, issues) = decompile(reload(&original), raw, language).unwrap();
+            assert!(issues.is_empty());
+            let mut output = OutputVisitor::default();
+            output.version = language;
+            ast.visit(&mut output);
+            for reoptimize in [false, true] {
+                let rebuilt = compile_with_runtime(&output.output, reoptimize, language);
+                assert_eq!(
+                    execute(&rebuilt, INSTRUCTION_LIMIT).0,
+                    baseline,
+                    "raw={raw}, optimize={optimize}, reoptimize={reoptimize}\n{}",
+                    output.output
+                );
+            }
+        }
+    }
 }
 
 #[test]

@@ -332,6 +332,20 @@ fn run_executable_collecting_inspected<P: Fn(&mut IcyBoard), T>(
     boundary: TestPpeBoundary,
     inspect: impl FnOnce(&mut IcyBoardState) -> T,
 ) -> (bool, String, T) {
+    let (result, text, inspected) = try_run_executable_collecting_inspected(executable, init_fn, files, ppe_dir, input, cleanup, boundary, inspect);
+    (result.expect("the snippet failed to run"), text, inspected)
+}
+
+fn try_run_executable_collecting_inspected<P: Fn(&mut IcyBoard), T>(
+    executable: crate::executable::Executable,
+    init_fn: P,
+    files: &[(&str, &[u8])],
+    ppe_dir: Option<&str>,
+    input: &[u8],
+    cleanup: bool,
+    boundary: TestPpeBoundary,
+    inspect: impl FnOnce(&mut IcyBoardState) -> T,
+) -> (crate::Res<bool>, String, T) {
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
         let path = work_dir.join(name);
@@ -426,9 +440,8 @@ fn run_executable_collecting_inspected<P: Fn(&mut IcyBoard), T>(
         drop(state);
         reader.join().unwrap();
 
-        let kept_answers = result.expect("the snippet failed to run");
         let bytes = collected.lock().unwrap().clone();
-        (kept_answers, bytes, inspected)
+        (result, bytes, inspected)
     });
 
     let _ = std::fs::remove_dir_all(&work_dir);

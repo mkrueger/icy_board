@@ -412,7 +412,12 @@ impl SemanticVisitor {
         for (index, (argument, expected)) in arguments.iter().zip(expected).enumerate() {
             let actual = argument.visit(self);
             self.reject_bare_array_value(argument);
-            if *expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
+            if *expected != actual
+                && (expected.is_temporal()
+                    || actual.is_temporal()
+                    || matches!(expected, VariableType::UserData(_))
+                    || matches!(actual, VariableType::UserData(_)))
+            {
                 self.errors.lock().unwrap().report_error(
                     argument.get_span(),
                     CompilationErrorType::ArgumentTypeMismatch(index + 1, self.source_type_name(*expected), self.source_type_name(actual)),
@@ -422,6 +427,96 @@ impl SemanticVisitor {
         for argument in arguments.iter().skip(expected.len()) {
             argument.visit(self);
         }
+    }
+
+    pub(super) fn temporal_call(&mut self, call: &crate::ast::FunctionCallExpression) -> Option<VariableType> {
+        use crate::executable::temporal::{temporal_builtin, temporal_members};
+        if self.lang_version < 400 {
+            return None;
+        }
+        let (operation, expected, result, instance) = match call.get_expression() {
+            Expression::Identifier(name) => {
+                let (operation, expected, result) = temporal_builtin(name.get_identifier().as_ref())?;
+                if expected.first().is_some_and(|typ| typ.is_temporal())
+                    && call.get_arguments().first().is_some_and(|argument| !argument.visit(self).is_temporal())
+                {
+                    return None;
+                }
+                (operation, expected, result, false)
+            }
+            Expression::MemberReference(member) => {
+                let static_type = if let Expression::Identifier(name) = member.get_expression() {
+                    if self.lookup_variable(name.get_identifier()).is_none() {
+                        if self.type_registry.get_board_object(name.get_identifier()).is_some()
+                            || self.type_registry.get_enum(name.get_identifier()).is_some()
+                            || string_type_name(member.get_expression(), self.lang_version)
+                        {
+                            return None;
+                        }
+                        let typ = crate::parser::built_in_type(name.get_identifier(), self.lang_version);
+                        if typ.is_some_and(|typ| !typ.is_temporal()) {
+                            return None;
+                        }
+                        typ
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                let typ = static_type.unwrap_or_else(|| self.visit_receiver(member.get_expression(), member.get_identifier_token()));
+                if !typ.is_temporal() {
+                    return None;
+                }
+                let definition = temporal_members(typ)
+                    .into_iter()
+                    .find(|definition| *member.get_identifier() == definition.name)?;
+                if definition.is_static != static_type.is_some() || definition.property {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::InvalidMemberReferenceExpression,
+                    );
+                }
+                if static_type.is_none() {
+                    self.reject_bare_array_value(member.get_expression());
+                }
+                self.member_receiver_type_lookup.insert(member.get_identifier_token().span.start, typ);
+                (definition.operation, definition.arguments, definition.result, static_type.is_none())
+            }
+            _ => return None,
+        };
+        self.check_expr_arg_count(expected.len(), call.get_arguments().len(), call.get_expression());
+        for (index, argument) in call.get_arguments().iter().enumerate() {
+            let actual = argument.visit(self);
+            self.reject_bare_array_value(argument);
+            let expected = expected.get(index).copied().unwrap_or(VariableType::None);
+            let compatible = expected == actual
+                || expected == VariableType::None
+                || matches!(expected, VariableType::Integer | VariableType::Long)
+                    && matches!(
+                        actual,
+                        VariableType::Integer | VariableType::Long | VariableType::Byte | VariableType::Word | VariableType::SByte | VariableType::SWord
+                    )
+                || expected == VariableType::UnboundedString && matches!(actual, VariableType::String | VariableType::BigStr);
+            if !compatible {
+                self.errors.lock().unwrap().report_error(
+                    argument.get_span(),
+                    CompilationErrorType::ArgumentTypeMismatch(index + 1, self.source_type_name(expected), self.source_type_name(actual)),
+                );
+            }
+        }
+        if self.runtime < 400 {
+            self.errors.lock().unwrap().report_error(
+                call.get_expression().get_span(),
+                CompilationErrorType::BuiltinNeedsRuntime("Date/time".into(), 400),
+            );
+        }
+        for value in [0, operation as i32] {
+            self.add_constant(&Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
+        }
+        self.function_type_lookup
+            .insert(crate::hir::CallId(call.id), super::SemanticInfo::TemporalCall(operation, instance));
+        Some(result)
     }
 
     /// Walks a member receiver once and caches nested expressions.

@@ -16,6 +16,7 @@ pub struct LookupVariabeleTable {
 
     const_lookup_table: HashMap<(VariableType, u64), usize>,
     string_lookup_table: HashMap<String, usize>,
+    temporal_lookup_table: HashMap<crate::executable::temporal::TemporalValue, usize>,
 }
 
 impl LookupVariabeleTable {
@@ -71,6 +72,13 @@ impl LookupVariabeleTable {
     }
 
     pub fn lookup_constant(&mut self, constant: &Constant) -> usize {
+        if let Constant::Temporal(value) = constant {
+            if let Some(id) = self.temporal_lookup_table.get(value) {
+                return *id;
+            }
+            self.add_constant(constant);
+            return self.temporal_lookup_table[value];
+        }
         let value = constant.get_value();
 
         if let GenericVariableData::String(value) = &value.generic_data {
@@ -97,6 +105,21 @@ impl LookupVariabeleTable {
     }
 
     pub(super) fn add_constant(&mut self, constant: &Constant) {
+        if let Constant::Temporal(value) = constant {
+            if self.temporal_lookup_table.contains_key(value) {
+                return;
+            }
+            let id = self.variable_table.len() + 1;
+            let header = VarHeader {
+                id,
+                variable_type: constant.get_var_type(),
+                ..Default::default()
+            };
+            self.variable_table
+                .push(TableEntry::new(format!("CONST_{id}"), header, constant.get_value(), EntryType::Constant));
+            self.temporal_lookup_table.insert(*value, id);
+            return;
+        }
         let value = constant.get_value();
         if let GenericVariableData::String(value) = &value.generic_data {
             if self.string_lookup_table.contains_key(value.as_str()) {

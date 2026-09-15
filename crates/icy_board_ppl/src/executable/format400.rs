@@ -20,7 +20,7 @@ const REQUIRED_SECTIONS: [[u8; 4]; 6] = [*b"TYPE", *b"CONS", *b"VARS", *b"ROUT",
 
 fn variable_type(id: u32) -> Result<VariableType> {
     match id {
-        0..=24 => Ok(VariableType::from(id as u8)),
+        0..=27 => Ok(VariableType::from(id as u8)),
         30..=0x7fff_ffff => Ok(VariableType::UserData(id)),
         _ => Err(invalid("type reference")),
     }
@@ -29,6 +29,10 @@ fn variable_type(id: u32) -> Result<VariableType> {
 fn write_constant(output: &mut Vec<u8>, entry: &TableEntry) -> Result<()> {
     word(output, u32::from(entry.header.variable_type) as usize)?;
     match &entry.value.generic_data {
+        GenericVariableData::Temporal(value) => {
+            word(output, 4)?;
+            blob(output, &value.encode())?;
+        }
         GenericVariableData::String(text) => {
             word(output, 2)?;
             blob(output, text.as_bytes())?;
@@ -420,6 +424,9 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
                         | VariableType::BigStr
                         | VariableType::UnboundedString
                         | VariableType::Bytes
+                        | VariableType::CalendarDate
+                        | VariableType::ClockTime
+                        | VariableType::Timestamp
                 ) || matches!(typ, VariableType::UserData(id) if table.enums.contains_key(&id))) =>
             {
                 value.data = VariableData::default();
@@ -431,6 +438,9 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
                 ));
             }
             3 if typ == VariableType::Bytes => value.generic_data = GenericVariableData::Bytes(payload.to_vec()),
+            4 if typ.is_temporal() => {
+                value.generic_data = GenericVariableData::Temporal(typ.empty_temporal().unwrap().decode(payload).map_err(|_| invalid("temporal constant"))?)
+            }
             _ => return Err(invalid("constant representation")),
         }
         constants.push(value);
@@ -797,6 +807,59 @@ mod tests {
         ast::BinOp,
         executable::{PPEStatement, VariableValue},
     };
+
+    #[test]
+    fn temporal_constants_validate_payloads_and_preserve_empty_and_epoch() {
+        use crate::executable::temporal::TemporalValue;
+        let values = [
+            TemporalValue::Date(None),
+            TemporalValue::Date(None).parse("1883-09-15").unwrap(),
+            TemporalValue::Time(None).parse("00:00:00.123456789").unwrap(),
+            TemporalValue::Timestamp(None),
+            TemporalValue::Timestamp(None).parse("1970-01-01T00:00:00Z").unwrap(),
+        ];
+        let mut executable = Executable::default();
+        for (index, value) in values.into_iter().enumerate() {
+            let value = VariableValue::new_temporal(value);
+            executable.variable_table.push(TableEntry::new(
+                format!("value{index}"),
+                VarHeader {
+                    id: index + 1,
+                    variable_type: value.vtype,
+                    ..Default::default()
+                },
+                value,
+                EntryType::Constant,
+            ));
+        }
+        executable.in_memory_script = Some(PPEScript {
+            statements: vec![PPEStatement {
+                span: 0..1,
+                command: PPECommand::End,
+            }],
+            ..Default::default()
+        });
+        let bytes = executable.to_buffer().unwrap();
+        let loaded = Executable::from_buffer(&mut bytes.clone(), false).unwrap();
+        for (entry, value) in loaded.variable_table.get_entries().iter().zip(values) {
+            assert_eq!(entry.value.temporal(), Some(value));
+        }
+        let limits = LoadLimits::default();
+        let mut container = Container::decode(&bytes, &limits).unwrap();
+        container.sections.retain(|section| section.kind != *b"IDEN");
+        let constants = container.sections.iter_mut().find(|section| section.kind == *b"CONS").unwrap();
+        constants.data[12] = 2;
+        let mut malformed = container.encode(Compression::None, &limits).unwrap();
+        assert!(
+            Executable::from_buffer(&mut malformed, false)
+                .err()
+                .expect("malformed temporal value")
+                .to_string()
+                .contains("temporal constant")
+        );
+        executable.runtime = 340;
+        assert!(executable.to_buffer().unwrap_err().to_string().contains("date/time values require runtime 400"));
+    }
 
     #[test]
     fn invalid_references_and_assignment_targets_are_rejected() {

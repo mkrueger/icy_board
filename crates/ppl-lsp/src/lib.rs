@@ -92,6 +92,37 @@ mod tests {
     use icy_board_ppl::{compiler::CompilationErrorType, executable::VariableType};
 
     #[test]
+    fn temporal_help_is_localized_with_independent_loaders() {
+        for (locale, calendar, empty) in [("en", "calendar date", "not empty"), ("de", "Kalenderdatum", "nicht leer")] {
+            let loader = fluent_language_loader!();
+            loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+            assert!(loader.get("hint-type-calendar-date").contains(calendar));
+            assert!(loader.get("hint-type-clock-time").contains(empty));
+            assert!(loader.get("hint-type-timestamp").contains(empty));
+            for key in [
+                "hint-temporal-empty",
+                "hint-temporal-parse",
+                "hint-temporal-format",
+                "hint-temporal-legacy",
+                "hint-temporal-now",
+                "hint-temporal-until",
+                "hint-temporal-change",
+                "hint-temporal-create",
+                "hint-temporal-component",
+                "hint-member-user-birthday",
+                "hint-member-native-timestamp",
+                "hint-member-zip-timestamp-utc",
+                "hint-param-timestamp",
+            ] {
+                let text = loader.get(key);
+                assert!(!text.is_empty() && text != key, "{locale}: {key}: {text}");
+            }
+            assert!(loader.get("hint-temporal-parse").contains("RFC3339"));
+            assert!(loader.get("hint-member-zip-timestamp-utc").contains("1980..2107"));
+        }
+    }
+
+    #[test]
     fn a5_resize_help_is_localized_with_independent_loaders() {
         for (locale, changed, unchanged) in [
             ("en", "The logical text size changed", "remain unchanged"),

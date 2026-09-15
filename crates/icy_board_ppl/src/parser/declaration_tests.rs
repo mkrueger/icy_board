@@ -337,7 +337,7 @@ fn filebase_member_ids_are_compact() {
         ),
         (
             super::FILE_ENTRY_ID,
-            vec!["Valid", "Id", "Name", "Description", "Size", "Date", "DescriptionTruncated"],
+            vec!["Valid", "Id", "Name", "Description", "Size", "Date", "DescriptionTruncated", "Timestamp"],
         ),
         (super::FILE_PAGE_ID, vec!["Valid", "Entries", "NextAfter", "HasMore"]),
     ] {

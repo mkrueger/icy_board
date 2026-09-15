@@ -29,6 +29,12 @@ impl SemanticVisitor {
     fn check_source_condition(&mut self, expression: &Expression, negated_by_lowering: bool) {
         let actual = self.visit_source_expression(expression);
         self.reject_bare_array_value(expression);
+        if actual.is_temporal() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(expression.get_span(), CompilationErrorType::InvalidTemporalOperation);
+        }
         // Structured branches/loops lower to an inverted test. Keep the existing
         // enum restriction on that implicit NOT, without imposing BOOLEAN-only
         // conditions on legacy scalar values. IF ... GOTO does not invert its test.
@@ -70,6 +76,31 @@ impl SemanticVisitor {
 
     /// Checks already-visited operands, preserving source call IDs and references.
     fn check_binary_operands(&mut self, binary: &crate::ast::BinaryExpression, left: VariableType, right: VariableType, source_binary: bool) -> VariableType {
+        if left.is_temporal() || right.is_temporal() {
+            if self.array_shape(binary.get_left_expression()).is_some() || self.array_shape(binary.get_right_expression()).is_some() {
+                self.reject_bare_array_value(binary.get_left_expression());
+                self.reject_bare_array_value(binary.get_right_expression());
+                return VariableType::None;
+            }
+            if left == right
+                && matches!(
+                    binary.get_op(),
+                    crate::ast::BinOp::Eq
+                        | crate::ast::BinOp::NotEq
+                        | crate::ast::BinOp::Lower
+                        | crate::ast::BinOp::LowerEq
+                        | crate::ast::BinOp::Greater
+                        | crate::ast::BinOp::GreaterEq
+                )
+            {
+                return VariableType::Boolean;
+            }
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(binary.get_op_token().span.clone(), CompilationErrorType::InvalidTemporalOperation);
+            return VariableType::None;
+        }
         if binary.get_op().is_short_circuit() && self.runtime < 400 {
             self.errors.lock().unwrap().report_error(
                 binary.get_op_token().span.clone(),
@@ -256,6 +287,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> VariableType {
         let result = unary.get_expression().visit(self);
+        if result.is_temporal() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(unary.get_expression().get_span(), CompilationErrorType::InvalidTemporalOperation);
+            return VariableType::None;
+        }
         self.reject_bare_array_value(unary.get_expression());
         if self.type_registry.is_enum_type(result) {
             self.errors
@@ -632,6 +670,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::Rejected => return VariableType::None,
         };
         self.reject_bare_array_value(member_reference_expression.get_expression());
+        if t.is_temporal() {
+            if let Some(member) = crate::executable::temporal::temporal_members(t)
+                .into_iter()
+                .find(|member| *member_reference_expression.get_identifier() == member.name && member.property)
+            {
+                self.member_receiver_type_lookup
+                    .insert(member_reference_expression.get_identifier_token().span.start, t);
+                for value in [0, member.operation as i32] {
+                    self.add_constant(&Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
+                }
+                return member.result;
+            }
+        }
         if self.lang_version >= 350 && self.type_registry.is_enum_type(t) && *member_reference_expression.get_identifier() == "Has" {
             self.member_receiver_type_lookup
                 .insert(member_reference_expression.get_identifier_token().span.start, t);
@@ -750,6 +801,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> VariableType {
         self.add_constant(constant.get_constant_value());
         match constant.get_constant_value() {
+            Constant::Temporal(_) => constant.get_constant_value().get_var_type(),
             Constant::String(_) => VariableType::String,
             Constant::Boolean(_) => VariableType::Boolean,
             Constant::Money(_) => VariableType::Money,
@@ -779,6 +831,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         for (index, argument) in call_stmt.get_arguments().iter().enumerate() {
             let actual = argument_types[index];
+            if actual.is_temporal() {
+                let supported = match def.opcode {
+                    OpCode::PRINT | OpCode::PRINTLN | OpCode::PUSH | OpCode::POP => true,
+                    OpCode::FPUT | OpCode::FPUTLN => index > 0,
+                    OpCode::FDPUT | OpCode::FDPUTLN => true,
+                    OpCode::FWRITE | OpCode::FREAD | OpCode::FGET | OpCode::FPUTPAD => index == 1,
+                    OpCode::FDWRITE | OpCode::FDREAD | OpCode::FDGET | OpCode::FDPUTPAD | OpCode::REDIM => index == 0,
+                    OpCode::INPUTDATE => index == 1 && actual == VariableType::CalendarDate,
+                    OpCode::INPUTTIME => index == 1 && actual == VariableType::ClockTime,
+                    OpCode::INPUT | OpCode::INPUTSTR | OpCode::INPUTTEXT => index == 1,
+                    _ => false,
+                };
+                if !supported {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(argument.get_span(), CompilationErrorType::InvalidTemporalOperation);
+                }
+            }
             if self.type_registry.is_enum_type(actual) {
                 use crate::executable::StatementSignature;
                 let output = match def.sig {
@@ -929,6 +1000,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
+        if let Some(result) = self.temporal_call(call) {
+            return result;
+        }
         if self.lang_version >= 350
             && let Expression::Identifier(name) = call.get_expression()
             && let Some(definition) = self.type_registry.get_enum(name.get_identifier())
@@ -1199,6 +1273,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     );
                 }
                 for (index, actual) in argument_types.iter().enumerate() {
+                    if actual.is_temporal() {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(call.get_arguments()[index].get_span(), CompilationErrorType::InvalidTemporalOperation);
+                    }
                     let comparison = matches!(
                         opcode,
                         FuncOpCode::StringFindComparison
@@ -1473,6 +1553,24 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         self.function_type_lookup.insert(CallId(call.id), SemanticInfo::PredefinedFunc(def.opcode));
                         for (index, argument) in call.get_arguments().iter().enumerate() {
                             let actual = argument_types[index];
+                            if actual.is_temporal()
+                                && !matches!(
+                                    def.opcode,
+                                    FuncOpCode::TOSTRING
+                                        | FuncOpCode::TOBIGSTR
+                                        | FuncOpCode::ToBytes
+                                        | FuncOpCode::TOBOOLEAN
+                                        | FuncOpCode::TOEDATE
+                                        | FuncOpCode::TODDATE
+                                        | FuncOpCode::TIMEAP
+                                )
+                                && !(def.opcode == FuncOpCode::Len_Dim && index == 0 && self.array_shape(argument).is_some())
+                            {
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(argument.get_span(), CompilationErrorType::InvalidTemporalOperation);
+                            }
                             if self.type_registry.is_enum_type(actual)
                                 && def.opcode != FuncOpCode::TOINTEGER
                                 && !(def.opcode == FuncOpCode::Len_Dim && index == 0 && self.array_shape(argument).is_some())
@@ -2182,6 +2280,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
+        if self.runtime < 400 && var_decl.get_variable_type().is_temporal() {
+            self.errors.lock().unwrap().report_error(
+                var_decl
+                    .get_variables()
+                    .first()
+                    .map(|variable| variable.get_identifier_token().span.clone())
+                    .unwrap_or_default(),
+                CompilationErrorType::BuiltinNeedsRuntime("Date/time storage".into(), 400),
+            );
+        }
         if self.runtime < 400
             && matches!(var_decl.get_variable_type(), VariableType::UserData(type_id) if matches!(type_id as usize, crate::parser::FILE_ENTRY_ID | crate::parser::FILE_PAGE_ID))
         {

@@ -9,7 +9,6 @@ use icy_board_ppl::ast::OutputFunc;
 use icy_board_ppl::ast::output_visitor;
 use icy_board_ppl::decompiler::decompile;
 use icy_board_ppl::executable::Executable;
-use icy_board_ppl::executable::LAST_PPL_LANGUAGE_VERSION;
 use icy_board_ppl::executable::PPEScript;
 use icy_board_ppl::executable::SUPPORTED_PPL_LANGUAGE_VERSIONS;
 use icy_board_ppl::executable::language_version_from_env;
@@ -73,6 +72,10 @@ lazy_static::lazy_static! {
 
 /// Set by build.rs, empty when the binary was not built from a checkout.
 const GIT_HASH: &str = env!("GIT_HASH");
+
+fn output_language_version(runtime: u16, option: Option<u16>, environment: Option<u16>) -> u16 {
+    option.or(environment).unwrap_or(runtime)
+}
 
 fn main() {
     let arguments: Cli = icy_board_cli::parse();
@@ -164,11 +167,10 @@ fn main() {
                 return;
             }
 
-            let lang_version = arguments.lang_version.or(env_language_version).unwrap_or(LAST_PPL_LANGUAGE_VERSION);
+            let lang_version = output_language_version(executable.runtime, arguments.lang_version, env_language_version);
             match decompile(executable, arguments.raw, lang_version) {
                 Ok((decompilation, issues)) => {
                     let mut output_visitor: output_visitor::OutputVisitor = output_visitor::OutputVisitor::default();
-                    // The source is written for our own pplc, whatever runtime the PPE was built for.
                     output_visitor.version = lang_version;
                     output_visitor.output_func = output_func;
                     decompilation.visit(&mut output_visitor);

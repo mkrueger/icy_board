@@ -326,7 +326,7 @@ fn test_msgtofile_writes_receipt_and_packout_extended_headers() {
         FCREATE 1, "body.txt", O_WR, S_DN
         FPUTLN 1, "body"
         FCLOSE 1
-        MESSAGE 0, "STAN", "SYSOP", "Expiring", "R", MKDATE(2026, 8, 15), TRUE, FALSE, "body.txt"
+        MESSAGE 0, "STAN", "SYSOP", "Expiring", "R", MKDATE(2026, 8, 15).ToLegacy(), TRUE, FALSE, "body.txt"
         MSGTOFILE 0, 4, "out.txt"
         STRING s
         FOPEN 1, "out.txt", O_RD, S_DN

@@ -295,6 +295,12 @@ TYPE User (48)
    51 func   AddContact(service: UnboundedString, account: UnboundedString) -> Boolean
    52 func   RemoveContact(index: Integer) -> Boolean
    53 func   SetNote(index: Integer, text: UnboundedString) -> Boolean
+   54 field  Birthday: CalendarDate
+   55 field  ExpiresAt: Timestamp
+   56 field  PasswordExpiresAt: Timestamp
+   57 getter FirstOn: Timestamp
+   58 getter LastOn: Timestamp
+   59 getter LastDirectoryRead: Timestamp
 
 TYPE Msg (49)
     0 getter Number: Long
@@ -314,6 +320,7 @@ TYPE Msg (49)
    14 getter NeedsPassword: Boolean
    15 func   Text() -> UnboundedString
    16 getter Header: MSGHEADER
+   17 getter WrittenAt: Timestamp
 
 TYPE Http (50)
     0 func   static Get(url: UnboundedString) -> HttpResponse
@@ -381,6 +388,7 @@ TYPE FileEntry (56)
     4 getter Size: Long
     5 getter Date: Date
     6 getter DescriptionTruncated: Boolean
+    7 getter Timestamp: Timestamp
 
 TYPE FilePage (57)
     0 getter Valid: Boolean
@@ -406,6 +414,7 @@ TYPE ZipWriter (59)
    11 func   AddBytes(data: Bytes, entryName: UnboundedString) -> Boolean
    12 func   Finish() -> Boolean
    13 func   Abort() -> Boolean
+   14 func   SetTimestampUtc(timestamp: Timestamp) -> Boolean
 
 TYPE Bulletin (60)
     0 getter Number: Integer

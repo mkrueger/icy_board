@@ -14,6 +14,7 @@ pub use smt_op_codes::*;
 pub mod func_op_codes;
 pub use func_op_codes::*;
 
+pub mod temporal;
 pub mod variable_value;
 use thiserror::Error;
 pub use variable_value::*;
@@ -169,6 +170,8 @@ impl VariableNameGenerator {
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum VMError {
+    #[error("Invalid date/time value: {0}")]
+    InvalidTemporalValue(String),
     #[error("Value {1} has an incompatible representation for enum type {0}")]
     InvalidEnumValue(u32, String),
 

@@ -607,9 +607,30 @@ impl Decompiler {
             {
                 arguments.first().and_then(|array| self.expression_type(array))
             }
+            PPEExpr::PredefinedFunctionCall(def, arguments) if def.opcode == FuncOpCode::TemporalCall => {
+                self.temporal_member(arguments).map(|(_, member)| member.result)
+            }
             PPEExpr::PredefinedFunctionCall(def, _) => Some(def.return_type),
             _ => None,
         }
+    }
+
+    fn temporal_member(&self, arguments: &[PPEExpr]) -> Option<(VariableType, crate::executable::temporal::TemporalMember)> {
+        use crate::executable::temporal::{TEMPORAL_OPS, temporal_members};
+        let [PPEExpr::Value(index), receiver, ..] = arguments else { return None };
+        let operation = *TEMPORAL_OPS.get(usize::try_from(self.executable.variable_table.try_get_entry(*index)?.value.try_as_int()?).ok()?)?;
+        let receiver_type = self.expression_type(receiver);
+        [VariableType::CalendarDate, VariableType::ClockTime, VariableType::Timestamp]
+            .into_iter()
+            .find_map(|typ| {
+                temporal_members(typ)
+                    .into_iter()
+                    .find(|member| {
+                        member.operation == operation
+                            && (member.is_static || !receiver_type.is_some_and(VariableType::is_temporal) || receiver_type == Some(typ))
+                    })
+                    .map(|member| (typ, member))
+            })
     }
 
     fn generate_function_declarations(&mut self, ast: &mut Ast) -> Res<()> {
@@ -681,6 +702,7 @@ impl Decompiler {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 } else if entry.entry_type == EntryType::Constant {
                     let constant = match entry.value.get_type() {
+                        VariableType::CalendarDate | VariableType::ClockTime | VariableType::Timestamp => entry.value.temporal().map(Constant::Temporal),
                         VariableType::BigStr | VariableType::String | VariableType::UnboundedString => Some(Constant::String(entry.value.as_string())),
                         VariableType::Float => Some(Constant::Double(entry.value.data.float_value as f64)),
                         VariableType::Double => Some(Constant::Double(entry.value.data.double_value)),
@@ -783,6 +805,38 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => {
+                if f.opcode == FuncOpCode::TemporalCall && args.len() == 5 {
+                    use crate::executable::temporal::TemporalOp;
+                    if let Some((typ, member)) = self.temporal_member(args) {
+                        if matches!(member.operation, TemporalOp::ParseDate | TemporalOp::ParseTime) {
+                            return FunctionCallExpression::create_empty_expression(
+                                IdentifierExpression::create_empty_expression(unicase::Ascii::new(
+                                    if typ == VariableType::CalendarDate { "TODATE" } else { "TOTIME" }.to_string(),
+                                )),
+                                vec![self.decompile_expression(&args[2])],
+                            );
+                        }
+                        let receiver = if member.is_static {
+                            IdentifierExpression::create_empty_expression(unicase::Ascii::new(typ.to_string()))
+                        } else {
+                            let index = if self.expression_type(&args[1]).is_some_and(VariableType::is_temporal) {
+                                1
+                            } else {
+                                2
+                            };
+                            self.decompile_expression(&args[index])
+                        };
+                        let reference = MemberReferenceExpression::create_empty_expression(receiver, unicase::Ascii::new(member.name.to_string()));
+                        return if member.property {
+                            reference
+                        } else {
+                            FunctionCallExpression::create_empty_expression(
+                                reference,
+                                args[2..2 + member.arguments.len()].iter().map(|arg| self.decompile_expression(arg)).collect(),
+                            )
+                        };
+                    }
+                }
                 if f.opcode == FuncOpCode::EnumHas
                     && let [PPEExpr::Value(index), receiver, mask] = args.as_slice()
                     && let Some(entry) = self.executable.variable_table.try_get_entry(*index)

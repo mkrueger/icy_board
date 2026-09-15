@@ -31,14 +31,14 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (MACROS_ID, 6),
         (BOARD_ID, 7),
         (SESSION_ID, 18),
-        (USER_ID, 54),
-        (MSG_ID, 17),
+        (USER_ID, 60),
+        (MSG_ID, 18),
         (HTTP_ID, 7),
         (HTTP_REQUEST_ID, 8),
         (HTTP_RESPONSE_ID, 10),
         (REGEX_ID, 10),
         (REGEX_MATCH_ID, 13),
-        (FILE_ENTRY_ID, 7),
+        (FILE_ENTRY_ID, 8),
         (FILE_PAGE_ID, 4),
     ] {
         let actual = runtime.get_type_from_id(id as u32).unwrap();

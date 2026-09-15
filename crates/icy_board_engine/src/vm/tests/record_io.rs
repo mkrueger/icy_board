@@ -549,6 +549,9 @@ fn every_supported_scalar_type_round_trips_through_both_codecs() {
             FLOAT FloatValue
             STRING StringValue
             TIME TimeValue
+            TIMESTAMP TimestampValue
+            TIMESTAMP EpochValue
+            TIMESTAMP EmptyValue
             BYTE ByteValue
             WORD WordValue
             SBYTE SByteValue
@@ -563,13 +566,15 @@ fn every_supported_scalar_type_round_trips_through_both_codecs() {
         Scalars source
         source.BoolValue = TRUE
         source.UnsignedValue = 4000000000
-        source.DateValue = Date()
-        source.EDateValue = Date()
+        source.DateValue = DATE.Create(1883, 9, 15)
+        source.EDateValue = DATE.Create(1983, 9, 15).ToLegacy()
         source.IntegerValue = -123456
         source.MoneyValue = 123.45
         source.FloatValue = 1.25
         source.StringValue = "text"
-        source.TimeValue = Time()
+        source.TimeValue = TIME.Parse("00:00:00.123456789")
+        source.TimestampValue = TIMESTAMP.Parse("2400-02-29T12:34:56.987654321Z")
+        source.EpochValue = TIMESTAMP.FromUnix(0)
         source.ByteValue = 250
         source.WordValue = 60000
         source.SByteValue = -100

@@ -19,7 +19,7 @@ use crate::{
 use super::{file::parse_field_info, index, table_path};
 
 async fn channel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], at: usize) -> Res<i32> {
-    Ok(vm.eval_expr(&args[at]).await?.as_int())
+    Ok(vm.eval_expr(&args[at]).await?.checked_numeric()?.as_int())
 }
 
 async fn text(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], at: usize) -> Res<String> {
@@ -121,13 +121,13 @@ pub async fn dbottom(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<bool>
 
 pub async fn dgo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<bool> {
     let channel = channel(vm, args, 0).await?;
-    let record_no = vm.eval_expr(&args[1]).await?.as_int();
+    let record_no = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(vm.dbase.go(channel, record_no))
 }
 
 pub async fn dskip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<bool> {
     let channel = channel(vm, args, 0).await?;
-    let count = vm.eval_expr(&args[1]).await?.as_int();
+    let count = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(vm.dbase.skip(channel, count))
 }
 
@@ -163,7 +163,7 @@ pub async fn dfields(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<i32> 
 
 pub async fn dname(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<String> {
     let channel = channel(vm, args, 0).await?;
-    let number = vm.eval_expr(&args[1]).await?.as_int();
+    let number = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     Ok(vm.dbase.field_name(channel, number))
 }
 

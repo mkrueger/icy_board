@@ -14,6 +14,15 @@ fn cli_defaults_preserve_decompiler_settings() {
 }
 
 #[test]
+fn cli_output_language_defaults_to_ppe_version_with_explicit_overrides() {
+    for &runtime in icy_board_ppl::executable::SUPPORTED_PPE_VERSIONS {
+        assert_eq!(super::output_language_version(runtime, None, None), runtime);
+        assert_eq!(super::output_language_version(runtime, None, Some(350)), 350);
+        assert_eq!(super::output_language_version(runtime, Some(400), Some(350)), 400);
+    }
+}
+
+#[test]
 fn cli_accepts_all_existing_options_and_short_aliases() {
     let cli = parse(&[
         "-r",

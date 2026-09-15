@@ -12,7 +12,7 @@ use crate::{
     password::Password,
 };
 
-use super::{MsgAreaIdValue, Signature};
+use super::{MsgAreaIdValue, Signature, temporal::TemporalValue};
 
 #[derive(Clone, Copy, PartialEq, Debug, Default, Eq, Hash)]
 #[allow(dead_code)]
@@ -91,6 +91,10 @@ pub enum VariableType {
     /// Unbounded Unicode text used by PPL 4.00 STRING declarations.
     UnboundedString,
 
+    CalendarDate,
+    ClockTime,
+    Timestamp,
+
     UserData(u32),
 }
 
@@ -137,6 +141,9 @@ impl From<VariableType> for u32 {
             VariableType::ULong => 22,
             VariableType::Bytes => 23,
             VariableType::UnboundedString => 24,
+            VariableType::CalendarDate => 25,
+            VariableType::ClockTime => 26,
+            VariableType::Timestamp => 27,
             VariableType::UserData(b) => b,
             VariableType::None => u32::MAX,
         }
@@ -144,7 +151,23 @@ impl From<VariableType> for u32 {
 }
 
 impl VariableType {
+    pub fn empty_temporal(self) -> Option<TemporalValue> {
+        match self {
+            Self::CalendarDate => Some(TemporalValue::Date(None)),
+            Self::ClockTime => Some(TemporalValue::Time(None)),
+            Self::Timestamp => Some(TemporalValue::Timestamp(None)),
+            _ => None,
+        }
+    }
+
+    pub fn is_temporal(self) -> bool {
+        self.empty_temporal().is_some()
+    }
+
     pub fn create_empty_value(&self) -> VariableValue {
+        if let Some(value) = self.empty_temporal() {
+            return VariableValue::new_temporal(value);
+        }
         match self {
             VariableType::String => VariableValue::new_string(String::new()),
             VariableType::BigStr => VariableValue {
@@ -189,6 +212,9 @@ impl VariableType {
             22 => VariableType::ULong,
             23 => VariableType::Bytes,
             24 => VariableType::UnboundedString,
+            25 => VariableType::CalendarDate,
+            26 => VariableType::ClockTime,
+            27 => VariableType::Timestamp,
             _ => VariableType::UserData(u32::from(b)),
         }
     }
@@ -220,6 +246,9 @@ impl VariableType {
             VariableType::ULong => "ULONG".to_string(),
             VariableType::Bytes => "BYTES".to_string(),
             VariableType::UnboundedString => "STRING".to_string(),
+            VariableType::CalendarDate => "DATE".to_string(),
+            VariableType::ClockTime => "TIME".to_string(),
+            VariableType::Timestamp => "TIMESTAMP".to_string(),
             VariableType::UserData(u) => format!("USERDATA({u})"),
             VariableType::None => "NONE".to_string(),
         };
@@ -256,6 +285,9 @@ impl fmt::Display for VariableType {
             VariableType::ULong => write!(f, "ULong"),             // u64
             VariableType::Bytes => write!(f, "Bytes"),             // Vec<u8>
             VariableType::UnboundedString => write!(f, "String"),
+            VariableType::CalendarDate => write!(f, "Date"),
+            VariableType::ClockTime => write!(f, "Time"),
+            VariableType::Timestamp => write!(f, "Timestamp"),
             VariableType::UserData(u) => write!(f, "UserData({u})"),
         }
     }
@@ -329,6 +361,7 @@ impl fmt::Debug for VariableData {
 pub enum GenericVariableData {
     #[default]
     None,
+    Temporal(TemporalValue),
     String(std::sync::Arc<String>),
 
     /// Contiguous binary payload for `VariableType::Bytes`.
@@ -356,6 +389,7 @@ impl fmt::Debug for GenericVariableData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GenericVariableData::None => write!(f, "None"),
+            GenericVariableData::Temporal(value) => write!(f, "{value:?}"),
             GenericVariableData::String(s) => write!(f, "String({s:?})"),
             GenericVariableData::Bytes(data) => write!(f, "Bytes({} bytes)", data.len()),
             GenericVariableData::Dim1(data) => write!(f, "Dim1({data:?})"),
@@ -435,6 +469,9 @@ unsafe impl Sync for VariableValue {}
 
 impl fmt::Display for VariableValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.vtype.is_temporal() {
+            return write!(f, "{}", self.as_string());
+        }
         unsafe {
             match self.vtype {
                 VariableType::Boolean => write!(f, "{}", self.as_bool()),
@@ -491,6 +528,9 @@ impl PartialEq for VariableValue {
             (GenericVariableData::Dim3(left), GenericVariableData::Dim3(right)) => return self.vtype == other.vtype && left == right,
             (GenericVariableData::Bytes(left), GenericVariableData::Bytes(right)) => return left == right,
             _ => {}
+        }
+        if self.vtype.is_temporal() || other.vtype.is_temporal() {
+            return self.vtype == other.vtype && self.temporal().is_some() && self.temporal() == other.temporal();
         }
         if let (VariableType::UserData(left_type), VariableType::UserData(right_type)) = (self.vtype, other.vtype) {
             if left_type != right_type {
@@ -849,8 +889,8 @@ impl Div<VariableValue> for VariableValue {
                     data.int_value = if divisor == 0 { 0 } else { self.as_int().wrapping_div(divisor) };
                 }
                 VariableType::Float => {
-                    let dividend = self.convert_to(VariableType::Float).data.float_value;
-                    let divisor = other.convert_to(VariableType::Float).data.float_value;
+                    let dividend = self.convert_legacy(VariableType::Float).data.float_value;
+                    let divisor = other.convert_legacy(VariableType::Float).data.float_value;
                     data.float_value = if divisor == 0.0 { 0.0 } else { dividend / divisor };
                 }
                 VariableType::Double => {
@@ -968,6 +1008,13 @@ impl Rem<VariableValue> for VariableValue {
 
 impl PartialOrd for VariableValue {
     fn partial_cmp(&self, other: &VariableValue) -> Option<Ordering> {
+        if self.vtype.is_temporal() || other.vtype.is_temporal() {
+            return if self.vtype == other.vtype {
+                self.temporal()?.partial_cmp(&other.temporal()?)
+            } else {
+                None
+            };
+        }
         let dest_type: VariableType = if self.vtype == VariableType::Password || other.vtype == VariableType::Password {
             VariableType::Password
         } else {
@@ -1201,6 +1248,9 @@ impl VariableValue {
     }
 
     pub fn to_bytes(&self) -> Option<Vec<u8>> {
+        if let Some(value) = self.temporal() {
+            return Some(value.encode().to_vec());
+        }
         if let GenericVariableData::Bytes(data) = &self.generic_data {
             return Some(data.clone());
         }
@@ -1522,6 +1572,9 @@ impl VariableValue {
     ///
     /// Panics if .
     pub fn as_bool(&self) -> bool {
+        if let Some(value) = self.temporal() {
+            return !value.is_empty();
+        }
         if matches!(self.vtype, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
             return self.as_int() != 0;
         }
@@ -1615,6 +1668,13 @@ impl VariableValue {
             | VariableType::MessageAreaID => Some(self.as_int()),
             _ => None,
         }
+    }
+
+    pub fn checked_numeric(&self) -> Res<&Self> {
+        if self.vtype.is_temporal() {
+            return Err(super::VMError::InvalidTemporalValue(format!("{} has no implicit numeric representation", self.vtype)).into());
+        }
+        Ok(self)
     }
 
     pub fn as_unsigned(&self) -> u64 {
@@ -1822,6 +1882,7 @@ impl VariableValue {
     pub fn as_string(&self) -> String {
         unsafe {
             match &self.generic_data {
+                GenericVariableData::Temporal(value) => value.text(),
                 GenericVariableData::String(s) => s.as_ref().clone(),
                 GenericVariableData::Enum(_) => self.data.int_value.to_string(),
                 GenericVariableData::Bytes(data) => bytes_to_hex(data),
@@ -1980,7 +2041,7 @@ impl VariableValue {
             GenericVariableData::Dim1(data) => {
                 let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() {
-                    data[dim1] = val.convert_to(self.vtype);
+                    data[dim1] = val.convert_to(self.vtype)?;
                 } else {
                     log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                 }
@@ -1988,7 +2049,7 @@ impl VariableValue {
             GenericVariableData::Dim2(data) => {
                 let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() && dim2 < data[dim1].len() {
-                    data[dim1][dim2] = val.convert_to(self.vtype);
+                    data[dim1][dim2] = val.convert_to(self.vtype)?;
                 } else if dim1 < data.len() {
                     log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                 } else {
@@ -1998,7 +2059,7 @@ impl VariableValue {
             GenericVariableData::Dim3(data) => {
                 let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() && dim2 < data[dim1].len() && dim3 < data[dim1][dim2].len() {
-                    data[dim1][dim2][dim3] = val.convert_to(self.vtype);
+                    data[dim1][dim2][dim3] = val.convert_to(self.vtype)?;
                 } else if dim1 < data.len() {
                     if dim2 < data[dim1].len() {
                         log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
@@ -2030,13 +2091,19 @@ impl VariableValue {
         Ok(())
     }
 
-    /// .
-    ///
-    /// # Panics
-    ///
-    /// Panics if .
-    #[must_use]
-    pub fn convert_to(self, convert_to_type: VariableType) -> VariableValue {
+    pub fn convert_to(self, convert_to_type: VariableType) -> Res<VariableValue> {
+        if self.vtype.is_temporal() || convert_to_type.is_temporal() {
+            if self.vtype.is_temporal() && convert_to_type == VariableType::Boolean && self.get_dimensions() == 0 {
+                return Ok(Self::new_bool(self.as_bool()));
+            }
+            return self
+                .checked_temporal_assignment(convert_to_type)
+                .map_err(|error| VMError::InvalidTemporalValue(error).into());
+        }
+        Ok(self.convert_legacy(convert_to_type))
+    }
+
+    pub(super) fn convert_legacy(self, convert_to_type: VariableType) -> VariableValue {
         // The PPL 4.00 string is unbounded. Legacy strings still fall through so
         // their character limits are enforced on every assignment.
         if self.vtype == convert_to_type && convert_to_type == VariableType::UnboundedString {
@@ -2055,7 +2122,7 @@ impl VariableValue {
                     return VariableValue {
                         vtype: convert_to_type,
                         generic_data: GenericVariableData::Dim1(std::sync::Arc::new(
-                            values.into_iter().map(|value| value.convert_to(convert_to_type)).collect(),
+                            values.into_iter().map(|value| value.convert_legacy(convert_to_type)).collect(),
                         )),
                         ..Default::default()
                     };
@@ -2067,7 +2134,7 @@ impl VariableValue {
                         generic_data: GenericVariableData::Dim2(std::sync::Arc::new(
                             values
                                 .into_iter()
-                                .map(|row| row.into_iter().map(|value| value.convert_to(convert_to_type)).collect())
+                                .map(|row| row.into_iter().map(|value| value.convert_legacy(convert_to_type)).collect())
                                 .collect(),
                         )),
                         ..Default::default()
@@ -2083,7 +2150,7 @@ impl VariableValue {
                                 .map(|plane| {
                                     plane
                                         .into_iter()
-                                        .map(|row| row.into_iter().map(|value| value.convert_to(convert_to_type)).collect())
+                                        .map(|row| row.into_iter().map(|value| value.convert_legacy(convert_to_type)).collect())
                                         .collect()
                                 })
                                 .collect(),
@@ -2152,6 +2219,7 @@ impl VariableValue {
             }
             VariableType::String | VariableType::BigStr | VariableType::UnboundedString => unreachable!(),
             VariableType::Bytes => unreachable!(),
+            VariableType::CalendarDate | VariableType::ClockTime | VariableType::Timestamp => unreachable!(),
             VariableType::Time => {
                 data.time_value = match self.vtype {
                     VariableType::String | VariableType::BigStr | VariableType::UnboundedString => IcbTime::parse_pcboard(&self.as_string()),
@@ -2423,7 +2491,7 @@ mod tests {
 
     #[test]
     fn a_string_converts_to_its_utf8_bytes() {
-        let value = VariableValue::new_string("Grüße".to_string()).convert_to(VariableType::Bytes);
+        let value = VariableValue::new_string("Grüße".to_string()).convert_to(VariableType::Bytes).unwrap();
         assert_eq!(VariableType::Bytes, value.get_type());
         assert_eq!("Grüße".as_bytes(), value.as_byte_slice());
     }
@@ -2436,6 +2504,7 @@ mod tests {
             256,
             VariableValue::new_string(text.clone())
                 .convert_to(VariableType::String)
+                .unwrap()
                 .as_string()
                 .chars()
                 .count()
@@ -2444,7 +2513,9 @@ mod tests {
             2048,
             VariableValue::new_string(text.clone())
                 .convert_to(VariableType::BigStr)
+                .unwrap()
                 .convert_to(VariableType::BigStr)
+                .unwrap()
                 .as_string()
                 .chars()
                 .count()
@@ -2453,6 +2524,7 @@ mod tests {
             3000,
             VariableValue::new_string(text)
                 .convert_to(VariableType::UnboundedString)
+                .unwrap()
                 .as_string()
                 .chars()
                 .count()

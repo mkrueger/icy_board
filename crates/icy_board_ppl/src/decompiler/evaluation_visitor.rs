@@ -9,6 +9,7 @@ pub struct EvaluationVisitor {}
 impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
     fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
+            Constant::Temporal(value) => Some(VariableValue::new_temporal(*value)),
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
             Constant::Integer(i, _) => Some(VariableValue::new_int(*i)),
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),

@@ -32,10 +32,10 @@ impl VirtualMachine<'_> {
             // SCREXEC assigns through *varLst[id]->data: only element zero,
             // never the parameter array's storage or its persistent tail.
             if let Some(target) = self.variable_table.get_value_mut(parameter).get_array_value_mut(0, 0, 0) {
-                *target = super::decay_array(value).convert_to(target.vtype);
+                *target = super::decay_array(value).convert_to(target.vtype)?;
             }
         } else {
-            self.variable_table.set_value(parameter, value);
+            self.variable_table.set_value(parameter, value)?;
         }
         Ok(())
     }

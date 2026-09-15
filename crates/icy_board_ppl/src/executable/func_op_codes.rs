@@ -374,9 +374,10 @@ pub enum FuncOpCode {
     /// Computed matrix/cube indexing; keep ArrayValueAt's published arity intact.
     ArrayValueAt2 = -357,
     ArrayValueAt3 = -358,
+    TemporalCall = -359,
 }
 
-pub const LAST_FUNC: i16 = -358;
+pub const LAST_FUNC: i16 = -359;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -387,7 +388,8 @@ impl FuncOpCode {
     pub fn minimum_runtime(self) -> u16 {
         if matches!(
             self,
-            FuncOpCode::Rgb
+            FuncOpCode::TemporalCall
+                | FuncOpCode::Rgb
                 | FuncOpCode::RgbAlpha
                 | FuncOpCode::Terminal
                 | FuncOpCode::StaticReceiver
@@ -512,7 +514,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 370]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 371]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3564,6 +3566,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 370]> 
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::FixedParameters(4),
+        },
+        FunctionDefinition {
+            name: "<temporal call>",
+            version: 400,
+            opcode: FuncOpCode::TemporalCall,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::FixedParameters(5),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

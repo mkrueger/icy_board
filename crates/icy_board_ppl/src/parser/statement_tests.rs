@@ -1008,7 +1008,7 @@ fn test_variable_declaration_statement() {
     check_statement(
         "Time VAR001",
         &VariableDeclarationStatement::create_empty_statement(
-            VariableType::Time,
+            VariableType::ClockTime,
             vec![VariableSpecifier::empty(unicase::Ascii::new("VAR001".to_string()), vec![])],
         ),
     );
@@ -1016,7 +1016,7 @@ fn test_variable_declaration_statement() {
     check_statement(
         "Date VAR001",
         &VariableDeclarationStatement::create_empty_statement(
-            VariableType::Date,
+            VariableType::CalendarDate,
             vec![VariableSpecifier::empty(unicase::Ascii::new("VAR001".to_string()), vec![])],
         ),
     );

@@ -45,6 +45,28 @@ fn signature(visitor: &SemanticVisitor, line: &str, language: u16) -> SignatureH
     get_signature_help_for_version(line, visitor, language).unwrap_or_else(|| panic!("missing signature for {line}"))
 }
 
+#[test]
+fn temporal_signatures_are_named_chained_and_versioned() {
+    let (_, visitor) = analyze("DATE birthday\nTIME clock\nTIMESTAMP stamp\n", 400);
+    assert_eq!(signature(&visitor, "TIMESTAMP(", 400).signatures[0].label, "TIMESTAMP() TIMESTAMP");
+    assert!(get_signature_help_for_version("TIMESTAMP(", &visitor, 350).is_none());
+    assert_eq!(
+        ppl_lsp::type_lookup::type_of_name_for_version(&visitor, "DATE", 350),
+        Some(icy_board_ppl::executable::VariableType::Date)
+    );
+    for (line, expected) in [
+        ("DATE.Create(", "DATE.Create(INTEGER year, INTEGER month, INTEGER day) DATE"),
+        ("TIME.Create(", "TIME.Create(INTEGER hour, INTEGER minute, INTEGER second) TIME"),
+        ("TIMESTAMP.FromUtc(", "TIMESTAMP.FromUtc(DATE date, TIME time) TIMESTAMP"),
+        ("stamp.UtcDate.WithYear(", "DATE.WithYear(INTEGER year) DATE"),
+        ("birthday.AddDays(", "DATE.AddDays(LONG days) DATE"),
+        ("stamp.SecondsUntil(", "TIMESTAMP.SecondsUntil(TIMESTAMP other) LONG"),
+    ] {
+        assert_eq!(signature(&visitor, line, 400).signatures[0].label, expected);
+        assert!(get_signature_help_for_version(line, &visitor, 350).is_none(), "{line}");
+    }
+}
+
 fn assert_array(ast: &Ast, visitor: &SemanticVisitor, line: &str, rank: u8, resizable: bool) {
     let items = complete(ast, visitor, line);
     let labels: Vec<_> = items.iter().map(|item| item.label.as_str()).collect();

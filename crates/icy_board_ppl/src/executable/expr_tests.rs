@@ -25,7 +25,10 @@ fn string_member_function_ids_are_compact_after_bytes() {
     assert_eq!(FuncOpCode::EnumHas as i16, -356);
     assert_eq!(FuncOpCode::ArrayValueAt2 as i16, -357);
     assert_eq!(FuncOpCode::ArrayValueAt3 as i16, -358);
-    assert_eq!(crate::executable::LAST_FUNC, -358);
+    assert_eq!(FuncOpCode::TemporalCall as i16, -359);
+    assert_eq!(crate::executable::LAST_FUNC, -359);
+    assert_eq!(FuncOpCode::TemporalCall.minimum_runtime(), 400);
+    assert_eq!(FuncOpCode::TemporalCall.get_definition().parameter_count(), 5);
     assert_eq!(FuncOpCode::EnumCast.minimum_runtime(), 400);
     assert_eq!(FuncOpCode::EnumCast.get_definition().parameter_count(), 2);
     assert_eq!(FuncOpCode::EnumHas.minimum_runtime(), 400);

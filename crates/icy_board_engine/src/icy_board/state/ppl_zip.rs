@@ -493,6 +493,28 @@ impl UserDataValue for PplZipWriter {
                     };
                     Ok(())
                 }
+                "settimestamputc" => {
+                    use crate::executable::temporal::TemporalValue;
+                    use chrono::{Datelike, Timelike};
+                    let value = match arguments.first().and_then(VariableValue::temporal) {
+                        Some(TemporalValue::Timestamp(value)) => value,
+                        _ => return Err(invalid("SetTimestampUtc requires a TIMESTAMP")),
+                    };
+                    archive.timestamp = value
+                        .map(|value| {
+                            DateTime::from_date_and_time(
+                                u16::try_from(value.year()).map_err(|_| invalid("ZIP timestamp must be in 1980..2107"))?,
+                                value.month() as u8,
+                                value.day() as u8,
+                                value.hour() as u8,
+                                value.minute() as u8,
+                                value.second() as u8,
+                            )
+                            .map_err(|_| invalid("ZIP timestamp must be in 1980..2107"))
+                        })
+                        .transpose()?;
+                    Ok(())
+                }
                 "settimestamp" => {
                     archive.timestamp = match arguments.len() {
                         0 => None,

@@ -6,6 +6,6 @@ check = Laufzeitkompatibilität prüfen; Funde liefern Exit-Code 0, außer mit -
 strict = erfordert --check; Exit-Code 1 bei jeder nicht unterstützten, nicht implementierten oder teilweise implementierten Referenz, sonst 0; Fehler liefern weiterhin Exit-Code 1
 cp437 = Quelltext für die ursprünglichen Werkzeuge als CP437 statt UTF-8 schreiben
 style = Schreibweise der Schlüsselwörter, gültig: u=Großbuchstaben (Standard), l=Kleinbuchstaben, c=CamelCase
-lang-version = Sprachversion des Quelltexts, standardmäßig PPL_LANG_VERSION und danach die neueste Version
+lang-version = Sprachversion des Quelltexts, standardmäßig PPL_LANG_VERSION und danach die gespeicherte PPE-Runtime
 version = Version ausgeben und beenden
 file = zu dekompilierende Datei[.ppe]

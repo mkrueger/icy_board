@@ -11,6 +11,15 @@ fn fixture() -> &'static Path {
 }
 
 #[test]
+fn without_overrides_the_stored_runtime_is_the_decompiler_default() {
+    let executable = icy_board_ppl::executable::Executable::read_file(&fixture(), false).unwrap();
+    let output = ppld().arg("-o").arg(fixture()).output().unwrap();
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(text.contains(&format!(";$LANGVERSION {}", executable.runtime)), "{text}");
+}
+
+#[test]
 fn the_environment_is_the_decompiler_default() {
     let output = ppld().env("PPL_LANG_VERSION", "350").arg("-o").arg(fixture()).output().unwrap();
     let text = String::from_utf8_lossy(&output.stdout);

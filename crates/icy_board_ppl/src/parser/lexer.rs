@@ -46,6 +46,8 @@ pub enum LexingErrorType {
 
     #[error("BIGSTR is deprecated in PPL 4.00; use STRING instead")]
     BigStrDeprecated,
+    #[error("{0} is deprecated in PPL 4.00; use DATE with explicit formatting or legacy conversion")]
+    LegacyDateDeprecated(String),
 
     #[error("Invalid define value: {0}")]
     InvalidDefineValue(String),
@@ -1262,6 +1264,12 @@ impl Lexer {
                 .lock()
                 .unwrap()
                 .report_warning(self.token_start..self.token_end, LexingErrorType::BigStrDeprecated);
+        }
+        if self.lang_version >= 400 && matches!(identifier.to_ascii_uppercase().as_str(), "EDATE" | "DDATE" | "TOEDATE" | "TODDATE") {
+            self.errors.lock().unwrap().report_warning(
+                self.token_start..self.token_end,
+                LexingErrorType::LegacyDateDeprecated(identifier.to_ascii_uppercase()),
+            );
         }
         if !open_bracket
             && let Some(token) = self

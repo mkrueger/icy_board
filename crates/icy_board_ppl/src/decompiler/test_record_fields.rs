@@ -10,6 +10,23 @@ use crate::{
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 
+#[test]
+fn temporal_member_roundtrip() {
+    assert_in_memory_roundtrip(
+        r#"
+CONST TIMESTAMP epoch = "1970-01-01T00:00:00Z"
+PRINTLN epoch.IsEmpty
+DATE birthday = DATE.Create(1883, 9, 15)
+TIME clock = TIME.Parse("12:34:56.123456789")
+TIMESTAMP stamp = TIMESTAMP.FromUtc(birthday, clock)
+PRINTLN birthday.WithYear(1983).Format("%d-%m-%Y"), stamp.UtcDate.Year
+PRINTLN YEAR(birthday), stamp.AddSeconds(1).Nanosecond, TODATE(birthday.ToLegacy())
+EXIT
+"#,
+        &[],
+    );
+}
+
 fn compile_in_memory(source: &str) -> Executable {
     let mut workspace = Workspace::default();
     workspace.set_default_language_version(Some(400));

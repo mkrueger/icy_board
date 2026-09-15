@@ -78,6 +78,31 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
 
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> HirExpr {
         let base = member_reference_expression.get_expression().visit(self);
+        if let Some(typ) = self
+            .compiler
+            .semantic_visitor
+            .member_receiver_type_lookup
+            .get(&member_reference_expression.get_identifier_token().span.start)
+            && let Some(member) = crate::executable::temporal::temporal_members(*typ)
+                .into_iter()
+                .find(|member| *member_reference_expression.get_identifier() == member.name && member.property)
+        {
+            let operation = self
+                .compiler
+                .lookup_table
+                .lookup_constant(&Constant::Integer(member.operation as i32, NumberFormat::Default));
+            let zero = self.compiler.lookup_table.lookup_constant(&Constant::Integer(0, NumberFormat::Default));
+            return HirExpr::predefined(
+                FuncOpCode::TemporalCall,
+                vec![
+                    HirExpr::constant(operation),
+                    base,
+                    HirExpr::constant(zero),
+                    HirExpr::constant(zero),
+                    HirExpr::constant(zero),
+                ],
+            );
+        }
         // Semantic analysis has already reported why the member is unknown, so codegen
         // only has to avoid running into it.
         let Some(type_id) = self
@@ -145,6 +170,25 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
         };
 
         match function_type {
+            SemanticInfo::TemporalCall(operation, instance) => {
+                let operation = self
+                    .compiler
+                    .lookup_table
+                    .lookup_constant(&Constant::Integer(operation as i32, NumberFormat::Default));
+                let zero = self.compiler.lookup_table.lookup_constant(&Constant::Integer(0, NumberFormat::Default));
+                let receiver = if instance {
+                    let Expression::MemberReference(member) = call.get_expression() else {
+                        return HirExpr::Invalid;
+                    };
+                    member.get_expression().visit(self)
+                } else {
+                    HirExpr::constant(zero)
+                };
+                let mut operands = vec![HirExpr::constant(operation), receiver];
+                operands.extend(arguments);
+                operands.resize(5, HirExpr::constant(zero));
+                HirExpr::predefined(FuncOpCode::TemporalCall, operands)
+            }
             SemanticInfo::EnumHas(id) => {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return HirExpr::Invalid;

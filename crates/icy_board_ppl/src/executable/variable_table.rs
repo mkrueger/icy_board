@@ -78,6 +78,9 @@ impl RecordField {
                 | VariableType::SWord
                 | VariableType::BigStr
                 | VariableType::UnboundedString
+                | VariableType::CalendarDate
+                | VariableType::ClockTime
+                | VariableType::Timestamp
                 | VariableType::Double
                 | VariableType::DDate
                 | VariableType::MessageAreaID
@@ -569,6 +572,11 @@ impl VariableTable {
 
     /// Check the nominal type before publishing any part of a value.
     pub fn checked_enum_value(&self, expected: VariableType, value: VariableValue) -> Res<VariableValue> {
+        if expected.is_temporal() || value.vtype.is_temporal() {
+            return value
+                .checked_temporal_assignment(expected)
+                .map_err(|error| super::VMError::InvalidTemporalValue(error).into());
+        }
         let VariableType::UserData(id) = expected else {
             return Ok(value);
         };
@@ -694,6 +702,9 @@ impl VariableTable {
             decrypt_chunks(cur_block, version, false);
             i += 11;
             let header = VarHeader::from_bytes(&buf[i - 11..i])?;
+            if version < 400 && header.variable_type.is_temporal() {
+                return Err(ExecutableError::Format400("date/time values require runtime 400".into()).into());
+            }
             // Dynamic storage is a 4.00 feature. Preserve legacy header bits
             // on disk without interpreting them as a new array-storage flag.
             let mut storage_header = header.clone();
@@ -1073,9 +1084,10 @@ impl VariableTable {
         self.entries.push(entry);
     }
 
-    pub fn set_value(&mut self, id: usize, value: VariableValue) {
-        let val = value.convert_to(self.entries[id - 1].value.vtype);
+    pub fn set_value(&mut self, id: usize, value: VariableValue) -> Res<()> {
+        let val = value.convert_to(self.entries[id - 1].value.vtype)?;
         self.get_var_entry_mut(id).value = val;
+        Ok(())
     }
 
     pub fn get_value(&self, id: usize) -> &VariableValue {

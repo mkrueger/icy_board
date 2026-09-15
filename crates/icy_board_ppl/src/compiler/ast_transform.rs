@@ -1445,7 +1445,7 @@ mod semantics_before_lowering_tests {
                 (VariableType::Time, FuncOpCode::TOTIME),
             ] {
                 let mut visitor = AstTransformationVisitor::new(optimize, Vec::new());
-                let value = VariableValue::new_int(42).convert_to(variable_type);
+                let value = VariableValue::new_int(42).convert_to(variable_type).unwrap();
                 visitor.global_constants.insert(name("answer"), (variable_type, value));
                 let Expression::FunctionCall(call) = identifier("answer", 10).visit_mut(&mut visitor) else {
                     panic!("lost {variable_type} constant with optimize={optimize}")

@@ -16,6 +16,7 @@ pub enum NumberFormat {
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Constant {
+    Temporal(crate::executable::temporal::TemporalValue),
     Money(i32),
     Integer(i32, NumberFormat),
     Unsigned(u64, NumberFormat),
@@ -370,6 +371,7 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 121] = [
 impl Constant {
     pub fn get_var_type(&self) -> VariableType {
         match self {
+            Constant::Temporal(value) => VariableValue::new_temporal(*value).vtype,
             Constant::Money(_) => VariableType::Money,
             Constant::Unsigned(_, _) => VariableType::Unsigned,
             Constant::String(_) => VariableType::String,
@@ -382,6 +384,7 @@ impl Constant {
     pub fn get_value(&self) -> VariableValue {
         let mut data = VariableData::default();
         match self {
+            Constant::Temporal(value) => VariableValue::new_temporal(*value),
             Constant::Money(i) => {
                 data.money_value = *i;
                 VariableValue::new(VariableType::Money, data)
@@ -414,6 +417,7 @@ impl Constant {
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Constant::Temporal(value) => write!(f, "{}.Parse(\"{}\")", self.get_var_type().to_string().to_ascii_uppercase(), value.text()),
             Constant::Money(i) => write!(f, "{i}"),
             Constant::Integer(i, fmt) => match fmt {
                 NumberFormat::Dec => write!(f, "{i}D"),

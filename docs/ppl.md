@@ -77,7 +77,7 @@ Options:
   --style           keyword casing style, valid values are u=upper (default),
                     l=lower, c=camel
   --lang-version    language version the source is written for, defaults to the
-                    newest one
+                    PPL_LANG_VERSION environment setting, then the stored PPE runtime
   --help, help      display usage information
 ```
 
@@ -99,6 +99,17 @@ Expression grouping and evaluation side effects are preserved in both raw and
 structured modes. Structured reconstruction keeps labels and jumps whenever a
 safe loop transformation cannot be established, including cross-loop jumps.
 Original names and formatting cannot generally be recovered from the bytecode.
+
+The output language defaults to the stored PPE runtime version. `PPL_LANG_VERSION`
+overrides this default, and `--lang-version` takes precedence over both. The source
+includes a `;$LANGVERSION` directive for the selected version. Reconstruction
+respects its syntax: for example, a 330 target does not introduce 350's
+`REPEAT`/`UNTIL` or `LOOP`/`ENDLOOP` constructs.
+
+The original source language is not generally stored in a PPE. Source written
+with newer syntax for an older runtime therefore defaults to that older runtime's
+language. Explicitly selecting 400 for legacy source can change `DATE` and `TIME`
+semantics; a 400 container holding legacy types has the same ambiguity.
 
 ## Compiler
 

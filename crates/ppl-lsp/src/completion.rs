@@ -126,7 +126,8 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                 label: stmt.to_string(),
                 insert_text: Some(stmt.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::CLASS),
-                tags: (ast.language_version >= 400 && stmt.eq_ignore_ascii_case("BIGSTR")).then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
+                tags: (ast.language_version >= 400 && ["BIGSTR", "EDATE", "DDATE"].iter().any(|name| stmt.eq_ignore_ascii_case(name)))
+                    .then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
@@ -448,6 +449,15 @@ impl CompletionVisitor {
     }
 
     fn add_functions(&mut self) {
+        if self.language_version >= 400 {
+            self.items.push(CompletionItem {
+                label: "TIMESTAMP".into(),
+                insert_text: Some("TIMESTAMP".into()),
+                kind: Some(CompletionItemKind::FUNCTION),
+                documentation: hover_documentation(crate::documentation::get_type_hover(icy_board_ppl::executable::VariableType::Timestamp)),
+                ..Default::default()
+            });
+        }
         for c in BUILTIN_CONSTS.iter() {
             let content = if let Some(hover) = get_const_hover(c) {
                 if let HoverContents::Markup(content) = hover.contents {
@@ -488,6 +498,8 @@ impl CompletionVisitor {
                 label: func.name.to_string(),
                 insert_text: Some(func.name.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
+                tags: (self.language_version >= 400 && ["TOEDATE", "TODDATE"].iter().any(|name| func.name.eq_ignore_ascii_case(name)))
+                    .then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 documentation: content,
                 ..Default::default()

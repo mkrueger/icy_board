@@ -216,6 +216,11 @@ impl UserData for PplMessage {
 #[async_trait(?Send)]
 impl UserDataValue for PplMessage {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == "WrittenAt" {
+            return Ok(VariableValue::new_temporal(crate::executable::temporal::TemporalValue::Timestamp(
+                self.valid.then(|| self.written_at()),
+            )));
+        }
         let value = if *name == *NUMBER {
             VariableValue::new_long(i64::from(self.number))
         } else if *name == *VALID {

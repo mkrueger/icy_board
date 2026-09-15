@@ -1025,6 +1025,12 @@ impl SemanticVisitor {
 
     fn reject_enum_argument(&mut self, argument: &Expression) {
         let actual = argument.visit(self);
+        if actual.is_temporal() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(argument.get_span(), CompilationErrorType::InvalidTemporalOperation);
+        }
         if self.type_registry.is_enum_type(actual) {
             self.errors
                 .lock()

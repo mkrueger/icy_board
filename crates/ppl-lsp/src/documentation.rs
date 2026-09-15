@@ -211,6 +211,9 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         {
             get_sig_hint(Signature::new("ENUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-enum-400"))
         }
+        VariableType::CalendarDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-calendar-date")),
+        VariableType::ClockTime => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-clock-time")),
+        VariableType::Timestamp => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-timestamp")),
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
@@ -235,6 +238,38 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
 }
 
 pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<String> {
+    if var_type.is_temporal() {
+        use icy_board_ppl::executable::temporal::{TemporalOp, temporal_members};
+        let definition = temporal_members(var_type)
+            .into_iter()
+            .find(|definition| definition.name.eq_ignore_ascii_case(member))?;
+        let key = match definition.operation {
+            TemporalOp::IsEmpty => "hint-temporal-empty",
+            TemporalOp::ParseDate | TemporalOp::ParseTime | TemporalOp::ParseTimestamp => "hint-temporal-parse",
+            TemporalOp::Format => "hint-temporal-format",
+            TemporalOp::LegacyDate | TemporalOp::LegacyTime => "hint-temporal-legacy",
+            TemporalOp::Today | TemporalOp::TimeNow | TemporalOp::TimestampNow => "hint-temporal-now",
+            TemporalOp::DaysUntil | TemporalOp::SecondsUntil => "hint-temporal-until",
+            TemporalOp::WithYear | TemporalOp::AddDays | TemporalOp::AddSeconds => "hint-temporal-change",
+            TemporalOp::FromUtc | TemporalOp::FromUnix | TemporalOp::CreateDate | TemporalOp::CreateTime => "hint-temporal-create",
+            _ => "hint-temporal-component",
+        };
+        return Some(LANGUAGE_LOADER.get(key));
+    }
+    let name = member.to_ascii_lowercase();
+    if var_type == VariableType::UserData(USER_ID as u32) && name == "birthday" {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-user-birthday"));
+    }
+    if (var_type == VariableType::UserData(USER_ID as u32)
+        && matches!(name.as_str(), "expiresat" | "passwordexpiresat" | "firston" | "laston" | "lastdirectoryread"))
+        || (var_type == VariableType::UserData(MSG_ID as u32) && name == "writtenat")
+        || (var_type == VariableType::UserData(FILE_ENTRY_ID as u32) && name == "timestamp")
+    {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-native-timestamp"));
+    }
+    if var_type == VariableType::UserData(icy_board_ppl::parser::ZIP_WRITER_ID as u32) && name == "settimestamputc" {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-zip-timestamp-utc"));
+    }
     if var_type == VariableType::Bytes {
         return match member.to_ascii_lowercase().as_str() {
             "len" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-len")),
@@ -697,6 +732,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
 /// hover and completion so the three views cannot drift apart.
 pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
+        "timestamp" => "hint-param-timestamp",
         "area" => "hint-param-message-area",
         "original" => "hint-param-message-original",
         "header" => "hint-param-message-header",

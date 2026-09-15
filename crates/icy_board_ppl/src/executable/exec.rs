@@ -427,6 +427,11 @@ impl Executable {
             return super::format400::encode(self, compression, debug_names, &super::container::LoadLimits::default())
                 .map_err(|error| ExecutableError::Format400(error.to_string()));
         }
+        if self.variable_table.get_entries().iter().any(|entry| entry.header.variable_type.is_temporal())
+            || self.user_types.iter().flatten().any(|field| field.variable_type.is_temporal())
+        {
+            return Err(ExecutableError::Format400("date/time values require runtime 400".into()));
+        }
         if compression != super::container::Compression::None {
             return Err(ExecutableError::Format400("section compression requires runtime 400".into()));
         }

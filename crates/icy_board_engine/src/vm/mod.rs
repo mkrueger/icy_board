@@ -266,56 +266,60 @@ impl VirtualMachine<'_> {
             return Ok(());
         }
         let cur_user = &self.user;
-        self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode));
+        self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode))?;
         match cur_user.flags.fse_mode {
             FSEMode::Yes => {
                 // U_FSE = FSEDefault, U_FSEP = !DontAskFSE. "Yes" means always use the
                 // full screen editor without asking, so U_FSEP (ask) must be false.
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(true));
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false));
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(true))?;
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false))?;
             }
             FSEMode::Ask => {
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false));
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true));
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false))?;
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true))?;
             }
             FSEMode::No => {
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false));
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false));
+                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false))?;
+                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false))?;
             }
         }
-        self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear));
+        self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear))?;
 
         self.variable_table.set_value(
             U_EXPDATE,
             VariableValue::new_date(IcbDate::from_utc(&cur_user.expiration_date).to_pcboard_date()),
-        );
+        )?;
 
-        self.variable_table.set_value(U_SEC, VariableValue::new_int(cur_user.security_level as i32));
-        self.variable_table.set_value(U_PAGELEN, VariableValue::new_int(cur_user.page_len as i32));
+        self.variable_table.set_value(U_SEC, VariableValue::new_int(cur_user.security_level as i32))?;
+        self.variable_table.set_value(U_PAGELEN, VariableValue::new_int(cur_user.page_len as i32))?;
         self.variable_table
-            .set_value(U_EXPSEC, VariableValue::new_int(cur_user.exp_security_level as i32));
-        self.variable_table.set_value(U_CITY, VariableValue::new_string(cur_user.city_or_state.clone()));
+            .set_value(U_EXPSEC, VariableValue::new_int(cur_user.exp_security_level as i32))?;
         self.variable_table
-            .set_value(U_BDPHONE, VariableValue::new_string(cur_user.bus_data_phone.clone()));
+            .set_value(U_CITY, VariableValue::new_string(cur_user.city_or_state.clone()))?;
         self.variable_table
-            .set_value(U_HVPHONE, VariableValue::new_string(cur_user.home_voice_phone.clone()));
+            .set_value(U_BDPHONE, VariableValue::new_string(cur_user.bus_data_phone.clone()))?;
+        self.variable_table
+            .set_value(U_HVPHONE, VariableValue::new_string(cur_user.home_voice_phone.clone()))?;
 
-        self.variable_table.set_value(U_TRANS, VariableValue::new_string(cur_user.protocol.clone()));
-        self.variable_table.set_value(U_CMNT1, VariableValue::new_string(cur_user.user_comment.clone()));
+        self.variable_table.set_value(U_TRANS, VariableValue::new_string(cur_user.protocol.clone()))?;
         self.variable_table
-            .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
+            .set_value(U_CMNT1, VariableValue::new_string(cur_user.user_comment.clone()))?;
+        self.variable_table
+            .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()))?;
         self.variable_table.get_value_mut(U_PWD).vtype = VariableType::Password;
         self.variable_table
-            .set_value(U_PWD, VariableValue::new_password(cur_user.password.password.clone()));
+            .set_value(U_PWD, VariableValue::new_password(cur_user.password.password.clone()))?;
 
-        self.variable_table.set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body));
         self.variable_table
-            .set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.use_short_filedescr));
+            .set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body))?;
+        self.variable_table
+            .set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.use_short_filedescr))?;
 
-        self.variable_table.set_value(U_DEF79, VariableValue::new_bool(cur_user.flags.wide_editor));
-        self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.clone()));
+        self.variable_table.set_value(U_DEF79, VariableValue::new_bool(cur_user.flags.wide_editor))?;
+        self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.clone()))?;
 
-        self.variable_table.set_value(U_VER, VariableValue::new_string(cur_user.verify_answer.clone()));
+        self.variable_table
+            .set_value(U_VER, VariableValue::new_string(cur_user.verify_answer.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
@@ -372,7 +376,7 @@ impl VirtualMachine<'_> {
         self.variable_table.set_value(
             U_PWDEXP,
             VariableValue::new_date(IcbDate::from_utc(&cur_user.password.expire_date).to_pcboard_date()),
-        );
+        )?;
         if self.variable_table.get_version() >= 300 {
             // PCBoard seems not to set this variable ever.
             // U_ACCOUNT
@@ -380,20 +384,20 @@ impl VirtualMachine<'_> {
 
         if self.variable_table.get_version() >= 340 {
             self.variable_table
-                .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr));
-            self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()));
+                .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr))?;
+            self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()))?;
             self.variable_table
-                .set_value(U_BIRTHDATE, VariableValue::new_date(IcbDate::from_utc(&cur_user.birth_date).to_pcboard_date()));
-            self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
-            self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
+                .set_value(U_BIRTHDATE, VariableValue::new_date(IcbDate::from_utc(&cur_user.birth_date).to_pcboard_date()))?;
+            self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()))?;
+            self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()))?;
         }
         self.snapshot_user_variables();
         Ok(())
     }
 
-    pub async fn put_user_variables(&self, cur_user: &mut User) {
+    pub async fn put_user_variables(&self, cur_user: &mut User) -> Res<()> {
         if !self.variable_table.has_user_vars() {
-            return;
+            return Ok(());
         }
         macro_rules! field {
             ($id:ident, $target:expr, $value:expr) => {
@@ -433,11 +437,23 @@ impl VirtualMachine<'_> {
         field!(
             U_EXPDATE,
             cur_user.expiration_date,
-            IcbDate::from_pcboard_full(self.variable_table.get_value(U_EXPDATE).as_int() as u32).to_utc_date_time()
+            IcbDate::from_pcboard_full(self.variable_table.get_value(U_EXPDATE).checked_numeric()?.as_int() as u32).to_utc_date_time()
         );
-        field!(U_SEC, cur_user.security_level, self.variable_table.get_value(U_SEC).as_int() as u8);
-        field!(U_PAGELEN, cur_user.page_len, self.variable_table.get_value(U_PAGELEN).as_int() as u16);
-        field!(U_EXPSEC, cur_user.exp_security_level, self.variable_table.get_value(U_EXPSEC).as_int() as u8);
+        field!(
+            U_SEC,
+            cur_user.security_level,
+            self.variable_table.get_value(U_SEC).checked_numeric()?.as_int() as u8
+        );
+        field!(
+            U_PAGELEN,
+            cur_user.page_len,
+            self.variable_table.get_value(U_PAGELEN).checked_numeric()?.as_int() as u16
+        );
+        field!(
+            U_EXPSEC,
+            cur_user.exp_security_level,
+            self.variable_table.get_value(U_EXPSEC).checked_numeric()?.as_int() as u8
+        );
         string!(U_CITY, cur_user.city_or_state);
         string!(U_BDPHONE, cur_user.bus_data_phone);
         string!(U_HVPHONE, cur_user.home_voice_phone);
@@ -481,7 +497,7 @@ impl VirtualMachine<'_> {
         field!(
             U_PWDEXP,
             cur_user.password.expire_date,
-            IcbDate::from_pcboard_full(self.variable_table.get_value(U_PWDEXP).as_int() as u32).to_utc_date_time()
+            IcbDate::from_pcboard_full(self.variable_table.get_value(U_PWDEXP).checked_numeric()?.as_int() as u32).to_utc_date_time()
         );
 
         // U_ACCOUNT is not loaded or stored by PCBoard.
@@ -491,12 +507,13 @@ impl VirtualMachine<'_> {
             field!(
                 U_BIRTHDATE,
                 cur_user.birth_date,
-                IcbDate::from_pcboard_full(self.variable_table.get_value(U_BIRTHDATE).clone().convert_to(VariableType::Date).as_int() as u32)
+                IcbDate::from_pcboard_full(self.variable_table.get_value(U_BIRTHDATE).clone().convert_to(VariableType::Date)?.as_int() as u32)
                     .to_utc_date_time()
             );
             string!(U_EMAIL, cur_user.email);
             string!(U_WEB, cur_user.web);
         }
+        Ok(())
     }
 
     /// The expression nodes that can never await, walked without the boxed future the
@@ -521,28 +538,31 @@ impl VirtualMachine<'_> {
             }
             PPEExpr::UnaryExpression(op, expr) => {
                 let value = self.eval_expr_sync(expr)?;
-                Some(Self::apply_unary_op(*op, value))
+                Self::apply_unary_op(*op, value).ok()
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr_sync(left)?;
+                if left_value.vtype.is_temporal() && op.is_short_circuit() {
+                    return None;
+                }
                 if let Some(result) = op.short_circuit_result(left_value.as_bool()) {
                     return Some(VariableValue::new_bool(result));
                 }
                 let right_value = self.eval_expr_sync(right)?;
-                Some(Self::apply_bin_op(*op, left_value, right_value))
+                Self::apply_bin_op(*op, left_value, right_value).ok()
             }
             PPEExpr::Dim(id, dims) => {
                 if self.variable_table.get_version() >= 400 && matches!(self.variable_table.get_value(*id).vtype, VariableType::UserData(_)) {
                     return None;
                 }
-                let dim_1 = self.eval_expr_sync(&dims[0])?.as_int() as usize;
+                let dim_1 = self.eval_expr_sync(&dims[0])?.try_as_int()? as usize;
                 let dim_2 = if dims.len() >= 2 {
-                    self.eval_expr_sync(&dims[1])?.as_int() as usize
+                    self.eval_expr_sync(&dims[1])?.try_as_int()? as usize
                 } else {
                     0
                 };
                 let dim_3 = if dims.len() >= 3 {
-                    self.eval_expr_sync(&dims[2])?.as_int() as usize
+                    self.eval_expr_sync(&dims[2])?.try_as_int()? as usize
                 } else {
                     0
                 };
@@ -552,16 +572,24 @@ impl VirtualMachine<'_> {
         }
     }
 
-    fn apply_unary_op(op: UnaryOp, value: VariableValue) -> VariableValue {
-        match op {
+    fn apply_unary_op(op: UnaryOp, value: VariableValue) -> Res<VariableValue> {
+        if value.vtype.is_temporal() {
+            return Err(crate::executable::VMError::InvalidTemporalValue("Unary operators require a non-temporal value".into()).into());
+        }
+        Ok(match op {
             UnaryOp::Not => value.not(),
             UnaryOp::Minus => -value,
             UnaryOp::Plus => value,
-        }
+        })
     }
 
-    fn apply_bin_op(op: BinOp, left: VariableValue, right: VariableValue) -> VariableValue {
-        match op {
+    fn apply_bin_op(op: BinOp, left: VariableValue, right: VariableValue) -> Res<VariableValue> {
+        if (left.vtype.is_temporal() || right.vtype.is_temporal())
+            && (left.vtype != right.vtype || !matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq))
+        {
+            return Err(crate::executable::VMError::InvalidTemporalValue("Temporal values only support same-type comparisons".into()).into());
+        }
+        Ok(match op {
             BinOp::Add => left + right,
             BinOp::Sub => left - right,
             BinOp::Mul => left * right,
@@ -576,7 +604,7 @@ impl VirtualMachine<'_> {
             BinOp::LowerEq => VariableValue::new_bool(left <= right),
             BinOp::Greater => VariableValue::new_bool(left > right),
             BinOp::GreaterEq => VariableValue::new_bool(left >= right),
-        }
+        })
     }
 
     pub async fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
@@ -617,7 +645,7 @@ impl VirtualMachine<'_> {
                         self.eval_expr(expression).await?
                     };
                     self.check_record_field_value(*type_id, *field_id, &field_value)?;
-                    values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type);
+                    values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type)?;
                 }
                 Ok(value)
             }
@@ -696,6 +724,12 @@ impl VirtualMachine<'_> {
                         return Err(VMError::InvalidMemberArgumentCount(type_id, *id, 1, arguments.len()).into());
                     }
                     let value = self.eval_expr(&arguments[0]).await?;
+                    let target_type = registry.fields.get(name).copied().ok_or(VMError::InvalidMemberId(type_id, *id))?;
+                    let value = if value.vtype.is_temporal() && !target_type.is_temporal() {
+                        self.variable_table.checked_enum_value(target_type, value)?
+                    } else {
+                        value
+                    };
                     object.set_property_value(self, name, value).await?;
                     return Ok(VariableValue::new_bool(true));
                 }
@@ -710,8 +744,13 @@ impl VirtualMachine<'_> {
                 }
 
                 let mut args = Vec::new();
-                for arg in arguments {
-                    args.push(self.eval_expr(arg).await?);
+                for (arg, expected) in arguments.iter().zip(&function.parameters) {
+                    let value = self.eval_expr(arg).await?;
+                    args.push(if value.vtype.is_temporal() || expected.is_temporal() {
+                        self.variable_table.checked_enum_value(*expected, value)?
+                    } else {
+                        value
+                    });
                 }
 
                 return object.call_function(self, name, &args).await;
@@ -719,28 +758,21 @@ impl VirtualMachine<'_> {
 
             PPEExpr::UnaryExpression(op, expr) => {
                 let value = self.eval_expr(expr).await?;
-                Ok(Self::apply_unary_op(*op, value))
+                Self::apply_unary_op(*op, value)
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr(left).await?;
+                if left_value.vtype.is_temporal() && op.is_short_circuit() {
+                    return Err(crate::executable::VMError::InvalidTemporalValue("Temporal conditions require an explicit BOOLEAN".into()).into());
+                }
                 if let Some(result) = op.short_circuit_result(left_value.as_bool()) {
                     return Ok(VariableValue::new_bool(result));
                 }
                 let right_value = self.eval_expr(right).await?;
-                Ok(Self::apply_bin_op(*op, left_value, right_value))
+                Self::apply_bin_op(*op, left_value, right_value)
             }
             PPEExpr::Dim(id, dims) => {
-                let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
-                let dim_2 = if dims.len() >= 2 {
-                    self.eval_expr(&dims[1]).await?.as_int() as usize
-                } else {
-                    0
-                };
-                let dim_3 = if dims.len() >= 3 {
-                    self.eval_expr(&dims[2]).await?.as_int() as usize
-                } else {
-                    0
-                };
+                let (dim_1, dim_2, dim_3) = self.eval_array_indices(dims).await?;
                 self.read_array_element(self.variable_table.get_value(*id), dim_1, dim_2, dim_3)
             }
 
@@ -760,6 +792,14 @@ impl VirtualMachine<'_> {
             }
             PPEExpr::PredefinedFunctionCall(func, arguments) => match run_function(func.opcode, self, arguments).await {
                 Ok(val) => Ok(val),
+                Err(error)
+                    if matches!(
+                        error.downcast_ref::<crate::executable::VMError>(),
+                        Some(crate::executable::VMError::InvalidTemporalValue(_))
+                    ) =>
+                {
+                    Err(error)
+                }
                 Err(e) => Err(VMError::ErrorInFunctionCall(func.name.to_string(), e.to_string()).into()),
             },
 
@@ -835,14 +875,14 @@ impl VirtualMachine<'_> {
         if dimensions.is_empty() || dimensions.len() > 3 {
             return Err(VMError::InvalidArrayDimensionCount(dimensions.len()).into());
         }
-        let first = self.eval_expr(&dimensions[0]).await?.as_int() as usize;
+        let first = self.eval_expr(&dimensions[0]).await?.convert_to(VariableType::Integer)?.as_int() as usize;
         let second = if dimensions.len() >= 2 {
-            self.eval_expr(&dimensions[1]).await?.as_int() as usize
+            self.eval_expr(&dimensions[1]).await?.convert_to(VariableType::Integer)?.as_int() as usize
         } else {
             0
         };
         let third = if dimensions.len() >= 3 {
-            self.eval_expr(&dimensions[2]).await?.as_int() as usize
+            self.eval_expr(&dimensions[2]).await?.convert_to(VariableType::Integer)?.as_int() as usize
         } else {
             0
         };
@@ -883,21 +923,11 @@ impl VirtualMachine<'_> {
                 ) {
                     self.variable_table.get_var_entry_mut(*id).value.set_array_value(0, 0, 0, value)?;
                 } else {
-                    self.variable_table.set_value(*id, value);
+                    self.variable_table.set_value(*id, value)?;
                 }
             }
             PPEExpr::Dim(id, dims) => {
-                let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
-                let dim_2 = if dims.len() >= 2 {
-                    self.eval_expr(&dims[1]).await?.as_int() as usize
-                } else {
-                    0
-                };
-                let dim_3 = if dims.len() >= 3 {
-                    self.eval_expr(&dims[2]).await?.as_int() as usize
-                } else {
-                    0
-                };
+                let (dim_1, dim_2, dim_3) = self.eval_array_indices(dims).await?;
                 let target_type = self.variable_table.get_var_entry(*id).header.variable_type;
                 let value = self.variable_table.checked_enum_value(target_type, value)?;
                 self.check_nominal_assignment(target_type, value.vtype)?;
@@ -913,6 +943,12 @@ impl VirtualMachine<'_> {
                         let registry = self.type_registry.get_type_from_id(type_id).ok_or(VMError::TypeNotFoundInRegistry(type_id))?;
                         let Some(crate::compiler::user_data::UserDataEntry::Field(name)) = registry.id_table.get(*member_id) else {
                             return Err(VMError::InvalidMemberId(type_id, *member_id).into());
+                        };
+                        let target_type = registry.fields.get(name).copied().ok_or(VMError::InvalidMemberId(type_id, *member_id))?;
+                        let value = if value.vtype.is_temporal() && !target_type.is_temporal() {
+                            self.variable_table.checked_enum_value(target_type, value)?
+                        } else {
+                            value
                         };
                         return crate::compiler::user_data::runtime_object(object.as_ref(), type_id)?
                             .set_property_value(self, name, value)
@@ -1009,8 +1045,8 @@ impl VirtualMachine<'_> {
         let field = field_layout.ok_or(VMError::InternalVMError)?;
         let field_type = field.variable_type;
         self.check_record_value(field, &value)?;
-        *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
-        self.variable_table.set_value(root_id, root_value);
+        *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type)?;
+        self.variable_table.set_value(root_id, root_value)?;
         Ok(())
     }
 
@@ -1140,6 +1176,9 @@ impl VirtualMachine<'_> {
                     Some(value) => value,
                     None => self.eval_expr(expr).await?,
                 };
+                if value.vtype.is_temporal() {
+                    return Err(crate::executable::VMError::InvalidTemporalValue("condition requires an explicit boolean value".into()).into());
+                }
                 if !value.as_bool() {
                     self.cleanup_foreach_for_jump(*label);
                     self.goto(*label)?;
@@ -1643,8 +1682,8 @@ mod followup_invariants {
                     let initial = create_record_value(100, &vm.user_types, &vm.variable_table.enums).unwrap();
                     let root = s1_push(&mut vm, initial);
                     let target = PPEExpr::Member(Box::new(root.clone()), 0);
-                    let element = VariableValue::new_unbounded_string("é".repeat(3000)).convert_to(source_type);
-                    let expected = element.clone().convert_to(target_type);
+                    let element = VariableValue::new_unbounded_string("é".repeat(3000)).convert_to(source_type).unwrap();
+                    let expected = element.clone().convert_to(target_type).unwrap();
                     let source_array = s1_array(element, rank, 0);
                     let source = s1_push(&mut vm, source_array.clone());
                     vm.execute_statement(&PPECommand::Let(Box::new(target.clone()), Box::new(source)))

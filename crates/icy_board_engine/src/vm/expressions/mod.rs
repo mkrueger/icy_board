@@ -345,7 +345,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::Session => predefined_functions::session(arg, arguments).await,
         FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
         FuncOpCode::EnumHas => {
-            let type_id = arg.eval_expr(&arguments[0]).await?.as_int();
+            let type_id = arg.eval_expr(&arguments[0]).await?.checked_numeric()?.as_int();
             let id = u32::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
             // Values are owned snapshots: evaluating the mask may mutate the receiver.
             let receiver = arg.eval_expr(&arguments[1]).await?;
@@ -355,10 +355,30 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
             }
             let receiver = arg.variable_table.checked_enum_value(crate::executable::VariableType::UserData(id), receiver)?;
             let mask = arg.variable_table.checked_enum_value(crate::executable::VariableType::UserData(id), mask)?;
-            Ok(crate::executable::VariableValue::new_bool((receiver.as_int() & mask.as_int()) == mask.as_int()))
+            Ok(crate::executable::VariableValue::new_bool(
+                (receiver.checked_numeric()?.as_int() & mask.checked_numeric()?.as_int()) == mask.checked_numeric()?.as_int(),
+            ))
+        }
+        FuncOpCode::TemporalCall => {
+            let mut values = Vec::with_capacity(5);
+            for expression in arguments {
+                values.push(arg.eval_expr(expression).await?);
+            }
+            let operation = values
+                .first()
+                .and_then(|value| value.try_as_int())
+                .and_then(|value| usize::try_from(value).ok())
+                .and_then(|index| crate::executable::temporal::TEMPORAL_OPS.get(index))
+                .ok_or_else(|| crate::executable::VMError::InvalidTemporalValue("invalid temporal operation number".into()))?;
+            if values.len() != 5 {
+                return Err(crate::vm::VMError::InternalVMError.into());
+            }
+            operation
+                .evaluate(&values[1], &values[2..])
+                .map_err(|error| crate::executable::VMError::InvalidTemporalValue(error).into())
         }
         FuncOpCode::EnumCast => {
-            let type_id = arg.eval_expr(&arguments[0]).await?.as_int();
+            let type_id = arg.eval_expr(&arguments[0]).await?.checked_numeric()?.as_int();
             let value = arg.eval_expr(&arguments[1]).await?;
             let id = u32::try_from(type_id).map_err(|_| crate::vm::VMError::InternalVMError)?;
             if value.get_type() != crate::executable::VariableType::Integer || !arg.variable_table.enums.contains_key(&id) {

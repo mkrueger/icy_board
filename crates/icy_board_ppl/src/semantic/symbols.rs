@@ -84,6 +84,7 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SemanticInfo {
+    TemporalCall(crate::executable::temporal::TemporalOp, bool),
     EnumCast(u32),
     EnumHas(u32),
     PredefinedFunc(FuncOpCode),
@@ -201,6 +202,12 @@ pub struct VariableLookups {
 
 impl VariableLookups {
     pub fn add_constant(&mut self, constant: &Constant) {
+        if matches!(constant, Constant::Temporal(_)) {
+            if !self.constants.contains(constant) {
+                self.constants.push(constant.clone());
+            }
+            return;
+        }
         let value = constant.get_value();
         if let GenericVariableData::String(string) = &value.generic_data {
             if self.string_lookup_table.insert(string.as_ref().clone()) {

@@ -1,23 +1,48 @@
 use crate::vm::tests::{compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn temporal_native_user_fields_preserve_utc_and_subseconds() {
+    use crate::icy_board::{IcyBoardSerializer, user_base::UserBase};
+    let directory = tempfile::tempdir().unwrap();
+    let user_file = directory.path().join("users.toml");
+    let output = run_ppl_on(
+        r#"
+        ;$LANGVERSION 400
+        Session.User.Birthday = DATE.Create(1883, 9, 15)
+        Session.User.ExpiresAt = TIMESTAMP.Parse("2400-02-29T01:00:00.123456789+01:00")
+        PRINTLN Error.Last().OK
+        PRINTLN Session.User.Birthday, "|", Session.User.ExpiresAt
+        PRINTLN Board.Users[0].Birthday, "|", Board.Users[0].ExpiresAt
+    "#,
+        |board| board.config.paths.user_file = user_file.clone(),
+    );
+    assert_eq!(
+        output,
+        "1\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883-09-15|2400-02-29T00:00:00.123456789Z\n"
+    );
+    let saved = UserBase::load(&user_file).unwrap();
+    assert_eq!(saved[0].birth_date.date_naive().to_string(), "1883-09-15");
+    assert_eq!(saved[0].expiration_date.to_rfc3339(), "2400-02-29T00:00:00.123456789+00:00");
+}
+
+#[test]
 fn pcboard_datetime_user_fields_persist_full_years() {
     use crate::icy_board::{IcyBoardSerializer, user_base::UserBase};
     use chrono::Datelike;
 
     for source in [
         r#"
-Session.User.BirthDate = MKDATE(1996, 3, 15)
-Session.User.ExpirationDate = MKDATE(2079, 1, 1)
-Session.User.PasswordExpires = MKDATE(2024, 2, 29)
+Session.User.BirthDate = MKDATE(1996, 3, 15).ToLegacy()
+Session.User.ExpirationDate = MKDATE(2079, 1, 1).ToLegacy()
+Session.User.PasswordExpires = MKDATE(2024, 2, 29).ToLegacy()
 PRINTLN Error.Last().OK
 PRINTLN YEAR(Session.User.BirthDate), "|", YEAR(Session.User.ExpirationDate), "|", YEAR(Session.User.PasswordExpires)
 "#,
         r#"
 GETUSER
 U_BIRTHDATE = "03-15-96"
-U_EXPDATE = MKDATE(2079, 1, 1)
-U_PWDEXP = MKDATE(2024, 2, 29)
+U_EXPDATE = MKDATE(2079, 1, 1).ToLegacy()
+U_PWDEXP = MKDATE(2024, 2, 29).ToLegacy()
 PUTUSER
 Session.User.City = "saved"
 GETUSER

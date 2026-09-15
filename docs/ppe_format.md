@@ -108,6 +108,32 @@ compression value is not a future section but a malformed one: compression is a
 container-version-1 mechanic, so the whole file is rejected. `META` is reserved
 for future metadata and is treated like any other optional section today.
 
+### Temporal values
+
+PPL 400 assigns new scalar type IDs **25** (calendar DATE), **26** (clock TIME)
+and **27** (UTC TIMESTAMP). Legacy IDs 2/3/8/17 retain their existing meanings,
+including in previously compiled 400 containers. `CONS` representation tag
+**4** contains exactly 13 bytes:
+
+| Offset | Size | Contents |
+| ---: | ---: | :--- |
+| 0 | 1 | Presence: 0 empty, 1 nonempty |
+| 1 | 8 | Signed little-endian whole component |
+| 9 | 4 | Unsigned little-endian nanosecond component |
+
+For DATE, the whole component is Chrono's day number from the common era
+(0001-01-01 = 1), and nanoseconds must be zero. For TIME it is seconds since
+midnight; for TIMESTAMP it is Unix seconds. Empty values must have an all-zero
+payload. Decoders validate length, presence, calendar range and nanoseconds
+with Chrono, including Chrono's leap-second representation. Midnight and the
+Unix epoch use presence 1 and therefore differ from empty.
+
+`TOBYTES`, binary file channels and binary record fields use the same payload;
+the declared type supplies its interpretation. No Rust struct or union layout
+is part of this contract. The internal fixed-five-argument function opcode
+`-359` selects a temporal operation and requires runtime 400. Existing legacy
+opcodes are unchanged; older runtimes reject the new type IDs and opcode.
+
 ### Compression
 
 Compression is explicit per section, never inferred from a length mismatch. The

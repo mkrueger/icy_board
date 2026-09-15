@@ -29,6 +29,7 @@ instructions from features requiring the 4.00 container or APIs.
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
 | Binary conversion and checksums | 400 | 400 | `BYTES`, `Checksum`, `TOBYTES`, base64 and checksum members |
+| Calendar dates and UTC timestamps | 400 | 400 | Native `DATE`, `TIME`, `TIMESTAMP`, checked calendar methods and explicit legacy bridges |
 | Extensible user contacts | 400 | 400 | `CONTACT` records on `Session.User` |
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
@@ -42,6 +43,91 @@ when compiling classic source. In both cases the generated PPE uses ordinary
 old instructions. Whether an authored declaration must match its implementation
 depends on the source language, as described below.
 Routine documentation is not in the table either, for the same reason.
+
+## Calendar dates, times and timestamps
+
+Source language **400** maps `DATE` to a validated calendar date and `TIME` to
+a time of day, both without a timezone. `TIMESTAMP` is an instant in UTC.
+They use Chrono calendar values, not PCBoard day numbers or arbitrary integers.
+Language versions below 400 and already compiled PPEs retain their original
+type IDs, opcodes, date formatting and arithmetic. Recompiling old source as
+400 deliberately changes `DATE`, `TIME`, `DATE()`, `TIME()`, `MKDATE`, `TODATE`
+and `TOTIME`; select the original language version to preserve old semantics.
+
+```ppl
+;$LANGVERSION 400
+DATE birthday = DATE.Create(1883, 9, 15)
+TIME clock = TIME.Parse("00:30:00.123456789")
+TIMESTAMP instant = TIMESTAMP.FromUtc(birthday, clock)
+PRINTLN birthday.WithYear(1983).Format("%d-%m-%Y")
+PRINTLN instant
+EXIT
+```
+
+Default values are **empty**, distinct from midnight and the Unix epoch.
+`value.IsEmpty` tests this state. Empty text parses as empty and empty values
+format as empty text. Nonempty dates print as `YYYY-MM-DD`, times as
+`HH:MM:SS[.fraction]`, and timestamps as RFC3339 UTC text ending in `Z`.
+Timestamp parsing requires an explicit offset, normalizes to UTC, and retains
+nanoseconds. No implicit local-time-to-UTC conversion is performed.
+
+| Type | Static methods | Instance properties and methods |
+| :--- | :--- | :--- |
+| All three | `Parse(STRING)` | `IsEmpty`, `Format(STRING)` |
+| `DATE` | `Today()`, `Create(year, month, day)` | `Year`, `Month`, `Day`, `DayOfWeek`, `WithYear(year)`, `AddDays(LONG)`, `DaysUntil(DATE)`, `ToLegacy()` |
+| `TIME` | `Now()`, `Create(hour, minute, second)` | `Hour`, `Minute`, `Second`, `Nanosecond`, `ToLegacy()` |
+| `TIMESTAMP` | `Now()`, `FromUtc(DATE, TIME)`, `FromUnix(LONG)` | `UtcDate`, `UtcTime`, `UnixSeconds`, `Nanosecond`, `AddSeconds(LONG)`, `SecondsUntil(TIMESTAMP)` |
+
+`Today()` and `TIME.Now()` use the host's local clock; `TIMESTAMP.Now()` uses
+UTC. `DayOfWeek` uses Sunday=0. Difference methods return signed whole days
+or seconds from the receiver to the argument; fractional seconds truncate
+toward zero. Calendar/time constructors take integer components. Changes
+return new values and never modify the receiver. Invalid dates (including
+invalid leap-day year replacements), overflow, incompatible conversions and
+reading components of empty values raise runtime errors; they do not silently
+wrap or substitute a date. A failed assignment does not publish its result.
+Temporal expression errors terminate the PPE rather than returning a sentinel.
+File codec failures use `FERR`/`Error.Last()` and preserve the destination.
+
+`Format` uses Chrono strftime directives, for example `%d-%m-%Y`. Invalid
+directives or components unavailable on the type are errors. Values of the
+same type can be compared; use methods instead of integer arithmetic or
+`INC`/`DEC`. `CONST DATE value = "1983-09-15"` and analogous `TIME`/`TIMESTAMP`
+constants validate at compile time. Arrays, record fields and typed routine
+parameters/results preserve the value types.
+
+Temporal values are not implicit conditions: `IF`, `WHILE`, `UNTIL`, `NOT`,
+`AND` and `OR` require an explicit boolean expression. Use `value.IsEmpty`, a
+same-type comparison, or `TOBOOLEAN(value)` (false for empty, true for nonempty).
+Legacy numeric `DATE`/`TIME` conditions retain their pre-400 behavior.
+
+`EDATE`, `DDATE`, `TOEDATE` and `TODDATE` remain legacy operations and warn in
+400. `date.ToLegacy()` explicitly produces the old DATE value, rejecting dates
+outside its representable range. `time.ToLegacy()` rejects subsecond loss;
+empty becomes legacy zero (which also represents midnight for legacy TIME).
+`TODATE(legacyDate)` and `TOTIME(legacyTime)` convert back, as do assignments
+to modern variables. `TOEDATE(date)` and `TODDATE(date)` use the checked legacy
+bridge. Free component functions (`YEAR`, `DOW`, `HOUR`, etc.) use modern
+components for modern arguments and retain their legacy path for legacy
+values, strings and numbers.
+
+Native Board access is additive, so existing stored host signatures stay valid:
+
+* `USER.Birthday` is a native DATE; `ExpiresAt` and `PasswordExpiresAt` are
+	UTC timestamps. These are writable on `Session.User`, require nonempty
+	values, and report persistence/validation failures through `Error.Last()`.
+* `USER.FirstOn`, `LastOn` and `LastDirectoryRead`, `MSG.WrittenAt` and
+	`FILEENTRY.Timestamp` expose UTC timestamps with the backing data's precision.
+* The existing `BirthDate`, `ExpirationDate`, `PasswordExpires`, `MSG.Date`,
+	`MSG.Time` and `FILEENTRY.Date` retain legacy signatures. Use explicit
+	`.ToLegacy()` when passing new dates to old APIs and statements.
+* `ZIPWRITER.SetTimestampUtc(TIMESTAMP)` uses UTC components, permits years
+	1980..2107, and follows ZIP's two-second precision (subseconds and odd seconds
+	are discarded). Empty clears the override. Invalid values leave it unchanged.
+
+`TOBYTES(value)`, `FREAD`/`FWRITE` (size **13**) and binary record I/O use the
+stable representation described in [PPE format](ppe_format.md#temporal-values).
+Text record I/O uses ISO/RFC3339. Raw host memory layout is never serialized.
 
 ## Logical evaluation and operator precedence
 

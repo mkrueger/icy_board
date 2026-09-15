@@ -152,7 +152,7 @@ impl HostCatalog {
         let mut names = BTreeSet::new();
         let typ = |id| match id {
             u32::MAX => VariableType::None,
-            0..=24 => VariableType::from(id as u8),
+            0..=27 => VariableType::from(id as u8),
             _ => VariableType::UserData(id),
         };
         for _ in 0..section.entries {
