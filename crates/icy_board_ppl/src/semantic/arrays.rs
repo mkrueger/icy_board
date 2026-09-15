@@ -1,6 +1,6 @@
 use crate::{ast::Expression, compiler::CompilationErrorType, executable::VariableType, hir::CallId};
 
-use super::{FunctionDeclaration, SemanticInfo, SemanticVisitor};
+use super::{FunctionDeclaration, SemanticInfo, SemanticVisitor, members::widens_to_temporal};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ArrayShape {
@@ -19,6 +19,7 @@ impl ArrayShape {
 
     fn same_layout(&self, other: &Self) -> bool {
         let compatible_elements = self.element_type == other.element_type
+            || widens_to_temporal(other.element_type, self.element_type)
             || (matches!(self.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && matches!(other.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString));
         compatible_elements && self.rank == other.rank && (self.resizable || self.bounds == other.bounds)

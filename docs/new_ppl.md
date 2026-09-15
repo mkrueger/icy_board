@@ -91,8 +91,9 @@ File codec failures use `FERR`/`Error.Last()` and preserve the destination.
 
 `Format` uses Chrono strftime directives, for example `%d-%m-%Y`. Invalid
 directives or components unavailable on the type are errors. Values of the
-same type can be compared; use methods instead of integer arithmetic or
-`INC`/`DEC`. `CONST DATE value = "1983-09-15"` and analogous `TIME`/`TIMESTAMP`
+same kind can be compared, including a native value against a legacy one; use
+methods instead of integer arithmetic or `INC`/`DEC`.
+`CONST DATE value = "1983-09-15"` and analogous `TIME`/`TIMESTAMP`
 constants validate at compile time. Arrays, record fields and typed routine
 parameters/results preserve the value types.
 
@@ -105,11 +106,34 @@ Legacy numeric `DATE`/`TIME` conditions retain their pre-400 behavior.
 400. `date.ToLegacy()` explicitly produces the old DATE value, rejecting dates
 outside its representable range. `time.ToLegacy()` rejects subsecond loss;
 empty becomes legacy zero (which also represents midnight for legacy TIME).
-`TODATE(legacyDate)` and `TOTIME(legacyTime)` convert back, as do assignments
-to modern variables. `TOEDATE(date)` and `TODDATE(date)` use the checked legacy
-bridge. Free component functions (`YEAR`, `DOW`, `HOUR`, etc.) use modern
-components for modern arguments and retain their legacy path for legacy
-values, strings and numbers.
+`TOEDATE(date)` and `TODDATE(date)` use the checked legacy bridge. Free
+component functions (`YEAR`, `DOW`, `HOUR`, etc.) use modern components for
+modern arguments and retain their legacy path for legacy values, strings and
+numbers.
+
+The bridge is implicit in the safe direction only. A legacy `DATE`, `EDATE` or
+`DDATE` widens to a native DATE and a legacy `TIME` widens to a native TIME
+in assignments, same-kind scalar comparisons, member arguments, host object
+members and typed value parameters. Whole-array assignments and value parameters
+convert elements while preserving rank; `VAR` parameters require identical
+temporal types because returning a native value to legacy storage would need
+the reverse conversion.
+
+Legacy date zero becomes the empty DATE. Legacy time zero becomes nonempty
+midnight (`00:00:00`), not the empty TIME. Legacy time counts outside `0..86399`
+are invalid and raise conversion errors, including in mixed comparisons.
+Valid old data and old functions remain usable without conversion calls:
+
+```PPL
+DATE lastCall = U_LDate()
+IF Session.User.BirthDate = MkDate(1996, 3, 15) PRINTLN "birthday"
+TIMESTAMP seen = TIMESTAMP.FromUtc(U_LDate(), U_LTime())
+```
+
+Widening never crosses kinds: a legacy TIME is not a DATE, and a day count is
+not an instant. The reverse direction loses range or precision and stays
+explicit through `.ToLegacy()`. `TODATE(legacyDate)` and `TOTIME(legacyTime)`
+remain available where an explicit conversion reads better.
 
 The PPL 400 Board/object API uses native types throughout, with no legacy
 date/time or bounded-string types in its host signatures:

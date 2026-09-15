@@ -583,11 +583,16 @@ impl VirtualMachine<'_> {
         })
     }
 
-    fn apply_bin_op(op: BinOp, left: VariableValue, right: VariableValue) -> Res<VariableValue> {
-        if (left.vtype.is_temporal() || right.vtype.is_temporal())
-            && (left.vtype != right.vtype || !matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq))
-        {
-            return Err(crate::executable::VMError::InvalidTemporalValue("Temporal values only support same-type comparisons".into()).into());
+    fn apply_bin_op(op: BinOp, mut left: VariableValue, mut right: VariableValue) -> Res<VariableValue> {
+        if left.vtype.is_temporal() || right.vtype.is_temporal() {
+            let comparable = |typ| crate::executable::temporal::widened_temporal_type(typ).unwrap_or(typ);
+            let target = comparable(left.vtype);
+            if target != comparable(right.vtype) || !matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq)
+            {
+                return Err(crate::executable::VMError::InvalidTemporalValue("Temporal values only support same-type comparisons".into()).into());
+            }
+            left = left.convert_to(target)?;
+            right = right.convert_to(target)?;
         }
         Ok(match op {
             BinOp::Add => left + right,
@@ -643,6 +648,11 @@ impl VirtualMachine<'_> {
                         self.eval_array_operand(expression).await?
                     } else {
                         self.eval_expr(expression).await?
+                    };
+                    let field_value = if field_type.is_temporal() {
+                        field_value.convert_to(field_type)?
+                    } else {
+                        field_value
                     };
                     self.check_record_field_value(*type_id, *field_id, &field_value)?;
                     values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type)?;
@@ -1044,6 +1054,7 @@ impl VirtualMachine<'_> {
         }
         let field = field_layout.ok_or(VMError::InternalVMError)?;
         let field_type = field.variable_type;
+        let value = if field_type.is_temporal() { value.convert_to(field_type)? } else { value };
         self.check_record_value(field, &value)?;
         *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type)?;
         self.variable_table.set_value(root_id, root_value)?;

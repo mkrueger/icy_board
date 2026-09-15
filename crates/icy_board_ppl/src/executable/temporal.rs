@@ -174,19 +174,28 @@ pub fn temporal_builtin(name: &str) -> Option<(TemporalOp, &'static [VariableTyp
     })
 }
 
+/// The native counterpart of a legacy type; conversion still validates the payload.
+pub fn widened_temporal_type(typ: VariableType) -> Option<VariableType> {
+    match typ {
+        VariableType::Date | VariableType::EDate | VariableType::DDate => Some(VariableType::CalendarDate),
+        VariableType::Time => Some(VariableType::ClockTime),
+        _ => None,
+    }
+}
+
 impl TemporalOp {
     pub fn evaluate(self, receiver: &VariableValue, args: &[VariableValue]) -> Result<VariableValue, String> {
         use TemporalValue as T;
         let arg = |index: usize| args.get(index).ok_or_else(|| "Missing temporal argument".to_string());
-        let date = |value: &VariableValue| match value.temporal() {
+        let date = |value: &VariableValue| match value.temporal_operand() {
             Some(T::Date(Some(value))) => Ok(value),
             _ => Err("A nonempty DATE is required".to_string()),
         };
-        let time = |value: &VariableValue| match value.temporal() {
+        let time = |value: &VariableValue| match value.temporal_operand() {
             Some(T::Time(Some(value))) => Ok(value),
             _ => Err("A nonempty TIME is required".to_string()),
         };
-        let stamp = |value: &VariableValue| match value.temporal() {
+        let stamp = |value: &VariableValue| match value.temporal_operand() {
             Some(T::Timestamp(Some(value))) => Ok(value),
             _ => Err("A nonempty TIMESTAMP is required".to_string()),
         };
@@ -365,6 +374,14 @@ impl VariableValue {
             GenericVariableData::Temporal(value) => Some(value),
             GenericVariableData::None => self.vtype.empty_temporal(),
             _ => None,
+        }
+    }
+
+    /// The temporal value this operand stands for, widening a legacy one.
+    pub fn temporal_operand(&self) -> Option<TemporalValue> {
+        match widened_temporal_type(self.vtype) {
+            Some(target) => self.try_temporal_conversion(target).ok()?.temporal(),
+            None => self.temporal(),
         }
     }
 
@@ -609,6 +626,83 @@ mod tests {
                     .unwrap()
                     .is_empty()
             );
+        }
+    }
+
+    /// Legacy date zero is empty; legacy time zero is midnight.
+    #[test]
+    fn legacy_values_widen_to_their_native_type() {
+        let date = VariableValue::new_temporal(TemporalValue::Date(None).parse("1983-09-15").unwrap());
+        let time = VariableValue::new_temporal(TemporalValue::Time(None).parse("12:34:56").unwrap());
+        for typ in [VariableType::Date, VariableType::EDate, VariableType::DDate] {
+            assert_eq!(widened_temporal_type(typ), Some(VariableType::CalendarDate));
+            let legacy = TemporalOp::LegacyDate.evaluate(&date, &[]).unwrap().convert_to(typ).unwrap();
+            assert_eq!(legacy.temporal_operand(), date.temporal());
+            assert_eq!(legacy, date);
+            assert!(legacy < TemporalOp::AddDays.evaluate(&date, &[VariableValue::new_int(1)]).unwrap());
+            assert!(typ.create_empty_value().temporal_operand().is_some_and(TemporalValue::is_empty));
+        }
+        assert_eq!(widened_temporal_type(VariableType::Time), Some(VariableType::ClockTime));
+        assert_eq!(TemporalOp::LegacyTime.evaluate(&time, &[]).unwrap(), time);
+        let midnight = VariableType::Time.create_empty_value().convert_to(VariableType::ClockTime).unwrap();
+        assert_eq!(midnight.as_string(), "00:00:00");
+        assert!(!midnight.temporal().unwrap().is_empty());
+        assert_eq!(midnight, VariableType::Time.create_empty_value());
+        assert_ne!(VariableType::ClockTime.create_empty_value(), VariableType::Time.create_empty_value());
+        // A time is not a date, so widening never makes the two comparable.
+        assert_ne!(TemporalOp::LegacyTime.evaluate(&time, &[]).unwrap(), date);
+        assert_eq!(
+            TemporalOp::LegacyTime.evaluate(&time, &[]).unwrap().partial_cmp(&date),
+            None,
+            "a legacy time must not order against a date"
+        );
+        for typ in [
+            VariableType::CalendarDate,
+            VariableType::ClockTime,
+            VariableType::Timestamp,
+            VariableType::Integer,
+        ] {
+            assert_eq!(widened_temporal_type(typ), None, "{typ:?} is not a legacy temporal type");
+        }
+    }
+
+    #[test]
+    fn temporal_legacy_time_arrays_validate_every_element() {
+        for invalid in [false, true] {
+            let values = vec![
+                VariableValue::new_time(0),
+                VariableValue {
+                    vtype: VariableType::Time,
+                    ..VariableValue::new_int(if invalid { 86400 } else { 86399 })
+                },
+            ];
+            for data in [
+                GenericVariableData::Dim1(std::sync::Arc::new(values.clone())),
+                GenericVariableData::Dim2(std::sync::Arc::new(vec![values.clone()])),
+                GenericVariableData::Dim3(std::sync::Arc::new(vec![vec![values.clone()]])),
+            ] {
+                let legacy = VariableValue {
+                    vtype: VariableType::Time,
+                    generic_data: data,
+                    ..Default::default()
+                };
+                let result = legacy.clone().convert_to(VariableType::ClockTime);
+                if invalid {
+                    assert!(result.is_err());
+                } else {
+                    let native = result.unwrap();
+                    assert_eq!(native.vtype, VariableType::ClockTime);
+                    assert_eq!(native.get_dimensions(), legacy.get_dimensions());
+                    let (first, second, third) = match native.get_dimensions() {
+                        1 => (1, 0, 0),
+                        2 => (0, 1, 0),
+                        3 => (0, 0, 1),
+                        _ => unreachable!(),
+                    };
+                    assert_eq!(native.get_array_value(0, 0, 0).as_string(), "00:00:00");
+                    assert_eq!(native.get_array_value(first, second, third).as_string(), "23:59:59");
+                }
+            }
         }
     }
 

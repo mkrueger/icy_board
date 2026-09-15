@@ -6,6 +6,31 @@ use crate::executable::{EntryType, VariableType};
 use super::{compile, compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn temporal_legacy_comparisons_propagate_conversion_errors() {
+    use crate::{ast::BinOp, executable::VariableValue, vm::VirtualMachine};
+    let native = VariableValue::new_time(43200).convert_to(VariableType::ClockTime).unwrap();
+    for seconds in [-1, 86400, i32::MAX] {
+        let legacy = VariableValue {
+            vtype: VariableType::Time,
+            ..VariableValue::new_int(seconds)
+        };
+        assert!(legacy.clone().convert_to(VariableType::ClockTime).is_err());
+        for operation in [BinOp::Eq, BinOp::NotEq, BinOp::Lower, BinOp::LowerEq, BinOp::Greater, BinOp::GreaterEq] {
+            for (left, right) in [(native.clone(), legacy.clone()), (legacy.clone(), native.clone())] {
+                let error = VirtualMachine::apply_bin_op(operation, left, right).expect_err("invalid legacy TIME must fail comparisons");
+                assert!(
+                    matches!(
+                        error.downcast_ref::<crate::executable::VMError>(),
+                        Some(crate::executable::VMError::InvalidTemporalValue(message)) if message == "Invalid legacy time"
+                    ),
+                    "{operation:?}, {seconds}: {error}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn temporal_bytecode_numeric_arguments_and_conditions_return_errors() {
     use crate::executable::{Executable, FuncOpCode, OpCode, PPECommand, PPEExpr, PPEScript};
     for source in [
@@ -244,6 +269,110 @@ fn temporal_ppl400_arrays_records_and_legacy_bridge() {
         ),
         "1|1983-09-15|0\n09/15/83|1983-09-15\n0|00:00:00\n"
     );
+}
+
+/// Legacy day and second counts reach the new API on their own, so old data and
+/// old functions stay usable. Only the lossy direction still needs `.ToLegacy()`.
+#[test]
+fn temporal_legacy_values_widen_into_the_new_api() {
+    assert_eq!(
+        run_ppl(
+            r#"
+;$LANGVERSION 400
+DECLARE PROCEDURE Show(DATE day)
+DATE day = DATE.Create(1996, 3, 15)
+TIME moment = TIME.Create(12, 34, 56)
+PRINTLN day = MKDATE(1996, 3, 15).ToLegacy(), day = MKDATE(1996, 3, 16).ToLegacy()
+PRINTLN day < MKDATE(1996, 3, 16).ToLegacy(), day > MKDATE(1996, 3, 16).ToLegacy()
+PRINTLN moment = moment.ToLegacy(), "|", DATE.Create(1996, 3, 1).DaysUntil(MKDATE(1996, 3, 15).ToLegacy())
+PRINTLN TIMESTAMP.FromUtc(MKDATE(1996, 3, 15).ToLegacy(), moment.ToLegacy())
+DATE assigned = MKDATE(1996, 3, 15).ToLegacy()
+PRINTLN assigned, "|", assigned.Year
+Show(MKDATE(1996, 3, 15).ToLegacy())
+DATE nothing
+PRINTLN nothing = nothing.ToLegacy(), day = nothing.ToLegacy()
+TIME emptyTime
+TIME midnight = emptyTime.ToLegacy()
+PRINTLN midnight.IsEmpty, "|", midnight, "|", midnight = emptyTime.ToLegacy(), "|", emptyTime = emptyTime.ToLegacy()
+Session.User.BirthDate = MKDATE(1996, 3, 15).ToLegacy()
+PRINTLN Error.Last().OK, "|", Session.User.BirthDate
+EXIT
+PROCEDURE Show(DATE day)
+    PRINTLN "shown ", day, " ", day.DayOfWeek
+ENDPROC
+"#
+        ),
+        "10\n10\n1|14\n1996-03-15T12:34:56Z\n1996-03-15|1996\nshown 1996-03-15 5\n10\n0|00:00:00|1|0\n1|1996-03-15\n"
+    );
+    // The lossy direction stays explicit, and widening never mixes dates with times.
+    for source in [
+        ";$LANGVERSION 400\nPRINT DATE.Create(1996, 3, 15) = TIME.Create(1, 2, 3).ToLegacy()",
+        ";$LANGVERSION 400\nPRINT DATE.Create(1996, 3, 15) < TIME.Create(1, 2, 3).ToLegacy()",
+        ";$LANGVERSION 400\nPRINT TIMESTAMP.Now().SecondsUntil(MKDATE(1996, 3, 15).ToLegacy())",
+        ";$LANGVERSION 400\nPRINT DATE.Create(1996, 3, 15).DaysUntil(TIME.Create(1, 2, 3).ToLegacy())",
+    ] {
+        assert!(!compile_errors(source).is_empty(), "{source}");
+    }
+}
+
+#[test]
+fn temporal_legacy_arrays_widen_by_value() {
+    for typ in ["EDATE", "DDATE"] {
+        for (shape, parameter, first, second) in [
+            ("[2]", "[]", "[0]", "[1]"),
+            ("[2,2]", "[,]", "[0,0]", "[1,1]"),
+            ("[2,2,2]", "[,,]", "[0,0,0]", "[1,1,1]"),
+        ] {
+            let source = format!(
+                r#"
+;$LANGVERSION 400
+DECLARE PROCEDURE Change(DATE values{parameter})
+DECLARE PROCEDURE ChangeInPlace(VAR DATE values{parameter})
+TYPE Holder
+    DATE items{shape}
+ENDTYPE
+{typ} legacy{shape}
+legacy{first} = DATE.Create(1996, 3, 15).ToLegacy()
+DATE native{shape}
+native = legacy
+PRINTLN native{first}, "|", native{second}.IsEmpty
+Holder assigned
+assigned.items = legacy
+Holder literal = Holder {{ items = legacy }}
+PRINTLN assigned.items{first}, "|", literal.items{first}
+Change(legacy)
+PRINTLN native{first}, "|", YEAR(legacy{first})
+ChangeInPlace(native)
+PRINTLN native{first}
+EXIT
+PROCEDURE Change(DATE values{parameter})
+    PRINTLN values{first}, "|", values{second}.IsEmpty
+    values{first} = DATE.Create(2000, 1, 1)
+    PRINTLN values{first}
+ENDPROC
+PROCEDURE ChangeInPlace(VAR DATE values{parameter})
+    values{first} = DATE.Create(2001, 1, 1)
+ENDPROC
+"#
+            );
+            assert_eq!(
+                run_ppl(&source),
+                "1996-03-15|1\n1996-03-15|1996-03-15\n1996-03-15|1\n2000-01-01\n1996-03-15|1996\n2001-01-01\n",
+                "{typ} {shape}"
+            );
+        }
+    }
+    for source in [
+        "DATE native[2]\nEDATE legacy[2]\nlegacy = native",
+        "EDATE legacy[2]\nTIME native[2]\nnative = legacy",
+        "EDATE legacy[2]\nDATE native[2,2]\nnative = legacy",
+        "TYPE Holder\nDATE items[2]\nENDTYPE\nHolder target\nEDATE legacy[3]\ntarget.items = legacy",
+        "DECLARE PROCEDURE Change(VAR DATE values[])\nEDATE legacy[2]\nChange(legacy)\nEXIT\nPROCEDURE Change(VAR DATE values[])\nENDPROC",
+        "DECLARE PROCEDURE Change(VAR DATE value)\nEDATE legacy\nChange(legacy)\nEXIT\nPROCEDURE Change(VAR DATE value)\nENDPROC",
+    ] {
+        let errors = compile_errors(source);
+        assert!(errors.iter().any(|error| error.contains("expects")), "{source}: {errors:?}");
+    }
 }
 
 #[test]

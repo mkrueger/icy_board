@@ -123,6 +123,16 @@ mod tests {
                 assert!(!text.is_empty() && text != key, "{locale}: {key}: {text}");
             }
             assert!(loader.get("hint-temporal-parse").contains("RFC3339"));
+            let legacy = loader.get("hint-temporal-legacy");
+            for term in [
+                "DATE",
+                "TIME",
+                "VAR",
+                "00:00:00",
+                if locale == "en" { "nonempty midnight" } else { "nicht leere Mitternacht" },
+            ] {
+                assert!(legacy.contains(term), "{locale}: {term}: {legacy}");
+            }
             assert!(loader.get("hint-member-zip-timestamp-utc").contains("1980..2107"));
             assert!(loader.get("hint-member-zip-timestamp").contains("1980..2107"));
             for key in [

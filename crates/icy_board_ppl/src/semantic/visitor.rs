@@ -21,8 +21,8 @@ use crate::{
 
 use super::{
     ArrayShape, FunctionContainer, FunctionDeclaration, ReferenceType, References, SemanticInfo, SemanticVisitor, StaticReceiver, VariableLookups,
-    array_member, array_procedure, bytes_member, bytes_member_type, carries_string_members, string_member, string_member_type, string_type_name,
-    takes_whole_array,
+    array_member, array_procedure, bytes_member, bytes_member_type, carries_string_members, comparable_temporal, string_member, string_member_type,
+    string_type_name, takes_whole_array,
 };
 
 impl SemanticVisitor {
@@ -82,7 +82,7 @@ impl SemanticVisitor {
                 self.reject_bare_array_value(binary.get_right_expression());
                 return VariableType::None;
             }
-            if left == right
+            if comparable_temporal(left) == comparable_temporal(right)
                 && matches!(
                     binary.get_op(),
                     crate::ast::BinOp::Eq

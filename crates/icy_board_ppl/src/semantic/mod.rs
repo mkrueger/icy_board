@@ -35,7 +35,8 @@ use arrays::ArrayShape;
 use call_graph::CallGraph;
 pub use members::{ARRAY_MEMBERS, ARRAY_PROCEDURES, ArrayMember, BYTES_MEMBERS, STRING_MEMBERS, ScalarMember, array_member, array_procedure};
 use members::{
-    StaticReceiver, bytes_member, bytes_member_type, carries_string_members, string_member, string_member_type, string_type_name, takes_whole_array,
+    StaticReceiver, bytes_member, bytes_member_type, carries_string_members, comparable_temporal, string_member, string_member_type, string_type_name,
+    takes_whole_array,
 };
 use symbols::parameter_lists_match;
 pub use symbols::{FunctionContainer, FunctionDeclaration, ModuleExport, ModuleSymbolKind, ReferenceType, References, SemanticInfo, VariableLookups};
@@ -1484,6 +1485,12 @@ impl SemanticVisitor {
                 ParameterSpecifier::Variable(parameter) => {
                     let expected = parameter.get_variable_type();
                     let actual = argument.visit(self);
+                    if parameter.is_var() && expected != actual && (expected.is_temporal() || actual.is_temporal()) {
+                        self.errors.lock().unwrap().report_error(
+                            argument.get_span(),
+                            CompilationErrorType::ArgumentTypeMismatch(i + 1, self.source_type_name(expected), self.source_type_name(actual)),
+                        );
+                    }
                     let rank = parameter.get_variable().as_ref().map_or(0, |variable| variable.get_dimensions().len() as u8);
                     if self.lang_version >= 400 && rank > 0 {
                         let shape = arrays::ArrayShape {

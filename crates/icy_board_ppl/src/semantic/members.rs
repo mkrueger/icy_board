@@ -371,6 +371,16 @@ pub fn array_procedure(name: &unicase::Ascii<String>) -> Option<&'static (&'stat
     ARRAY_PROCEDURES.iter().find(|(member, _, _)| *name == *member)
 }
 
+/// True where a legacy value reaches a native date or time without losing anything.
+pub(super) fn widens_to_temporal(actual: VariableType, expected: VariableType) -> bool {
+    expected.is_temporal() && crate::executable::temporal::widened_temporal_type(actual) == Some(expected)
+}
+
+/// The type a value compares as, so legacy and native values of one kind meet.
+pub(super) fn comparable_temporal(typ: VariableType) -> VariableType {
+    crate::executable::temporal::widened_temporal_type(typ).unwrap_or(typ)
+}
+
 /// True where a statement wants the array itself rather than one of its elements,
 /// the positions `PCBoard` compiled with `wrVID` instead of `wrVIDSUB`.
 pub(super) fn takes_whole_array(opcode: OpCode, signature: StatementSignature, index: usize) -> bool {
@@ -413,6 +423,7 @@ impl SemanticVisitor {
             let actual = argument.visit(self);
             self.reject_bare_array_value(argument);
             if *expected != actual
+                && !widens_to_temporal(actual, *expected)
                 && (expected.is_temporal()
                     || actual.is_temporal()
                     || matches!(expected, VariableType::UserData(_))
@@ -492,6 +503,7 @@ impl SemanticVisitor {
             let expected = expected.get(index).copied().unwrap_or(VariableType::None);
             let compatible = expected == actual
                 || expected == VariableType::None
+                || widens_to_temporal(actual, expected)
                 || matches!(expected, VariableType::Integer | VariableType::Long)
                     && matches!(
                         actual,

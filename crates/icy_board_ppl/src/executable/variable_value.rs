@@ -530,7 +530,10 @@ impl PartialEq for VariableValue {
             _ => {}
         }
         if self.vtype.is_temporal() || other.vtype.is_temporal() {
-            return self.vtype == other.vtype && self.temporal().is_some() && self.temporal() == other.temporal();
+            return match (self.temporal_operand(), other.temporal_operand()) {
+                (Some(left), Some(right)) => left == right,
+                _ => false,
+            };
         }
         if let (VariableType::UserData(left_type), VariableType::UserData(right_type)) = (self.vtype, other.vtype) {
             if left_type != right_type {
@@ -1009,11 +1012,9 @@ impl Rem<VariableValue> for VariableValue {
 impl PartialOrd for VariableValue {
     fn partial_cmp(&self, other: &VariableValue) -> Option<Ordering> {
         if self.vtype.is_temporal() || other.vtype.is_temporal() {
-            return if self.vtype == other.vtype {
-                self.temporal()?.partial_cmp(&other.temporal()?)
-            } else {
-                None
-            };
+            let (left, right) = (self.temporal_operand()?, other.temporal_operand()?);
+            // Ordering a date against a time would be meaningless, not merely false.
+            return (std::mem::discriminant(&left) == std::mem::discriminant(&right)).then(|| left.cmp(&right));
         }
         let dest_type: VariableType = if self.vtype == VariableType::Password || other.vtype == VariableType::Password {
             VariableType::Password
