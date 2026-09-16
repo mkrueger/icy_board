@@ -247,6 +247,37 @@ fn hir_validation_source_errors_block_empty_output_without_duplicate_diagnostics
 }
 
 #[test]
+fn label_based_routine_edges_are_transitive_without_rooting_dead_code() {
+    for branch in [
+        "GOSUB entry",
+        "GOTO entry",
+        "IF (flag) GOTO entry",
+        "ON ERROR GOSUB entry",
+        "ON ERROR GOTO entry",
+    ] {
+        let source = format!(
+            "BOOLEAN flag\n{branch}\nIF (FALSE) GOSUB deadEntry\nEXIT\n\
+             PROCEDURE First()\n:entry\nGOSUB leaf\nRETURN\nENDPROC\n\
+             PROCEDURE Second()\n:leaf\nPRINTLN 1\nRETURN\nENDPROC\n\
+             PROCEDURE Dead()\n:deadEntry\nGOSUB deadLeaf\nRETURN\nENDPROC\n\
+             PROCEDURE DeadLeaf()\n:deadLeaf\nPRINTLN 2\nRETURN\nENDPROC\n"
+        );
+        let compiler = valid_compiler(&source);
+        let executable = compiler.create_executable().unwrap_or_else(|error| panic!("{branch}: {error}"));
+        let routines = executable
+            .variable_table
+            .get_entries()
+            .iter()
+            .filter(|entry| matches!(entry.header.variable_type, VariableType::Function | VariableType::Procedure))
+            .map(|entry| entry.get_name().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(routines, ["First", "Second"], "{branch}");
+        let mut bytes = executable.to_buffer().unwrap();
+        Executable::from_buffer(&mut bytes, false).unwrap();
+    }
+}
+
+#[test]
 fn hir_validation_valid_ppe_roundtrips_and_keeps_label_zero() {
     for source in [
         "PRINT 1\n:start\nPRINT 2\nGOTO start\n",

@@ -85,6 +85,7 @@ pub struct SemanticVisitor {
     label_count: usize,
     label_lookup_table: NameTableLookup,
     label_reference_lookup: HashMap<usize, usize>,
+    label_routine_owners: HashMap<usize, usize>,
     predefined_function_reference_lookup: HashMap<i16, usize>,
     predefined_procedure_reference_lookup: HashMap<i16, usize>,
 
@@ -386,6 +387,7 @@ impl SemanticVisitor {
             label_count: 0,
             label_lookup_table: HashMap::new(),
             label_reference_lookup: HashMap::new(),
+            label_routine_owners: HashMap::new(),
             predefined_function_reference_lookup: HashMap::new(),
             predefined_procedure_reference_lookup: HashMap::new(),
             user_type_lookup: HashMap::new(),
@@ -1353,6 +1355,15 @@ impl SemanticVisitor {
     }
 
     pub fn finish(&mut self) {
+        for (label, owner) in &self.label_routine_owners {
+            if let Some(reference) = self.label_reference_lookup.get(label)
+                && let Some(callers) = self.reference_owners.get(reference)
+            {
+                for caller in callers {
+                    self.call_graph.add_call(caller.map(SymbolId), SymbolId(*owner));
+                }
+            }
+        }
         self.call_graph.finish();
         for (reference_index, (rt, r)) in self.references.iter().enumerate() {
             if matches!(rt, ReferenceType::Label(_)) {

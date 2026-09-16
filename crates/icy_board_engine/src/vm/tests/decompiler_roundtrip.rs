@@ -250,6 +250,50 @@ fn assert_roundtrip(source: &str, expected: &str) {
 }
 
 #[test]
+fn legacy_310_gosub_into_procedure_roundtrips() {
+    let source = "DECLARE PROCEDURE helper()\nhelper()\nEND\nPROCEDURE helper()\nPRINTLN \"helper reached\"\nRETURN\nENDPROC\n";
+    let mut original = compile_with_runtime(source, false, 310);
+    let script = PPEScript::from_ppe_file(&original).unwrap();
+    let PPECommand::ProcedureCall(id, arguments) = &script.statements[0].command else {
+        panic!("expected the fixture's direct procedure call");
+    };
+    assert!(arguments.is_empty());
+    assert_eq!(script.statements[0].span, 0..3);
+    let entry = unsafe { original.variable_table.get_var_entry(*id).value.data.procedure_value.start_offset };
+    let mut replacement = Vec::new();
+    PPECommand::Gosub(entry as usize).serialize(&mut replacement);
+    PPECommand::End.serialize(&mut replacement);
+    assert_eq!(replacement.len(), 3);
+    original.script_buffer[..3].copy_from_slice(&replacement);
+    let original = reload(&original);
+    assert_eq!(original.runtime, 310);
+    let (baseline, _) = execute(&original, INSTRUCTION_LIMIT);
+    assert_eq!(baseline.result, Ok(()));
+    assert_eq!(baseline.output, "helper reached\n");
+    assert_eq!(baseline.frames, [0; 5]);
+    for language in [310, 400] {
+        for raw in [false, true] {
+            let (ast, issues) = decompile(reload(&original), raw, language).unwrap();
+            assert!(issues.is_empty());
+            let mut output = OutputVisitor::default();
+            output.version = language;
+            ast.visit(&mut output);
+            for runtime in [310, 400] {
+                for optimize in [false, true] {
+                    let rebuilt = compile_with_runtime(&output.output, optimize, runtime);
+                    assert_eq!(
+                        execute(&rebuilt, INSTRUCTION_LIMIT).0,
+                        baseline,
+                        "language={language}, raw={raw}, runtime={runtime}, optimize={optimize}\n{}",
+                        output.output
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn legacy_330_decompiler_roundtrip_preserves_dates_times_and_nested_loops() {
     let source = r#"
 ;$LANGVERSION 350

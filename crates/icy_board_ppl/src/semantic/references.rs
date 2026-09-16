@@ -133,6 +133,9 @@ impl SemanticVisitor {
             self.label_count
         };
         let reference_type = ReferenceType::Label(index);
+        if let Some(owner) = self.cur_func_impl {
+            self.label_routine_owners.insert(index, owner);
+        }
         let span = label_token.span.start + 1..label_token.span.end;
 
         if let Some(reference) = self.label_reference_lookup.get(&index).copied() {
