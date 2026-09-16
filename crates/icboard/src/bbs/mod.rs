@@ -1,11 +1,11 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{future::Future, sync::Arc, thread, time::Duration};
 
 use crate::Res;
 use async_recursion::async_recursion;
 use icy_board_engine::{
     icy_board::{
         IcyBoard,
-        bbs::BBS,
+        bbs::{BBS, NodeAdmission},
         icb_text::IceText,
         login_server::{SecureWebsocket, Telnet, Websocket},
         state::{
@@ -27,6 +27,45 @@ use crate::menu_runner::PcbBoardCommand;
 
 pub mod ssh;
 
+/// A refused caller must not occupy an accept slot while it completes its
+/// handshake and reads the notice.
+const REJECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// PCBoard told a caller who found every node taken instead of dropping the line.
+async fn busy_notice(board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> String {
+    let text = board
+        .lock()
+        .await
+        .default_display_text
+        .get_display_text(IceText::NodesBusy)
+        .map(|entry| entry.text.trim().to_string())
+        .unwrap_or_default();
+    format!("\r\n{text}\r\n")
+}
+
+/// Runs detached so the listener keeps accepting. No BBS node exists for this
+/// connection; it is closed once the notice was sent.
+fn reject_busy_caller<F>(board: Arc<tokio::sync::Mutex<IcyBoard>>, name: &'static str, accept: F)
+where
+    F: Future<Output = Option<Box<dyn Connection>>> + Send + 'static,
+{
+    tokio::spawn(async move {
+        let notice = busy_notice(&board).await;
+        let refused = async move {
+            let Some(mut connection) = accept.await else {
+                return;
+            };
+            if let Err(err) = connection.send(notice.as_bytes()).await {
+                log::debug!("{name}: could not send the busy notice: {err}");
+            }
+            let _ = connection.shutdown().await;
+        };
+        if tokio::time::timeout(REJECT_TIMEOUT, refused).await.is_err() {
+            log::debug!("{name}: refused caller did not finish reading the busy notice");
+        }
+    });
+}
+
 pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     let addr = if con.address.is_empty() {
         format!("0.0.0.0:{}", con.port)
@@ -45,8 +84,9 @@ pub async fn serve_telnet_connections(listener: TcpListener, board: Arc<tokio::s
         let mut admission = bbs.lock().await;
         let node_list = admission.open_connections.clone();
         let board = board.clone();
-        admission
-            .spawn_node(ConnectionType::Telnet, move |node, _| {
+        let reject_board = board.clone();
+        let admitted = admission
+            .spawn_node_with(ConnectionType::Telnet, stream, move |node, _, stream| {
                 std::thread::Builder::new().name("Telnet handle".to_string()).spawn(move || {
                     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                         let orig_hook = std::panic::take_hook();
@@ -72,6 +112,14 @@ pub async fn serve_telnet_connections(listener: TcpListener, board: Arc<tokio::s
                 })
             })
             .await?;
+        drop(admission);
+        if let NodeAdmission::Busy(stream) = admitted {
+            reject_busy_caller(reject_board, "Telnet", async move {
+                TelnetConnection::accept(stream)
+                    .ok()
+                    .map(|connection| Box::new(connection) as Box<dyn Connection>)
+            });
+        }
     }
 }
 
@@ -88,8 +136,9 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
         let mut admission = bbs.lock().await;
         let node_list = admission.open_connections.clone();
         let board = board.clone();
-        admission
-            .spawn_node(ConnectionType::Telnet, move |node, _| {
+        let reject_board = board.clone();
+        let admitted = admission
+            .spawn_node_with(ConnectionType::Telnet, stream, move |node, _, stream| {
                 std::thread::Builder::new().name("Websocket handle".to_string()).spawn(move || {
                     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                         let orig_hook: Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Send + Sync> = std::panic::take_hook();
@@ -116,6 +165,15 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
                 })
             })
             .await?;
+        drop(admission);
+        if let NodeAdmission::Busy(stream) = admitted {
+            reject_busy_caller(reject_board, "WebSocket", async move {
+                accept_websocket(stream)
+                    .await
+                    .ok()
+                    .map(|connection| Box::new(connection) as Box<dyn Connection>)
+            });
+        }
     }
 }
 
@@ -137,8 +195,9 @@ pub async fn serve_securewebsocket_connections(listener: TcpListener, board: Arc
         let mut admission = bbs.lock().await;
         let node_list = admission.open_connections.clone();
         let board = board.clone();
-        admission
-            .spawn_node(ConnectionType::Telnet, move |node, _| {
+        let reject_board = board.clone();
+        let admitted = admission
+            .spawn_node_with(ConnectionType::Telnet, stream, move |node, _, stream| {
                 std::thread::Builder::new().name("Secure Websocket handle".to_string()).spawn(move || {
                     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                         let orig_hook = std::panic::take_hook();
@@ -165,6 +224,15 @@ pub async fn serve_securewebsocket_connections(listener: TcpListener, board: Arc
                 })
             })
             .await?;
+        drop(admission);
+        if let NodeAdmission::Busy(stream) = admitted {
+            reject_busy_caller(reject_board, "Secure WebSocket", async move {
+                accept_sec_websocket(stream)
+                    .await
+                    .ok()
+                    .map(|connection| Box::new(connection) as Box<dyn Connection>)
+            });
+        }
     }
 }
 

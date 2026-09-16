@@ -60,6 +60,16 @@ pub enum EventMaintenancePhase {
     Restarting,
 }
 
+/// Outcome of a node allocation for an accepted connection.
+pub enum NodeAdmission<P> {
+    Spawned(usize),
+    /// Every node is taken; the connection is handed back so the caller can be
+    /// told that the board is busy.
+    Busy(P),
+    /// Admission is closed for maintenance: drop the connection without a message.
+    Closed,
+}
+
 /// Online work never owns the admission gate or the maintenance restart handshake.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OnlineEventStatus {
@@ -202,20 +212,32 @@ impl BBS {
     where
         F: FnOnce(usize, &mut NodeState) -> std::io::Result<std::thread::JoinHandle<crate::Res<()>>>,
     {
+        match self.spawn_node_with(connection_type, (), |node, state, ()| spawn(node, state)).await? {
+            NodeAdmission::Spawned(node) => Ok(Some(node)),
+            NodeAdmission::Busy(()) | NodeAdmission::Closed => Ok(None),
+        }
+    }
+
+    /// Like `spawn_node`, but returns the unused connection when every node is
+    /// taken, so the listener can tell that caller the board is busy.
+    pub async fn spawn_node_with<P, F>(&mut self, connection_type: ConnectionType, payload: P, spawn: F) -> std::io::Result<NodeAdmission<P>>
+    where
+        F: FnOnce(usize, &mut NodeState, P) -> std::io::Result<std::thread::JoinHandle<crate::Res<()>>>,
+    {
         if self.admissions_closed() {
-            return Ok(None);
+            return Ok(NodeAdmission::Closed);
         }
         self.clear_closed_connections().await;
         let mut list = self.open_connections.lock().await;
         let Some(node) = list.iter().position(Option::is_none) else {
-            return Ok(None);
+            return Ok(NodeAdmission::Busy(payload));
         };
         let (tx, rx) = mpsc::channel(32);
         let mut state = NodeState::new(node + 1, connection_type, rx);
-        state.handle = Some(spawn(node, &mut state)?);
+        state.handle = Some(spawn(node, &mut state, payload)?);
         list[node] = Some(state);
         self.bbs_channels[node] = Some(tx);
-        Ok(Some(node))
+        Ok(NodeAdmission::Spawned(node))
     }
 
     /// Caller must hold the maintenance gate. Never discard live thread handles.

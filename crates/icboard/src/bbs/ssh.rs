@@ -2,7 +2,11 @@ use std::{borrow::Cow, io::ErrorKind, sync::Arc, time::Duration};
 
 use crate::Res;
 use async_trait::async_trait;
-use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, login_server::SSH};
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    bbs::{BBS, NodeAdmission},
+    login_server::SSH,
+};
 use icy_net::{Connection, ConnectionType};
 use rand::rngs::StdRng;
 use tokio::{
@@ -148,9 +152,10 @@ impl server::Handler for SshSession {
         let channel_id = channel.id();
         let session_handle = session.handle();
         let connection = SSHConnection::new(channel, channel_id, session_handle);
+        let reject_board = self.board.clone();
 
-        let node = admission
-            .spawn_node(ConnectionType::SSH, move |node, _| {
+        let admitted = admission
+            .spawn_node_with(ConnectionType::SSH, connection, move |node, _, connection| {
                 std::thread::Builder::new().name("SSH handle".to_string()).spawn(move || {
                     tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                         if let Err(err) = handle_client(bbs2, board, node_list, node, Box::new(connection), None, "").await {
@@ -163,9 +168,16 @@ impl server::Handler for SshSession {
             })
             .await?;
         drop(admission);
-        if node.is_none() {
+        match admitted {
+            NodeAdmission::Spawned(_) => {}
+            NodeAdmission::Busy(connection) => {
+                // The notice needs an open channel, so accept before refusing.
+                reply.accept().await;
+                super::reject_busy_caller(reject_board, "SSH", async move { Some(Box::new(connection) as Box<dyn Connection>) });
+                return Ok(());
+            }
             // Dropping the unanswered reply rejects the channel; no BBS thread exists.
-            return Ok(());
+            NodeAdmission::Closed => return Ok(()),
         }
 
         reply.accept().await;

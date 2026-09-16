@@ -19,6 +19,7 @@ use icy_board_tui::{
     get_text, get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
+use icy_net::ConnectionType;
 use ratatui::{
     Frame, Terminal,
     buffer::Buffer,
@@ -49,6 +50,11 @@ pub enum CallWaitMessage {
     Sysop,
     Exit,
     Monitor,
+    /// Watch the caller on `node`, like PCBoard's single-node console did.
+    ViewSession {
+        node: usize,
+        session_id: u64,
+    },
     EventMonitor,
     LogViewer,
     SystemStatus,
@@ -81,6 +87,8 @@ pub struct CallWaitScreen {
     statistics: Statistics,
     paging_alert: Option<String>,
     error_message: Option<String>,
+    /// A caller the operator stopped watching. Only the next call is shown again.
+    detached_session: Option<u64>,
     runtime: RuntimeStatus,
 }
 
@@ -197,8 +205,15 @@ impl CallWaitScreen {
             statistics: Statistics::default(),
             paging_alert: None,
             error_message: None,
+            detached_session: None,
             runtime: RuntimeStatus::default(),
         })
+    }
+
+    /// Called when the operator leaves a session view, so the caller they left is
+    /// not shown again while still online.
+    pub fn set_detached_session(&mut self, session_id: u64) {
+        self.detached_session = Some(session_id);
     }
 
     pub fn show_error(&mut self, message: impl Into<String>) {
@@ -349,6 +364,13 @@ impl CallWaitScreen {
             self.statistics = board.lock().await.statistics.clone();
             self.paging_alert = Self::paging_alert(board, bbs).await;
 
+            if self.selected.is_none()
+                && self.error_message.is_none()
+                && let Some((node, session_id)) = Self::single_node_session(bbs, self.detached_session).await
+            {
+                return Ok(CallWaitMessage::ViewSession { node, session_id });
+            }
+
             if terminal.get_frame().area().width > 1 && terminal.get_frame().area().height > 1 {
                 terminal.draw(|frame| self.ui(frame, full_screen))?;
             }
@@ -392,6 +414,27 @@ impl CallWaitScreen {
                 last_tick = Instant::now();
             }
         }
+    }
+
+    /// A single-node board behaves like PCBoard on one line: the caller owns the
+    /// console, so the operator watches the session instead of the call-wait screen.
+    async fn single_node_session(bbs: &Arc<Mutex<BBS>>, detached: Option<u64>) -> Option<(usize, u64)> {
+        let open_connections = {
+            let mut bbs = bbs.lock().await;
+            bbs.clear_closed_connections().await;
+            bbs.open_connections.clone()
+        };
+        let connections = open_connections.lock().await;
+        if connections.len() != 1 {
+            return None;
+        }
+        let node = connections[0].as_ref()?;
+        // A local session already draws on this terminal, and a view that is
+        // still attached needs no second one.
+        if node.connection_type == ConnectionType::Channel || node.sysop_connection.is_some() {
+            return None;
+        }
+        (Some(node.session_id) != detached).then_some((0, node.session_id))
     }
 
     async fn paging_alert(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Option<String> {
@@ -728,7 +771,46 @@ impl<'a> Widget for PcbButton<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icy_net::channel::ChannelConnection;
     use ratatui::backend::TestBackend;
+
+    async fn bbs_with_caller(nodes: usize, connection_type: ConnectionType) -> (Arc<Mutex<BBS>>, u64) {
+        let bbs = Arc::new(Mutex::new(BBS::new(nodes)));
+        let node = bbs.lock().await.try_create_new_node(connection_type).await.unwrap();
+        let session_id = bbs.lock().await.open_connections.lock().await[node].as_ref().unwrap().session_id;
+        (bbs, session_id)
+    }
+
+    #[tokio::test]
+    async fn a_single_node_board_shows_the_caller_instead_of_the_call_wait_screen() {
+        let (bbs, session_id) = bbs_with_caller(1, ConnectionType::Telnet).await;
+
+        assert_eq!(CallWaitScreen::single_node_session(&bbs, None).await, Some((0, session_id)));
+        // Left by the operator: only the next caller is shown again.
+        assert_eq!(CallWaitScreen::single_node_session(&bbs, Some(session_id)).await, None);
+        assert_eq!(CallWaitScreen::single_node_session(&bbs, Some(session_id + 1)).await, Some((0, session_id)));
+    }
+
+    #[tokio::test]
+    async fn an_idle_board_a_local_session_and_a_watched_caller_stay_on_the_call_wait_screen() {
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        assert_eq!(CallWaitScreen::single_node_session(&bbs, None).await, None);
+
+        let (local, _) = bbs_with_caller(1, ConnectionType::Channel).await;
+        assert_eq!(CallWaitScreen::single_node_session(&local, None).await, None);
+
+        let (watched, _) = bbs_with_caller(1, ConnectionType::Telnet).await;
+        let (_peer, connection) = ChannelConnection::create_pair();
+        watched.lock().await.open_connections.lock().await[0].as_mut().unwrap().sysop_connection = Some(connection);
+        assert_eq!(CallWaitScreen::single_node_session(&watched, None).await, None);
+    }
+
+    #[tokio::test]
+    async fn a_multi_node_board_keeps_manual_session_viewing() {
+        let (bbs, _) = bbs_with_caller(2, ConnectionType::Telnet).await;
+
+        assert_eq!(CallWaitScreen::single_node_session(&bbs, None).await, None);
+    }
 
     #[tokio::test]
     async fn main_keeps_white_frame_and_plain_title_while_subscreens_use_red_titles() {
@@ -881,6 +963,7 @@ mod tests {
             statistics: Statistics::default(),
             paging_alert: None,
             error_message: None,
+            detached_session: None,
             runtime: RuntimeStatus::default(),
         };
         screen.show_error("icbsetup exited with exit status: 7");
@@ -912,6 +995,7 @@ mod tests {
             statistics: Statistics::default(),
             paging_alert: Some("SYSOP PAGE: Node 2 - Alice (1 active)".into()),
             error_message: None,
+            detached_session: None,
             runtime: RuntimeStatus::default(),
         };
         let backend = TestBackend::new(80, 25);

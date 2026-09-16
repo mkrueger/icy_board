@@ -62,6 +62,7 @@ mod generated_help;
 mod login_options;
 mod paging;
 mod session_recovery;
+mod single_node;
 mod statistics;
 mod subscriptions;
 mod sysop_security;

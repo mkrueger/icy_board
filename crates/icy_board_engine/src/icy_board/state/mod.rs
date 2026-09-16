@@ -5,7 +5,10 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     str::FromStr,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -590,11 +593,16 @@ impl NodeStatus {
     }
 }
 
+/// Distinguishes callers that reuse the same node index, so a sysop viewer of a
+/// finished session can never act on its successor.
+static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
+
 pub struct NodeState {
     pub sysop_connection: Option<ChannelConnection>,
     /// Host picker capability, installed only by the local console before login.
     pub local_file_picker: Option<tokio::sync::mpsc::Sender<local_transfer::LocalFilePickerRequest>>,
     pub bbs_channel: Option<tokio::sync::mpsc::Receiver<BBSMessage>>,
+    pub session_id: u64,
     pub cur_user: i32,
     pub cur_conference: u16,
     pub graphics_mode: GraphicsMode,
@@ -619,6 +627,7 @@ impl NodeState {
             sysop_connection: None,
             local_file_picker: None,
             bbs_channel: Some(rx),
+            session_id: NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed),
             status: NodeStatus::NoCaller,
             operation: String::new(),
             user_name: String::new(),

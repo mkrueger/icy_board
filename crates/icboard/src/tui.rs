@@ -105,6 +105,8 @@ pub struct Tui {
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
+    /// The caller this view belongs to. A node index alone is reused by the next call.
+    session_id: Option<u64>,
     node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
     rendered_sixels: Vec<Sixel>,
     image_picker: Option<Picker>,
@@ -196,6 +198,7 @@ impl Tui {
             screen_generation,
             status_bar: 0,
             node,
+            session_id: None,
             node_state,
             handle: bbs.lock().await.get_open_connections().clone(),
             rendered_sixels: Vec::new(),
@@ -213,7 +216,7 @@ impl Tui {
 
     async fn logoff_sysop(&self, bbs: &mut Arc<Mutex<BBS>>) -> Res<()> {
         if self.sysop_mode {
-            let channel = bbs.lock().await.bbs_channels.get(self.node).and_then(Clone::clone);
+            let channel = self.session_channel(bbs).await;
             if let Some(channel) = channel {
                 let _ = channel.try_send(BBSMessage::SysopLogout);
             }
@@ -226,14 +229,26 @@ impl Tui {
         Ok(())
     }
 
+    /// The node's channel, but only while it still carries the caller this view
+    /// was opened for.
+    async fn session_channel(&self, bbs: &Arc<Mutex<BBS>>) -> Option<tokio::sync::mpsc::Sender<BBSMessage>> {
+        let bbs = bbs.lock().await;
+        if let Some(session_id) = self.session_id {
+            let connections = bbs.open_connections.lock().await;
+            if !matches!(connections.get(self.node), Some(Some(state)) if state.session_id == session_id) {
+                return None;
+            }
+        }
+        bbs.bbs_channels.get(self.node).and_then(Clone::clone)
+    }
+
     async fn send_bbs_message(&self, bbs: &Arc<Mutex<BBS>>, message: BBSMessage) {
-        let channel = bbs.lock().await.bbs_channels.get(self.node).and_then(Clone::clone);
-        if let Some(channel) = channel {
+        if let Some(channel) = self.session_channel(bbs).await {
             let _ = channel.send(message).await;
         }
     }
 
-    pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
+    pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize, session_id: u64) -> Res<Option<Self>> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let mut bbs = bbs.lock().await;
         log::info!("Creating sysop mode");
@@ -244,6 +259,10 @@ impl Tui {
         let Some(Some(connection_state)) = connections.get_mut(node) else {
             return Ok(None);
         };
+        // The caller may have hung up while the operator was deciding.
+        if connection_state.session_id != session_id {
+            return Ok(None);
+        }
         connection_state.sysop_connection = Some(connection);
         drop(connections);
 
@@ -266,6 +285,7 @@ impl Tui {
             screen_generation,
             status_bar: 0,
             node,
+            session_id: Some(session_id),
             node_state,
             handle: bbs.get_open_connections().clone(),
             rendered_sixels: Vec::new(),
@@ -311,6 +331,12 @@ impl Tui {
                 return Ok(());
             }
             let mut nodes = self.handle.lock().await;
+            if let Some(session_id) = self.session_id
+                && !matches!(nodes.get(self.node), Some(Some(state)) if state.session_id == session_id)
+            {
+                // The caller is gone; its node may already serve the next call.
+                return Ok(());
+            }
             if let Some(Some(node_state)) = nodes.get_mut(self.node) {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
@@ -998,6 +1024,7 @@ mod sixel_tests {
             status_bar: 0,
             handle: Arc::new(Mutex::new(Vec::new())),
             node: 0,
+            session_id: None,
             node_state: Arc::new(Mutex::new(Vec::new())),
             rendered_sixels: Vec::new(),
             image_picker: None,
@@ -1400,9 +1427,31 @@ EXIT
     async fn entering_a_disconnected_node_returns_to_the_monitor() {
         let bbs = Arc::new(Mutex::new(BBS::new(1)));
 
-        let tui = Tui::sysop_mode(&bbs, 0).await.unwrap();
+        let tui = Tui::sysop_mode(&bbs, 0, 1).await.unwrap();
 
         assert!(tui.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_view_never_attaches_to_the_caller_that_reused_the_node() {
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        let node = bbs.lock().await.try_create_new_node(ConnectionType::Telnet).await.unwrap();
+        let gone = bbs.lock().await.open_connections.lock().await[node].as_ref().unwrap().session_id;
+
+        // The caller hangs up and the next call takes the same node.
+        bbs.lock().await.open_connections.lock().await[node] = None;
+        bbs.lock().await.try_create_new_node(ConnectionType::Telnet).await.unwrap();
+        let current = bbs.lock().await.open_connections.lock().await[node].as_ref().unwrap().session_id;
+
+        assert_ne!(gone, current);
+        assert!(Tui::sysop_mode(&bbs, node, gone).await.unwrap().is_none());
+        assert!(
+            bbs.lock().await.open_connections.lock().await[node]
+                .as_ref()
+                .unwrap()
+                .sysop_connection
+                .is_none()
+        );
     }
 }
 

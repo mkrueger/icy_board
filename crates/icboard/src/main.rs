@@ -298,6 +298,10 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                             }
 
                             let exiting = matches!(&msg, CallWaitMessage::Exit);
+                            if let CallWaitMessage::ViewSession { session_id, .. } = &msg {
+                                // Leaving the view must not immediately reopen it.
+                                app.set_detached_session(*session_id);
+                            }
                             let result = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen, String::new(), web_admin.clone()).await;
 
                             if launches_board_tool {
@@ -665,6 +669,14 @@ where
         CallWaitMessage::Exit => {
             reserve_operator_exit(bbs).await?;
         }
+        CallWaitMessage::ViewSession { node, session_id } => {
+            if let Some(mut tui) = Tui::sysop_mode(bbs, node, session_id).await? {
+                if let Err(err) = tui.run(bbs, board).await {
+                    log::error!("while viewing the session on node {}: {}", node + 1, err);
+                    return Err(err);
+                }
+            }
+        }
         CallWaitMessage::EventMonitor => {
             event_screen::run(terminal, board, bbs, full_screen).await?;
         }
@@ -679,7 +691,18 @@ where
             match app.run(terminal, board, bbs, full_screen, web_admin.as_ref()).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
-                        if let Some(mut tui) = Tui::sysop_mode(bbs, node).await? {
+                        let session_id = bbs
+                            .lock()
+                            .await
+                            .open_connections
+                            .lock()
+                            .await
+                            .get(node)
+                            .and_then(|state| state.as_ref())
+                            .map(|state| state.session_id);
+                        if let Some(session_id) = session_id
+                            && let Some(mut tui) = Tui::sysop_mode(bbs, node, session_id).await?
+                        {
                             if let Err(err) = tui.run(bbs, board).await {
                                 log::error!("while running board in local mode: {}", err);
                                 return Err(err);
