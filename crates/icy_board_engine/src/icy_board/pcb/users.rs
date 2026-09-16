@@ -22,6 +22,44 @@ fn format_users_date(date: &IcbDate) -> String {
     format!("{:02}{:02}{:02}", date.year() % 100, date.month(), date.day())
 }
 
+/// `IcbTime::parse` wants HH:MM:SS; the record only carries HH:MM.
+fn parse_users_time(time: &str) -> IcbTime {
+    IcbTime::parse(&format!("{}:00", time.trim()))
+}
+
+/// The byte counters at offsets 115, 208 and 216 are Microsoft Binary Format
+/// doubles: 55 fraction bits in bytes 0-6, sign in bit 7 of byte 6, and an
+/// exponent biased by 0x81 in byte 7.
+fn parse_basic_double(data: &[u8]) -> u64 {
+    let exponent = data[7];
+    if exponent == 0 {
+        return 0;
+    }
+    let mut bytes = [0; 8];
+    bytes.copy_from_slice(data);
+    if bytes[6] & 0x80 != 0 {
+        return 0;
+    }
+    let mantissa = (u64::from_le_bytes(bytes) & 0x007F_FFFF_FFFF_FFFF) | 0x0080_0000_0000_0000;
+    let shift = i32::from(exponent) - 184;
+    if shift < 0 {
+        mantissa.checked_shr(shift.unsigned_abs()).unwrap_or_default()
+    } else {
+        mantissa.checked_shl(shift as u32).unwrap_or(u64::MAX)
+    }
+}
+
+fn format_basic_double(value: u64) -> [u8; 8] {
+    if value == 0 {
+        return [0; 8];
+    }
+    let bits = 64 - value.leading_zeros();
+    let mantissa = if bits <= 56 { value << (56 - bits) } else { value >> (bits - 56) };
+    let mut bytes = (mantissa & 0x007F_FFFF_FFFF_FFFF).to_le_bytes();
+    bytes[7] = (bits + 128) as u8;
+    bytes
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PcbUserRecord {
     pub name: String,
@@ -124,7 +162,7 @@ impl PcbUserRecord {
 
             let last_time_on = import_cp437_string(&data[..5], true);
             data = &data[5..];
-            let last_time_on = IcbTime::parse(&last_time_on);
+            let last_time_on = parse_users_time(&last_time_on);
 
             let expert_mode = data[0] == b'Y';
             let protocol = data[1] as char;
@@ -169,9 +207,8 @@ impl PcbUserRecord {
             let num_downloads = u16::from_le_bytes([data[0], data[1]]);
             data = &data[2..];
 
-            let daily_downloaded_bytes = import_cp437_string(&data[..8], true);
+            let daily_downloaded_bytes = parse_basic_double(&data[..8]);
             data = &data[8..];
-            let daily_downloaded_bytes = daily_downloaded_bytes.parse::<u32>().unwrap_or_default();
 
             let user_comment = import_cp437_string(&data[..30], true);
             data = &data[30..];
@@ -202,13 +239,11 @@ impl PcbUserRecord {
             conf_sel_flags.clone_from_slice(&data[0..5]);
             data = &data[5..];
 
-            let ul_tot_dnld_bytes = import_cp437_string(&data[..8], true);
+            let ul_tot_dnld_bytes = parse_basic_double(&data[..8]);
             data = &data[8..];
-            let ul_tot_dnld_bytes = ul_tot_dnld_bytes.parse::<u32>().unwrap_or_default();
 
-            let ul_tot_upld_bytes = import_cp437_string(&data[..8], true);
+            let ul_tot_upld_bytes = parse_basic_double(&data[..8]);
             data = &data[8..];
-            let ul_tot_upld_bytes = ul_tot_upld_bytes.parse::<u32>().unwrap_or_default();
 
             let delete_flag = data[0] == b'Y';
             data = &data[1..];
@@ -221,7 +256,8 @@ impl PcbUserRecord {
                 data = &data[4..];
             }
 
-            let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) - 1;
+            // The pointer is 1-based; 0 marks a record without a USERS.INF entry.
+            let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]).saturating_sub(1);
             data = &data[4..];
 
             // flags 2
@@ -230,8 +266,8 @@ impl PcbUserRecord {
 
             // Bit 0 = Chat Status - OFF=Available, ON=unavailable
             let is_chat_available = (flags2 & (1 << 0)) == 0;
-            // Bit 1 = Short File Description
-            let short_file_descr = (flags2 & (1 << 1)) == 0;
+            // Bit 1 = Single Line file descriptions
+            let short_file_descr = (flags2 & (1 << 1)) != 0;
 
             // resevered
             data = &data[8..];
@@ -278,8 +314,8 @@ impl PcbUserRecord {
 
                 last_message_read_ptr,
 
-                ul_tot_dnld_bytes: ul_tot_dnld_bytes as u64,
-                ul_tot_upld_bytes: ul_tot_upld_bytes as u64,
+                ul_tot_dnld_bytes,
+                ul_tot_upld_bytes,
                 delete_flag,
                 rec_num,
                 short_file_descr,
@@ -370,9 +406,8 @@ impl PcbUserRecord {
         // Number of downloads - 2 bytes (little endian)
         writer.write_all(&(self.num_downloads as u16).to_le_bytes())?;
 
-        // Daily downloaded bytes - 8 bytes (as string)
-        let daily_dl_str = format!("{}", self.daily_downloaded_bytes);
-        writer.write_all(&export_cp437_string(&daily_dl_str, 8, b' '))?;
+        // Total Bytes Downloaded Today - 8 bytes (Basic double)
+        writer.write_all(&format_basic_double(self.daily_downloaded_bytes as u64))?;
 
         // User comment - 30 bytes
         writer.write_all(&export_cp437_string(&self.user_comment, 30, b' '))?;
@@ -402,13 +437,11 @@ impl PcbUserRecord {
         // Conference user selected flags - 5 bytes
         writer.write_all(&self.conf_usr_flags)?;
 
-        // Total download bytes - 8 bytes (as string)
-        let tot_dl_str = format!("{}", self.ul_tot_dnld_bytes);
-        writer.write_all(&export_cp437_string(&tot_dl_str, 8, b' '))?;
+        // Total Bytes Downloaded - 8 bytes (Basic double)
+        writer.write_all(&format_basic_double(self.ul_tot_dnld_bytes))?;
 
-        // Total upload bytes - 8 bytes (as string)
-        let tot_ul_str = format!("{}", self.ul_tot_upld_bytes);
-        writer.write_all(&export_cp437_string(&tot_ul_str, 8, b' '))?;
+        // Total Bytes Uploaded - 8 bytes (Basic double)
+        writer.write_all(&format_basic_double(self.ul_tot_upld_bytes))?;
 
         // Delete flag - 1 byte
         writer.write_all(&[if self.delete_flag { b'Y' } else { b'N' }])?;
@@ -432,9 +465,9 @@ impl PcbUserRecord {
         if !self.is_chat_available {
             flags2 |= 1 << 0;
         } // Note: inverted logic
-        if !self.short_file_descr {
+        if self.short_file_descr {
             flags2 |= 1 << 1;
-        } // Note: inverted logic
+        }
         writer.write_all(&[flags2])?;
 
         // Reserved - 8 bytes

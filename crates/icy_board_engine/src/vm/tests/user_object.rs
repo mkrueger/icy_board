@@ -398,3 +398,26 @@ PRINT Session.User.SetPassword("")
         )
     );
 }
+
+/// Reactor 7's R7USERS opens the PCBoard USERS file named on line 29 of
+/// PCBDAT() and slices the date out of the raw 400-byte record.
+#[test]
+fn a_legacy_ppe_reads_the_assigned_date_out_of_the_users_record() {
+    let output = run_ppl_on(
+        r#"
+STRING UsersFile, UserRecord, Assigned
+UsersFile = READLINE(PCBDAT(), 29)
+PRINTLN FILEINF(UsersFile, 4) / 400
+FOPEN 1, UsersFile, O_RD, S_DN
+FREAD 1, UserRecord, 400
+FCLOSE 1
+Assigned = MID(UserRecord, 90, 2) + "-" + MID(UserRecord, 92, 2) + "-1983"
+PRINTLN Assigned
+PRINTLN MID(UserRecord, 88, 6), "|", MID(UserRecord, 94, 5)
+"#,
+        |board| {
+            board.users[0].stats.last_on = chrono::DateTime::parse_from_rfc3339("2026-09-15T21:07:00Z").unwrap().to_utc();
+        },
+    );
+    assert_eq!(output, "1\n09-15-1983\n260915|21:07\n");
+}

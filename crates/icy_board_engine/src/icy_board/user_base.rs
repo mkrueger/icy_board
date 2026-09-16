@@ -6,14 +6,14 @@ use std::{
 
 use crate::{
     Res,
-    datetime::IcbDate,
+    datetime::{IcbDate, IcbTime},
     icy_board::{
         user_inf::{AddressUserInf, AliasUserInf, CallStatsUserInf, NotesUserInf, PasswordUserInf, PcbUserInf, PersonalUserInf, VerifyUserInf},
         users::PcbUserRecord,
     },
 };
 use bitflag::bitflag;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 pub use icy_board_ppl::password::Password;
 use serde::{Deserialize, Serialize};
 
@@ -941,10 +941,10 @@ impl User {
             language: String::new(),
             stats: UserStats {
                 first_date_on: first_date_on.to_utc_date_time(),
-                last_on: u.user.last_date_on.to_utc_date_time(),
+                last_on: u.user.last_date_on.to_utc_date_time() + Duration::seconds(i64::from(u.user.last_time_on.to_pcboard_time())),
                 num_times_on: u.user.num_times_on as u64,
-                messages_read: u.user.num_times_on as u64,
-                messages_left: u.user.num_times_on as u64,
+                messages_read: u.inf.messages_read as u64,
+                messages_left: u.inf.messages_left as u64,
                 num_sysop_pages: num_sysop_pages as u64,
                 num_group_chats: num_group_chats as u64,
                 num_comments: num_comments as u64,
@@ -1018,6 +1018,7 @@ impl User {
             date_last_dir_read: IcbDate::from_utc(&self.date_last_dir_read),
             is_chat_available: matches!(self.chat_status, ChatStatus::Available),
             last_date_on: IcbDate::from_utc(&self.stats.last_on),
+            last_time_on: IcbTime::from_naive(self.stats.last_on.naive_utc()),
             num_times_on: self.stats.num_times_on as usize,
             num_uploads: self.stats.num_uploads as i32,
             num_downloads: self.stats.num_downloads as i32,
@@ -1083,7 +1084,7 @@ impl User {
                 country: self.country.clone(),
             });
         }
-        if !(self.gender.is_empty() && self.email.is_empty() && self.web.is_empty()) {
+        if !(self.gender.is_empty() && self.email.is_empty() && self.web.is_empty() && self.birth_date.timestamp() == 0) {
             let birth_date = IcbDate::from_utc(&self.birth_date);
 
             inf.personal = Some(PersonalUserInf {
@@ -1093,7 +1094,11 @@ impl User {
                 web: self.web.clone(),
             });
         }
-        if (!self.password.prev_pwd.is_empty()) || self.password.times_changed > 0 {
+        if (!self.password.prev_pwd.is_empty())
+            || self.password.times_changed > 0
+            || self.password.expire_date.timestamp() != 0
+            || self.password.last_change.timestamp() != 0
+        {
             // PCBoard expects exactly 3 previous passwords, pad with empty strings if needed
             let mut prev = Vec::new();
             for i in 0..3 {

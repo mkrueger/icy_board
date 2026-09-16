@@ -471,7 +471,7 @@ impl PasswordUserInf {
         i += Self::PWD_LEN;
         let pwd3 = convert_str(&data[i..i + Self::PWD_LEN]);
         i += Self::PWD_LEN;
-        let last_change = IcbDate::from_pcboard(u16::from_le_bytes([data[i], data[i + 1]]) as u32);
+        let last_change = IcbDate::from_pcboard_full(u16::from_le_bytes([data[i], data[i + 1]]) as u32);
         i += 2;
         let times_changed = u16::from_le_bytes([data[i], data[i + 1]]) as usize;
         i += 2;
@@ -481,7 +481,7 @@ impl PasswordUserInf {
             prev_pwd: [pwd1, pwd2, pwd3],
             last_change,
             times_changed,
-            expire_date: IcbDate::from_pcboard(expire_date),
+            expire_date: IcbDate::from_pcboard_full(expire_date),
         })
     }
 
@@ -954,11 +954,11 @@ impl PersonalUserInf {
         };
         writer.write_all(&[gender_byte])?;
 
-        // Birth date - 9 bytes
+        // Birth date - 9 bytes, MMDDYYYY so the century survives the field width
         let birth_str = if self.birth_date == IcbDate::default() {
             String::new()
         } else {
-            self.birth_date.to_string()
+            format!("{:02}{:02}{:04}", self.birth_date.month(), self.birth_date.day(), self.birth_date.year())
         };
         writer.write_all(&export_cp437_string(&birth_str, 9, b' '))?;
 
@@ -997,8 +997,8 @@ impl BankInfo {
         let max_stored_amount = cursor.read_u32::<LittleEndian>()?;
 
         Ok(Self {
-            last_deposite_date: IcbDate::from_pcboard(last_deposite_date),
-            last_withdraw_date: IcbDate::from_pcboard(last_withdraw_date),
+            last_deposite_date: IcbDate::from_pcboard_full(last_deposite_date),
+            last_withdraw_date: IcbDate::from_pcboard_full(last_withdraw_date),
             last_transaction_amount,
             amount_saved,
             max_withdrawl_per_day,

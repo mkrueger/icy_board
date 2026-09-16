@@ -477,3 +477,156 @@ fn test_lastread_pointers_roundtrip() {
         }
     }
 }
+
+/// PCBoard stores the three byte counters as Basic doubles, so a record written
+/// here has to read back the same way in `PCBSM` and in old PPEs.
+#[test]
+fn test_byte_counters_use_basic_doubles() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+
+    let mut user = create_test_user("Byte Counters", 1);
+    user.stats.total_dnld_bytes = 3_221_225_472;
+    user.stats.total_upld_bytes = 1;
+    user.stats.today_dnld_bytes = 3;
+
+    let mut user_base = UserBase::default();
+    user_base.new_user(user.clone());
+    user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+    let record = std::fs::read(&users_file).unwrap();
+    // 1.0 and 3.0 in Microsoft Binary Format: exponent 0x81/0x82, no sign bit.
+    assert_eq!(&record[216..224], &[0, 0, 0, 0, 0, 0, 0, 0x81]);
+    assert_eq!(&record[115..123], &[0, 0, 0, 0, 0, 0, 0x40, 0x82]);
+
+    let pcb_users = PcbUserRecord::read_users(&users_file).unwrap();
+    assert_eq!(pcb_users[0].ul_tot_dnld_bytes, user.stats.total_dnld_bytes);
+    assert_eq!(pcb_users[0].ul_tot_upld_bytes, user.stats.total_upld_bytes);
+    assert_eq!(pcb_users[0].daily_downloaded_bytes as i64, user.stats.today_dnld_bytes);
+
+    for value in [0u64, 1, 2, 3, 255, 1024, 65_535, 1_048_576, 4_294_967_296, 1 << 55] {
+        let mut user = create_test_user("Byte Counters", 1);
+        user.stats.total_dnld_bytes = value;
+        let mut user_base = UserBase::default();
+        user_base.new_user(user);
+        user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+        assert_eq!(PcbUserRecord::read_users(&users_file).unwrap()[0].ul_tot_dnld_bytes, value, "value {value}");
+    }
+}
+
+/// `SingleLines` is set when the caller wants short descriptions, matching PCBSM.
+#[test]
+fn test_short_descriptions_flag_matches_pcboard() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+
+    for short in [false, true] {
+        let mut user = create_test_user("Flag Test", 1);
+        user.flags.use_short_filedescr = short;
+        user.chat_status = ChatStatus::Available;
+
+        let mut user_base = UserBase::default();
+        user_base.new_user(user);
+        user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+        let record = std::fs::read(&users_file).unwrap();
+        assert_eq!(record[389] & 0b10, if short { 0b10 } else { 0 }, "short descriptions: {short}");
+        assert_eq!(record[389] & 0b1, 0, "chat available should clear the UnAvailable bit");
+        assert_eq!(PcbUserRecord::read_users(&users_file).unwrap()[0].short_file_descr, short);
+    }
+}
+
+#[test]
+fn test_last_time_on_roundtrip() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+
+    let mut user = create_test_user("Time Test", 1);
+    user.stats.last_on = DateTime::parse_from_rfc3339("2026-09-15T21:07:00Z").unwrap().to_utc();
+
+    let mut user_base = UserBase::default();
+    user_base.new_user(user.clone());
+    user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+    let record = std::fs::read(&users_file).unwrap();
+    assert_eq!(&record[93..98], b"21:07");
+
+    let pcb_users = PcbUserRecord::read_users(&users_file).unwrap();
+    let pcb_infs = PcbUserInf::read_users(&users_inf_file).unwrap();
+    let imported = UserBase::import_pcboard(&[PcbUser {
+        user: pcb_users[0].clone(),
+        inf: pcb_infs[0].clone(),
+    }]);
+    assert_eq!(imported[0].stats.last_on, user.stats.last_on);
+}
+
+#[test]
+fn test_message_counts_come_from_users_inf() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+
+    let mut user = create_test_user("Counts", 1);
+    user.stats.num_times_on = 7;
+    user.stats.messages_read = 4321;
+    user.stats.messages_left = 123;
+
+    let mut user_base = UserBase::default();
+    user_base.new_user(user.clone());
+    user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+    let pcb_users = PcbUserRecord::read_users(&users_file).unwrap();
+    let pcb_infs = PcbUserInf::read_users(&users_inf_file).unwrap();
+    let imported = UserBase::import_pcboard(&[PcbUser {
+        user: pcb_users[0].clone(),
+        inf: pcb_infs[0].clone(),
+    }]);
+    assert_eq!(imported[0].stats.num_times_on, 7);
+    assert_eq!(imported[0].stats.messages_read, 4321);
+    assert_eq!(imported[0].stats.messages_left, 123);
+}
+
+/// A foreign record may carry a zero USERS.INF pointer; reading it must not panic.
+#[test]
+fn test_missing_users_inf_pointer_is_tolerated() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    std::fs::write(&users_file, vec![0; PcbUserRecord::RECORD_SIZE as usize]).unwrap();
+    assert_eq!(PcbUserRecord::read_users(&users_file).unwrap()[0].rec_num, 0);
+}
+
+/// The optional USERS.INF sections are written whenever any of their fields is
+/// set, not only when the string fields are.
+#[test]
+fn test_optional_inf_sections_keep_their_dates() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+
+    let mut user = create_test_user("Dates Only", 1);
+    user.gender = String::new();
+    user.email = String::new();
+    user.web = String::new();
+    user.birth_date = DateTime::parse_from_rfc3339("1974-03-08T00:00:00Z").unwrap().to_utc();
+    user.password.prev_pwd.clear();
+    user.password.times_changed = 0;
+    user.password.last_change = DateTime::parse_from_rfc3339("2026-01-02T00:00:00Z").unwrap().to_utc();
+    user.password.expire_date = DateTime::parse_from_rfc3339("2026-12-31T00:00:00Z").unwrap().to_utc();
+
+    let mut user_base = UserBase::default();
+    user_base.new_user(user.clone());
+    user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+    let pcb_users = PcbUserRecord::read_users(&users_file).unwrap();
+    let pcb_infs = PcbUserInf::read_users(&users_inf_file).unwrap();
+    let imported = UserBase::import_pcboard(&[PcbUser {
+        user: pcb_users[0].clone(),
+        inf: pcb_infs[0].clone(),
+    }]);
+    assert_eq!(imported[0].birth_date.date_naive(), user.birth_date.date_naive());
+    assert_eq!(imported[0].password.expire_date.date_naive(), user.password.expire_date.date_naive());
+    assert_eq!(imported[0].password.last_change.date_naive(), user.password.last_change.date_naive());
+}
