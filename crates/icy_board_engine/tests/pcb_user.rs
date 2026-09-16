@@ -180,6 +180,78 @@ fn create_test_user(name: &str, idx: u8) -> User {
 }
 
 #[test]
+fn test_export_legacy_users_dates() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    let users_inf_file = temp_dir.path().join("USERS.INF");
+    let mut user = create_test_user("MILO", 1);
+    user.stats.first_date_on = DateTime::parse_from_rfc3339("2026-09-07T00:00:00Z").unwrap().to_utc();
+    user.stats.last_on = DateTime::parse_from_rfc3339("2026-09-15T12:34:00Z").unwrap().to_utc();
+    user.date_last_dir_read = DateTime::parse_from_rfc3339("2026-08-31T00:00:00Z").unwrap().to_utc();
+    user.expiration_date = DateTime::parse_from_rfc3339("2027-12-01T00:00:00Z").unwrap().to_utc();
+
+    let mut user_base = UserBase::default();
+    user_base.new_user(user.clone());
+    user_base.export_pcboard(&users_file, &users_inf_file).unwrap();
+
+    let record = std::fs::read(&users_file).unwrap();
+    assert_eq!(record.len(), PcbUserRecord::RECORD_SIZE as usize);
+    assert_eq!(&record[87..93], b"260915");
+    assert_eq!(&record[101..107], b"260831");
+    assert_eq!(&record[185..191], b"271201");
+    let assigned = format!(
+        "{}-{}-1983",
+        std::str::from_utf8(&record[89..91]).unwrap(),
+        std::str::from_utf8(&record[91..93]).unwrap(),
+    );
+    assert_eq!(assigned, "09-15-1983");
+
+    let pcb_users = PcbUserRecord::read_users(&users_file).unwrap();
+    assert_eq!(pcb_users[0].last_date_on, IcbDate::from_utc(&user.stats.last_on));
+    assert_eq!(pcb_users[0].date_last_dir_read, IcbDate::from_utc(&user.date_last_dir_read));
+    assert_eq!(pcb_users[0].exp_date, IcbDate::from_utc(&user.expiration_date));
+    let pcb_infs = PcbUserInf::read_users(&users_inf_file).unwrap();
+    assert_eq!(
+        pcb_infs[0].call_stats.as_ref().unwrap().first_date_on,
+        IcbDate::from_utc(&user.stats.first_date_on),
+    );
+    let imported = UserBase::import_pcboard(&[PcbUser {
+        user: pcb_users[0].clone(),
+        inf: pcb_infs[0].clone(),
+    }]);
+    assert_eq!(imported[0].stats.first_date_on, user.stats.first_date_on);
+    assert_eq!(imported[0].stats.last_on.date_naive(), user.stats.last_on.date_naive());
+}
+
+#[test]
+fn test_import_legacy_user_dates() {
+    let temp_dir = TempDir::new().unwrap();
+    let users_file = temp_dir.path().join("USERS");
+    for (stored, expected) in [
+        ("830907", IcbDate::new(9, 7, 1983)),
+        ("000229", IcbDate::new(2, 29, 2000)),
+        ("260915", IcbDate::new(9, 15, 2026)),
+        ("000000", IcbDate::default()),
+        ("      ", IcbDate::default()),
+    ] {
+        let mut record = vec![0; PcbUserRecord::RECORD_SIZE as usize];
+        record[385..389].copy_from_slice(&1u32.to_le_bytes());
+        for offset in [87, 101, 185] {
+            record[offset..offset + 6].copy_from_slice(stored.as_bytes());
+        }
+        std::fs::write(&users_file, record).unwrap();
+        let imported = PcbUserRecord::read_users(&users_file).unwrap();
+        assert_eq!(imported[0].last_date_on, expected, "last on: {stored}");
+        assert_eq!(imported[0].date_last_dir_read, expected, "directory scan: {stored}");
+        assert_eq!(imported[0].exp_date, expected, "expiration: {stored}");
+
+        let mut call_stats = [0; 30];
+        call_stats[..2].copy_from_slice(&(expected.to_pcboard_date() as u16).to_le_bytes());
+        assert_eq!(CallStatsUserInf::read(&call_stats).unwrap().first_date_on, expected, "first on: {stored}");
+    }
+}
+
+#[test]
 fn test_export_import_single_user() {
     let temp_dir = TempDir::new().unwrap();
     let users_file = temp_dir.path().join("USERS");

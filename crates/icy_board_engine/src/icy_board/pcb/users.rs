@@ -8,6 +8,20 @@ use crate::{
     tables::import_cp437_string,
 };
 
+fn parse_users_date(date: &str) -> IcbDate {
+    if date.len() != 6 || !date.bytes().all(|byte| byte.is_ascii_digit()) {
+        return IcbDate::default();
+    }
+    IcbDate::parse(&format!("{}{}{}", &date[2..4], &date[4..6], &date[..2]))
+}
+
+fn format_users_date(date: &IcbDate) -> String {
+    if date.is_empty() {
+        return "000000".to_string();
+    }
+    format!("{:02}{:02}{:02}", date.year() % 100, date.month(), date.day())
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PcbUserRecord {
     pub name: String,
@@ -106,7 +120,7 @@ impl PcbUserRecord {
 
             let last_date_on = import_cp437_string(&data[..6], true);
             data = &data[6..];
-            let last_date_on = IcbDate::parse(&last_date_on);
+            let last_date_on = parse_users_date(&last_date_on);
 
             let last_time_on = import_cp437_string(&data[..5], true);
             data = &data[5..];
@@ -139,7 +153,7 @@ impl PcbUserRecord {
 
             let date_last_dir_read = import_cp437_string(&data[..6], true);
             data = &data[6..];
-            let date_last_dir_read = IcbDate::parse(&date_last_dir_read);
+            let date_last_dir_read = parse_users_date(&date_last_dir_read);
 
             let security_level = data[0];
             data = &data[1..];
@@ -169,7 +183,7 @@ impl PcbUserRecord {
 
             let reg_exp_date = import_cp437_string(&data[..6], true);
             data = &data[6..];
-            let reg_exp_date = IcbDate::parse(&reg_exp_date);
+            let reg_exp_date = parse_users_date(&reg_exp_date);
 
             let exp_security_level = data[0];
             data = &data[1..];
@@ -295,8 +309,8 @@ impl PcbUserRecord {
         // Home/Voice Phone - 13 bytes
         writer.write_all(&export_cp437_string(&self.home_voice_phone, 13, b' '))?;
 
-        // Last Date On - 6 bytes (MM-DD-YY format)
-        let last_date_str = self.last_date_on.to_pcb_str();
+        // Last Date On - 6 bytes (YYMMDD format)
+        let last_date_str = format_users_date(&self.last_date_on);
         writer.write_all(&export_cp437_string(&last_date_str, 6, b' '))?;
 
         // Last Time On - 5 bytes (HH:MM format)
@@ -338,7 +352,7 @@ impl PcbUserRecord {
         writer.write_all(&[packet_flags])?;
 
         // Date Last Dir Read - 6 bytes
-        let date_last_dir_str = self.date_last_dir_read.to_pcb_str();
+        let date_last_dir_str = format_users_date(&self.date_last_dir_read);
         writer.write_all(&export_cp437_string(&date_last_dir_str, 6, b' '))?;
 
         // Security Level - 1 byte
@@ -370,7 +384,7 @@ impl PcbUserRecord {
         writer.write_all(&self.elapsed_time_on.to_le_bytes())?;
 
         // Registration expiration date - 6 bytes
-        let exp_date_str = self.exp_date.to_pcb_str();
+        let exp_date_str = format_users_date(&self.exp_date);
         writer.write_all(&export_cp437_string(&exp_date_str, 6, b' '))?;
 
         // Expired security level - 1 byte

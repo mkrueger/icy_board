@@ -553,7 +553,7 @@ impl CallStatsUserInf {
         }
 
         let mut cursor = Cursor::new(data);
-        let first_date_on = cursor.read_i16::<LittleEndian>()? as u32;
+        let first_date_on = cursor.read_u16::<LittleEndian>()? as u32;
         let num_sysop_pages = cursor.read_u16::<LittleEndian>()? as usize;
         let num_group_chats = cursor.read_u16::<LittleEndian>()? as usize;
         let num_comments = cursor.read_u16::<LittleEndian>()? as usize;
@@ -570,7 +570,7 @@ impl CallStatsUserInf {
         let num_verify_errors = cursor.read_u16::<LittleEndian>()? as usize;
 
         Ok(Self {
-            first_date_on: IcbDate::from_pcboard(first_date_on),
+            first_date_on: IcbDate::from_pcboard_full(first_date_on),
             num_sysop_pages,
             num_group_chats,
             num_comments,
@@ -591,7 +591,7 @@ impl CallStatsUserInf {
     fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
 
-        writer.write_i16::<LittleEndian>(self.first_date_on.to_pcboard_date() as i16)?;
+        writer.write_u16::<LittleEndian>(self.first_date_on.to_pcboard_date() as u16)?;
         writer.write_u16::<LittleEndian>(self.num_sysop_pages as u16)?;
         writer.write_u16::<LittleEndian>(self.num_group_chats as u16)?;
         writer.write_u16::<LittleEndian>(self.num_comments as u16)?;
