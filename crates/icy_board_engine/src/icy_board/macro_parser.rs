@@ -536,7 +536,7 @@ pub enum PcbToken {
 
 fn parse_formatting(str: &str) -> (u16, bool, MacroJustification) {
     let mut num: u16 = 0;
-    let mut is_trunc = false;
+    let mut is_trunc = true;
     let mut justification = MacroJustification::LeftJustify;
     let mut parse_num = true;
     for c in str.chars().skip(1) {
@@ -606,24 +606,22 @@ pub struct Macro {
 
 impl Macro {
     pub fn format_value(&self, val: &str) -> String {
-        let mut result = val.to_string();
+        let value = match self.justification {
+            MacroJustification::LeftJustify => val.trim_start(),
+            MacroJustification::RightJustify => val.trim_end(),
+            MacroJustification::Center => val.trim(),
+        };
+        let value = if self.truncate {
+            value.chars().take(self.length as usize).collect::<String>()
+        } else {
+            value.to_string()
+        };
 
         match self.justification {
-            MacroJustification::LeftJustify => {
-                result = format!("{:<width$}", result.trim_start(), width = self.length as usize);
-            }
-            MacroJustification::RightJustify => {
-                result = format!("{:>width$}", result.trim_end(), width = self.length as usize);
-            }
-            MacroJustification::Center => {
-                result = format!("{:^width$}", result.trim(), width = self.length as usize);
-            }
+            MacroJustification::LeftJustify => format!("{value:<width$}", width = self.length as usize),
+            MacroJustification::RightJustify => format!("{value:>width$}", width = self.length as usize),
+            MacroJustification::Center => format!("{value:^width$}", width = self.length as usize),
         }
-
-        if self.truncate {
-            result.truncate(self.length as usize);
-        }
-        result
     }
 }
 
@@ -689,26 +687,32 @@ mod tests {
 
     #[test]
     fn test_right_justify() {
-        let macro_str = "CLS:20R";
-        let macro_parsed: Macro = macro_str.parse().unwrap();
-        let formatted = macro_parsed.format_value("Hello");
-        assert_eq!(formatted, "               Hello");
+        let macro_parsed: Macro = "CLS:5R".parse().unwrap();
+        assert_eq!(macro_parsed.format_value("Hi"), "   Hi");
+        assert_eq!(macro_parsed.format_value("Hello"), "Hello");
+        assert_eq!(macro_parsed.format_value("Hello world"), "Hello");
     }
 
     #[test]
     fn test_left_justify() {
-        let macro_str = "CLS:20";
-        let macro_parsed: Macro = macro_str.parse().unwrap();
-        let formatted = macro_parsed.format_value("Hello");
-        assert_eq!(formatted, "Hello               ");
+        let macro_parsed: Macro = "DIRNAME:5".parse().unwrap();
+        assert_eq!(macro_parsed.format_value("Hi"), "Hi   ");
+        assert_eq!(macro_parsed.format_value("Hello"), "Hello");
+        assert_eq!(macro_parsed.format_value("Hello world"), "Hello");
     }
 
     #[test]
     fn test_center_justify() {
-        let macro_str = "CLS:20C";
-        let macro_parsed: Macro = macro_str.parse().unwrap();
-        let formatted = macro_parsed.format_value("Hello");
-        assert_eq!(formatted, "       Hello        ");
+        let macro_parsed: Macro = "CLS:5C".parse().unwrap();
+        assert_eq!(macro_parsed.format_value("Hi"), " Hi  ");
+        assert_eq!(macro_parsed.format_value("Hello"), "Hello");
+        assert_eq!(macro_parsed.format_value("Hello world"), "Hello");
+    }
+
+    #[test]
+    fn test_formatting_truncates_by_character() {
+        let macro_parsed: Macro = "DIRNAME:2".parse().unwrap();
+        assert_eq!(macro_parsed.format_value("Ärea"), "Är");
     }
 
     #[test]
@@ -822,7 +826,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 209);
-            assert!(!truncate);
+            assert!(truncate);
             assert_eq!(justify, MacroJustification::LeftJustify);
         } else {
             panic!("Expected POS macro");
@@ -848,7 +852,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 9);
-            assert!(!truncate);
+            assert!(truncate);
             assert_eq!(justify, MacroJustification::Center);
         } else {
             panic!("Expected POS macro");
