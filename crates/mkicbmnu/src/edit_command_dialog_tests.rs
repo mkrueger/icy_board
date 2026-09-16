@@ -194,6 +194,37 @@ fn empty_type_search_enter_and_escape_are_safe() {
 }
 
 #[test]
+fn action_type_popup_supports_page_navigation() {
+    let board = IcyBoard::default();
+    let mut editor = ActionEditor::new(CommandAction::default(), None, &board);
+    editor.handle(key(KeyCode::Enter), &board);
+
+    let (selected_item, first_item) = match &editor.config.get_item(0).unwrap().value {
+        ListValue::ComboBox(combo_box) => (combo_box.selected_item, combo_box.first_item),
+        _ => panic!("command type should be a combo box"),
+    };
+    editor.handle(key(KeyCode::PageDown), &board);
+    match &editor.config.get_item(0).unwrap().value {
+        ListValue::ComboBox(combo_box) => {
+            assert_eq!(combo_box.selected_item, selected_item + icy_board_tui::config_menu::COMBO_BOX_VISIBLE_ROWS);
+            assert!(combo_box.first_item > first_item, "the visible page follows the selection");
+        }
+        _ => panic!("command type should be a combo box"),
+    }
+
+    editor.handle(key(KeyCode::End), &board);
+    match &editor.config.get_item(0).unwrap().value {
+        ListValue::ComboBox(combo_box) => assert_eq!(combo_box.selected_item, combo_box.values.len() - 1),
+        _ => panic!("command type should be a combo box"),
+    }
+    editor.handle(key(KeyCode::Home), &board);
+    match &editor.config.get_item(0).unwrap().value {
+        ListValue::ComboBox(combo_box) => assert_eq!((combo_box.selected_item, combo_box.first_item), (0, 0)),
+        _ => panic!("command type should be a combo box"),
+    }
+}
+
+#[test]
 fn path_classification_follows_runtime_not_obsolete_enum_comments() {
     assert!(file_parameter(CommandType::StuffFile));
     assert!(!file_parameter(CommandType::StuffTextAndExitMenu));

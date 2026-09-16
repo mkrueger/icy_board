@@ -101,6 +101,9 @@ pub struct ComboBox {
     pub first_item: usize,
 }
 
+/// Entries an open list shows at once, which is also the Page Up/Down step.
+pub const COMBO_BOX_VISIBLE_ROWS: usize = 10;
+
 impl ComboBox {
     fn handle_input(&mut self, key: KeyEvent) {
         match key.code {
@@ -110,7 +113,15 @@ impl ComboBox {
             }
             KeyCode::End => {
                 self.selected_item = self.values.len().saturating_sub(1);
-                self.first_item = self.values.len().saturating_sub(4);
+                self.first_item = self.values.len().saturating_sub(COMBO_BOX_VISIBLE_ROWS);
+            }
+            KeyCode::PageUp => {
+                self.selected_item = self.selected_item.saturating_sub(COMBO_BOX_VISIBLE_ROWS);
+                self.first_item = self.first_item.saturating_sub(COMBO_BOX_VISIBLE_ROWS);
+            }
+            KeyCode::PageDown => {
+                self.selected_item = (self.selected_item + COMBO_BOX_VISIBLE_ROWS).min(self.values.len().saturating_sub(1));
+                self.first_item = (self.first_item + COMBO_BOX_VISIBLE_ROWS).min(self.values.len().saturating_sub(COMBO_BOX_VISIBLE_ROWS));
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if self.selected_item > 0 {
@@ -122,8 +133,8 @@ impl ComboBox {
             }
             KeyCode::Char('j') | KeyCode::Down if self.selected_item < self.values.len().saturating_sub(1) => {
                 self.selected_item += 1;
-                if self.selected_item >= self.first_item + 4 {
-                    self.first_item = self.selected_item - 3;
+                if self.selected_item >= self.first_item + COMBO_BOX_VISIBLE_ROWS {
+                    self.first_item = self.selected_item - (COMBO_BOX_VISIBLE_ROWS - 1);
                 }
             }
             _ => {}
@@ -811,7 +822,20 @@ impl<T> ListItem<T> {
                 }
                 let mut area = area;
                 area.width = c.values.iter().map(|l| l.display.len()).max().unwrap_or(0) as u16 + 2;
-                area.height = (c.values.len() + 2).clamp(3, 6) as u16;
+                // The list opens downwards, so it can only use the rows left below the field.
+                let rows = c
+                    .values
+                    .len()
+                    .min(COMBO_BOX_VISIBLE_ROWS)
+                    .min(frame.area().bottom().saturating_sub(area.y + 2) as usize)
+                    .max(1);
+                area.height = (rows + 2) as u16;
+                c.first_item = c.first_item.min(c.values.len().saturating_sub(rows));
+                if c.selected_item < c.first_item {
+                    c.first_item = c.selected_item;
+                } else if c.selected_item >= c.first_item + rows {
+                    c.first_item = c.selected_item + 1 - rows;
+                }
                 Clear.render(area, frame.buffer_mut());
 
                 let block = Block::new()
@@ -828,7 +852,7 @@ impl<T> ListItem<T> {
                 line.width -= 2;
                 line.y += 1;
                 line.height = 1;
-                for (i, l) in c.values.iter().skip(c.first_item).take((area.height as usize).saturating_sub(2)).enumerate() {
+                for (i, l) in c.values.iter().skip(c.first_item).take(rows).enumerate() {
                     if i + c.first_item == c.selected_item {
                         Text::from(l.display.clone()).style(get_tui_theme().edit_value).render(line, frame.buffer_mut());
                     } else {
@@ -1790,6 +1814,61 @@ mod tests {
     use super::*;
     use crossterm::event::KeyModifiers;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn open_combo_box(len: usize) -> ComboBox {
+        let values: Vec<ComboBoxValue> = (0..len).map(|value| ComboBoxValue::new(format!("Item{value:02}"), value.to_string())).collect();
+        ComboBox {
+            is_edit_open: true,
+            cur_value: values[0].clone(),
+            values,
+            selected_item: 0,
+            first_item: 0,
+        }
+    }
+
+    #[test]
+    fn combo_box_pages_and_jumps_to_both_ends() {
+        let mut combo_box = open_combo_box(25);
+        combo_box.selected_item = 2;
+        let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
+
+        combo_box.handle_input(key(KeyCode::PageDown));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (12, 10));
+        combo_box.handle_input(key(KeyCode::PageDown));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (22, 15));
+        combo_box.handle_input(key(KeyCode::PageUp));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (12, 5));
+
+        combo_box.handle_input(key(KeyCode::End));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (24, 15));
+        combo_box.handle_input(key(KeyCode::Home));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (0, 0));
+        combo_box.handle_input(key(KeyCode::PageUp));
+        assert_eq!((combo_box.selected_item, combo_box.first_item), (0, 0));
+    }
+
+    #[test]
+    fn an_open_combo_box_fills_a_page_without_leaving_the_screen() {
+        let mut item: ListItem<()> = ListItem::new("Type".to_string(), ListValue::ComboBox(open_combo_box(25)));
+        let row = |terminal: &Terminal<TestBackend>, y: u16| {
+            let buffer = terminal.backend().buffer().clone();
+            (0..buffer.area.width).map(|x| buffer[(x, y)].symbol().to_string()).collect::<String>()
+        };
+
+        let mut terminal = Terminal::new(TestBackend::new(40, 25)).unwrap();
+        terminal.draw(|frame| assert!(item.render_editor(&(), Rect::new(0, 0, 20, 1), frame))).unwrap();
+        assert!(row(&terminal, 1).contains("Item00"));
+        assert!(row(&terminal, 10).contains("Item09"), "ten entries stay visible at once");
+        assert!(!row(&terminal, 11).contains("Item10"), "the list ends after a full page");
+
+        // A field near the bottom shows fewer rows, but never loses the selection.
+        if let ListValue::ComboBox(c) = &mut item.value {
+            c.selected_item = 24;
+        }
+        let mut terminal = Terminal::new(TestBackend::new(40, 8)).unwrap();
+        terminal.draw(|frame| assert!(item.render_editor(&(), Rect::new(0, 0, 20, 1), frame))).unwrap();
+        assert!(row(&terminal, 6).contains("Item24"), "the selected entry is still shown");
+    }
 
     #[test]
     fn path_browser_updates_once_without_waiting_for_render_and_cancel_does_not_edit() {
