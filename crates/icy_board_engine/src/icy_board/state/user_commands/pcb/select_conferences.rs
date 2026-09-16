@@ -26,28 +26,36 @@ fn with_flag(value: ConferenceFlags, flag: ConferenceFlags, on: bool) -> Confere
 impl IcyBoardState {
     pub async fn select_conferences(&mut self, select_mode: SelectMode) -> Res<()> {
         let divider = "-".repeat(79);
-        let num_lines = if self.session.page_len < 4 || self.session.page_len > 50 {
-            19
-        } else {
-            self.session.page_len - 4
+        let num_lines = match self.page_line_limit().map(|limit| limit.saturating_sub(1)) {
+            Some(page_len @ 4..=50) => (page_len - 4).max(1),
+            _ => 19,
         };
-        let begin = 0;
-        let num_conf = self.board.lock().await.conferences.len();
         let conferences = &self.board.lock().await.conferences.clone();
+        let num_conf = conferences.len();
+        if num_conf == 0 {
+            return Ok(());
+        }
+        let skip_print = !self.session.tokens.is_empty();
+        let mut begin = 0;
         let mut done = false;
-        while !done {
-            if self.session.tokens.is_empty() {
+        while !done && !self.session.request_logoff {
+            let mut end = begin;
+            if !skip_print {
+                let page: Vec<_> = (begin..num_conf)
+                    .filter(|&number| {
+                        !conferences[number].name.is_empty() && (select_mode == SelectMode::Register || self.is_registered(&conferences[number], number as u16))
+                    })
+                    .take(num_lines)
+                    .collect();
+                let Some(&last) = page.last() else {
+                    break;
+                };
+                end = last;
                 self.print_header(&divider).await?;
-                let mut line_number = 0;
-                for x in begin..num_conf {
-                    let conference = &conferences[x];
-                    if select_mode == SelectMode::SelectCmd && !self.is_registered(conference, x as u16) {
-                        continue;
-                    }
-                    self.print_conference_line(conference, x, select_mode).await?;
-                    line_number += 1;
+                for &number in &page {
+                    self.print_conference_line(&conferences[number], number, select_mode).await?;
                 }
-                for _ in line_number..num_lines {
+                for _ in page.len()..num_lines {
                     self.new_line().await?;
                 }
                 self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
@@ -61,16 +69,18 @@ impl IcyBoardState {
                 let text = self
                     .input_field(
                         txt,
-                        58,
+                        39,
                         MASK_CONFNUMBERS,
                         help,
                         None,
                         display_flags::ERASELINE | display_flags::STACKED | display_flags::UPCASE,
                     )
                     .await?;
+                if text.is_empty() {
+                    begin = end + 1;
+                    continue;
+                }
                 self.session.push_tokens(&text);
-            } else {
-                done = true;
             }
 
             // A pending token answers the next question instead of it being asked, so the
@@ -92,18 +102,15 @@ impl IcyBoardState {
                 String::new()
             };
 
+            let mut edited_range = None;
             for token in pending {
-                match token.as_str() {
+                let (from, to, value, all) = match token.as_str() {
                     "Q" => {
                         done = true;
                         break;
                     }
-                    "S" => {
-                        self.apply_selection(0, num_conf, Some(true), select_mode, &flags).await?;
-                    }
-                    "D" => {
-                        self.apply_selection(0, num_conf, Some(false), select_mode, &flags).await?;
-                    }
+                    "S" => (0, num_conf - 1, Some(true), true),
+                    "D" => (0, num_conf - 1, Some(false), true),
                     _ => {
                         let mut str = token;
                         let value;
@@ -114,20 +121,51 @@ impl IcyBoardState {
                             value = Some(true);
                             str.pop();
                         } else {
-                            value = None;
+                            value = skip_print.then_some(true);
                         }
 
-                        if str.contains('-') {
-                            let mut parts = str.split('-');
-                            if let (Some(from), Some(to)) = (parts.next(), parts.next())
-                                && let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>())
-                            {
-                                self.apply_selection(from, to, value, select_mode, &flags).await?;
-                            }
+                        let range = if let Some((from, to)) = str.split_once('-') {
+                            from.parse::<usize>().ok().zip(to.parse::<usize>().ok())
                         } else if let Ok(num) = str.parse::<usize>() {
-                            self.apply_selection(num, num, value, select_mode, &flags).await?;
+                            Some((num, num))
+                        } else {
+                            None
+                        };
+                        let Some((from, to)) = range else {
+                            continue;
+                        };
+                        (from, to.min(num_conf - 1), value, false)
+                    }
+                };
+                if from > to {
+                    continue;
+                }
+                if select_mode == SelectMode::Register {
+                    self.apply_conference_flags(from, to, &flags).await?;
+                } else {
+                    for number in from..=to {
+                        if !conferences[number].name.is_empty() && self.is_registered(&conferences[number], number as u16) {
+                            self.change_selection(number, number, value)?;
                         }
                     }
+                }
+                edited_range = Some((from, to, all));
+            }
+            if skip_print {
+                break;
+            }
+            if let Some((from, to, all)) = edited_range {
+                if all {
+                    begin = 0;
+                } else if (from < begin || from > end) && self.is_registered(&conferences[from], from as u16) {
+                    begin = from;
+                } else if from < begin || to > end {
+                    begin = (0..=to)
+                        .rev()
+                        .filter(|&number| !conferences[number].name.is_empty() && self.is_registered(&conferences[number], number as u16))
+                        .take(num_lines)
+                        .last()
+                        .unwrap_or(0);
                 }
             }
         }
@@ -181,7 +219,7 @@ impl IcyBoardState {
                     }
 
                     if flags.contains(ConferenceFlags::Sysop) {
-                        flag_str.push('S');
+                        flag_str.push('C');
                     }
                     if flags.contains(ConferenceFlags::NetStatus) {
                         flag_str.push('N');
@@ -194,14 +232,6 @@ impl IcyBoardState {
         let str = format!(" {flag_str:<5}");
         self.println(TerminalTarget::Both, &str).await?;
         Ok(())
-    }
-
-    async fn apply_selection(&mut self, from: usize, to: usize, set_selection_to: Option<bool>, select_mode: SelectMode, flags: &str) -> Res<()> {
-        if select_mode == SelectMode::Register {
-            self.apply_conference_flags(from, to, flags).await
-        } else {
-            self.change_selection(from, to, set_selection_to)
-        }
     }
 
     /// The answer names the flags a conference should end up with, so a letter that is

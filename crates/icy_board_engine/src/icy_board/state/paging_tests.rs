@@ -145,6 +145,279 @@ fn body_lines(raw: &[u8]) -> Vec<usize> {
         .collect()
 }
 
+async fn select_state(local: bool, conferences: usize) -> (IcyBoardState, ChannelConnection) {
+    let (mut state, peer) = paging_state(23, local).await;
+    state.display_text.update_record_number(IceText::ConferenceNumbers as usize, ENTER).unwrap();
+    {
+        let mut board = state.board.lock().await;
+        board.conferences.clear();
+        for number in 0..conferences {
+            board.conferences.push(Conference {
+                name: format!("Conference {number:02}"),
+                is_public: true,
+                ..Default::default()
+            });
+        }
+    }
+    (state, peer)
+}
+
+#[tokio::test]
+async fn select_page_length_23_reaches_input_without_more() {
+    for local in [true, false] {
+        let (mut state, mut peer) = select_state(local, 3).await;
+        let output = exchange(&mut state, &mut peer, &[(Prompt::Enter, "Q\r")], async |state| {
+            state
+                .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+                .await
+                .unwrap();
+        })
+        .await;
+        let rendered = screen(output.before(0), if local { 23 } else { 25 });
+        assert_eq!(row(&rendered, 0), "Conference");
+        for number in 0..3 {
+            assert!(row(&rendered, number + 3).contains(&format!("Conference {number:02}")));
+        }
+        let prompt_row = if local { 21 } else { 22 };
+        assert_eq!(row(&rendered, prompt_row - 1), "-".repeat(79));
+        assert_eq!(row(&rendered, prompt_row), ENTER);
+        assert!(!output.text().contains(MORE));
+    }
+}
+
+#[tokio::test]
+async fn select_localized_prompts_fit_the_page_length_23_screen() {
+    for (heading, columns, prompt) in [
+        (
+            "Conference",
+            "#   Name                                                   Flags",
+            "Enter Conference Numbers, (S)elect All, (D)eselect All or (Q)uit",
+        ),
+        (
+            "Konferenzen",
+            "Nr. Name                                                   Flags",
+            "Konferenznummern, (S) ausw\u{e4}hlen, (D) abw\u{e4}hlen oder (Q) Ende",
+        ),
+    ] {
+        for local in [true, false] {
+            let (mut state, mut peer) = select_state(local, 3).await;
+            for (id, text) in [
+                (IceText::ConferenceHeader1, heading.to_string()),
+                (IceText::ConferenceHeader2, columns.to_string()),
+                (IceText::ConferenceNumbers, format!("{prompt}{ENTER}")),
+            ] {
+                state.display_text.update_record_number(id as usize, &text).unwrap();
+            }
+            let output = exchange(&mut state, &mut peer, &[(Prompt::Enter, "Q\r")], async |state| {
+                state
+                    .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+                    .await
+                    .unwrap();
+            })
+            .await;
+            let height = if local { 23 } else { 25 };
+            let rendered = screen(output.before(0), height);
+            let prompt_row = if local { 21 } else { 22 };
+            assert_eq!(row(&rendered, 0), heading);
+            assert_eq!(row(&rendered, 1), columns);
+            assert_eq!(row(&rendered, prompt_row - 1), "-".repeat(79));
+            assert_eq!(row(&rendered, prompt_row), format!("{prompt}{ENTER}"));
+            for below in prompt_row + 1..height {
+                assert!(row(&rendered, below).is_empty());
+            }
+            assert!(!output.text().contains(MORE));
+        }
+    }
+}
+
+#[tokio::test]
+async fn select_enter_advances_pages_and_exits_after_last_page() {
+    for local in [true, false] {
+        let capacity = if local { 17 } else { 18 };
+        for count in [3, capacity, capacity + 1, capacity * 2, capacity * 2 + 3] {
+            let (mut state, mut peer) = select_state(local, count).await;
+            let pages = count.div_ceil(capacity);
+            let replies = vec![(Prompt::Enter, "\r"); pages];
+            let output = exchange(&mut state, &mut peer, &replies, async |state| {
+                state
+                    .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+                    .await
+                    .unwrap();
+            })
+            .await;
+            for page in 0..pages {
+                let rendered = screen(output.before(page), if local { 23 } else { 25 });
+                for offset in 0..capacity {
+                    let number = page * capacity + offset;
+                    let actual = row(&rendered, offset as i32 + 3);
+                    if number < count {
+                        assert!(actual.contains(&format!("Conference {number:02}")), "page={page}, row={offset}: {actual}");
+                    } else {
+                        assert!(actual.is_empty(), "unexpected conference on last page: {actual}");
+                    }
+                }
+                assert_eq!(row(&rendered, capacity as i32 + 3), "-".repeat(79));
+                assert_eq!(row(&rendered, capacity as i32 + 4), ENTER);
+            }
+            assert!(!output.text().contains(MORE));
+        }
+    }
+}
+
+#[tokio::test]
+async fn select_moves_window_to_edited_range_and_all_returns_to_start() {
+    let (mut state, mut peer) = select_state(true, 40).await;
+    let replies = [
+        (Prompt::Enter, "30D\r"),
+        (Prompt::Enter, "2D\r"),
+        (Prompt::Enter, "3-25D\r"),
+        (Prompt::Enter, "D\r"),
+        (Prompt::Enter, "Q\r"),
+    ];
+    let output = exchange(&mut state, &mut peer, &replies, async |state| {
+        state
+            .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+            .await
+            .unwrap();
+    })
+    .await;
+    for (stop, first) in [0, 30, 2, 9, 0].into_iter().enumerate() {
+        let rendered = screen(output.before(stop), 23);
+        assert!(row(&rendered, 3).contains(&format!("Conference {first:02}")));
+        assert_eq!(row(&rendered, 21), ENTER);
+    }
+    assert!(!output.text().contains(MORE));
+}
+
+#[tokio::test]
+async fn select_filters_hidden_conferences_and_bounds_selection_flags() {
+    let (mut state, mut peer) = select_state(true, 20).await;
+    {
+        let mut board = state.board.lock().await;
+        board.conferences[1].is_public = false;
+        board.conferences[2].name.clear();
+    }
+    state
+        .session
+        .current_user
+        .as_mut()
+        .unwrap()
+        .conference_flags
+        .insert(3, ConferenceFlags::Expired);
+    let replies = [(Prompt::Enter, "S\r"), (Prompt::Enter, "Q\r")];
+    let output = exchange(&mut state, &mut peer, &replies, async |state| {
+        state
+            .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+            .await
+            .unwrap();
+    })
+    .await;
+    let rendered = screen(output.before(1), 23);
+    for (offset, number) in std::iter::once(0).chain(4..20).enumerate() {
+        let actual = row(&rendered, offset as i32 + 3);
+        assert!(actual.contains(&format!("Conference {number:02}")));
+        assert!(actual.ends_with('X'));
+        assert!(state.session.current_user.as_ref().unwrap().conference_flags[&number].contains(ConferenceFlags::Selected));
+    }
+    let flags = &state.session.current_user.as_ref().unwrap().conference_flags;
+    for number in [1, 2, 20] {
+        assert!(!flags.contains_key(&number));
+    }
+    assert_eq!(flags[&3], ConferenceFlags::Expired);
+    assert!(!output.text().contains(MORE));
+}
+
+#[tokio::test]
+async fn select_stacked_selects_instead_of_toggling_and_ignores_invalid_ranges() {
+    let (mut state, mut peer) = select_state(true, 3).await;
+    state
+        .session
+        .current_user
+        .as_mut()
+        .unwrap()
+        .conference_flags
+        .insert(1, ConferenceFlags::Selected);
+    state.session.push_tokens("1 999999 2-999999 2-1");
+    let output = exchange(&mut state, &mut peer, &[], async |state| {
+        state
+            .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+            .await
+            .unwrap();
+    })
+    .await;
+    assert_eq!(output.raw, DONE.as_bytes());
+    let flags = &state.session.current_user.as_ref().unwrap().conference_flags;
+    assert_eq!(flags.len(), 2);
+    assert_eq!(flags[&1], ConferenceFlags::Selected);
+    assert_eq!(flags[&2], ConferenceFlags::Selected);
+    assert!(state.session.tokens.is_empty());
+}
+
+#[tokio::test]
+async fn select_interactive_numbers_toggle_and_deselect_all_preserves_other_flags() {
+    let (mut state, mut peer) = select_state(true, 3).await;
+    state
+        .session
+        .current_user
+        .as_mut()
+        .unwrap()
+        .conference_flags
+        .insert(1, ConferenceFlags::Registered);
+    let replies = [
+        (Prompt::Enter, "1\r"),
+        (Prompt::Enter, "1\r"),
+        (Prompt::Enter, "S\r"),
+        (Prompt::Enter, "D\r"),
+        (Prompt::Enter, "Q\r"),
+    ];
+    let output = exchange(&mut state, &mut peer, &replies, async |state| {
+        state
+            .select_conferences(user_commands::pcb::select_conferences::SelectMode::SelectCmd)
+            .await
+            .unwrap();
+    })
+    .await;
+    for (stop, selected) in [false, true, false, true, false].into_iter().enumerate() {
+        assert_eq!(row(&screen(output.before(stop), 23), 4).ends_with('X'), selected);
+    }
+    let flags = &state.session.current_user.as_ref().unwrap().conference_flags;
+    assert_eq!(flags.len(), 1);
+    assert_eq!(flags[&1], ConferenceFlags::Registered);
+    assert!(!output.text().contains(MORE));
+}
+
+#[tokio::test]
+async fn select_register_mode_pages_and_keeps_flag_answers_separate() {
+    let (mut state, mut peer) = select_state(true, 20).await;
+    state.display_text.update_record_number(IceText::ConferenceNumbers2 as usize, ENTER).unwrap();
+    state.display_text.update_record_number(IceText::SelectConferenceFlags as usize, ENTER).unwrap();
+    state.board.lock().await.conferences[18].is_public = false;
+    let replies = [
+        (Prompt::Enter, "\r"),
+        (Prompt::Enter, "18 19\r"),
+        (Prompt::Enter, "RSC\r"),
+        (Prompt::Enter, "\r"),
+    ];
+    let output = exchange(&mut state, &mut peer, &replies, async |state| {
+        state
+            .select_conferences(user_commands::pcb::select_conferences::SelectMode::Register)
+            .await
+            .unwrap();
+    })
+    .await;
+    let rendered = screen(output.before(3), 23);
+    for number in [18, 19] {
+        assert_eq!(
+            state.session.current_user.as_ref().unwrap().conference_flags[&number],
+            ConferenceFlags::Registered | ConferenceFlags::Selected | ConferenceFlags::Sysop
+        );
+        let actual = row(&rendered, number as i32 - 17 + 3);
+        assert!(actual.contains(&format!("Conference {number:02}")));
+        assert!(actual.ends_with("RSC"), "{actual}");
+    }
+    assert!(!output.text().contains(MORE));
+}
+
 async fn body_line(state: &mut IcyBoardState, number: usize) {
     state.print(TerminalTarget::Both, &format!("[body-{number:03}]")).await.unwrap();
     state.new_line().await.unwrap();
