@@ -4140,6 +4140,47 @@ door_editor_use_shell_execute-help=
     Runs the door through the system shell, so a command line with arguments or
     redirection is interpreted as it would be when typed.
 
+door_editor_args=Arguments
+door_editor_args-status=Command line arguments passed to the door
+door_editor_args-help=
+    # Arguments
+
+    Arguments handed to the door, quoted like a command line. Each argument is
+    passed on its own, so a value containing spaces stays one argument.
+
+    {"{"}dropFilePath{"}"}, {"{"}dropFile{"}"} and {"{"}dropFileDir{"}"} give the drop file written for this
+    call, {"{"}socketHandle{"}"} the inherited socket, and {"{"}node{"}"}, {"{"}userId{"}"}, {"{"}userName{"}"},
+    {"{"}timeLeftSeconds{"}"}, {"{"}termWidth{"}"} and {"{"}termHeight{"}"} describe the caller.
+
+door_editor_working_directory=Work Directory
+door_editor_working_directory-status=Directory the door runs in
+door_editor_working_directory-help=
+    # Work Directory
+
+    The directory the door runs in. Empty uses the directory holding the
+    program. The drop file is always written to a private directory of its own,
+    so give the door its path through the arguments.
+
+door_editor_provide_socket=Socket Connection
+door_editor_provide_socket-status=Hand the door a connected socket
+door_editor_provide_socket-help=
+    # Socket Connection
+
+    Hands the door an already connected socket instead of standard input and
+    output, and reports it in DOOR32.SYS. Doors reading a socket need this;
+    doors reading standard input must not have it.
+
+    The socket is local to this machine, carries the door's data unchanged, and
+    is not the caller's own connection.
+
+door_editor_max_parallel=Max Parallel
+door_editor_max_parallel-status=Callers allowed in this door at once
+door_editor_max_parallel-help=
+    # Max Parallel
+
+    How many callers may be in this door at the same time. Zero does not limit
+    it. A door that cannot serve several callers at once belongs at one.
+
 lang_editor_title=Language Table
 
 lang_editor_header_language=Language

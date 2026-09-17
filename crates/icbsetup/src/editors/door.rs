@@ -10,7 +10,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard, IcyBoardSerializer,
-        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType, DropFile},
+        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType, DropFile, launch},
         security_expr::SecurityExpression,
     },
 };
@@ -169,6 +169,10 @@ impl<'a> DoorEditor<'a> {
             use_shell_execute: false,
             door_type: DoorType::Local,
             path: String::new(),
+            args: Vec::new(),
+            working_directory: String::new(),
+            provide_socket_connection: false,
+            max_parallel: 0,
             drop_file: Default::default(),
             dos_command: String::new(),
             dos_memory_mb: 64,
@@ -213,7 +217,7 @@ impl<'a> Page for DoorEditor<'a> {
 
         self.detail.render(
             frame,
-            area.inner(Margin { vertical: 4, horizontal: 3 }),
+            area.inner(Margin { vertical: 2, horizontal: 3 }),
             get_text("doors_editor_edit_title"),
             "",
         );
@@ -389,6 +393,46 @@ impl<'a> Page for DoorEditor<'a> {
                                             .with_label_width(16)
                                             .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
                                                 list.lock().unwrap()[*i].use_shell_execute = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("door_editor_args"),
+                                            ListValue::Text(60, TextFlags::None, launch::join_arguments(&action.args)),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                if let Ok(args) = launch::parse_arguments(&value) {
+                                                    list.lock().unwrap()[*i].args = args;
+                                                }
+                                            },
+                                        ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("door_editor_working_directory"),
+                                            ListValue::Text(30, TextFlags::None, action.working_directory.clone()),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].working_directory = value;
+                                            },
+                                        ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(get_text("door_editor_provide_socket"), ListValue::Bool(action.provide_socket_connection))
+                                            .with_label_width(16)
+                                            .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
+                                                list.lock().unwrap()[*i].provide_socket_connection = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(get_text("door_editor_max_parallel"), ListValue::U32(action.max_parallel, 0, 255))
+                                            .with_label_width(16)
+                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                                list.lock().unwrap()[*i].max_parallel = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(

@@ -460,6 +460,265 @@ async fn missing_or_corrupt_ppe_and_invalid_menu_script_selection_are_free() {
 
 #[cfg(unix)]
 #[tokio::test]
+async fn native_door32_socket_transport_and_expanded_arguments() {
+    for shell in [false, true] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        let work = root.path().join("work dir");
+        let reference = root.path().join("reference");
+        std::fs::create_dir(&work).unwrap();
+        std::fs::create_dir(&reference).unwrap();
+        let mut game = native_door32_fixture(root.path(), "roundtrip", shell);
+        game.working_directory = work.to_str().unwrap().to_string();
+        game.create_drop_file(&state, &reference, 0).await.unwrap();
+        let local = std::fs::read_to_string(reference.join("door32.sys")).unwrap();
+        assert_eq!(local.lines().take(2).collect::<Vec<_>>(), ["0", "0"]);
+        let client = async {
+            native_stdio_frame(&mut peer).await;
+            let bytes: Vec<u8> = (0..=255).collect();
+            peer.send(&bytes).await.unwrap();
+            assert_eq!(native_stdio_frame(&mut peer).await, bytes);
+            peer.send(b"Q").await.unwrap();
+            assert_eq!(native_stdio_frame(&mut peer).await, b"FINAL-OUTPUT");
+            peer
+        };
+        let (result, _peer) = tokio::time::timeout(Duration::from_secs(10), async {
+            let list = DoorList::default();
+            tokio::join!(state.run_door(&list, &game, 0), client)
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        let transport = std::fs::read_to_string(work.join("transport")).unwrap();
+        let lines: Vec<_> = transport.lines().collect();
+        assert_eq!(lines[0], "2");
+        assert!(lines[1].parse::<i32>().unwrap() > 2);
+        assert_eq!(lines.len(), 11);
+        assert_eq!(&lines[2..], &local.lines().collect::<Vec<_>>()[2..]);
+        assert_eq!(transport.matches("\r\n").count(), 11);
+        assert_eq!(std::fs::read_to_string(work.join("cwd")).unwrap(), work.to_string_lossy());
+        assert!(!work.join("door32.sys").exists() && !root.path().join("door32.sys").exists());
+        assert!(!state.session.request_logoff);
+    }
+}
+
+#[cfg(unix)]
+fn native_door32_fixture(root: &std::path::Path, mode: &str, shell: bool) -> Door {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = root.join("socket door");
+    let executable = std::env::current_exe().unwrap();
+    std::fs::write(
+        &path,
+        format!(
+            "#!/bin/sh\nICB_DOOR32_TEST_MODE={mode} ICB_DOOR32_DROPFILE=\"$1\" exec {} --exact icy_board::state::menu_runner::command_door_accounting_tests::native_door32_process_worker --ignored --nocapture\n",
+            shell_words::quote(executable.to_str().unwrap())
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut game = door(path.to_str().unwrap());
+    game.drop_file = crate::icy_board::doors::DropFile::Door32Sys;
+    game.provide_socket_connection = true;
+    game.args = vec!["{dropFilePath}".into()];
+    game.use_shell_execute = shell;
+    game
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "subprocess helper invoked by native_door32 tests"]
+fn native_door32_process_worker() {
+    use std::io::{IsTerminal, Read, Write};
+    use std::os::fd::FromRawFd;
+
+    let Ok(mode) = std::env::var("ICB_DOOR32_TEST_MODE") else {
+        return;
+    };
+    let drop_file = std::path::PathBuf::from(std::env::var_os("ICB_DOOR32_DROPFILE").unwrap());
+    assert!(drop_file.is_absolute(), "{drop_file:?}");
+    let transport = std::fs::read_to_string(&drop_file).unwrap();
+    let lines: Vec<_> = transport.lines().collect();
+    assert_eq!(lines[0], "2");
+    let descriptor = lines[1].parse::<i32>().unwrap();
+    assert!(descriptor > 2);
+    let mut stream = unsafe { std::net::TcpStream::from_raw_fd(descriptor) };
+    assert!(stream.peer_addr().unwrap().ip().is_loopback());
+    assert!(stream.nodelay().unwrap());
+    assert_eq!(rustix::io::fcntl_getfd(&stream).unwrap(), rustix::io::FdFlags::empty());
+    assert!(!rustix::fs::fcntl_getfl(&stream).unwrap().contains(rustix::fs::OFlags::NONBLOCK));
+    assert!(!std::io::stdin().is_terminal());
+    assert!(!std::io::stdout().is_terminal());
+    std::fs::write("transport", &transport).unwrap();
+    std::fs::write("cwd", std::env::current_dir().unwrap().to_string_lossy().as_bytes()).unwrap();
+    #[cfg(target_os = "linux")]
+    if let Ok(forbidden) = std::fs::read_to_string("forbidden-fds") {
+        for entry in std::fs::read_dir("/proc/self/fd").unwrap() {
+            if let Ok(target) = std::fs::read_link(entry.unwrap().path()) {
+                assert!(!forbidden.lines().any(|line| std::path::Path::new(line) == target), "inherited {target:?}");
+            }
+        }
+    }
+    if mode == "drain" {
+        stream.write_all(&vec![b'X'; 256 * 1024 + 17]).unwrap();
+        stream.write_all(b"FINAL-OUTPUT").unwrap();
+        return;
+    }
+    if mode == "close" {
+        stream.write_all(b"CLOSED").unwrap();
+        stream.shutdown(std::net::Shutdown::Both).unwrap();
+        std::thread::park();
+        unreachable!();
+    }
+    writeln!(stream, "{}", std::process::id()).unwrap();
+    if mode == "roundtrip" {
+        let mut bytes = [0; 256];
+        stream.read_exact(&mut bytes).unwrap();
+        assert_eq!(bytes.to_vec(), (0..=255).collect::<Vec<u8>>());
+        stream.write_all(&bytes).unwrap();
+        let mut quit = [0];
+        stream.read_exact(&mut quit).unwrap();
+        assert_eq!(&quit, b"Q");
+        stream.write_all(b"FINAL-OUTPUT").unwrap();
+    } else {
+        let mut bytes = [0; 4096];
+        loop {
+            let count = stream.read(&mut bytes).unwrap();
+            if count == 0 {
+                break;
+            }
+            stream.write_all(&bytes[..count]).unwrap();
+        }
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_door32_disconnect_and_cancellation_reap_child() {
+    for cancel in [false, true] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        let game = native_door32_fixture(root.path(), "wait", cancel);
+        let list = DoorList::default();
+        let mut running = Box::pin(state.run_door(&list, &game, 0));
+        let header = tokio::select! {
+            header = native_stdio_frame(&mut peer) => header,
+            result = &mut running => panic!("door ended before disconnect: {result:?}"),
+        };
+        let pid = rustix::process::Pid::from_raw(String::from_utf8(header).unwrap().trim().parse().unwrap()).unwrap();
+        if !cancel {
+            drop(peer);
+            tokio::time::timeout(Duration::from_secs(3), &mut running).await.unwrap().unwrap();
+        }
+        drop(running);
+        assert_eq!(state.session.request_logoff, !cancel);
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while rustix::process::test_kill_process(pid).is_ok() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(rustix::process::test_kill_process(pid), Err(rustix::io::Errno::SRCH));
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_door32_drains_output_and_observes_socket_eof() {
+    for mode in ["drain", "close"] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        let game = native_door32_fixture(root.path(), mode, false);
+        tokio::time::timeout(Duration::from_secs(5), state.run_door(&DoorList::default(), &game, 0))
+            .await
+            .unwrap()
+            .unwrap();
+        let expected = if mode == "drain" {
+            let mut expected = vec![b'X'; 256 * 1024 + 17];
+            expected.extend_from_slice(b"FINAL-OUTPUT");
+            expected
+        } else {
+            b"CLOSED".to_vec()
+        };
+        assert_eq!(output(&mut peer).await.as_bytes(), expected);
+        assert!(!state.session.request_logoff);
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_door_max_parallel_refuses_further_callers_for_free() {
+    let (root, mut first, mut first_peer) = fixture(false).await;
+    let (_second_root, mut second, _second_peer) = fixture(true).await;
+    let mut game = native_door32_fixture(root.path(), "wait", false);
+    game.name = "PARALLEL GAME".into();
+    game.max_parallel = 1;
+    let list = DoorList::default();
+    let mut running = Box::pin(first.run_door(&list, &game, 0));
+    tokio::select! {
+        _ = native_stdio_frame(&mut first_peer) => {},
+        result = &mut running => panic!("first door ended: {result:?}"),
+    }
+    tokio::time::timeout(Duration::from_secs(2), second.run_door(&list, &game, 0))
+        .await
+        .expect("a full door must be refused immediately")
+        .unwrap();
+    assert_eq!(account(&second).debit_tpu, 0.0);
+    drop(running);
+    let mut next = native_door32_fixture(root.path(), "drain", true);
+    next.name = game.name.clone();
+    next.max_parallel = 1;
+    tokio::time::timeout(Duration::from_secs(5), second.run_door(&list, &next, 0))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account(&second).debit_tpu, 7.0);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_door_rejects_socket_placeholder_without_a_socket_connection() {
+    let (root, mut state, _peer) = fixture(true).await;
+    let mut game = native_door32_fixture(root.path(), "wait", false);
+    game.provide_socket_connection = false;
+    game.args = vec!["{socketHandle}".into()];
+    let error = state.run_door(&DoorList::default(), &game, 0).await.unwrap_err();
+    assert!(error.to_string().contains("socket connection"), "{error}");
+    assert_eq!(account(&state).debit_tpu, 0.0);
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn native_door32_parallel_launches_do_not_inherit_other_sockets() {
+    let (root, mut first, mut first_peer) = fixture(false).await;
+    let (other_root, mut second, mut second_peer) = fixture(false).await;
+    let game = native_door32_fixture(root.path(), "wait", false);
+    let other = native_door32_fixture(other_root.path(), "drain", true);
+    let list = DoorList::default();
+    let mut running = Box::pin(first.run_door(&list, &game, 0));
+    tokio::select! {
+        _ = native_stdio_frame(&mut first_peer) => {},
+        result = &mut running => panic!("first door ended: {result:?}"),
+    }
+    let forbidden: Vec<_> = std::fs::read_dir("/proc/self/fd")
+        .unwrap()
+        .filter_map(|entry| std::fs::read_link(entry.unwrap().path()).ok())
+        .map(|target| target.to_string_lossy().into_owned())
+        .filter(|target| target.starts_with("socket:["))
+        .collect();
+    assert!(!forbidden.is_empty());
+    std::fs::write(other_root.path().join("forbidden-fds"), forbidden.join("\n")).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), second.run_door(&list, &other, 0))
+        .await
+        .unwrap()
+        .unwrap();
+    let mut expected = vec![b'X'; 256 * 1024 + 17];
+    expected.extend_from_slice(b"FINAL-OUTPUT");
+    assert_eq!(output(&mut second_peer).await.as_bytes(), expected);
+    drop(first_peer);
+    tokio::time::timeout(Duration::from_secs(3), running).await.unwrap().unwrap();
+}
+
+#[cfg(unix)]
+#[tokio::test]
 async fn native_stdio_door_has_terminal_streams_and_preserves_ansi_bytes() {
     use std::os::unix::fs::PermissionsExt;
 
@@ -592,12 +851,12 @@ async fn native_stdio_frame(peer: &mut ChannelConnection) -> Vec<u8> {
 #[cfg(unix)]
 #[tokio::test]
 #[ignore = "requires ICB_UMRC_TEST_DIR with original uMRC 105 and Probe fixture"]
-async fn native_stdio_door_umrc_original_menu_roundtrip() {
+async fn native_door_umrc_original_menu_roundtrip() {
     use icy_engine::{Position, TextPane};
     use std::os::unix::fs::{PermissionsExt, symlink};
 
     let source = PathBuf::from(std::env::var_os("ICB_UMRC_TEST_DIR").expect("set ICB_UMRC_TEST_DIR"));
-    for (width, height) in [(80, 25), (132, 43)] {
+    for (socket, width, height) in [(false, 80, 25), (false, 132, 43), (true, 80, 25), (true, 132, 43)] {
         let (root, mut state, mut peer) = fixture(false).await;
         state.set_terminal_size(width, height);
         state.session.user_name = "Probe".into();
@@ -612,10 +871,12 @@ async fn native_stdio_door_umrc_original_menu_roundtrip() {
             symlink(source.join("assets").join(name), root.path().join(name)).unwrap();
         }
         let path = root.path().join("stdio-door");
-        std::fs::write(&path, "#!/bin/sh\nexec ./umrc-original -D door32.sys\n").unwrap();
+        std::fs::write(&path, "#!/bin/sh\nexec ./umrc-original \"$@\"\n").unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
         let mut game = door(path.to_str().unwrap());
         game.drop_file = crate::icy_board::doors::DropFile::Door32Sys;
+        game.args = vec!["-D".into(), "{dropFilePath}".into()];
+        game.provide_socket_connection = socket;
         let client = async {
             let mut screen = super::super::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
             super::super::virtual_screen::resize_screen(&mut screen.buffer, icy_engine::Size::new(width.into(), height.into()));
@@ -629,7 +890,7 @@ async fn native_stdio_door_umrc_original_menu_roundtrip() {
                         let rendered: String = (0..text.len())
                             .map(|offset| screen.buffer.char_at(Position::new(column + offset as i32, row)).ch)
                             .collect();
-                        assert_eq!(rendered, text, "{width}x{height} menu {index}");
+                        assert_eq!(rendered, text, "socket={socket} {width}x{height} menu {index}");
                     }
                 }
                 peer.send(input).await.unwrap();

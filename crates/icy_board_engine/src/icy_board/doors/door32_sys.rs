@@ -10,10 +10,10 @@ use crate::{
 use std::fmt::Write as _;
 
 /// Mystic BBS door32.sys format
-pub fn create_door32_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+pub fn create_door32_sys(state: &IcyBoardState, path: &std::path::Path, socket: Option<i64>) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str("0\r\n"); // Line 1 : Comm type (0=local, 1=serial, 2=telnet)
-    contents.push_str("0\r\n"); // Line 2 : Comm or socket handle
+    // Comm type 2 claims an inherited socket, so only a real handle may write it.
+    let _ = write!(contents, "{}\r\n{}\r\n", if socket.is_some() { 2 } else { 0 }, socket.unwrap_or(0));
     let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Line 3 : Baud rate
 
     let _ = write!(contents, "Icy Board {}\r\n", *crate::VERSION); // Line 4 : BBSID (software name and version)

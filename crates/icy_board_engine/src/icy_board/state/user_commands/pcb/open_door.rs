@@ -23,6 +23,56 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 static DOS_MACHINE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
+/// A connected loopback pair; the door inherits its own end and never sees the
+/// caller's connection.
+#[cfg(unix)]
+struct DoorSocket {
+    board: tokio::net::TcpStream,
+    door: std::os::fd::OwnedFd,
+}
+
+#[cfg(unix)]
+impl DoorSocket {
+    fn open() -> Res<Self> {
+        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
+        let board = std::net::TcpStream::connect(listener.local_addr()?)?;
+        let expected = board.local_addr()?;
+        let door = loop {
+            // Another local process can reach the listener first, so accept only our own endpoint.
+            let (candidate, peer) = listener.accept()?;
+            if peer == expected {
+                break candidate;
+            }
+        };
+        drop(listener);
+        board.set_nodelay(true)?;
+        door.set_nodelay(true)?;
+        board.set_nonblocking(true)?;
+        Ok(Self {
+            board: tokio::net::TcpStream::from_std(board)?,
+            door: rustix::io::fcntl_dupfd_cloexec(door, 3)?,
+        })
+    }
+
+    fn handle(&self) -> i64 {
+        std::os::fd::AsRawFd::as_raw_fd(&self.door).into()
+    }
+}
+
+#[cfg(not(unix))]
+struct DoorSocket;
+
+#[cfg(not(unix))]
+impl DoorSocket {
+    fn open() -> Res<Self> {
+        Err("doors cannot be handed a socket connection on this platform yet".into())
+    }
+
+    fn handle(&self) -> i64 {
+        0
+    }
+}
+
 /// An explicitly priced command opening a priced door is two configured
 /// activities, never an implicit duplicate of the door's own surcharge.
 struct DoorUsage<'a> {
@@ -321,44 +371,109 @@ impl IcyBoardState {
             result?;
             return Ok(());
         }
-        let working_directory = file_name.parent().unwrap();
-        door.create_drop_file(self, working_directory, door_number).await?;
+        let working_directory = if door.working_directory.is_empty() {
+            file_name.parent().unwrap().to_path_buf()
+        } else {
+            self.resolve_path(&door.working_directory)
+        };
+        crate::icy_board::doors::launch::check_arguments(door)?;
+        let Some(_parallel) = crate::icy_board::doors::launch::acquire(&door.name, door.max_parallel) else {
+            self.display_text(
+                IceText::DOORNotAvailable,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+            )
+            .await?;
+            return Ok(());
+        };
+        // Every launch owns its drop file, so parallel sessions cannot read each other's.
+        let drop_directory = tempfile::Builder::new().prefix("icbdoor").tempdir()?;
+        let socket = if door.provide_socket_connection { Some(DoorSocket::open()?) } else { None };
+        door.create_drop_file_with_socket(self, drop_directory.path(), door_number, socket.as_ref().map(DoorSocket::handle))
+            .await?;
+        let placeholders = crate::icy_board::doors::launch::Placeholders {
+            drop_file: door.drop_file.file_name(self.node).map(|name| drop_directory.path().join(name)),
+            node: self.node,
+            user_id: self.session.cur_user_id,
+            user_name: self.session.user_name.clone(),
+            time_left_seconds: i64::from(self.session.minutes_left()) * 60,
+            term_width: self.session.term_caps.term_size.0,
+            term_height: self.session.term_caps.term_size.1,
+            socket_handle: socket.as_ref().map(DoorSocket::handle),
+        };
+        let arguments = door
+            .args
+            .iter()
+            .map(|argument| crate::icy_board::doors::launch::expand(argument, &placeholders))
+            .collect::<Res<Vec<String>>>()?;
         // Shell execution is considered started when the shell spawns; a later
         // shell error/nonzero exit is billable, just like a game's runtime error.
         #[cfg(unix)]
-        let (mut cmd, mut stdout, mut stdin) = {
+        let (mut cmd, mut stdout, mut stdin): (
+            tokio::process::Child,
+            Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+            Box<dyn tokio::io::AsyncWrite + Send + Unpin>,
+        ) = if let Some(socket) = socket {
+            let DoorSocket { board, door: inherited } = socket;
+            let mut command = if door.use_shell_execute {
+                let mut command = tokio::process::Command::new("sh");
+                command.arg("-c").arg("exec \"$0\" \"$@\"").arg(&file_name);
+                command
+            } else {
+                tokio::process::Command::new(&file_name)
+            };
+            command
+                .args(&arguments)
+                .current_dir(&working_directory)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::inherit())
+                .process_group(0)
+                .kill_on_drop(true);
+            unsafe {
+                command.pre_exec(move || {
+                    rustix::io::fcntl_setfd(&inherited, rustix::io::FdFlags::empty())?;
+                    Ok(())
+                });
+            }
+            let child = command.spawn()?;
+            drop(command);
+            let (reader, writer) = board.into_split();
+            (child, Box::new(reader), Box::new(writer))
+        } else {
             let (pty, pts) = pty_process::open()?;
             let mut attributes = rustix::termios::tcgetattr(&pts)?;
             attributes.make_raw();
             rustix::termios::tcsetattr(&pts, rustix::termios::OptionalActions::Now, &attributes)?;
             let (width, height) = self.session.term_caps.term_size;
             pty.resize(pty_process::Size::new(height.max(1), width.max(1)))?;
-            let command = if door.use_shell_execute {
-                pty_process::Command::new("sh").arg("-c").arg("exec \"$0\"").arg(&file_name)
+            let mut command = if door.use_shell_execute {
+                pty_process::Command::new("sh").arg("-c").arg("exec \"$0\" \"$@\"").arg(&file_name)
             } else {
                 pty_process::Command::new(&file_name)
             };
-            let child = command.current_dir(working_directory).stderr(Stdio::inherit()).kill_on_drop(true).spawn(pts)?;
+            for argument in &arguments {
+                command = command.arg(argument);
+            }
+            let child = command.current_dir(&working_directory).stderr(Stdio::inherit()).kill_on_drop(true).spawn(pts)?;
             let (stdout, stdin) = pty.into_split();
-            (child, stdout, stdin)
+            (child, Box::new(stdout), Box::new(stdin))
         };
         #[cfg(not(unix))]
-        let mut cmd = if door.use_shell_execute {
-            tokio::process::Command::new("sh")
-                .arg("-c")
-                .arg(format!("{}", file_name.display()))
-                .current_dir(working_directory)
+        let mut cmd = {
+            let mut command = if door.use_shell_execute {
+                let mut command = tokio::process::Command::new("sh");
+                command.arg("-c").arg("exec \"$0\" \"$@\"").arg(&file_name);
+                command
+            } else {
+                tokio::process::Command::new(&file_name)
+            };
+            command
+                .args(&arguments)
+                .current_dir(&working_directory)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn()?
-        } else {
-            tokio::process::Command::new(&file_name)
-                .current_dir(working_directory)
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .kill_on_drop(true)
-                .spawn()?
+                .kill_on_drop(true);
+            command.spawn()?
         };
         usage.start(self)?;
 
@@ -377,7 +492,7 @@ impl IcyBoardState {
                     match write_data {
                         Ok(size) => {
                             if size > 0 {
-                                log::info!("{}", String::from_utf8_lossy(&read_buf[0..size]));
+                                log::debug!("door sent {size} bytes");
                                 if self.connection.send(&read_buf[0..size]).await.is_err() {
                                     break;
                                 }
@@ -397,7 +512,7 @@ impl IcyBoardState {
                             }
                         }
                         #[cfg(unix)]
-                        Err(error) if error.raw_os_error() == Some(rustix::io::Errno::IO.raw_os_error()) => break,
+                        Err(error) if !door.provide_socket_connection && error.raw_os_error() == Some(rustix::io::Errno::IO.raw_os_error()) => break,
                         Err(e) => {
                             log::error!("Error reading from door: {e}");
                             break;

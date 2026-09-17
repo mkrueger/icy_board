@@ -88,7 +88,7 @@ fn door_popup_labels_fit_at_80_columns() {
     page.handle_key_press(KeyEvent::from(KeyCode::Enter));
     assert_popup_labels_fit(
         page,
-        Rect::new(3, 5, 74, 15),
+        Rect::new(3, 3, 74, 19),
         &[
             "door_editor_name",
             "door_editor_description",
@@ -97,6 +97,10 @@ fn door_popup_labels_fit_at_80_columns() {
             "door_editor_security",
             "door_editor_door_type",
             "door_editor_use_shell_execute",
+            "door_editor_args",
+            "door_editor_working_directory",
+            "door_editor_provide_socket",
+            "door_editor_max_parallel",
             "door_editor_drop_file",
             "door_editor_dos_command",
             "door_editor_dos_memory",
@@ -611,6 +615,9 @@ mod common_regressions {
         assert_eq!(door.drop_file, DropFile::None);
         assert!(!door.use_shell_execute);
         assert!(door.path.is_empty() && door.dos_command.is_empty());
+        assert!(door.args.is_empty() && door.working_directory.is_empty());
+        assert!(!door.provide_socket_connection);
+        assert_eq!(door.max_parallel, 0);
         assert_eq!(door.dos_memory_mb, 64);
         assert_eq!(door.dos_max_runtime_seconds, DEFAULT_DOS_MAX_RUNTIME_SECONDS);
     }

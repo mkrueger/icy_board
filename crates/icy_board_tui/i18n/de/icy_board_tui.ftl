@@ -3684,6 +3684,44 @@ door_editor_use_shell_execute-help=
 
     Startet das Door über die System-Shell. Befehlszeilen mit Argumenten
     oder Umleitungen werden so wie bei manueller Eingabe interpretiert.
+door_editor_args=Argumente
+door_editor_args-status=Argumente für den Door-Aufruf
+door_editor_args-help=
+    # Argumente
+
+    Argumente für das Door, wie eine Befehlszeile zitiert. Jedes Argument wird
+    einzeln übergeben; ein Wert mit Leerzeichen bleibt ein Argument.
+
+    {"{"}dropFilePath{"}"}, {"{"}dropFile{"}"} und {"{"}dropFileDir{"}"} liefern die für diesen Aufruf
+    erzeugte Drop-Datei, {"{"}socketHandle{"}"} den vererbten Socket sowie {"{"}node{"}"},
+    {"{"}userId{"}"}, {"{"}userName{"}"}, {"{"}timeLeftSeconds{"}"}, {"{"}termWidth{"}"} und {"{"}termHeight{"}"}
+    Angaben zum Benutzer.
+door_editor_working_directory=Arbeitsverzeichnis
+door_editor_working_directory-status=Verzeichnis, in dem das Door läuft
+door_editor_working_directory-help=
+    # Arbeitsverzeichnis
+
+    Verzeichnis, in dem das Door ausgeführt wird. Leer verwendet das
+    Programmverzeichnis. Die Drop-Datei entsteht immer in einem eigenen,
+    privaten Verzeichnis; ihr Pfad wird über die Argumente übergeben.
+door_editor_provide_socket=Socket-Verbindung
+door_editor_provide_socket-status=Dem Door eine verbundene Socket-Verbindung übergeben
+door_editor_provide_socket-help=
+    # Socket-Verbindung
+
+    Übergibt dem Door statt Standardein- und -ausgabe eine bereits verbundene
+    Socket-Verbindung und trägt sie in DOOR32.SYS ein. Doors, die einen Socket
+    lesen, benötigen dies; Doors mit Standardeingabe dürfen es nicht haben.
+
+    Die Verbindung ist lokal, überträgt die Daten unverändert und ist nicht die
+    Verbindung des Benutzers.
+door_editor_max_parallel=Parallele Aufrufe
+door_editor_max_parallel-status=Gleichzeitig zugelassene Benutzer in diesem Door
+door_editor_max_parallel-help=
+    # Parallele Aufrufe
+
+    Anzahl der Benutzer, die dieses Door gleichzeitig verwenden dürfen. Null
+    begrenzt nicht. Ein nicht mehrbenutzerfähiges Door gehört auf eins.
 
 lang_editor_title=Sprachtabelle
 lang_editor_header_language=Sprache

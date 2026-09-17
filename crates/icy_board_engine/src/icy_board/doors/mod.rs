@@ -26,6 +26,7 @@ mod dorinfo_x;
 pub mod dos;
 mod exitinfo_bbs;
 mod jumper_dat;
+pub mod launch;
 pub mod pcboard;
 mod sfdoors_dat;
 mod tribbs_sys;
@@ -133,6 +134,25 @@ impl DropFile {
         ]
         .into_iter()
     }
+
+    /// File a door is pointed at; `PCBoard` additionally writes USER.SYS.
+    pub fn file_name(&self, node: usize) -> Option<String> {
+        Some(match self {
+            DropFile::None => return None,
+            DropFile::PCBoard => "PCBOARD.SYS".to_string(),
+            DropFile::DoorSys => "DOOR.SYS".to_string(),
+            DropFile::Door32Sys => "door32.sys".to_string(),
+            DropFile::DorInfo => format!("DORINFO{}.DEF", node + 1),
+            DropFile::CallInfo => "CALLINFO.BBS".to_string(),
+            DropFile::DoorFileSR => "DOORFILE.SR".to_string(),
+            DropFile::CurruserBBS => "CURRUSER.BBS".to_string(),
+            DropFile::ChainTXT => "CHAIN.TXT".to_string(),
+            DropFile::TriBBSSYS => "TRIBBS.SYS".to_string(),
+            DropFile::SFDoorsDAT => "SFDOORS.DAT".to_string(),
+            DropFile::ExitInfoBBS => "EXITINFO.BBS".to_string(),
+            DropFile::JumperDat => "JUMPER.DAT".to_string(),
+        })
+    }
 }
 
 impl std::fmt::Display for DropFile {
@@ -186,6 +206,22 @@ pub struct Door {
     #[serde(default)]
     pub use_shell_execute: bool,
 
+    /// Command line arguments; each entry is expanded and passed on its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+
+    /// Directory the door runs in; empty keeps the program's own directory.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub working_directory: String,
+
+    /// Hand the door an already connected socket instead of standard I/O.
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub provide_socket_connection: bool,
+
+    /// Concurrent sessions allowed in this door; zero does not limit them.
+    #[serde(default, skip_serializing_if = "super::is_null_32")]
+    pub max_parallel: u32,
+
     #[serde(default)]
     pub drop_file: DropFile,
 
@@ -211,11 +247,21 @@ fn default_dos_max_runtime_seconds() -> u32 {
 }
 impl Door {
     pub async fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
+        self.create_drop_file_with_socket(state, path, door_number, None).await
+    }
+
+    pub async fn create_drop_file_with_socket(
+        &self,
+        state: &super::state::IcyBoardState,
+        path: &std::path::Path,
+        door_number: usize,
+        socket: Option<i64>,
+    ) -> Res<()> {
         match self.drop_file {
             DropFile::None => Ok(()),
             DropFile::PCBoard => pcboard::create_pcboard(state, path).await,
             DropFile::DoorSys => door_sys::create_door_sys(state, path).await,
-            DropFile::Door32Sys => door32_sys::create_door32_sys(state, path),
+            DropFile::Door32Sys => door32_sys::create_door32_sys(state, path, socket),
             DropFile::DorInfo => dorinfo_x::create_dorinfo(state, path).await,
             DropFile::CallInfo => callinfo_bbs::create_callinfo_bbs(state, path, door_number).await,
             DropFile::DoorFileSR => doorfile_sr::create_doorfile_sr(state, path),
@@ -343,6 +389,10 @@ impl DoorList {
                 door_type: DoorType::Local,
                 path: path.to_string(),
                 use_shell_execute: use_shell,
+                args: Vec::new(),
+                working_directory: String::new(),
+                provide_socket_connection: false,
+                max_parallel: 0,
                 drop_file: if door_sys {
                     DropFile::DoorSys
                 } else if user_sys {
