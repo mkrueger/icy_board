@@ -85,10 +85,23 @@ impl IcyBoardState {
     }
 
     pub async fn start_survey(&mut self, survey: &crate::icy_board::surveys::Survey) -> Res<()> {
+        self.run_survey(survey, false).await
+    }
+
+    pub async fn start_registration_survey(&mut self, survey: &crate::icy_board::surveys::Survey) -> Res<()> {
+        self.run_survey(survey, true).await
+    }
+
+    async fn run_survey(&mut self, survey: &crate::icy_board::surveys::Survey, registration: bool) -> Res<()> {
         let question = &survey.survey_file;
         let answer_file = &survey.answer_file;
+        let save_answers = if registration {
+            !answer_file.as_os_str().is_empty()
+        } else {
+            answer_file.is_file()
+        };
 
-        if !answer_file.exists() || !answer_file.is_file() {
+        if !save_answers {
             log::info!("DISPLAY: {}", question.display());
             self.display_file(&question).await?;
             return Ok(());
@@ -147,15 +160,19 @@ impl IcyBoardState {
                 let lines: Vec<&str> = question.lines().collect();
                 self.reset_color(TerminalTarget::Both).await?;
                 let mut start_line = 0;
-                for line in &lines {
-                    start_line += 1;
-                    if line.starts_with("*****") {
-                        break;
+                if !registration || lines.iter().any(|line| line.starts_with("*****")) {
+                    for line in &lines {
+                        start_line += 1;
+                        if line.starts_with("*****") {
+                            break;
+                        }
+                        self.print(crate::vm::TerminalTarget::Both, line).await?;
+                        self.new_line().await?;
                     }
-                    self.print(crate::vm::TerminalTarget::Both, line).await?;
-                    self.new_line().await?;
                 }
-                let txt = if let Some(text) = self.session.tokens.pop_front() {
+                let txt = if registration {
+                    self.session.yes_char.to_string()
+                } else if let Some(text) = self.session.tokens.pop_front() {
                     text
                 } else {
                     self.input_field(
@@ -170,21 +187,39 @@ impl IcyBoardState {
                 };
                 if txt.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
                     for question in &lines[start_line..] {
-                        self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
-                        self.print(TerminalTarget::Both, question).await?;
-                        self.new_line().await?;
-                        self.reset_color(TerminalTarget::Both).await?;
-                        let answer = self
-                            .input_string(
-                                IcbColor::None,
-                                String::new(),
-                                60,
-                                &MASK_ASCII,
-                                "",
-                                None,
-                                display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
-                            )
-                            .await?;
+                        if self.session.request_logoff {
+                            return Ok(());
+                        }
+                        if registration && let Some(text) = question.strip_prefix(';') {
+                            self.print(TerminalTarget::Both, text).await?;
+                            self.new_line().await?;
+                            continue;
+                        }
+                        let answer = loop {
+                            self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
+                            self.print(TerminalTarget::Both, question).await?;
+                            self.new_line().await?;
+                            self.reset_color(TerminalTarget::Both).await?;
+                            let answer = self
+                                .input_string(
+                                    IcbColor::None,
+                                    String::new(),
+                                    60,
+                                    &MASK_ASCII,
+                                    "",
+                                    None,
+                                    display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
+                                )
+                                .await?;
+                            if self.session.request_logoff {
+                                return Ok(());
+                            }
+                            if !registration || !answer.is_empty() {
+                                break answer;
+                            }
+                            self.display_text(IceText::ResponseRequired, display_flags::NEWLINE | display_flags::LFAFTER)
+                                .await?;
+                        };
                         output.push(format!("Q: {question}"));
                         output.push(format!("A: {answer}"));
                     }

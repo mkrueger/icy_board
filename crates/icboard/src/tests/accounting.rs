@@ -419,6 +419,155 @@ async fn accounting_failed_password_never_charges_or_saves_selected_user() {
     assert_eq!(tracking(dir.path(), "LOGON"), 0);
 }
 
+fn newask_board(root: &Path, closed: bool, use_newask: bool, survey: &str) -> IcyBoard {
+    let mut board = board_at(root);
+    board.config.accounting.enabled = false;
+    board.config.system_control.is_closed_board = closed;
+    board.config.new_user_settings.use_newask_and_builtin = use_newask;
+    board.config.paths.newask_survey = match survey {
+        "unset" => Default::default(),
+        "directory" => root.to_path_buf(),
+        _ => root.join("newask"),
+    };
+    board.config.paths.newask_answer = root.join("newask.answers");
+    if survey == "file" {
+        std::fs::write(root.join("newask"), "*****\n[newask-question]\n").unwrap();
+        std::fs::write(root.join("newask.answers"), "").unwrap();
+    }
+    let settings = &mut board.config.new_user_settings;
+    settings.ask_city_or_state = true;
+    settings.ask_business_phone = true;
+    settings.ask_home_phone = true;
+    settings.ask_address = true;
+    settings.ask_verification = true;
+    settings.ask_comment = true;
+    settings.ask_clr_msg = true;
+    settings.ask_use_short_descr = true;
+    for (id, marker) in [
+        (IceText::CityState, "[newask-city-state]"),
+        (IceText::BusDataPhone, "[newask-business-phone]"),
+        (IceText::HomeVoicePhone, "[newask-home-phone]"),
+        (IceText::CommentFieldPrompt, "[newask-comment]"),
+        (IceText::CLSBetweenMessages, "[newask-clear]"),
+        (IceText::EnterAddress, "[newask-address]"),
+        (IceText::Street1, "[newask-street1]"),
+        (IceText::Street2, "[newask-street2]"),
+        (IceText::City, "[newask-city]"),
+        (IceText::State, "[newask-state]"),
+        (IceText::Zip, "[newask-zip]"),
+        (IceText::Country, "[newask-country]"),
+        (IceText::EnterVerifyText, "[newask-verify]"),
+        (IceText::UseShortDescription, "[newask-short]"),
+        (IceText::CompleteQuestion, "[newask-confirm]"),
+    ] {
+        board.default_display_text.update_record_number(id as usize, marker).unwrap();
+    }
+    board
+}
+
+async fn begin_newask_registration(board: Arc<Mutex<IcyBoard>>) -> Session {
+    let mut session = Session::start(board, options(false)).await;
+    for (prompt, answer) in [("[account-name]", "NEW CALLER"), ("[account-reenter]", "C"), ("[account-register]", "Y")] {
+        session.expect(prompt).await;
+        session.send(&format!("{answer}\r")).await;
+    }
+    session
+}
+
+#[tokio::test]
+async fn pcboard_newask_on_open_boards_is_additive_and_never_replaces_builtin_questions() {
+    for use_newask in [false, true] {
+        for survey in ["file", "missing", "unset", "directory"] {
+            let dir = tempfile::tempdir().unwrap();
+            let board = Arc::new(Mutex::new(newask_board(dir.path(), false, use_newask, survey)));
+            let mut session = begin_newask_registration(board.clone()).await;
+            for (prompt, answer) in [
+                ("[account-new-password]", "NEWSECRET"),
+                ("[account-confirm-password]", "NEWSECRET"),
+                ("[newask-city-state]", "Hamburg"),
+                ("[newask-business-phone]", "123-4567"),
+                ("[newask-home-phone]", "234-5678"),
+                ("[newask-comment]", "New caller comment"),
+                ("[newask-clear]", "Y"),
+                ("[newask-street1]", "Test Street 12"),
+                ("[newask-street2]", "Floor 3"),
+                ("[newask-city]", "Hamburg"),
+                ("[newask-state]", "HH"),
+                ("[newask-zip]", "20095"),
+                ("[newask-country]", "Germany"),
+                ("[newask-verify]", "Verification answer"),
+                ("[newask-short]", "Y"),
+            ] {
+                session.expect(prompt).await;
+                session.send(&format!("{answer}\r")).await;
+            }
+            let run_survey = use_newask && survey == "file";
+            if run_survey {
+                session.expect("[newask-question]").await;
+                assert_eq!(board.lock().await.users.len(), 1, "account published before NEWASK finished");
+                assert_eq!(UserBase::load(&dir.path().join("users.toml")).unwrap().len(), 1);
+                session.send("Survey answer\r").await;
+            }
+            session.expect(COMMAND).await;
+            let output = session.bye().await;
+            assert_eq!(output.matches("[newask-question]").count(), usize::from(run_survey), "{output}");
+            assert!(!output.contains("[newask-confirm]"), "NEWASK must not ask permission: {output}");
+            let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+            assert_eq!(users.len(), 2);
+            let user = &users[1];
+            assert_eq!(user.get_name(), "NEW CALLER");
+            assert!(user.password.password.is_valid("NEWSECRET"));
+            assert_eq!(user.city_or_state, "Hamburg");
+            assert_eq!(user.bus_data_phone, "123-4567");
+            assert_eq!(user.home_voice_phone, "234-5678");
+            assert_eq!(user.user_comment, "New caller comment");
+            assert!(user.flags.msg_clear);
+            assert_eq!(user.street1, "Test Street 12");
+            assert_eq!(user.street2, "Floor 3");
+            assert_eq!(user.city, "Hamburg");
+            assert_eq!(user.state, "HH");
+            assert_eq!(user.zip, "20095");
+            assert_eq!(user.country, "Germany");
+            assert_eq!(user.verify_answer, "Verification answer");
+            assert!(user.flags.use_short_filedescr);
+            let answers = std::fs::read_to_string(dir.path().join("newask.answers")).unwrap_or_default();
+            assert_eq!(answers.contains("A: Survey answer"), run_survey, "{answers}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn pcboard_newask_on_closed_boards_never_creates_an_account_or_asks_builtin_questions() {
+    for use_newask in [false, true] {
+        for survey in ["file", "missing", "unset", "directory"] {
+            let dir = tempfile::tempdir().unwrap();
+            let board = Arc::new(Mutex::new(newask_board(dir.path(), true, use_newask, survey)));
+            let before = std::fs::read(dir.path().join("users.toml")).unwrap();
+            let mut session = begin_newask_registration(board.clone()).await;
+            if survey == "file" {
+                session.expect("[newask-question]").await;
+                session.send("Closed board answer\r").await;
+            }
+            let (result, output) = session.finish().await;
+            result.unwrap();
+            for forbidden in [
+                "[account-new-password]",
+                "[newask-city-state]",
+                "[newask-address]",
+                "[newask-verify]",
+                "[newask-confirm]",
+                COMMAND,
+            ] {
+                assert!(!output.contains(forbidden), "closed board reached {forbidden}: {output}");
+            }
+            assert_eq!(board.lock().await.users.len(), 1);
+            assert_eq!(std::fs::read(dir.path().join("users.toml")).unwrap(), before);
+            let answers = std::fs::read_to_string(dir.path().join("newask.answers")).unwrap_or_default();
+            assert_eq!(answers.contains("A: Closed board answer"), survey == "file", "{answers}");
+        }
+    }
+}
+
 #[tokio::test]
 async fn accounting_local_sysop_starts_before_conference_presentation() {
     let dir = tempfile::tempdir().unwrap();
@@ -520,6 +669,128 @@ async fn accounting_tracking_only_allows_negative_balance_without_security_drop(
     assert_eq!(saved[0].account.as_ref().unwrap().balance(false, 0.0), -7.0);
     assert_eq!(tracking(dir.path(), "LOGON"), 1);
     assert_eq!(tracking(dir.path(), "MSG WRITE"), 1);
+}
+
+#[tokio::test]
+async fn pcboard_newask_creates_answer_file_and_requires_nonempty_answers() {
+    for existing_answers in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut board = newask_board(dir.path(), true, false, "file");
+        board
+            .default_display_text
+            .update_record_number(IceText::ResponseRequired as usize, "[newask-required]")
+            .unwrap();
+        if !existing_answers {
+            std::fs::remove_file(&board.config.paths.newask_answer).unwrap();
+            std::fs::write(&board.config.paths.newask_survey, ";[newask-intro]\n[newask-question]\n").unwrap();
+        }
+        let mut session = begin_newask_registration(Arc::new(Mutex::new(board))).await;
+        session.expect("[newask-question]").await;
+        session.send("\r").await;
+        session.expect("[newask-required]").await;
+        session.expect("[newask-question]").await;
+        session.send("Required answer\r").await;
+        let (result, output) = session.finish().await;
+        result.unwrap();
+        assert_eq!(output.matches("[newask-question]").count(), 2, "{output}");
+        let answers = std::fs::read_to_string(dir.path().join("newask.answers")).unwrap();
+        assert!(answers.contains("Q: [newask-question]\nA: Required answer"), "{answers}");
+        assert!(!answers.contains("A: \n"), "{answers}");
+        assert_eq!(UserBase::load(&dir.path().join("users.toml")).unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn pcboard_newask_respects_disabled_or_blank_builtin_prompts_and_display_only_surveys() {
+    for blank_prompts in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut board = newask_board(dir.path(), false, true, "file");
+        board.config.paths.newask_answer = Default::default();
+        if blank_prompts {
+            for id in [
+                IceText::CityState,
+                IceText::BusDataPhone,
+                IceText::HomeVoicePhone,
+                IceText::CommentFieldPrompt,
+                IceText::CLSBetweenMessages,
+                IceText::EnterAddress,
+                IceText::EnterVerifyText,
+                IceText::UseShortDescription,
+            ] {
+                board.default_display_text.update_record_number(id as usize, "").unwrap();
+            }
+        } else {
+            let settings = &mut board.config.new_user_settings;
+            settings.ask_city_or_state = false;
+            settings.ask_business_phone = false;
+            settings.ask_home_phone = false;
+            settings.ask_address = false;
+            settings.ask_verification = false;
+            settings.ask_comment = false;
+            settings.ask_clr_msg = false;
+            settings.ask_use_short_descr = false;
+        }
+        let mut session = begin_newask_registration(Arc::new(Mutex::new(board))).await;
+        session.expect("[account-new-password]").await;
+        session.send("NEWSECRET\r").await;
+        session.expect("[account-confirm-password]").await;
+        session.send("NEWSECRET\r").await;
+        session.expect(COMMAND).await;
+        let output = session.bye().await;
+        for forbidden in [
+            "[newask-city-state]",
+            "[newask-business-phone]",
+            "[newask-home-phone]",
+            "[newask-comment]",
+            "[newask-clear]",
+            "[newask-address]",
+            "[newask-street1]",
+            "[newask-verify]",
+            "[newask-short]",
+            "[newask-confirm]",
+        ] {
+            assert!(!output.contains(forbidden), "disabled prompt {forbidden} was asked: {output}");
+        }
+        assert_eq!(output.matches("[newask-question]").count(), 1, "{output}");
+        assert!(std::fs::read_to_string(dir.path().join("newask.answers")).unwrap().is_empty());
+        let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+        assert_eq!(users.len(), 2);
+        assert!(users[1].city_or_state.is_empty());
+        assert!(users[1].bus_data_phone.is_empty());
+        assert!(users[1].verify_answer.is_empty());
+    }
+}
+
+#[tokio::test]
+async fn pcboard_newask_disconnect_before_completion_does_not_publish_an_account() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut board = newask_board(dir.path(), false, true, "file");
+    for id in [
+        IceText::CityState,
+        IceText::BusDataPhone,
+        IceText::HomeVoicePhone,
+        IceText::CommentFieldPrompt,
+        IceText::CLSBetweenMessages,
+        IceText::EnterAddress,
+        IceText::EnterVerifyText,
+        IceText::UseShortDescription,
+    ] {
+        board.default_display_text.update_record_number(id as usize, "").unwrap();
+    }
+    let before = std::fs::read(&board.config.paths.user_file).unwrap();
+    let board = Arc::new(Mutex::new(board));
+    let mut session = begin_newask_registration(board.clone()).await;
+    session.expect("[account-new-password]").await;
+    session.send("NEWSECRET\r").await;
+    session.expect("[account-confirm-password]").await;
+    session.send("NEWSECRET\r").await;
+    session.expect("[newask-question]").await;
+    session.peer.shutdown().await.unwrap();
+    let (result, output) = session.finish().await;
+    result.unwrap();
+    assert!(!output.contains(COMMAND), "{output}");
+    assert_eq!(board.lock().await.users.len(), 1);
+    assert_eq!(std::fs::read(dir.path().join("users.toml")).unwrap(), before);
 }
 
 #[tokio::test]
