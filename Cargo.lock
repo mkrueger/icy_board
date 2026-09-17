@@ -4113,10 +4113,12 @@ dependencies = [
  "logos",
  "md5",
  "percent-encoding",
+ "pty-process",
  "radix_fmt",
  "rand_core 0.6.4",
  "regex",
  "reqwest",
+ "rustix 1.1.4",
  "same-file",
  "semver",
  "serde",
@@ -7713,6 +7715,16 @@ checksum = "4dcd034599e63b970727f70d79e02d62390a4a84f7c6b827c27c46d5ac3fa622"
 dependencies = [
  "ar_archive_writer",
  "cc",
+]
+
+[[package]]
+name = "pty-process"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71cec9e2670207c5ebb9e477763c74436af3b9091dd550b9fb3c1bec7f3ea266"
+dependencies = [
+ "rustix 1.1.4",
+ "tokio",
 ]
 
 [[package]]

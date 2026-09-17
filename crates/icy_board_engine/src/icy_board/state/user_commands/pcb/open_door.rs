@@ -325,6 +325,24 @@ impl IcyBoardState {
         door.create_drop_file(self, working_directory, door_number).await?;
         // Shell execution is considered started when the shell spawns; a later
         // shell error/nonzero exit is billable, just like a game's runtime error.
+        #[cfg(unix)]
+        let (mut cmd, mut stdout, mut stdin) = {
+            let (pty, pts) = pty_process::open()?;
+            let mut attributes = rustix::termios::tcgetattr(&pts)?;
+            attributes.make_raw();
+            rustix::termios::tcsetattr(&pts, rustix::termios::OptionalActions::Now, &attributes)?;
+            let (width, height) = self.session.term_caps.term_size;
+            pty.resize(pty_process::Size::new(height.max(1), width.max(1)))?;
+            let command = if door.use_shell_execute {
+                pty_process::Command::new("sh").arg("-c").arg("exec \"$0\"").arg(&file_name)
+            } else {
+                pty_process::Command::new(&file_name)
+            };
+            let child = command.current_dir(working_directory).stderr(Stdio::inherit()).kill_on_drop(true).spawn(pts)?;
+            let (stdout, stdin) = pty.into_split();
+            (child, stdout, stdin)
+        };
+        #[cfg(not(unix))]
         let mut cmd = if door.use_shell_execute {
             tokio::process::Command::new("sh")
                 .arg("-c")
@@ -346,8 +364,12 @@ impl IcyBoardState {
 
         let mut write_buf = vec![0; 32 * 1024];
         let mut read_buf = vec![0; 128 * 1024];
-        let mut stidn = cmd.stdin.take().unwrap();
+        #[cfg(not(unix))]
+        let mut stdin = cmd.stdin.take().unwrap();
+        #[cfg(not(unix))]
         let mut stdout = cmd.stdout.take().unwrap();
+        let mut exited = false;
+        let mut drain_deadline = tokio::time::Instant::now();
 
         loop {
             tokio::select! {
@@ -369,8 +391,13 @@ impl IcyBoardState {
                                 if remove_sysop_connection {
                                     node_state[self.node].as_mut().unwrap().sysop_connection = None;
                                 }
+                                drain_deadline = tokio::time::Instant::now() + Duration::from_secs(1);
+                            } else {
+                                break;
                             }
                         }
+                        #[cfg(unix)]
+                        Err(error) if error.raw_os_error() == Some(rustix::io::Errno::IO.raw_os_error()) => break,
                         Err(e) => {
                             log::error!("Error reading from door: {e}");
                             break;
@@ -384,7 +411,7 @@ impl IcyBoardState {
                                 self.session.request_logoff = true;
                                 break;
                             }
-                            if stidn.write_all(&write_buf[0..size]).await.is_err() {
+                            if stdin.write_all(&write_buf[0..size]).await.is_err() {
                                 break;
                             }
                         }
@@ -393,12 +420,18 @@ impl IcyBoardState {
                         }
                     }
                 }
+                status = cmd.wait(), if !exited => {
+                    status?;
+                    exited = true;
+                    drain_deadline = tokio::time::Instant::now() + Duration::from_secs(1);
+                }
+                _ = tokio::time::sleep_until(drain_deadline), if exited => break,
             };
-
-            if cmd.try_wait()?.is_some() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(25));
+        }
+        drop(stdin);
+        drop(stdout);
+        if cmd.try_wait()?.is_none() {
+            cmd.kill().await?;
         }
         log::info!("door exited.");
 

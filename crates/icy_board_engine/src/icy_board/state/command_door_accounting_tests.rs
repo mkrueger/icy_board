@@ -460,6 +460,195 @@ async fn missing_or_corrupt_ppe_and_invalid_menu_script_selection_are_free() {
 
 #[cfg(unix)]
 #[tokio::test]
+async fn native_stdio_door_has_terminal_streams_and_preserves_ansi_bytes() {
+    use std::os::unix::fs::PermissionsExt;
+
+    for shell in [false, true] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        state.set_terminal_size(80, 25);
+        let path = root.path().join("stdio-door");
+        std::fs::write(
+            &path,
+            "#!/bin/sh\nif ! test -t 0 || ! test -t 1; then printf 'NOT-A-TERMINAL'; exit 1; fi\nprintf '\\033[2J\\033[9;25H(C) Enter chat!\\r\\nRAW\\r\\n'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let mut game = door(path.to_str().unwrap());
+        game.use_shell_execute = shell;
+        tokio::time::timeout(Duration::from_secs(5), state.run_door(&DoorList::default(), &game, 0))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(output(&mut peer).await, "\x1b[2J\x1b[9;25H(C) Enter chat!\r\nRAW\r\n", "shell={shell}");
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_stdio_door_raw_input_size_and_disconnect() {
+    use std::os::unix::fs::PermissionsExt;
+
+    for (width, height) in [(80, 25), (132, 43)] {
+        for disconnect in [false, true] {
+            let (root, mut state, mut peer) = fixture(false).await;
+            state.set_terminal_size(width, height);
+            let path = root.path().join("stdio door");
+            std::fs::write(&path, "#!/bin/sh\nprintf '%s\\n' \"$$\"\nstty size\nexec cat\n").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let mut game = door(path.to_str().unwrap());
+            game.use_shell_execute = disconnect;
+            let client = async {
+                let header = native_stdio_frame(&mut peer).await;
+                let header = String::from_utf8(header).unwrap();
+                let mut lines = header.lines();
+                let pid = rustix::process::Pid::from_raw(lines.next().unwrap().parse().unwrap()).unwrap();
+                assert_eq!(lines.next().unwrap(), format!("{height} {width}"));
+                if !disconnect {
+                    let input = [3, 13, 10, 17, 19, 0xff];
+                    peer.send(&input).await.unwrap();
+                    assert_eq!(native_stdio_frame(&mut peer).await, input);
+                }
+                drop(peer);
+                pid
+            };
+            let (result, pid) = tokio::time::timeout(Duration::from_secs(10), async {
+                let list = DoorList::default();
+                tokio::join!(state.run_door(&list, &game, 0), client)
+            })
+            .await
+            .unwrap();
+            result.unwrap();
+            assert!(state.session.request_logoff);
+            assert_eq!(rustix::process::test_kill_process(pid), Err(rustix::io::Errno::SRCH));
+        }
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_stdio_door_cancellation_closes_child_and_terminal() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (root, mut state, mut peer) = fixture(false).await;
+    let path = root.path().join("stdio-door");
+    std::fs::write(&path, "#!/bin/sh\nprintf '%s\\n' \"$$\"\nexec cat\n").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let game = door(path.to_str().unwrap());
+    let list = DoorList::default();
+    let mut running = Box::pin(state.run_door(&list, &game, 0));
+    let header = tokio::select! {
+        header = native_stdio_frame(&mut peer) => header,
+        result = &mut running => panic!("door ended before cancellation: {result:?}"),
+    };
+    let pid = rustix::process::Pid::from_raw(String::from_utf8(header).unwrap().trim().parse().unwrap()).unwrap();
+    drop(running);
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while rustix::process::test_kill_process(pid).is_ok() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(rustix::process::test_kill_process(pid), Err(rustix::io::Errno::SRCH));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_stdio_door_drains_output_after_process_exit() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (root, mut state, mut peer) = fixture(false).await;
+    let path = root.path().join("stdio-door");
+    std::fs::write(&path, "#!/bin/sh\ncat payload\nprintf 'FINAL-OUTPUT'\n").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut expected = vec![b'X'; 256 * 1024 + 17];
+    std::fs::write(root.path().join("payload"), &expected).unwrap();
+    expected.extend_from_slice(b"FINAL-OUTPUT");
+    tokio::time::timeout(Duration::from_secs(10), state.run_door(&DoorList::default(), &door(path.to_str().unwrap()), 0))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(output(&mut peer).await.as_bytes(), expected);
+    assert!(!state.session.request_logoff);
+}
+
+#[cfg(unix)]
+async fn native_stdio_frame(peer: &mut ChannelConnection) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut buffer = [0; 8192];
+    let count = tokio::time::timeout(Duration::from_secs(3), peer.read(&mut buffer)).await.unwrap().unwrap();
+    assert!(count > 0);
+    bytes.extend_from_slice(&buffer[..count]);
+    while let Ok(result) = tokio::time::timeout(Duration::from_millis(150), peer.read(&mut buffer)).await {
+        let count = result.unwrap();
+        if count == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    bytes
+}
+
+#[cfg(unix)]
+#[tokio::test]
+#[ignore = "requires ICB_UMRC_TEST_DIR with original uMRC 105 and Probe fixture"]
+async fn native_stdio_door_umrc_original_menu_roundtrip() {
+    use icy_engine::{Position, TextPane};
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    let source = PathBuf::from(std::env::var_os("ICB_UMRC_TEST_DIR").expect("set ICB_UMRC_TEST_DIR"));
+    for (width, height) in [(80, 25), (132, 43)] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        state.set_terminal_size(width, height);
+        state.session.user_name = "Probe".into();
+        state.session.alias_name = "Probe".into();
+        for name in ["mrc.cfg", "umrc-original"] {
+            std::fs::copy(source.join(name), root.path().join(name)).unwrap();
+        }
+        std::fs::create_dir(root.path().join("userdata")).unwrap();
+        std::fs::copy(source.join("userdata/Probe.dat"), root.path().join("userdata/Probe.dat")).unwrap();
+        std::fs::write(root.path().join("mrcstats.dat"), "1 1 1 0 0\n").unwrap();
+        for name in ["screens", "themes"] {
+            symlink(source.join("assets").join(name), root.path().join(name)).unwrap();
+        }
+        let path = root.path().join("stdio-door");
+        std::fs::write(&path, "#!/bin/sh\nexec ./umrc-original -D door32.sys\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let mut game = door(path.to_str().unwrap());
+        game.drop_file = crate::icy_board::doors::DropFile::Door32Sys;
+        let client = async {
+            let mut screen = super::super::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
+            super::super::virtual_screen::resize_screen(&mut screen.buffer, icy_engine::Size::new(width.into(), height.into()));
+            for (index, input) in [b"I".as_slice(), b" ", b"Q"].into_iter().enumerate() {
+                let frame = native_stdio_frame(&mut peer).await;
+                for byte in frame {
+                    screen.print_char(codepages::tables::CP437_TO_UNICODE[byte as usize]).unwrap();
+                }
+                if index != 1 {
+                    for (column, row, text) in [(24, 8, "(C) Enter chat!"), (24, 12, "(Q) Quit to"), (28, 13, "Make a selection")] {
+                        let rendered: String = (0..text.len())
+                            .map(|offset| screen.buffer.char_at(Position::new(column + offset as i32, row)).ch)
+                            .collect();
+                        assert_eq!(rendered, text, "{width}x{height} menu {index}");
+                    }
+                }
+                peer.send(input).await.unwrap();
+            }
+            peer
+        };
+        let (result, _peer) = tokio::time::timeout(Duration::from_secs(15), async {
+            let list = DoorList::default();
+            tokio::join!(state.run_door(&list, &game, 0), client)
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert!(!state.session.request_logoff);
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
 async fn started_local_door_bills_once_and_only_explicit_command_rates_add_to_it() {
     let (_root, mut state, _peer) = fixture(true).await;
     let game = door("/bin/true");
