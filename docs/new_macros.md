@@ -1,5 +1,8 @@
 ## NewMarcos
 
+For the complete reference, including standard codes, colors, field widths,
+alignment, and trimming, see [Display Macros](macros.md).
+
 IcyBoard adds following new macros.
 
 | Macro | Description | 
