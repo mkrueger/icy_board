@@ -110,6 +110,13 @@ async fn output(peer: &mut ChannelConnection) -> String {
     }
 }
 
+#[cfg(unix)]
+fn door_payload_before_reset(bytes: &[u8]) -> &[u8] {
+    bytes
+        .strip_suffix(b"\x18\x1b[?6l\x1b[r\x1b[?69l\x1b[?7h\x1b[?25h\x1b[0m")
+        .expect("door output must end with terminal restoration")
+}
+
 #[tokio::test]
 async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() {
     let (root, mut state, mut peer) = fixture(true).await;
@@ -478,7 +485,7 @@ async fn native_door32_socket_transport_and_expanded_arguments() {
             peer.send(&bytes).await.unwrap();
             assert_eq!(native_stdio_frame(&mut peer).await, bytes);
             peer.send(b"Q").await.unwrap();
-            assert_eq!(native_stdio_frame(&mut peer).await, b"FINAL-OUTPUT");
+            assert_eq!(door_payload_before_reset(&native_stdio_frame(&mut peer).await), b"FINAL-OUTPUT");
             peer
         };
         let (result, _peer) = tokio::time::timeout(Duration::from_secs(10), async {
@@ -638,7 +645,7 @@ async fn native_door32_drains_output_and_observes_socket_eof() {
         } else {
             b"CLOSED".to_vec()
         };
-        assert_eq!(output(&mut peer).await.as_bytes(), expected);
+        assert_eq!(door_payload_before_reset(output(&mut peer).await.as_bytes()), expected);
         assert!(!state.session.request_logoff);
     }
 }
@@ -712,9 +719,58 @@ async fn native_door32_parallel_launches_do_not_inherit_other_sockets() {
         .unwrap();
     let mut expected = vec![b'X'; 256 * 1024 + 17];
     expected.extend_from_slice(b"FINAL-OUTPUT");
-    assert_eq!(output(&mut second_peer).await.as_bytes(), expected);
+    assert_eq!(door_payload_before_reset(output(&mut second_peer).await.as_bytes()), expected);
     drop(first_peer);
     tokio::time::timeout(Duration::from_secs(3), running).await.unwrap().unwrap();
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_door_return_restores_full_screen_rendering() {
+    use icy_engine::{Position, TextPane};
+    use std::os::unix::fs::PermissionsExt;
+
+    for (width, height, tail) in [(80, 25, ""), (132, 43, ""), (80, 25, "\\033["), (132, 43, "\\033[")] {
+        let (root, mut state, mut peer) = fixture(false).await;
+        state.set_terminal_size(width, height);
+        let path = root.path().join("dirty-terminal-door");
+        std::fs::write(&path, format!("#!/bin/sh\nprintf '\\033[1;2r\\033[?6h\\033[?7lDOOR{tail}'\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), state.run_door(&DoorList::default(), &door(path.to_str().unwrap()), 0))
+            .await
+            .unwrap()
+            .unwrap();
+        let menu = format!(
+            "\x1b[2J\x1b[HHEADER\r\nROW TWO\r\nROW THREE\r\nROW FOUR\x1b[6;{}HXYZ\x1b[{};1HFOOTER",
+            width - 1,
+            height
+        );
+        state.print(crate::vm::TerminalTarget::Both, &menu).await.unwrap();
+        let bytes = output(&mut peer).await;
+        let mut screen = super::super::virtual_screen::VirtualScreen::new(icy_parser_core::AnsiParser::default());
+        super::super::virtual_screen::resize_screen(&mut screen.buffer, icy_engine::Size::new(width.into(), height.into()));
+        for ch in bytes.chars() {
+            screen.print_char(ch).unwrap();
+        }
+        for (row, column, text) in [
+            (0, 0, "HEADER"),
+            (1, 0, "ROW TWO"),
+            (2, 0, "ROW THREE"),
+            (3, 0, "ROW FOUR"),
+            (5, i32::from(width) - 2, "XY"),
+            (6, 0, "Z"),
+            (i32::from(height) - 1, 0, "FOOTER"),
+        ] {
+            let rendered: String = (0..text.len())
+                .map(|offset| screen.buffer.char_at(Position::new(column + offset as i32, row)).ch)
+                .collect();
+            assert_eq!(rendered, text, "{width}x{height}, row {row}");
+            let tracked: String = (0..text.len())
+                .map(|offset| state.display_screen().buffer.char_at(Position::new(column + offset as i32, row)).ch)
+                .collect();
+            assert_eq!(tracked, text, "tracked {width}x{height}, row {row}");
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -722,9 +778,12 @@ async fn native_door32_parallel_launches_do_not_inherit_other_sockets() {
 async fn native_stdio_door_has_terminal_streams_and_preserves_ansi_bytes() {
     use std::os::unix::fs::PermissionsExt;
 
-    for shell in [false, true] {
+    for (shell, plain_text) in [(false, false), (true, false), (false, true)] {
         let (root, mut state, mut peer) = fixture(false).await;
         state.set_terminal_size(80, 25);
+        if plain_text {
+            state.session.disp_options.grapics_mode = crate::icy_board::state::GraphicsMode::Ctty;
+        }
         let path = root.path().join("stdio-door");
         std::fs::write(
             &path,
@@ -738,7 +797,16 @@ async fn native_stdio_door_has_terminal_streams_and_preserves_ansi_bytes() {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(output(&mut peer).await, "\x1b[2J\x1b[9;25H(C) Enter chat!\r\nRAW\r\n", "shell={shell}");
+        let bytes = output(&mut peer).await;
+        let payload = if plain_text {
+            bytes.as_bytes()
+        } else {
+            door_payload_before_reset(bytes.as_bytes())
+        };
+        assert_eq!(
+            payload, b"\x1b[2J\x1b[9;25H(C) Enter chat!\r\nRAW\r\n",
+            "shell={shell}, plain_text={plain_text}"
+        );
     }
 }
 
@@ -827,7 +895,7 @@ async fn native_stdio_door_drains_output_after_process_exit() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(output(&mut peer).await.as_bytes(), expected);
+    assert_eq!(door_payload_before_reset(output(&mut peer).await.as_bytes()), expected);
     assert!(!state.session.request_logoff);
 }
 

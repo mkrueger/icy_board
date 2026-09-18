@@ -78,6 +78,7 @@ impl DoorSocket {
 struct DoorUsage<'a> {
     door: ActivityUsage,
     command: Option<&'a mut ActivityUsage>,
+    restore_terminal: bool,
 }
 
 impl DoorUsage<'_> {
@@ -327,7 +328,11 @@ impl IcyBoardState {
         if !usage.allowed_with_reserved(self, reserved).await? {
             return Ok(());
         }
-        let mut usage = DoorUsage { door: usage, command };
+        let mut usage = DoorUsage {
+            door: usage,
+            command,
+            restore_terminal: false,
+        };
         // Selection, password/security, confirmation and admission have all
         // succeeded. Each backend marks its actual launch, not setup attempts.
         let result = match door.door_type {
@@ -340,6 +345,16 @@ impl IcyBoardState {
             }
             DoorType::Local => self.run_local_door(door, door_number, &mut usage).await,
             DoorType::Dos => self.run_dos_door(door, door_number, &mut usage).await,
+        };
+        let result = if usage.restore_terminal
+            && !self.session.request_logoff
+            && self.session.disp_options.grapics_mode != crate::icy_board::state::GraphicsMode::Ctty
+        {
+            let reset = b"\x18\x1b[?6l\x1b[r\x1b[?69l\x1b[?7h\x1b[?25h\x1b[0m";
+            let restored = self.write_terminal_bytes(crate::vm::TerminalTarget::Both, reset, reset).await;
+            result.and(restored)
+        } else {
+            result
         };
         usage.door.finish(self, result).await
     }
@@ -475,6 +490,7 @@ impl IcyBoardState {
                 .kill_on_drop(true);
             command.spawn()?
         };
+        usage.restore_terminal = true;
         usage.start(self)?;
 
         let mut write_buf = vec![0; 32 * 1024];
@@ -598,6 +614,7 @@ impl IcyBoardState {
         let runtime_remaining = dos_runtime_remaining(self.session.login_date, self.session.time_limit, door.dos_max_runtime_seconds)
             .expect("DOS doors always have a hard runtime limit");
         let mut session = crate::icy_board::doors::dos::start_session(&image_path, &bios_path, &vga_bios_path, door.dos_memory_mb, runtime_remaining)?;
+        usage.restore_terminal = true;
         // Native DOS has started once its emulator worker was successfully
         // launched. Guest boot/game failures after this point are billable.
         usage.start(self)?;

@@ -261,7 +261,7 @@ pub fn expand_run_batch(door: &Door, node: usize, drop_file: &str) -> Res<String
         value
             .replace("{dropFile}", drop_file)
             .replace("{dropfile}", drop_file)
-            .replace("{node}", &node.to_string())
+            .replace("{node}", &(node + 1).to_string())
             .replace("{baud}", "57600")
     };
     let mut command = expand(&door.dos_command);
@@ -381,12 +381,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dos_node_placeholder_is_one_based_in_commands_and_arguments() {
+        let door = Door {
+            dos_command: "START.BAT {node}".into(),
+            args: vec!["/N{node}".into()],
+            ..Door::default()
+        };
+        for node in [0, 1, 3] {
+            assert_eq!(
+                expand_run_batch(&door, node, "PCBOARD.SYS").unwrap(),
+                format!("@ECHO OFF\nCD C:\\DOOR\nSTART.BAT {} /N{}", node + 1, node + 1)
+            );
+        }
+    }
+
+    #[test]
     fn normalizes_batch_files_and_expands_tokens() {
         let mut door = Door::default();
         door.dos_command = "COPY C:\\ICB\\{dropFile} C:\\DOOR\nGAME {node} {baud}".into();
         assert_eq!(
             normalize_dos_text(&expand_run_batch(&door, 3, "DOOR.SYS").unwrap()),
-            "@ECHO OFF\r\nCD C:\\DOOR\r\nCOPY C:\\ICB\\DOOR.SYS C:\\DOOR\r\nGAME 3 57600"
+            "@ECHO OFF\r\nCD C:\\DOOR\r\nCOPY C:\\ICB\\DOOR.SYS C:\\DOOR\r\nGAME 4 57600"
         );
     }
 
@@ -399,7 +414,7 @@ mod tests {
         };
         assert_eq!(
             expand_run_batch(&door, 3, "DOOR.SYS").unwrap(),
-            "@ECHO OFF\nCD C:\\DOOR\nGAME.EXE /LOCAL /N3 DOOR.SYS \"C:\\DOOR\\GAME DATA\" \"\""
+            "@ECHO OFF\nCD C:\\DOOR\nGAME.EXE /LOCAL /N4 DOOR.SYS \"C:\\DOOR\\GAME DATA\" \"\""
         );
     }
 
