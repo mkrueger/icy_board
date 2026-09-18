@@ -102,7 +102,7 @@ fn door_popup_labels_fit_at_80_columns() {
             "door_editor_provide_socket",
             "door_editor_max_parallel",
             "door_editor_drop_file",
-            "door_editor_dos_command",
+            "door_editor_path_dos",
             "door_editor_dos_memory",
             "door_editor_dos_max_seconds",
         ],
@@ -136,7 +136,7 @@ fn every_door_field_explains_itself_on_f1() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("doors.toml");
     let mut topics = std::collections::HashSet::new();
-    for (door_type, fields) in [(DoorType::Local, 14), (DoorType::Dos, 12), (DoorType::BBSlink, 8)] {
+    for (door_type, fields) in [(DoorType::Local, 14), (DoorType::Dos, 13), (DoorType::BBSlink, 8)] {
         let mut list = DoorList::default();
         list.doors.push(Door { door_type, ..Door::default() });
         list.save(&path).unwrap();
@@ -152,7 +152,7 @@ fn every_door_field_explains_itself_on_f1() {
         assert_eq!(door_help_topics(&mut page, 1)[0], active_topics[0], "navigation did not wrap");
         topics.extend(active_topics);
     }
-    assert_eq!(topics.len(), 19, "not every field is reachable for an appropriate type");
+    assert_eq!(topics.len(), 21, "not every field is reachable for an appropriate type");
     for help in &topics {
         assert!(help.trim_start().starts_with('#'), "not a help text: {help}");
     }
@@ -169,10 +169,12 @@ fn every_door_field_explains_itself_on_f1() {
         "door_editor_door_type",
         "door_editor_use_shell_execute",
         "door_editor_args",
+        "door_editor_args_dos",
         "door_editor_working_directory",
         "door_editor_provide_socket",
         "door_editor_max_parallel",
         "door_editor_drop_file",
+        "door_editor_drop_file_dos",
         "door_editor_dos_command",
         "door_editor_dos_memory",
         "door_editor_dos_max_seconds",

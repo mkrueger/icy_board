@@ -4130,15 +4130,24 @@ door_editor_password-help=
 
     A password callers must give before this door starts.
 
-door_editor_path_local=Program
+door_editor_path_local=Command
 door_editor_path_local-status=Program or PPE started for this door
 door_editor_path_local-help=
-    # Program
+    # Command
 
     The program started for this door. A .ppe file is run by the board itself
     rather than started as a separate process.
 
     Only the program belongs here; its arguments belong in the arguments field.
+
+door_editor_path_ppe=PPE File
+door_editor_path_ppe-status=PPE executed within the board
+door_editor_path_ppe-help=
+    # PPE File
+
+    The board runs this PPE itself. External process settings, including the
+    arguments field, are not used for this launch.
+door_editor_unused_for_ppe=not used when running a PPE internally
 
 door_editor_path_dos=Door directory
 door_editor_path_dos-status=Directory holding the installed DOS door
@@ -4176,16 +4185,27 @@ door_editor_drop_file-status=Drop file generated before the door starts
 door_editor_drop_file-help=
     # Drop File
 
-    The BBS session file generated in the door directory before launch. DOS
-    doors receive the same file in C:\DOOR and C:\ICB.
+    The BBS session file is generated in a private temporary directory for
+    each call. Pass its path through {"{"}dropFilePath{"}"} in the arguments.
+    This directory is removed after the door exits.
+    The file type and connection are independent settings.
+
+door_editor_drop_file_dos-status=Drop file for the DOS machine
+door_editor_drop_file_dos-help=
+    # Drop File
+
+    DOS doors receive the session file in C:\DOOR and C:\ICB.
+    {"{"}dropFile{"}"} in the command or arguments expands to its file name.
 
 door_editor_use_shell_execute=Use Shell Execute
 door_editor_use_shell_execute-status=Use Shell Execute
 door_editor_use_shell_execute-help=
     # Use Shell Execute
 
-    Runs the door through the system shell, so a command line with arguments or
-    redirection is interpreted as it would be when typed.
+    Advanced launch option: starts the program through sh. The program and
+    arguments stay separate; redirection, pipes and variables are not
+    interpreted as a shell command line.
+    Executable scripts with an interpreter line do not need this option.
 
 door_editor_args=Arguments
 door_editor_args-status=Command line arguments passed to the door
@@ -4201,11 +4221,32 @@ door_editor_args-help=
     - {"{"}dropFile{"}"}: its file name on its own
     - {"{"}dropFileDir{"}"}: the directory holding it
     - {"{"}socketHandle{"}"}: the inherited socket, with the socket connection
-    - {"{"}node{"}"}: the node number
+    - {"{"}node{"}"}: the node number, starting at 1
     - {"{"}userId{"}"}: the caller's user number
     - {"{"}userName{"}"}: the caller's name
     - {"{"}timeLeftSeconds{"}"}: the caller's remaining seconds
     - {"{"}termWidth{"}"} and {"{"}termHeight{"}"}: the terminal size
+
+door_editor_args_dos-status=Separate arguments appended to the DOS command
+door_editor_args_dos-help=
+    # Arguments
+
+    These arguments are appended to the DOS command. Input follows shell
+    quoting rules; enclose DOS paths in single quotes, such as
+    'C:\DOOR\GAME DATA'. Each value stays one argument.
+
+    Supported placeholders in the command and arguments:
+
+    - {"{"}dropFile{"}"} or {"{"}dropfile{"}"}: the drop file name
+    - {"{"}node{"}"}: the historical DOS node number, starting at 0
+    - {"{"}baud{"}"}: 57600
+
+    Other local-program placeholders do not apply here.
+    Line breaks, double quotes within argument values and percent signs are
+    not allowed. Batch syntax belongs in the command or a .BAT file.
+door_editor_args_invalid_quotes=Arguments: unclosed quote or escape sequence.
+door_editor_args_invalid_dos=Arguments: line breaks, double quotes within values and percent signs are not allowed.
+door_editor_args_invalid=Invalid arguments: { $error }
 
 door_editor_working_directory=Work Directory
 door_editor_working_directory-status=Directory the door runs in
@@ -4216,17 +4257,20 @@ door_editor_working_directory-help=
     program. The drop file is always written to a private directory of its own,
     so give the door its path through the arguments.
 
-door_editor_provide_socket=Socket Connection
-door_editor_provide_socket-status=Hand the door a connected socket
+door_editor_connection_stdio=Standard I/O
+door_editor_connection_socket=Socket
+door_editor_provide_socket=Connection
+door_editor_provide_socket-status=Input and output of the local door program
 door_editor_provide_socket-help=
-    # Socket Connection
+    # Connection
 
-    Hands the door an already connected socket instead of standard input and
-    output, and reports it in DOOR32.SYS. Doors reading a socket need this;
-    doors reading standard input must not have it.
+    Standard I/O uses standard input and output, through a raw PTY on Unix.
+    Socket passes an already connected local TCP connection instead; the
+    door must support this mode.
 
-    The socket is local to this machine, carries the door's data unchanged, and
-    is not the caller's own connection.
+    The socket is recorded in DOOR32.SYS when selected and is available through
+    {"{"}socketHandle{"}"}. It is not the caller's own connection.
+    Socket mode is currently implemented only on Unix.
 
 door_editor_max_parallel=Max Parallel
 door_editor_max_parallel-status=Callers allowed in this door at once

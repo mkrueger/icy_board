@@ -3676,16 +3676,24 @@ door_editor_password-help=
     # Passwort
 
     Vor dem Start des Doors erforderliches Passwort.
-door_editor_path_local=Programm
+door_editor_path_local=Befehl
 door_editor_path_local-status=Programm oder PPE, das für dieses Door gestartet wird
 door_editor_path_local-help=
-    # Programm
+    # Befehl
 
     Programm, das für dieses Door gestartet wird. Eine .ppe-Datei führt das
     Board selbst aus, statt sie als eigenen Prozess zu starten.
 
     Hierher gehört nur das Programm; seine Argumente gehören in das Feld
     Argumente.
+door_editor_path_ppe=PPE-Datei
+door_editor_path_ppe-status=PPE, das innerhalb des Boards ausgeführt wird
+door_editor_path_ppe-help=
+    # PPE-Datei
+
+    Das Board führt dieses PPE selbst aus. Die Einstellungen für externe
+    Prozesse, einschließlich des Argumentfelds, werden dabei nicht verwendet.
+door_editor_unused_for_ppe=wird beim internen PPE-Start nicht verwendet
 door_editor_path_dos=Door-Verzeichnis
 door_editor_path_dos-status=Verzeichnis mit dem installierten DOS-Door
 door_editor_path_dos-help=
@@ -3718,15 +3726,25 @@ door_editor_drop_file-status=Vor dem Door-Start erzeugte Drop-Datei
 door_editor_drop_file-help=
     # Drop-Datei
 
-    BBS-Sitzungsdatei, die vor dem Start im Door-Verzeichnis erzeugt wird.
-    DOS-Doors erhalten dieselbe Datei in C:\DOOR und C:\ICB.
+    BBS-Sitzungsdatei in einem privaten temporären Verzeichnis je Aufruf.
+    Übergeben Sie ihren Pfad mit {"{"}dropFilePath{"}"} im Argumentfeld.
+    Nach dem Door-Aufruf wird dieses Verzeichnis entfernt.
+    Der Dateityp und die Verbindung sind unabhängige Einstellungen.
+door_editor_drop_file_dos-status=Drop-Datei für den DOS-Rechner
+door_editor_drop_file_dos-help=
+    # Drop-Datei
+
+    DOS-Doors erhalten die Sitzungsdatei in C:\DOOR und C:\ICB.
+    {"{"}dropFile{"}"} im Befehl oder Argumentfeld ergibt ihren Dateinamen.
 door_editor_use_shell_execute=Über Shell ausführen
 door_editor_use_shell_execute-status=Über die System-Shell ausführen
 door_editor_use_shell_execute-help=
     # Über Shell ausführen
 
-    Startet das Door über die System-Shell. Befehlszeilen mit Argumenten
-    oder Umleitungen werden so wie bei manueller Eingabe interpretiert.
+    Erweiterte Startoption: startet das Programm über sh. Programm und
+    Argumente bleiben getrennt; Umleitungen, Pipes und Variablen werden
+    nicht als Shell-Befehlszeile interpretiert.
+    Ausführbare Skripte mit Interpreterzeile benötigen diese Option nicht.
 door_editor_args=Argumente
 door_editor_args-status=Argumente für den Door-Aufruf
 door_editor_args-help=
@@ -3741,11 +3759,31 @@ door_editor_args-help=
     - {"{"}dropFile{"}"}: nur ihr Dateiname
     - {"{"}dropFileDir{"}"}: ihr Verzeichnis
     - {"{"}socketHandle{"}"}: der vererbte Socket, bei Socket-Verbindung
-    - {"{"}node{"}"}: die Node-Nummer
+    - {"{"}node{"}"}: die Node-Nummer, beginnend bei 1
     - {"{"}userId{"}"}: die Benutzernummer
     - {"{"}userName{"}"}: der Benutzername
     - {"{"}timeLeftSeconds{"}"}: die verbleibenden Sekunden des Benutzers
     - {"{"}termWidth{"}"} und {"{"}termHeight{"}"}: die Terminalgröße
+door_editor_args_dos-status=Separate Argumente hinter dem DOS-Befehl
+door_editor_args_dos-help=
+    # Argumente
+
+    Diese Argumente werden hinter dem DOS-Befehl angehängt. Für die Eingabe
+    gelten Shell-Zitierregeln; DOS-Pfade daher in einfache Anführungszeichen
+    setzen, etwa 'C:\DOOR\GAME DATA'. Jeder Wert bleibt ein Argument.
+
+    Unterstützte Platzhalter in Befehl und Argumenten:
+
+    - {"{"}dropFile{"}"} oder {"{"}dropfile{"}"}: Name der Drop-Datei
+    - {"{"}node{"}"}: historische DOS-Node-Nummer, beginnend bei 0
+    - {"{"}baud{"}"}: 57600
+
+    Die übrigen Platzhalter lokaler Programme gelten hier nicht.
+    Zeilenumbrüche, doppelte Anführungszeichen im Argumentwert und Prozentzeichen
+    sind nicht erlaubt. Batch-Syntax gehört in den Befehl oder eine .BAT-Datei.
+door_editor_args_invalid_quotes=Argumente: Anführungszeichen oder Escape-Sequenz nicht abgeschlossen.
+door_editor_args_invalid_dos=Argumente: Keine Zeilenumbrüche, doppelten Anführungszeichen im Wert oder Prozentzeichen erlaubt.
+door_editor_args_invalid=Ungültige Argumente: { $error }
 door_editor_working_directory=Arbeitsverzeichnis
 door_editor_working_directory-status=Verzeichnis, in dem das Door läuft
 door_editor_working_directory-help=
@@ -3754,17 +3792,20 @@ door_editor_working_directory-help=
     Verzeichnis, in dem das Door ausgeführt wird. Leer verwendet das
     Programmverzeichnis. Die Drop-Datei entsteht immer in einem eigenen,
     privaten Verzeichnis; ihr Pfad wird über die Argumente übergeben.
-door_editor_provide_socket=Socket-Verbindung
-door_editor_provide_socket-status=Dem Door eine verbundene Socket-Verbindung übergeben
+door_editor_connection_stdio=Standard-I/O
+door_editor_connection_socket=Socket
+door_editor_provide_socket=Verbindung
+door_editor_provide_socket-status=Ein- und Ausgabe des lokalen Door-Programms
 door_editor_provide_socket-help=
-    # Socket-Verbindung
+    # Verbindung
 
-    Übergibt dem Door statt Standardein- und -ausgabe eine bereits verbundene
-    Socket-Verbindung und trägt sie in DOOR32.SYS ein. Doors, die einen Socket
-    lesen, benötigen dies; Doors mit Standardeingabe dürfen es nicht haben.
+    Standard-I/O verwendet Standardein- und -ausgabe, unter Unix über ein
+    Raw-PTY. Socket übergibt stattdessen eine bereits verbundene lokale
+    TCP-Verbindung; das Door muss diesen Modus unterstützen.
 
-    Die Verbindung ist lokal, überträgt die Daten unverändert und ist nicht die
-    Verbindung des Benutzers.
+    Der Socket wird bei gewähltem DOOR32.SYS dort eingetragen und ist über
+    {"{"}socketHandle{"}"} verfügbar. Er ist nicht die Verbindung des Benutzers.
+    Der Socket-Modus ist derzeit nur unter Unix implementiert.
 door_editor_max_parallel=Parallele Aufrufe
 door_editor_max_parallel-status=Gleichzeitig zugelassene Benutzer in diesem Door
 door_editor_max_parallel-help=
