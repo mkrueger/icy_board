@@ -192,10 +192,7 @@ def local_login_probe(files):
             raise RuntimeError("Live board changed during cloning")
         fixtures = scratch / "COMPAT"
         fixtures.mkdir()
-        inputs = [(path.name, path.read_bytes()) for path in files]
-        inputs.extend((f"numbered-{count}", ("@CLS@@X07" + "".join(
-            f"[body-{number:03d}]\r\n" for number in range(1, count + 1)) + "@X07").encode("ascii"))
-            for count in (21, 22, 23, 24, 25, 46))
+        inputs = fixture_inputs(files)
         for index, (name, data) in enumerate(inputs):
             (fixtures / f"F{index}.PCB").write_bytes(data)
             (out / f"F{index}.PCB").write_bytes(data)
@@ -279,13 +276,261 @@ def local_login_probe(files):
     return 0 if metadata["status"] == "complete" else 1
 
 
+def fixture_inputs(files):
+    """The supplied display files byte-for-byte, plus numbered files around the boundary."""
+    inputs = [(path.name, path.read_bytes()) for path in files]
+    inputs.extend((f"numbered-{count}", ("@CLS@@X07" + "".join(
+        f"[body-{number:03d}]\r\n" for number in range(1, count + 1)) + "@X07").encode("ascii"))
+        for count in (21, 22, 23, 24, 25, 46))
+    return inputs
+
+
+def local_session_probe(files, carrier, out, before):
+    """Resumes a normally started board as a local caller.
+
+    PCBOARD.SYS carries the layout switch: "Local" keeps the two status lines of a normal
+    install, "LOCAL" selects the single-line /LOCALON layout (SYS.C readpcboardsys).
+    """
+    metadata = {"status": "starting", "output": str(out), "carrier": carrier, "cases": []}
+    scratch = Path(tempfile.mkdtemp(prefix="pcblocal-"))
+    process = None
+    try:
+        metadata["scratch"] = str(scratch)
+        shutil.copytree(DOS / "PCB", scratch / "PCB", symlinks=False)
+        (scratch / "RA").mkdir()
+        shutil.copy2(DOS / "RA/X00.EXE", scratch / "RA/X00.EXE")
+        fixtures = scratch / "COMPAT"
+        fixtures.mkdir()
+        if fingerprint(scratch / "PCB") != before["PCB"]:
+            raise RuntimeError("Live board changed during clone; refusing to launch")
+        inputs = fixture_inputs(files)
+        for index, (name, data) in enumerate(inputs):
+            (fixtures / f"F{index}.PCB").write_bytes(data)
+            (out / f"F{index}.PCB").write_bytes(data)
+            metadata.setdefault("fixtures", []).append({"name": name, "crlf": data.count(b"\r\n"),
+                                                        "sha256": hashlib.sha256(data).hexdigest()})
+        source = ["BOOLEAN captureError", "INTEGER i", "INTEGER bottom", "GETUSER",
+                  'FCREATE 1, "C:\\COMPAT\\ROWS.OUT", O_WR, S_DN',
+                  "STARTDISP FNS", 'PRINT "@CLS@"',
+                  "FOR i = 1 TO 40", '  PRINTLN "[probe-", i, "]"', "NEXT",
+                  "bottom = GETY()", 'FPUTLN 1, "rows|", bottom',
+                  "U_PAGELEN = 24", "PUTUSER"]
+        for index, (name, _) in enumerate(inputs):
+            metadata["cases"].append({"case": index, "fixture": name})
+            source.extend([
+                "STARTDISP FCL", "KBDFLUSH",
+                "KBDSTUFF " + " + ".join(["CHR(13)"] * 100),
+                f'OPENCAP "C:\\COMPAT\\C{index}.CAP", captureError',
+                f'DISPFILE "C:\\COMPAT\\F{index}.PCB", 0',
+                f'FPUTLN 1, "case|{index}|", captureError, "|", U_PAGELEN, "|", LPRINTED(), "|", GETY()',
+                'PRINT "Username:"', "CLOSECAP",
+            ])
+        source.extend(["FCLOSE 1", "KBDFLUSH", "END", ""])
+        probe = out / "local.pps"
+        probe.write_text("\n".join(source), encoding="ascii")
+        command = ["flatpak", "run", "--nofilesystem=host", "--nofilesystem=home",
+                   f"--filesystem={scratch}", "com.dosbox_x.DOSBox-X", "-defaultconf"]
+        arguments = argparse.Namespace(dos_root=scratch, scratch=Path("COMPAT/COMPILE"), disarr=False,
+                                       dosbox=shlex.join(command), pplc=r"c:\PCB\PPLC.EXE",
+                                       output_dir=out, encoding="ascii")
+        ppe, log = pplc_oracle.compile_source(arguments, probe)
+        pplc_oracle.print_log(log)
+        if ppe is None:
+            raise RuntimeError("Original PPLC rejected the local-session probe")
+        shutil.copy2(ppe, fixtures / "ROWS.PPE")
+        # cmdtype: Name[15], SecLevel, File[40], two floats.
+        record = b"ROWS".ljust(15, b"\0") + bytes(1) + rb"C:\COMPAT\ROWS.PPE".ljust(40, b"\0") + bytes(8)
+        commands = scratch / "PCB/GEN/CMD.LST"
+        if len(record) != 64 or not commands.is_file() or commands.stat().st_size % 64:
+            raise RuntimeError("Unexpected CMD.LST layout")
+        with commands.open("ab") as handle:
+            handle.write(record)
+        # USERS record 1: name at 0, password at 49. Blanking it skips the door-return password.
+        users = scratch / "PCB/MAIN/USERS"
+        if not users.is_file() or users.stat().st_size % 0x190:
+            raise RuntimeError("Unexpected USERS record layout")
+        record_one = bytearray(users.read_bytes()[:0x190])
+        first_name = bytes(record_one[:25]).decode("cp437").strip().split(" ")[0]
+        record_one[49:61] = b" " * 12
+        with users.open("r+b") as handle:
+            handle.write(record_one)
+        # PCBOARD.SYS: resume as the sysop record so no logon dialogue is needed.
+        system = bytearray((scratch / "PCB/NODE1/PCBOARD.SYS").read_bytes())
+        if len(system) < 128:
+            raise RuntimeError("Unexpected PCBOARD.SYS size")
+        system[11:12] = b"Y"
+        system[18:23] = carrier.encode("ascii")
+        system[23:25] = (1).to_bytes(2, "little")
+        system[25:40] = first_name.encode("cp437").ljust(15, b" ")[:15]
+        (scratch / "PCB/NODE1/PCBOARD.SYS").write_bytes(system)
+        (out / "PCBOARD.SYS").write_bytes(system)
+        (scratch / "PCB/NODE1/PCBSTUFF.KBD").write_bytes(b"ROWS\rG\rY\r")
+        batch = "\r\n".join([
+            "@echo off", "cd \\RA", "x00 e", "set PCB=/NODE:1 /PORT1F:", "set PCBDRIVE=C:",
+            "set PCBDIR=\\PCB\\NODE1", "set PCBDAT=C:\\PCB\\PCBOARD.DAT", "set NODE=1",
+            "cd \\PCB\\NODE1", "if exist endpcb del endpcb",
+            "c:\\pcb\\pcboardm.exe /file:C:\\PCB\\PCBOARD.DAT",
+            "echo complete > c:\\compat\\DONE.TXT", "exit", "",
+        ])
+        (fixtures / "RUN.BAT").write_bytes(batch.encode("ascii"))
+        with (out / "dosbox.log").open("xb") as emulator_log:
+            process = subprocess.Popen(
+                command + ["-silent", "-exit", "-set", "cpu cycles=max", "-c", f'mount c "{scratch}"',
+                           "-c", "c:", "-c", "path z:\\;c:\\pcb;c:\\ra", "-c", "c:\\compat\\RUN.BAT", "-c", "exit"],
+                stdout=emulator_log, stderr=subprocess.STDOUT,
+                env={**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}, start_new_session=True)
+            try:
+                process.wait(timeout=180)
+            except subprocess.TimeoutExpired:
+                metadata["timed_out"] = True
+        results = fixtures / "ROWS.OUT"
+        if not results.is_file():
+            raise RuntimeError("The probe never ran; the resumed session did not reach the command prompt")
+        lines = results.read_text(encoding="cp437").splitlines()
+        (out / "ROWS.OUT").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        rows = next((int(line.split("|")[1]) for line in lines if line.startswith("rows|")), None)
+        if rows is None:
+            raise RuntimeError("The probe did not report the caller-area height")
+        metadata.update(display_rows=rows, status_rows=25 - rows)
+        for line in lines:
+            if not line.startswith("case|"):
+                continue
+            _, number, capture_error, page_length, printed, row = line.split("|")
+            case = metadata["cases"][int(number)]
+            if int(capture_error) != 0:
+                raise RuntimeError(f"Capture failed: {line}")
+            case.update(user_page_length=int(page_length), lines_printed=int(printed), cursor_row=int(row))
+            raw = (fixtures / f"C{number}.CAP").read_bytes()
+            (out / f"C{number}.CAP").write_bytes(raw)
+            case["reached_input"] = raw.decode("cp437").endswith("Username:")
+            print(json.dumps(case), flush=True)
+        metadata["status"] = "complete"
+    except Exception as error:
+        metadata.update(status="blocked", error=f"{type(error).__name__}: {error}")
+        print(metadata["error"], flush=True)
+    finally:
+        if process is not None and process.poll() is None:
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+        (out / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    return metadata
+
+
+def local_session_probes(files):
+    """Compares a normal install against the /LOCALON layout in one disposable run each."""
+    os.umask(0o077)
+    parent = ROOT / "target/paging-oracle"
+    parent.mkdir(parents=True, exist_ok=True)
+    before = live_fingerprints()
+    results = {}
+    for carrier in ("Local", "LOCAL"):
+        out = Path(tempfile.mkdtemp(prefix=f"local{carrier}-", dir=parent))
+        print(f"CAPTURES={out} carrier={carrier}", flush=True)
+        results[carrier] = local_session_probe(files, carrier, out, before)
+        print(json.dumps({key: results[carrier].get(key) for key in
+                          ("status", "carrier", "display_rows", "status_rows", "error")}), flush=True)
+    after = live_fingerprints()
+    unchanged = {key: before[key] == after[key] for key in before}
+    print(json.dumps({"live_unchanged": unchanged}), flush=True)
+    return 0 if all(unchanged.values()) and all(r["status"] == "complete" for r in results.values()) else 1
+
+
+def launch_board(scratch, out, metadata, emulator_log):
+    """Boots the cloned board with its serial port bridged to a free TCP port."""
+    with socket.socket() as reservation:
+        reservation.bind(("0.0.0.0", 0))
+        port = reservation.getsockname()[1]
+    conf = scratch / "oracle.conf"
+    conf.write_text(f"""[sdl]
+autolock=false
+[dosbox]
+memsize=16
+machine=svga_s3
+[cpu]
+core=auto
+cputype=auto
+cycles=max
+[serial]
+serial1=nullmodem port:{port} transparent:1
+serial2=disabled
+serial3=disabled
+serial4=disabled
+[autoexec]
+mount c {scratch}
+c:
+path z:\\;c:\\pcb;c:\\ra
+cd \\RA
+x00 e
+set PCB=/NODE:1 /PORT1F:
+set PCBDRIVE=C:
+set PCBDIR=\\PCB\\NODE1
+set PCBDAT=C:\\PCB\\PCBOARD.DAT
+set NODE=1
+cd \\PCB\\NODE1
+if exist endpcb del endpcb
+call c:\\compat\\RUNPCB.BAT
+exit
+""")
+    command = ["flatpak", "run", "--nofilesystem=host", "--nofilesystem=home",
+               f"--filesystem={scratch}", "com.dosbox_x.DOSBox-X",
+               "-defaultconf", "-conf", str(conf)]
+    metadata["command"] = command
+    metadata["port"] = port
+    (out / "oracle.conf").write_bytes(conf.read_bytes())
+    proc = subprocess.Popen(command, stdout=emulator_log, stderr=subprocess.STDOUT,
+                            env={**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"},
+                            start_new_session=True)
+    metadata["child_pid"] = proc.pid
+    return proc, port
+
+
+def fixture_login(session):
+    """Answers only the approved logon prompts of the throwaway oracle account."""
+    view = session.read()
+    rules = bbs.load_rules([], ROOT / "compat/logon.expect")
+    rules.insert(0, (re.compile("Scan Message Base Since", re.I), "N"))
+    approved = {r"\(Enter\) to continue", r"- more \]-", r"More\? \[Y",
+                "you want graphics", "What is your first name", "What is your last name",
+                "username:", r"Password \(Dots will echo", "password:", "Scan Message Base Since"}
+    startup_reads = 0
+    for _ in range(45):
+        if MENU.search(view):
+            break
+        for pattern, answer in rules:
+            if pattern.search(view[-400:]):
+                if pattern.pattern not in approved:
+                    raise RuntimeError(f"Unapproved login/profile prompt: {pattern.pattern}")
+                if pattern.pattern == "you want graphics":
+                    view = session.send("Y", "[enable ANSI graphics]")
+                else:
+                    view = session.send(answer, "[fixture login response]")
+                break
+        else:
+            # ANSI detection can pause after the version banner, before logon.
+            if startup_reads < 3 and "PCBoard (R) v15.4" in "".join(e["text"] for e in session.events):
+                startup_reads += 1
+                view = session.read()
+                continue
+            raise RuntimeError("No safe fixture login rule matched")
+    require(view, MENU)
+    return view
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--help-boundaries", action="store_true",
                         help="only probe PGC24 with H at the first More, then Enter, for page lengths 1, 2, 5, 23")
     parser.add_argument("--login-files", nargs="+", type=Path,
                         help="probe these exact display files and counted boundaries in a disposable local /PPE session")
+    parser.add_argument("--local-session", nargs="+", type=Path, metavar="FILE",
+                        help="probe these display files in a resumed local session of a normally started board")
     args = parser.parse_args()
+    if args.local_session:
+        return local_session_probes(args.local_session)
     if args.login_files:
         return local_login_probe(args.login_files)
     os.umask(0o077)
@@ -327,80 +572,11 @@ def main():
                 metadata["fixtures"].append({"name": name, "lines": length, "cls": cls,
                                              "sha256": hashlib.sha256(data).hexdigest()})
         metadata["original_hlpe_sha256"] = hashlib.sha256((scratch / "PCB/HELP/HLPE").read_bytes()).hexdigest()
-        with socket.socket() as reservation:
-            reservation.bind(("0.0.0.0", 0))
-            port = reservation.getsockname()[1]
-        conf = scratch / "oracle.conf"
-        conf.write_text(f"""[sdl]
-autolock=false
-[dosbox]
-memsize=16
-machine=svga_s3
-[cpu]
-core=auto
-cputype=auto
-cycles=max
-[serial]
-serial1=nullmodem port:{port} transparent:1
-serial2=disabled
-serial3=disabled
-serial4=disabled
-[autoexec]
-mount c {scratch}
-c:
-path z:\\;c:\\pcb;c:\\ra
-cd \\RA
-x00 e
-set PCB=/NODE:1 /PORT1F:
-set PCBDRIVE=C:
-set PCBDIR=\\PCB\\NODE1
-set PCBDAT=C:\\PCB\\PCBOARD.DAT
-set NODE=1
-cd \\PCB\\NODE1
-if exist endpcb del endpcb
-call c:\\compat\\RUNPCB.BAT
-exit
-""")
-        command = ["flatpak", "run", "--nofilesystem=host", "--nofilesystem=home",
-                   f"--filesystem={scratch}", "com.dosbox_x.DOSBox-X",
-                   "-defaultconf", "-conf", str(conf)]
-        metadata["command"] = command
-        metadata["port"] = port
-        (out / "oracle.conf").write_bytes(conf.read_bytes())
         with (out / "dosbox.log").open("xb") as emulator_log:
-            proc = subprocess.Popen(command, stdout=emulator_log, stderr=subprocess.STDOUT,
-                                    env={**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"},
-                                    start_new_session=True)
-            metadata["child_pid"] = proc.pid
+            proc, port = launch_board(scratch, out, metadata, emulator_log)
             with bbs.connect("127.0.0.1", port, 30) as sock:
                 session = Session(sock, out)
-                view = session.read()
-                rules = bbs.load_rules([], ROOT / "compat/logon.expect")
-                rules.insert(0, (re.compile("Scan Message Base Since", re.I), "N"))
-                approved = {r"\(Enter\) to continue", r"- more \]-", r"More\? \[Y",
-                            "you want graphics", "What is your first name", "What is your last name",
-                            "username:", r"Password \(Dots will echo", "password:", "Scan Message Base Since"}
-                startup_reads = 0
-                for _ in range(45):
-                    if MENU.search(view):
-                        break
-                    for pattern, answer in rules:
-                        if pattern.search(view[-400:]):
-                            if pattern.pattern not in approved:
-                                raise RuntimeError(f"Unapproved login/profile prompt: {pattern.pattern}")
-                            if pattern.pattern == "you want graphics":
-                                view = session.send("Y", "[enable ANSI graphics]")
-                            else:
-                                view = session.send(answer, "[fixture login response]")
-                            break
-                    else:
-                        # ANSI detection can pause after the version banner, before logon.
-                        if startup_reads < 3 and "PCBoard (R) v15.4" in "".join(e["text"] for e in session.events):
-                            startup_reads += 1
-                            view = session.read()
-                            continue
-                        raise RuntimeError("No safe fixture login rule matched")
-                require(view, MENU)
+                view = fixture_login(session)
                 metadata["version_banner"] = next((e["text"] for e in session.events if "15.4" in e["text"]), None)
                 if metadata["version_banner"] is None:
                     raise RuntimeError("PCBoard 15.4 banner not observed")

@@ -92,15 +92,17 @@ fn a_local_session_knows_that_it_is_local() {
     assert!(output.starts_with("LOCAL=1"), "{output:?}");
 }
 
-/// The console keeps its last row for the status bar, so the board is given the rows
+/// The console keeps its last two rows for the status bar, so the board is given the rows
 /// above them and scrolls there rather than writing behind the bar.
 #[test]
 fn a_local_session_gets_the_rows_the_status_bar_leaves() {
     let output = test_ppe_output(";$LANGVERSION 400\nPRINT \"SIZE=\", Terminal.Info.Columns, \"x\", Terminal.Info.Rows", |_| {});
 
-    assert!(output.starts_with("SIZE=80x24"), "{output:?}");
+    assert!(output.starts_with("SIZE=80x23"), "{output:?}");
 }
 
+/// The counted boundary of a local session, measured on PCBoard 15.4/M with a page length of
+/// 24: it pauses every 22 newlines, which is its twenty-three row screen less the prompt row.
 #[test]
 fn login_ppe_display_matches_pcboard_local_paging() {
     let directory = tempfile::tempdir().unwrap();
@@ -146,7 +148,7 @@ fn login_ppe_display_matches_pcboard_local_paging() {
                 ";$LANGVERSION 320\nDISPFILE \"{}\", 0\nPRINT \"[counter=\", LPRINTED(), \"]Username:\"\nPRINT \"@POFF@\"",
                 path.display()
             ),
-            &"\r".repeat(newlines / 23),
+            &"\r".repeat(newlines / 22),
             |board| {
                 board.users[0].page_len = 24;
                 board
@@ -155,10 +157,10 @@ fn login_ppe_display_matches_pcboard_local_paging() {
                     .unwrap();
             },
         );
-        assert!(output.contains(&format!("[counter={}]Username:", newlines % 23)), "{newlines}: {output:?}");
-        if newlines < 23 {
-            assert!(!output.contains("[login-more]"), "{newlines}: {output:?}");
-            let mut screen = TextScreen::new((80, 24));
+        assert!(output.contains(&format!("[counter={}]Username:", newlines % 22)), "{newlines}: {output:?}");
+        assert_eq!(output.contains("[login-more]"), newlines >= 22, "{newlines}: {output:?}");
+        if newlines < 22 {
+            let mut screen = TextScreen::new((80, 23));
             screen.buffer.buffer_type = icy_engine::BufferType::Unicode;
             let login = &output[..output.find("Username:").unwrap() + "Username:".len()];
             AnsiParser::default().parse(login.replace('\n', "\r\n").as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));

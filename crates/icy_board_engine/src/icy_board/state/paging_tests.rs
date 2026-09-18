@@ -423,22 +423,29 @@ async fn body_line(state: &mut IcyBoardState, number: usize) {
     state.new_line().await.unwrap();
 }
 
+/// Oracle, PCBoard 15.4/M with two status lines: a caller whose page length is 24 pauses on
+/// the 22nd newline of a local session and on the 24th of a remote one, so the login display
+/// of the report (22 newlines) only reaches the prompt unpaused when the caller is remote.
 #[tokio::test]
-async fn login_display_23_lines_reaches_input_without_more() {
+async fn login_display_pauses_on_the_local_boundary_only() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("login.pcb");
     std::fs::write(&path, format!("@CLS@@X07{}@X07", "\r\n".repeat(22))).unwrap();
-    let (mut state, mut peer) = paging_state(24, true).await;
-    state.set_terminal_size(80, 24);
-    state.session.current_user = None;
-    state.session.cur_user_id = -1;
-    let output = exchange(&mut state, &mut peer, &[], async |state| {
-        state.display_file(&path).await.unwrap();
-        state.print(TerminalTarget::Both, "Username:").await.unwrap();
-    })
-    .await;
-    assert!(!output.text().contains(MORE));
-    assert!(row(&screen(&output.raw, 24), 22).starts_with("Username:"));
+    for local in [false, true] {
+        let (mut state, mut peer) = paging_state(24, local).await;
+        state.session.current_user = None;
+        state.session.cur_user_id = -1;
+        let replies: &[(Prompt, &str)] = if local { &[(Prompt::More, "\r")] } else { &[] };
+        let output = exchange(&mut state, &mut peer, replies, async |state| {
+            state.display_file(&path).await.unwrap();
+            state.print(TerminalTarget::Both, "Username:").await.unwrap();
+        })
+        .await;
+        assert_eq!(state.session.disp_options.num_lines_printed, if local { 0 } else { 22 });
+        assert_eq!(output.text().contains(MORE), local);
+        let height = if local { 23 } else { 25 };
+        assert!(row(&screen(&output.raw, height), 22).starts_with("Username:"));
+    }
 }
 
 #[tokio::test]

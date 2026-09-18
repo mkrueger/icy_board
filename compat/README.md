@@ -125,31 +125,45 @@ Hard-won details, all of which cost a debugging cycle:
 ### Local login paging
 
 ```sh
-.venv/bin/python compat/paging_oracle.py --login-files /path/to/R7-LOGIN21.pcb /path/to/R7-LOGIN22.pcb /path/to/R7-LOGIN23.pcb
+.venv/bin/python compat/paging_oracle.py --local-session /path/to/R7-LOGIN21.pcb /path/to/R7-LOGIN22.pcb /path/to/R7-LOGIN23.pcb
 ```
 
-This mode clones the board, compiles a local `/PPE:` probe with the installed
-PPLC, and displays the supplied files byte-for-byte. It records `LPRINTED()`
-and `GETY()`, with queued Enter responses for boundary cases, under
-`target/paging-oracle/login-*`. Capture files omit prompts answered by queued
-input; the counter resets, not visible prompt text, identify paging boundaries.
-The live installation is fingerprinted and is never mounted.
+This mode clones the board twice, compiles a probe with the installed PPLC and
+displays the supplied files byte-for-byte in a **normally started** board. No
+serial port is needed: the clone's PCBOARD.SYS resumes the sysop record as a
+local caller and PCBSTUFF.KBD types the probe command. `LPRINTED()` and `GETY()`
+go to a file, so prompts answered from the stuffed keyboard cannot hide a pause;
+a counter that fell back to zero is what marks a boundary. The live installation
+is fingerprinted and is never mounted.
 
-PCBoard 15.4/M with PPLC 3.40 (2026-09-18) leaves the supplied 21/22/23-line
-files at counters 20/21/22 and cursor rows 21/22/23 without a pause. The files
-end with an unterminated color code: the "23-line" file has only 22 CRLFs.
-Numbered files with 23/24/25/46 newlines leave counters 0/1/2/0 locally.
-The same boundary holds after `PUTUSER` with page length 23, 24, or 255;
-page length 1 pauses each line and 0 disables paging after `PUTUSER`.
+**`PCBOARD.SYS` carries the layout switch, and it decides the result.** Its
+carrier field `"Local"` keeps a normal install, `"LOCAL"` selects `/LOCALON`
+(`SYS.C readpcboardsys`). Measured on PCBoard 15.4/M with PPLC 3.40 (2026-09-18),
+caller page length 24:
 
-The controlling source is `MAIN/INIT.C::setscreen` (24 local display rows,
-one status row; 23 display rows when monitoring a remote caller),
-`MAIN/MISC.C::checkpagelen` (user length minus one, locally capped at display
-height minus two), and `DISPLAY/DISPLAY.C::newline` (increment, then compare
-with `>`). Thus a normal 80x25 local console pauses on newline 23, not 22.
-IcyBoard must reserve only one local status row; changing the counter comparison
-would incorrectly move remote paging boundaries. This probe verifies the
-installed versions, not the reporter's unavailable PPLC 3.20 login PPE.
+| Boot | Status lines | Caller rows | Pauses after |
+| --- | --- | --- | --- |
+| normal install | 2 | 23 | 22 newlines |
+| `/LOCALON` | 1 | 24 | 23 newlines |
+
+The supplied files end with an unterminated color code, so the "23-line" file
+holds only 22 CRLFs: it pauses in a normal local session and does not in
+`/LOCALON`. A remote caller is not capped by the console at all and pauses after
+24 newlines, so the same file reaches the prompt unpaused.
+
+`MAIN/INIT.C::setscreen` sizes this (`MaxNumScrnLines-2` with two status lines,
+`-1` with one), `MAIN/MISC.C::checkpagelen` caps a local caller at
+`min(PageLen-1, NumScrnLines-2)`, and `DISPLAY/DISPLAY.C::newline` increments
+before comparing with `>`.
+
+**`--login-files` measures `/LOCALON`, not a normal board.** `/PPE:` and
+`/RUNPPE` set `LocalOn = TRUE` themselves (`INIT.C runppe`), so that mode cannot
+answer questions about the status lines or the local page length; use
+`--local-session` for those.
+
+The remote oracle below currently cannot run: DOSBox-X 2026.08.31 rejects
+`serial1=nullmodem` with "Invalid type for serial1", although the type is still
+listed in its reference configuration.
 
 ## Driving the session
 
