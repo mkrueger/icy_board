@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -20,6 +21,7 @@ import tempfile
 sys.dont_write_bytecode = True
 import bbs_session as bbs
 import pyte
+import pplc_oracle
 
 ROOT = Path(__file__).resolve().parents[1]
 DOS = Path.home() / "dos"
@@ -174,11 +176,118 @@ class Session:
         return view, result
 
 
+def local_login_probe(files):
+    os.umask(0o077)
+    parent = ROOT / "target/paging-oracle"
+    parent.mkdir(parents=True, exist_ok=True)
+    out = Path(tempfile.mkdtemp(prefix="login-", dir=parent))
+    scratch = Path(tempfile.mkdtemp(prefix="pcblogin-"))
+    before = live_fingerprints()
+    metadata = {"status": "starting", "scratch": str(scratch), "cases": []}
+    process = None
+    print(f"CAPTURES={out}", flush=True)
+    try:
+        shutil.copytree(DOS / "PCB", scratch / "PCB")
+        if fingerprint(scratch / "PCB") != before["PCB"]:
+            raise RuntimeError("Live board changed during cloning")
+        fixtures = scratch / "COMPAT"
+        fixtures.mkdir()
+        inputs = [(path.name, path.read_bytes()) for path in files]
+        inputs.extend((f"numbered-{count}", ("@CLS@@X07" + "".join(
+            f"[body-{number:03d}]\r\n" for number in range(1, count + 1)) + "@X07").encode("ascii"))
+            for count in (21, 22, 23, 24, 25, 46))
+        for index, (name, data) in enumerate(inputs):
+            (fixtures / f"F{index}.PCB").write_bytes(data)
+            (out / f"F{index}.PCB").write_bytes(data)
+            metadata.setdefault("fixtures", []).append({"name": name, "crlf": data.count(b"\r\n"),
+                "sha256": hashlib.sha256(data).hexdigest()})
+        source = ["BOOLEAN captureError", 'FCREATE 1, "C:\\COMPAT\\RESULT.OUT", O_WR, S_DN', "GETUSER"]
+        for page_length in (None, 0, 1, 23, 24, 255):
+            if page_length is not None:
+                source.extend([f"U_PAGELEN = {page_length}", "PUTUSER"])
+            for index, (name, _) in enumerate(inputs):
+                case = len(metadata["cases"])
+                metadata["cases"].append({"case": case, "fixture": name, "putuser_page_length": page_length})
+                source.extend([
+                    "KBDFLUSH",
+                    "KBDSTUFF " + " + ".join(["CHR(13)"] * 100),
+                    f'OPENCAP "C:\\COMPAT\\C{case}.CAP", captureError',
+                    f'DISPFILE "C:\\COMPAT\\F{index}.PCB", 0',
+                    f'FPUTLN 1, "{case}|", captureError, "|", U_PAGELEN, "|", LPRINTED(), "|", GETY()',
+                    'PRINT "Username:"', "CLOSECAP",
+                ])
+        source.extend(["FCLOSE 1", "KBDFLUSH", "END"])
+        probe = out / "login.pps"
+        probe.write_text("\n".join(source) + "\n", encoding="ascii")
+        command = ["flatpak", "run", "--nofilesystem=host", "--nofilesystem=home",
+                   f"--filesystem={scratch}", "com.dosbox_x.DOSBox-X", "-defaultconf"]
+        arguments = argparse.Namespace(dos_root=scratch, scratch=Path("COMPAT/COMPILE"),
+            disarr=False, dosbox=shlex.join(command), pplc=r"c:\PCB\PPLC.EXE", output_dir=out, encoding="ascii")
+        ppe, log = pplc_oracle.compile_source(arguments, probe)
+        pplc_oracle.print_log(log)
+        if ppe is None:
+            raise RuntimeError("Original PPLC rejected the login probe")
+        shutil.copy2(ppe, fixtures / "LOGIN.PPE")
+        batch = "\r\n".join([
+            "@echo off", "set PCB=", "set PCBDRIVE=C:", "set PCBDIR=\\PCB\\NODE1",
+            "set PCBDAT=C:\\PCB\\PCBOARD.DAT", "set NODE=1", "cd \\PCB\\NODE1",
+            "c:\\pcb\\pcboardm.exe /file:C:\\PCB\\PCBOARD.DAT /PPE:C:\\COMPAT\\LOGIN.PPE",
+            "if errorlevel 1 goto failed", "echo complete > c:\\compat\\DONE.TXT", "goto done",
+            ":failed", "echo failed > c:\\compat\\FAIL.TXT", ":done", "exit", "",
+        ])
+        (fixtures / "RUN.BAT").write_bytes(batch.encode("ascii"))
+        with (out / "dosbox.log").open("xb") as emulator_log:
+            process = subprocess.Popen(command + ["-silent", "-exit", "-set", "cpu cycles=max",
+                "-c", f'mount c "{scratch}"', "-c", "c:", "-c", "path z:\\;c:\\pcb",
+                "-c", "c:\\compat\\RUN.BAT", "-c", "exit"], stdout=emulator_log, stderr=subprocess.STDOUT,
+                env={**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}, start_new_session=True)
+            process.wait(timeout=120)
+        if process.returncode or not (fixtures / "DONE.TXT").is_file():
+            raise RuntimeError("PCBoard did not complete the login probe")
+        results = (fixtures / "RESULT.OUT").read_text(encoding="cp437").splitlines()
+        if len(results) != len(metadata["cases"]):
+            raise RuntimeError("Incomplete login probe results")
+        for case, result in zip(metadata["cases"], results):
+            number, capture_error, user_length, printed, row = map(int, result.split("|"))
+            if number != case["case"] or capture_error != 0:
+                raise RuntimeError(f"Bad capture result: {result}")
+            raw = (fixtures / f"C{number}.CAP").read_bytes()
+            (out / f"C{number}.CAP").write_bytes(raw)
+            text = raw.decode("cp437")
+            if not text.endswith("Username:"):
+                raise RuntimeError("Capture did not reach username input")
+            case.update(user_page_length=user_length, lines_printed=printed, cursor_row=row)
+            print(json.dumps(case), flush=True)
+        metadata["status"] = "complete"
+    except Exception as error:
+        metadata.update(status="blocked", error=f"{type(error).__name__}: {error}")
+        print(metadata["error"], flush=True)
+    finally:
+        if process is not None and process.poll() is None:
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+        after = live_fingerprints()
+        metadata["live_unchanged"] = {key: before[key] == after[key] for key in before}
+        if not all(metadata["live_unchanged"].values()):
+            metadata["status"] = "blocked"
+        (out / "run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({key: metadata[key] for key in ("status", "live_unchanged")}), flush=True)
+    return 0 if metadata["status"] == "complete" else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--help-boundaries", action="store_true",
                         help="only probe PGC24 with H at the first More, then Enter, for page lengths 1, 2, 5, 23")
+    parser.add_argument("--login-files", nargs="+", type=Path,
+                        help="probe these exact display files and counted boundaries in a disposable local /PPE session")
     args = parser.parse_args()
+    if args.login_files:
+        return local_login_probe(args.login_files)
     os.umask(0o077)
     parent = ROOT / "target/paging-oracle"
     parent.mkdir(parents=True, exist_ok=True)

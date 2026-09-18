@@ -92,11 +92,79 @@ fn a_local_session_knows_that_it_is_local() {
     assert!(output.starts_with("LOCAL=1"), "{output:?}");
 }
 
-/// The console keeps its last two rows for the status bar, so the board is given the rows
+/// The console keeps its last row for the status bar, so the board is given the rows
 /// above them and scrolls there rather than writing behind the bar.
 #[test]
 fn a_local_session_gets_the_rows_the_status_bar_leaves() {
     let output = test_ppe_output(";$LANGVERSION 400\nPRINT \"SIZE=\", Terminal.Info.Columns, \"x\", Terminal.Info.Rows", |_| {});
 
-    assert!(output.starts_with("SIZE=80x23"), "{output:?}");
+    assert!(output.starts_with("SIZE=80x24"), "{output:?}");
+}
+
+#[test]
+fn login_ppe_display_matches_pcboard_local_paging() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("LOGIN.PCB");
+    for newlines in [20, 21, 22, 23, 24, 25, 46] {
+        let mut display = b"@CLS@@X07\r\n\r\n\r\n\r\n\r\n\r\n\r\n".to_vec();
+        for (index, label) in ["", "LOGIN.AS.:", "PASSWORD.:", "", "FUNCTION.:", "LAST.SEEN:", "", "", ""].iter().enumerate() {
+            display.extend_from_slice(b"@X08                                                  ");
+            if matches!(index, 0 | 3 | 6 | 8) {
+                display.push(if index == 0 {
+                    0xDA
+                } else if index == 8 {
+                    0xC0
+                } else {
+                    0xC3
+                });
+                display.extend_from_slice(&[0xC4; 25]);
+                display.push(if index == 0 {
+                    0xBF
+                } else if index == 8 {
+                    0xD9
+                } else {
+                    0xB4
+                });
+            } else {
+                display.push(0xB3);
+                display.extend_from_slice(format!("@X07{label:25}@X08").as_bytes());
+                display.push(0xB3);
+            }
+            display.extend_from_slice(b"\r\n");
+        }
+        display.extend_from_slice("\r\n".repeat(newlines - 16).as_bytes());
+        display.extend_from_slice(b"@X07");
+        if newlines <= 22
+            && let Some(fixtures) = std::env::var_os("ICB_LOGIN_PAGING_FIXTURES")
+        {
+            display = std::fs::read(std::path::PathBuf::from(fixtures).join(format!("R7-LOGIN{}.pcb", newlines + 1))).unwrap();
+            assert_eq!(display.windows(2).filter(|bytes| *bytes == b"\r\n").count(), newlines);
+        }
+        std::fs::write(&path, display).unwrap();
+        let output = test_ppe_output_with_input(
+            &format!(
+                ";$LANGVERSION 320\nDISPFILE \"{}\", 0\nPRINT \"[counter=\", LPRINTED(), \"]Username:\"\nPRINT \"@POFF@\"",
+                path.display()
+            ),
+            &"\r".repeat(newlines / 23),
+            |board| {
+                board.users[0].page_len = 24;
+                board
+                    .default_display_text
+                    .update_record_number(icy_board_engine::icy_board::icb_text::IceText::MorePrompt as usize, "[login-more]")
+                    .unwrap();
+            },
+        );
+        assert!(output.contains(&format!("[counter={}]Username:", newlines % 23)), "{newlines}: {output:?}");
+        if newlines < 23 {
+            assert!(!output.contains("[login-more]"), "{newlines}: {output:?}");
+            let mut screen = TextScreen::new((80, 24));
+            screen.buffer.buffer_type = icy_engine::BufferType::Unicode;
+            let login = &output[..output.find("Username:").unwrap() + "Username:".len()];
+            AnsiParser::default().parse(login.replace('\n', "\r\n").as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+            let row = |row| (0..80).map(|column| screen.char_at((column, row).into()).ch).collect::<String>();
+            assert!(row(8).contains("LOGIN.AS.:"), "{newlines}: {:?}", row(8));
+            assert!(row(newlines as i32).contains("Username:"), "{newlines}: {:?}", row(newlines as i32));
+        }
+    }
 }

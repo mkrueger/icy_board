@@ -424,15 +424,33 @@ async fn body_line(state: &mut IcyBoardState, number: usize) {
 }
 
 #[tokio::test]
-async fn counted_boundaries_and_rendered_prompt_rows_remote25_local23() {
-    for local in [false, true] {
+async fn login_display_23_lines_reaches_input_without_more() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("login.pcb");
+    std::fs::write(&path, format!("@CLS@@X07{}@X07", "\r\n".repeat(22))).unwrap();
+    let (mut state, mut peer) = paging_state(24, true).await;
+    state.set_terminal_size(80, 24);
+    state.session.current_user = None;
+    state.session.cur_user_id = -1;
+    let output = exchange(&mut state, &mut peer, &[], async |state| {
+        state.display_file(&path).await.unwrap();
+        state.print(TerminalTarget::Both, "Username:").await.unwrap();
+    })
+    .await;
+    assert!(!output.text().contains(MORE));
+    assert!(row(&screen(&output.raw, 24), 22).starts_with("Username:"));
+}
+
+#[tokio::test]
+async fn counted_boundaries_and_rendered_prompt_rows_remote25_local23_24_25() {
+    for (local, height) in [(false, 25), (true, 23), (true, 24), (true, 25)] {
         for page_len in [0, 1, 2, 5, 23, 24, 255] {
             let (mut state, mut peer) = paging_state(page_len, local).await;
-            let height = if local { 23 } else { 25 };
+            state.set_terminal_size(80, height as u16);
             let limit = if page_len == 0 {
                 None
             } else {
-                Some(usize::from(if local { page_len.min(22) } else { page_len }))
+                Some(usize::from(if local { page_len.min(height as u16 - 1) } else { page_len }))
             };
             assert_eq!(state.page_line_limit(), limit);
             let lines = limit.map_or(256, |limit| 2 * limit + limit.saturating_sub(1));

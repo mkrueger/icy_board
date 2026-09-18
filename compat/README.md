@@ -122,6 +122,35 @@ Hard-won details, all of which cost a debugging cycle:
 * PCBoard exits after every call, so the batch file has to loop to serve more
   than one session.
 
+### Local login paging
+
+```sh
+.venv/bin/python compat/paging_oracle.py --login-files /path/to/R7-LOGIN21.pcb /path/to/R7-LOGIN22.pcb /path/to/R7-LOGIN23.pcb
+```
+
+This mode clones the board, compiles a local `/PPE:` probe with the installed
+PPLC, and displays the supplied files byte-for-byte. It records `LPRINTED()`
+and `GETY()`, with queued Enter responses for boundary cases, under
+`target/paging-oracle/login-*`. Capture files omit prompts answered by queued
+input; the counter resets, not visible prompt text, identify paging boundaries.
+The live installation is fingerprinted and is never mounted.
+
+PCBoard 15.4/M with PPLC 3.40 (2026-09-18) leaves the supplied 21/22/23-line
+files at counters 20/21/22 and cursor rows 21/22/23 without a pause. The files
+end with an unterminated color code: the "23-line" file has only 22 CRLFs.
+Numbered files with 23/24/25/46 newlines leave counters 0/1/2/0 locally.
+The same boundary holds after `PUTUSER` with page length 23, 24, or 255;
+page length 1 pauses each line and 0 disables paging after `PUTUSER`.
+
+The controlling source is `MAIN/INIT.C::setscreen` (24 local display rows,
+one status row; 23 display rows when monitoring a remote caller),
+`MAIN/MISC.C::checkpagelen` (user length minus one, locally capped at display
+height minus two), and `DISPLAY/DISPLAY.C::newline` (increment, then compare
+with `>`). Thus a normal 80x25 local console pauses on newline 23, not 22.
+IcyBoard must reserve only one local status row; changing the counter comparison
+would incorrectly move remote paging boundaries. This probe verifies the
+installed versions, not the reporter's unavailable PPLC 3.20 login PPE.
+
 ## Driving the session
 
 `bbs_session.py` answers prompts by pattern rather than by position, because the

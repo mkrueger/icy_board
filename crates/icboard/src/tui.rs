@@ -44,10 +44,11 @@ const STATUS_HELP: &str = "ALT-H=Help ALT-X=Exit";
 
 /// Rows the sysop status bar sits on, kept out of the session's own screen.
 pub(crate) const STATUS_ROWS: u16 = 2;
+const LOCAL_STATUS_ROWS: u16 = 1;
 
 /// What a local session gets to write on: the console is twenty-five rows and the status
 /// bar keeps the last of them, so the board scrolls in what is left.
-pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - STATUS_ROWS);
+pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - LOCAL_STATUS_ROWS);
 
 #[derive(Debug, PartialEq)]
 enum SysopHotkey {
@@ -142,10 +143,10 @@ fn new_monitor_screen() -> TextScreen {
 
 /// Places the screen and the status bar below it, clamped to the terminal. The bar keeps
 /// its rows, so a screen too tall for the terminal loses rows before the bar does.
-fn terminal_layout(frame_area: Rect, view_size: (u16, u16)) -> (Rect, Option<Rect>) {
+fn terminal_layout(frame_area: Rect, view_size: (u16, u16), sysop_mode: bool) -> (Rect, Option<Rect>) {
     let (view_width, view_height) = view_size;
     let width = frame_area.width.min(view_width);
-    let status_height = STATUS_ROWS.min(frame_area.height);
+    let status_height = (if sysop_mode { STATUS_ROWS } else { LOCAL_STATUS_ROWS }).min(frame_area.height);
     let height = view_height.min(frame_area.height - status_height);
     let total_height = height + status_height;
     let x = frame_area.x + (frame_area.width - width) / 2;
@@ -519,7 +520,7 @@ impl Tui {
         let screen = &self.screen.lock().unwrap();
         let view_width = screen.buffer.terminal_state.width().max(0) as u16;
         let view_height = screen.buffer.terminal_state.height().max(0) as u16;
-        let (area, status_area) = terminal_layout(frame.area(), (view_width, view_height));
+        let (area, status_area) = terminal_layout(frame.area(), (view_width, view_height), self.sysop_mode);
 
         if self.display_visible {
             for y in 0..area.height as i32 {
@@ -843,7 +844,7 @@ impl Tui {
                 screen.buffer.terminal_state.height().max(0) as u16,
             );
             // Reported through the same layout that drew it, or the two drift apart.
-            let (area, _) = terminal_layout(Rect::new(0, 0, terminal_size.width, terminal_size.height), view);
+            let (area, _) = terminal_layout(Rect::new(0, 0, terminal_size.width, terminal_size.height), view, self.sysop_mode);
             (state, area.x, area.y)
         };
         if state.mouse_mode == MouseMode::OFF {
@@ -1240,24 +1241,41 @@ EXIT
         assert_eq!(screen.buffer.buffer_type.convert_to_unicode(cell.ch), '═');
     }
 
-    /// A local session writes on twenty-three rows and the bar sits under them, which
+    /// A local session writes on twenty-four rows and the bar sits under them, which
     /// fills an eighty by twenty-five console exactly.
     #[test]
     fn a_local_screen_and_the_bar_fill_a_25_row_console() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), LOCAL_SCREEN_SIZE);
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), LOCAL_SCREEN_SIZE, false);
 
-        assert_eq!(screen, Rect::new(0, 0, 80, 23));
-        assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
+        assert_eq!(screen, Rect::new(0, 0, 80, 24));
+        assert_eq!(status, Some(Rect::new(0, 24, 80, 1)));
+    }
+
+    #[test]
+    fn local_login_row_24_is_rendered_above_the_status_bar() {
+        for label in ["Username:", "Benutzername:"] {
+            let tui = test_tui();
+            let display = format!("\x1b[2J\x1b[HLOGIN\x1b[24;1H{label}");
+            AnsiParser::default().parse(display.as_bytes(), &mut icy_engine::ScreenSink::new(&mut *tui.screen.lock().unwrap()));
+            let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+            terminal.draw(|frame| tui.ui(frame, StatusBarInfo::default())).unwrap();
+            let buffer = terminal.backend().buffer();
+            let row = |row| (0..80).map(|column| buffer[(column, row)].symbol()).collect::<String>();
+            assert_eq!(row(0).trim_end(), "LOGIN");
+            assert_eq!(row(23).trim_end(), label);
+            assert!(row(24).starts_with("1(Local)"));
+            assert_eq!(terminal.get_cursor_position().unwrap(), (label.len() as u16, 23).into());
+        }
     }
 
     /// The console measures the screen, not the terminal it happens to be shown in.
     #[test]
     fn the_terminal_around_it_does_not_size_the_console() {
         for height in 25..=40 {
-            let (screen, status) = terminal_layout(Rect::new(0, 0, 100, height), LOCAL_SCREEN_SIZE);
+            let (screen, status) = terminal_layout(Rect::new(0, 0, 100, height), LOCAL_SCREEN_SIZE, false);
 
-            assert_eq!((screen.width, screen.height), (80, 23), "the board area moved at {height} rows");
-            assert_eq!(status.map(|bar| bar.height), Some(2), "the bar moved at {height} rows");
+            assert_eq!((screen.width, screen.height), (80, 24), "the board area moved at {height} rows");
+            assert_eq!(status.map(|bar| bar.height), Some(1), "the bar moved at {height} rows");
         }
     }
 
@@ -1265,7 +1283,7 @@ EXIT
     /// because a monitor without its bar is what issue 24 reported.
     #[test]
     fn a_monitor_keeps_its_bar_when_the_callers_screen_is_too_tall() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25));
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25), true);
 
         assert_eq!(screen, Rect::new(0, 0, 80, 23));
         assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
@@ -1274,7 +1292,7 @@ EXIT
     /// A screen an ANSI sequence made bigger is shown at that size, bar included.
     #[test]
     fn a_screen_resized_by_ansi_is_shown_at_its_own_size() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 45), (120, 40));
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 45), (120, 40), true);
 
         assert_eq!(screen, Rect::new(0, 1, 120, 40));
         assert_eq!(status, Some(Rect::new(0, 41, 120, 2)));
