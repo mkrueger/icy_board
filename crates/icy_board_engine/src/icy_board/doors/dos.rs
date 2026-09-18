@@ -256,14 +256,33 @@ pub fn image_file_name(door_name: &str) -> String {
     format!("{}.img", if name.is_empty() { "door" } else { &name })
 }
 
-pub fn expand_run_batch(door: &Door, node: usize, drop_file: &str) -> String {
-    let command = door
-        .dos_command
-        .replace("{dropFile}", drop_file)
-        .replace("{dropfile}", drop_file)
-        .replace("{node}", &node.to_string())
-        .replace("{baud}", "57600");
-    format!("@ECHO OFF\nCD C:\\DOOR\n{command}")
+pub fn expand_run_batch(door: &Door, node: usize, drop_file: &str) -> Res<String> {
+    let expand = |value: &str| {
+        value
+            .replace("{dropFile}", drop_file)
+            .replace("{dropfile}", drop_file)
+            .replace("{node}", &node.to_string())
+            .replace("{baud}", "57600")
+    };
+    let mut command = expand(&door.dos_command);
+    if !door.args.is_empty() {
+        command.truncate(command.trim_end().len());
+    }
+    for argument in &door.args {
+        let argument = expand(argument);
+        if argument.contains(['\r', '\n', '"', '%']) {
+            return Err("DOS arguments cannot contain line breaks, double quotes or percent signs; use the command field for batch syntax".into());
+        }
+        command.push(' ');
+        if argument.is_empty() || argument.chars().any(|character| character.is_whitespace() || matches!(character, '&' | '|' | '<' | '>')) {
+            command.push('"');
+            command.push_str(&argument);
+            command.push('"');
+        } else {
+            command.push_str(&argument);
+        }
+    }
+    Ok(format!("@ECHO OFF\nCD C:\\DOOR\n{command}"))
 }
 
 pub fn validate_simple_command(source_directory: &Path, command: &str) -> Res<()> {
@@ -366,9 +385,36 @@ mod tests {
         let mut door = Door::default();
         door.dos_command = "COPY C:\\ICB\\{dropFile} C:\\DOOR\nGAME {node} {baud}".into();
         assert_eq!(
-            normalize_dos_text(&expand_run_batch(&door, 3, "DOOR.SYS")),
+            normalize_dos_text(&expand_run_batch(&door, 3, "DOOR.SYS").unwrap()),
             "@ECHO OFF\r\nCD C:\\DOOR\r\nCOPY C:\\ICB\\DOOR.SYS C:\\DOOR\r\nGAME 3 57600"
         );
+    }
+
+    #[test]
+    fn dos_arguments_follow_the_command_and_preserve_dos_paths() {
+        let door = Door {
+            dos_command: "GAME.EXE /LOCAL".into(),
+            args: vec!["/N{node}".into(), "{dropFile}".into(), "C:\\DOOR\\GAME DATA".into(), String::new()],
+            ..Door::default()
+        };
+        assert_eq!(
+            expand_run_batch(&door, 3, "DOOR.SYS").unwrap(),
+            "@ECHO OFF\nCD C:\\DOOR\nGAME.EXE /LOCAL /N3 DOOR.SYS \"C:\\DOOR\\GAME DATA\" \"\""
+        );
+    }
+
+    #[test]
+    fn dos_arguments_reject_batch_expansion_and_quote_operators() {
+        let mut door = Door {
+            dos_command: "GAME.EXE".into(),
+            args: vec!["a&b|c<d>e".into(), "{baud}".into()],
+            ..Door::default()
+        };
+        assert_eq!(expand_run_batch(&door, 0, "").unwrap(), "@ECHO OFF\nCD C:\\DOOR\nGAME.EXE \"a&b|c<d>e\" 57600");
+        for argument in ["%PATH%", "quoted\"value", "first\nsecond", "first\rsecond"] {
+            door.args = vec![argument.into()];
+            assert!(expand_run_batch(&door, 0, "").is_err(), "accepted {argument:?}");
+        }
     }
 
     #[tokio::test]

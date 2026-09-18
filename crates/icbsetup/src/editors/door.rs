@@ -33,6 +33,32 @@ enum EditCommandMode {
     Table,
 }
 
+type DoorItem = ListItem<(usize, Arc<Mutex<DoorList>>)>;
+
+fn door_item(key: &str, value: ListValue) -> DoorItem {
+    ListItem::new(get_text(key), value)
+        .with_label_width(16)
+        .with_status(get_text(&format!("{key}-status")))
+        .with_help(get_text(&format!("{key}-help")))
+}
+
+/// The path is a program, a door directory or a remote code, depending on the type.
+const PATH_KEYS: [&str; 3] = ["door_editor_path_local", "door_editor_path_dos", "door_editor_path_bbslink"];
+
+fn path_key(door_type: &DoorType) -> &'static str {
+    match door_type {
+        DoorType::Local => PATH_KEYS[0],
+        DoorType::Dos => PATH_KEYS[1],
+        DoorType::BBSlink => PATH_KEYS[2],
+    }
+}
+
+/// Reserves room for every type's label so switching the type cannot clip it.
+fn path_item(door_type: &DoorType, value: ListValue) -> DoorItem {
+    let width = PATH_KEYS.iter().map(|key| Line::raw(get_text(key)).width() as u16).max().unwrap_or(0);
+    door_item(path_key(door_type), value).with_label_width(width.max(16))
+}
+
 pub struct DoorEditor<'a> {
     path: std::path::PathBuf,
     door_list_orig: DoorList,
@@ -44,6 +70,7 @@ pub struct DoorEditor<'a> {
 
     insert_table: InsertTable<'a>,
     detail: super::EditorDialog<(usize, Arc<Mutex<DoorList>>)>,
+    path_label: &'static str,
     save_changes: super::EditorSaveChanges,
 }
 
@@ -142,6 +169,7 @@ impl<'a> DoorEditor<'a> {
             insert_table,
             mode: EditCommandMode::Config,
             detail: super::EditorDialog::default(),
+            path_label: PATH_KEYS[0],
             save_changes: super::EditorSaveChanges::default(),
         })
     }
@@ -182,6 +210,54 @@ impl<'a> DoorEditor<'a> {
         });
         self.insert_table.sync_rows(door_list.len(), Some(selected));
         self.mode = EditCommandMode::Table;
+    }
+
+    fn refresh_door_fields(&mut self) {
+        let Some(menu) = self.detail.menu.as_mut() else { return };
+        let ConfigEntry::Item(type_item) = &menu.entry[7] else { return };
+        let ListValue::ComboBox(combo) = &type_item.value else { return };
+        let local = combo.cur_value.value == "Local";
+        let dos = combo.cur_value.value == "Dos";
+        let path_label = if local {
+            PATH_KEYS[0]
+        } else if dos {
+            PATH_KEYS[1]
+        } else {
+            PATH_KEYS[2]
+        };
+        if self.path_label != path_label {
+            self.path_label = path_label;
+            if let Some(ConfigEntry::Item(item)) = menu.entry.get_mut(3) {
+                item.set_title(get_text(path_label));
+                item.status = get_text(&format!("{path_label}-status"));
+                item.help = get_text(&format!("{path_label}-help"));
+            }
+        }
+        let fields = [
+            ("door_editor_use_shell_execute", local),
+            ("door_editor_args", local),
+            ("door_editor_working_directory", local),
+            ("door_editor_provide_socket", local),
+            ("door_editor_max_parallel", local),
+            ("door_editor_drop_file", local || dos),
+            ("door_editor_dos_command", dos),
+            ("door_editor_dos_memory", dos),
+            ("door_editor_dos_max_seconds", dos),
+        ];
+        for (entry, (key, editable)) in menu.entry.iter_mut().skip(8).zip(fields) {
+            let ConfigEntry::Item(item) = entry else { continue };
+            if item.editable() == editable {
+                continue;
+            }
+            item.set_editable(editable);
+            item.status = get_text(&format!("{key}-status"));
+            item.help = get_text(&format!("{key}-help"));
+            if !editable {
+                let reason = get_text("door_editor_unused_for_type");
+                item.status.push_str(&format!(" - {reason}"));
+                item.help.push_str(&format!("\n\n{reason}"));
+            }
+        }
     }
 }
 
@@ -248,6 +324,7 @@ impl<'a> Page for DoorEditor<'a> {
         }
 
         if let Some(message) = self.detail.handle_key(key) {
+            self.refresh_door_fields();
             return message;
         }
 
@@ -283,53 +360,41 @@ impl<'a> Page for DoorEditor<'a> {
                             let Some(action) = cmd.get(selected_item) else {
                                 return PageMessage::None;
                             };
+                            self.path_label = path_key(&action.door_type);
                             self.detail.open(super::align_editor_labels(ConfigMenu {
                                 obj: (selected_item, self.door_list.clone()),
                                 entry: vec![
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_name"), ListValue::Text(30, TextFlags::None, action.name.clone()))
-                                            .with_label_width(16)
-                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                        door_item("door_editor_name", ListValue::Text(30, TextFlags::None, action.name.clone())).with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].name = value;
-                                            }),
-                                    ),
-                                    ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_description"),
-                                            ListValue::Text(30, TextFlags::None, action.description.clone()),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_text_value(
-                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
-                                                list.lock().unwrap()[*i].description = value;
                                             },
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_password"),
-                                            ListValue::Text(30, TextFlags::Password, action.password.clone()),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_text_value(
-                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
-                                                list.lock().unwrap()[*i].password = value;
-                                            },
-                                        ),
-                                    ),
-                                    ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_path"), ListValue::Text(30, TextFlags::None, action.path.clone()))
-                                            .with_label_width(16)
+                                        door_item("door_editor_description", ListValue::Text(30, TextFlags::None, action.description.clone()))
                                             .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
-                                                list.lock().unwrap()[*i].path = value;
+                                                list.lock().unwrap()[*i].description = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_security"),
+                                        door_item("door_editor_password", ListValue::Text(30, TextFlags::Password, action.password.clone()))
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].password = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        path_item(&action.door_type, ListValue::Text(30, TextFlags::None, action.path.clone())).with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].path = value;
+                                            },
+                                        ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        door_item(
+                                            "door_editor_security",
                                             ListValue::Security(action.securiy_level.clone(), action.securiy_level.to_string()),
                                         )
-                                        .with_label_width(16)
                                         .with_update_sec_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: SecurityExpression| {
                                                 list.lock().unwrap()[*i].securiy_level = value;
@@ -337,12 +402,10 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("accounting_activity_per_use"),
+                                        door_item(
+                                            "accounting_activity_per_use",
                                             ListValue::Float(action.charge_per_use, action.charge_per_use.to_string()),
                                         )
-                                        .with_status(get_text("accounting_activity_per_use-status"))
-                                        .with_help(get_text("accounting_activity_per_use-help"))
                                         .with_update_float_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value| {
                                                 list.lock().unwrap()[*i].charge_per_use = value;
@@ -350,12 +413,10 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("accounting_activity_per_minute"),
+                                        door_item(
+                                            "accounting_activity_per_minute",
                                             ListValue::Float(action.charge_per_minute, action.charge_per_minute.to_string()),
                                         )
-                                        .with_status(get_text("accounting_activity_per_minute-status"))
-                                        .with_help(get_text("accounting_activity_per_minute-help"))
                                         .with_update_float_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value| {
                                                 list.lock().unwrap()[*i].charge_per_minute = value;
@@ -363,8 +424,8 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_door_type"),
+                                        door_item(
+                                            "door_editor_door_type",
                                             ListValue::ComboBox(ComboBox {
                                                 cur_value: ComboBoxValue::new(format!("{}", action.door_type), format!("{}", action.door_type)),
                                                 selected_item: 0,
@@ -375,7 +436,6 @@ impl<'a> Page for DoorEditor<'a> {
                                                     .collect::<Vec<ComboBoxValue>>(),
                                             }),
                                         )
-                                        .with_label_width(16)
                                         .with_update_combobox_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
                                                 if value.cur_value.value == "BBSlink" {
@@ -389,32 +449,25 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_use_shell_execute"), ListValue::Bool(action.use_shell_execute))
-                                            .with_label_width(16)
-                                            .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
+                                        door_item("door_editor_use_shell_execute", ListValue::Bool(action.use_shell_execute)).with_update_bool_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
                                                 list.lock().unwrap()[*i].use_shell_execute = value;
-                                            }),
-                                    ),
-                                    ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_args"),
-                                            ListValue::Text(60, TextFlags::None, launch::join_arguments(&action.args)),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_text_value(
-                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
-                                                if let Ok(args) = launch::parse_arguments(&value) {
-                                                    list.lock().unwrap()[*i].args = args;
-                                                }
                                             },
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_working_directory"),
+                                        door_item("door_editor_args", ListValue::Text(60, TextFlags::None, launch::join_arguments(&action.args)))
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                if let Ok(args) = launch::parse_arguments(&value) {
+                                                    list.lock().unwrap()[*i].args = args;
+                                                }
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        door_item(
+                                            "door_editor_working_directory",
                                             ListValue::Text(30, TextFlags::None, action.working_directory.clone()),
                                         )
-                                        .with_label_width(16)
                                         .with_update_text_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].working_directory = value;
@@ -422,22 +475,22 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_provide_socket"), ListValue::Bool(action.provide_socket_connection))
-                                            .with_label_width(16)
-                                            .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
+                                        door_item("door_editor_provide_socket", ListValue::Bool(action.provide_socket_connection)).with_update_bool_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
                                                 list.lock().unwrap()[*i].provide_socket_connection = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_max_parallel"), ListValue::U32(action.max_parallel, 0, 255))
-                                            .with_label_width(16)
-                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                        door_item("door_editor_max_parallel", ListValue::U32(action.max_parallel, 0, 255)).with_update_u32_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
                                                 list.lock().unwrap()[*i].max_parallel = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_drop_file"),
+                                        door_item(
+                                            "door_editor_drop_file",
                                             ListValue::ComboBox(ComboBox {
                                                 cur_value: ComboBoxValue::new(action.drop_file.to_string(), format!("{:?}", action.drop_file)),
                                                 selected_item: 0,
@@ -448,7 +501,6 @@ impl<'a> Page for DoorEditor<'a> {
                                                     .collect(),
                                             }),
                                         )
-                                        .with_label_width(16)
                                         .with_update_combobox_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
                                                 if let Some(drop_file) = DropFile::iter().find(|drop_file| format!("{drop_file:?}") == value.cur_value.value) {
@@ -458,35 +510,23 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_dos_command"),
-                                            ListValue::Text(60, TextFlags::None, action.dos_command.clone()),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_text_value(
-                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                        door_item("door_editor_dos_command", ListValue::Text(60, TextFlags::None, action.dos_command.clone()))
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].dos_command = value;
-                                            },
-                                        ),
-                                    ),
-                                    ConfigEntry::Item(
-                                        ListItem::new(get_text("door_editor_dos_memory"), ListValue::U32(action.dos_memory_mb, 1, 512))
-                                            .with_label_width(16)
-                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
-                                                list.lock().unwrap()[*i].dos_memory_mb = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            get_text("door_editor_dos_max_seconds"),
-                                            ListValue::U32(action.dos_max_runtime_seconds, 0, 86400),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_u32_value(
+                                        door_item("door_editor_dos_memory", ListValue::U32(action.dos_memory_mb, 1, 512)).with_update_u32_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
-                                                list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
+                                                list.lock().unwrap()[*i].dos_memory_mb = value;
                                             },
                                         ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        door_item("door_editor_dos_max_seconds", ListValue::U32(action.dos_max_runtime_seconds, 0, 86400))
+                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                                list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
+                                            }),
                                     ),
                                 ],
                             }));
@@ -504,6 +544,7 @@ impl<'a> Page for DoorEditor<'a> {
                 }
             },
         }
+        self.refresh_door_fields();
         PageMessage::None
     }
 }
@@ -519,6 +560,159 @@ mod tests {
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn assert_door_fields(editor: &DoorEditor<'_>, door_type: &DoorType) {
+        let menu = editor.detail.menu.as_ref().unwrap();
+        assert_eq!(menu.entry.len(), 17);
+        let ConfigEntry::Item(path) = &menu.entry[3] else { panic!("path field") };
+        let key = path_key(door_type);
+        assert_eq!(path.status, get_text(&format!("{key}-status")), "{door_type} path status");
+        assert_eq!(path.help, get_text(&format!("{key}-help")), "{door_type} path help");
+        for (index, entry) in menu.entry.iter().enumerate() {
+            let ConfigEntry::Item(item) = entry else { panic!("expected a field") };
+            let expected = match index {
+                8..=12 => *door_type == DoorType::Local,
+                13 => *door_type != DoorType::BBSlink,
+                14..=16 => *door_type == DoorType::Dos,
+                _ => true,
+            };
+            assert_eq!(item.editable(), expected, "{door_type}, field {index}");
+            let reason = get_text("door_editor_unused_for_type");
+            assert_eq!(item.help.matches(&reason).count(), usize::from(!expected));
+            assert_eq!(item.status.matches(&reason).count(), usize::from(!expected));
+        }
+    }
+
+    #[test]
+    fn door_fields_follow_the_selected_type() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("doors.toml");
+        for door_type in [DoorType::Local, DoorType::Dos, DoorType::BBSlink] {
+            let mut list = DoorList::default();
+            list.doors.push(Door {
+                door_type: door_type.clone(),
+                ..Door::default()
+            });
+            list.save(&path).unwrap();
+            let mut editor = DoorEditor::new(&path).unwrap();
+            editor.handle_key_press(key(KeyCode::Tab));
+            editor.handle_key_press(key(KeyCode::Enter));
+            assert_door_fields(&editor, &door_type);
+        }
+    }
+
+    #[test]
+    fn door_type_changes_refresh_grey_fields_and_preserve_values() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("doors.toml");
+        let mut expected = Door {
+            name: "GAME".into(),
+            path: "doors/game".into(),
+            use_shell_execute: true,
+            args: vec!["--node".into(), "{node}".into()],
+            working_directory: "doors/work".into(),
+            provide_socket_connection: true,
+            max_parallel: 3,
+            dos_command: "BRE.BAT".into(),
+            dos_memory_mb: 8,
+            dos_max_runtime_seconds: 23,
+            ..Door::default()
+        };
+        let mut list = DoorList::default();
+        list.doors.push(expected.clone());
+        list.save(&path).unwrap();
+        let mut editor = DoorEditor::new(&path).unwrap();
+        editor.handle_key_press(key(KeyCode::Tab));
+        editor.handle_key_press(key(KeyCode::Enter));
+        for _ in 0..7 {
+            editor.handle_key_press(key(KeyCode::Down));
+        }
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        for door_type in [
+            DoorType::Local,
+            DoorType::Dos,
+            DoorType::BBSlink,
+            DoorType::Local,
+            DoorType::Dos,
+            DoorType::Local,
+        ] {
+            editor.handle_key_press(key(KeyCode::Enter));
+            let ConfigEntry::Item(item) = &editor.detail.menu.as_ref().unwrap().entry[7] else {
+                panic!("type field")
+            };
+            let ListValue::ComboBox(combo) = &item.value else { panic!("type combo") };
+            let current = combo.selected_item;
+            let target = combo.values.iter().position(|value| value.value == door_type.to_string()).unwrap();
+            for _ in 0..current.abs_diff(target) {
+                editor.handle_key_press(key(if target > current { KeyCode::Down } else { KeyCode::Up }));
+            }
+            assert_door_fields(&editor, &expected.door_type);
+            editor.handle_key_press(key(KeyCode::Enter));
+            assert_eq!(editor.detail.state.selected, 7);
+            assert_door_fields(&editor, &door_type);
+            terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();
+            expected.door_type = door_type.clone();
+            assert!(
+                editor.door_list.lock().unwrap()[0] == expected,
+                "{door_type}: switching types changed stored values"
+            );
+
+            let buffer = terminal.backend().buffer();
+            let path_row: String = (4..76).map(|column| buffer[(column, 7)].symbol()).collect();
+            let path_label = get_text(path_key(&door_type));
+            assert!(
+                path_row.split_once(&path_label).is_some_and(|(_, rest)| rest.trim_start().starts_with(':')),
+                "{door_type}: path row is {path_row:?}, expected label {path_label:?}"
+            );
+            for (offset, field) in [
+                "door_editor_use_shell_execute",
+                "door_editor_args",
+                "door_editor_working_directory",
+                "door_editor_provide_socket",
+                "door_editor_max_parallel",
+                "door_editor_drop_file",
+                "door_editor_dos_command",
+                "door_editor_dos_memory",
+                "door_editor_dos_max_seconds",
+            ]
+            .iter()
+            .enumerate()
+            {
+                let ConfigEntry::Item(item) = &editor.detail.menu.as_ref().unwrap().entry[8 + offset] else {
+                    panic!("field")
+                };
+                let label = get_text(field);
+                let row_y = 12 + offset as u16;
+                let row: String = (4..76).map(|column| buffer[(column, row_y)].symbol()).collect();
+                let label_start = row.find(&label).unwrap_or_else(|| panic!("clipped {field}: {row}"));
+                let label_x = 4 + row[..label_start].chars().count() as u16;
+                let value_x = 4 + row[..row.find(':').unwrap()].chars().count() as u16 + 2;
+                let theme = icy_board_tui::theme::get_tui_theme();
+                let label_style = if item.editable() { theme.item } else { theme.table_inactive };
+                let value_style = match (&item.value, item.editable()) {
+                    (_, false) => theme.table_inactive,
+                    (ListValue::Bool(true), true) => theme.true_value,
+                    (ListValue::Bool(false), true) => theme.false_value,
+                    _ => theme.value,
+                };
+                for column in label_x..label_x + label.chars().count() as u16 {
+                    assert_eq!(Some(buffer[(column, row_y)].fg), label_style.fg, "{door_type}: {field} label");
+                }
+                assert_eq!(Some(buffer[(value_x, row_y)].fg), value_style.fg, "{door_type}: {field} value");
+                assert_eq!(buffer[(3, row_y)].symbol(), "\u{2551}");
+                assert_eq!(buffer[(76, row_y)].symbol(), "\u{2551}");
+            }
+            editor.handle_key_press(key(KeyCode::Down));
+            let next_field = match door_type {
+                DoorType::Local => 8,
+                DoorType::Dos => 13,
+                DoorType::BBSlink => 0,
+            };
+            assert_eq!(editor.detail.state.selected, next_field);
+            editor.handle_key_press(key(KeyCode::Up));
+            assert_eq!(editor.detail.state.selected, 7);
+        }
     }
 
     #[test]

@@ -93,7 +93,7 @@ fn door_popup_labels_fit_at_80_columns() {
             "door_editor_name",
             "door_editor_description",
             "door_editor_password",
-            "door_editor_path",
+            "door_editor_path_local",
             "door_editor_security",
             "door_editor_door_type",
             "door_editor_use_shell_execute",
@@ -107,6 +107,126 @@ fn door_popup_labels_fit_at_80_columns() {
             "door_editor_dos_max_seconds",
         ],
     );
+}
+
+fn door_help_topics(page: &mut DoorEditor<'_>, fields: usize) -> Vec<String> {
+    use icy_board_tui::{config_menu::EditMessage, tab_page::PageMessage};
+
+    let mut topics = Vec::new();
+    for _ in 0..fields {
+        let PageMessage::ResultState(result) = page.handle_key_press(KeyEvent::from(KeyCode::F(1))) else {
+            panic!("field {} answers F1 with no form action", topics.len());
+        };
+        let EditMessage::DisplayHelp(help) = result.edit_msg else {
+            panic!("field {} has no help", topics.len());
+        };
+        topics.push(help);
+        page.handle_key_press(KeyEvent::from(KeyCode::Down));
+    }
+    topics
+}
+
+#[test]
+fn every_door_field_explains_itself_on_f1() {
+    use icy_board_engine::icy_board::{
+        IcyBoardSerializer,
+        doors::{Door, DoorList, DoorType},
+    };
+
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("doors.toml");
+    let mut topics = std::collections::HashSet::new();
+    for (door_type, fields) in [(DoorType::Local, 14), (DoorType::Dos, 12), (DoorType::BBSlink, 8)] {
+        let mut list = DoorList::default();
+        list.doors.push(Door { door_type, ..Door::default() });
+        list.save(&path).unwrap();
+        let mut page = DoorEditor::new(&path).unwrap();
+        page.handle_key_press(KeyEvent::from(KeyCode::Tab));
+        page.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        let active_topics = door_help_topics(&mut page, fields);
+        assert_eq!(
+            active_topics.iter().collect::<std::collections::HashSet<_>>().len(),
+            fields,
+            "a field was visited twice"
+        );
+        assert_eq!(door_help_topics(&mut page, 1)[0], active_topics[0], "navigation did not wrap");
+        topics.extend(active_topics);
+    }
+    assert_eq!(topics.len(), 19, "not every field is reachable for an appropriate type");
+    for help in &topics {
+        assert!(help.trim_start().starts_with('#'), "not a help text: {help}");
+    }
+    for key in [
+        "door_editor_name",
+        "door_editor_description",
+        "door_editor_password",
+        "door_editor_path_local",
+        "door_editor_path_dos",
+        "door_editor_path_bbslink",
+        "door_editor_security",
+        "accounting_activity_per_use",
+        "accounting_activity_per_minute",
+        "door_editor_door_type",
+        "door_editor_use_shell_execute",
+        "door_editor_args",
+        "door_editor_working_directory",
+        "door_editor_provide_socket",
+        "door_editor_max_parallel",
+        "door_editor_drop_file",
+        "door_editor_dos_command",
+        "door_editor_dos_memory",
+        "door_editor_dos_max_seconds",
+    ] {
+        assert!(topics.contains(&get_text(&format!("{key}-help"))), "missing help: {key}");
+    }
+
+    // Placeholders survive Fluent only when their braces are escaped.
+    let arguments = get_text("door_editor_args-help");
+    for placeholder in [
+        "{dropFilePath}",
+        "{dropFile}",
+        "{dropFileDir}",
+        "{socketHandle}",
+        "{node}",
+        "{userId}",
+        "{userName}",
+    ] {
+        assert!(arguments.contains(&format!("- {placeholder}")), "{placeholder} is not listed:\n{arguments}");
+    }
+}
+
+#[test]
+fn the_socket_option_is_offered_only_for_local_doors() {
+    use icy_board_engine::icy_board::{
+        IcyBoardSerializer,
+        doors::{Door, DoorList, DoorType},
+    };
+
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("doors.toml");
+    let socket_help = get_text("door_editor_provide_socket-help");
+    for (door_type, offered, path_key) in [
+        (DoorType::Local, true, "door_editor_path_local"),
+        (DoorType::BBSlink, false, "door_editor_path_bbslink"),
+        (DoorType::Dos, false, "door_editor_path_dos"),
+    ] {
+        let mut list = DoorList::default();
+        list.doors.push(Door {
+            name: "GAME".into(),
+            door_type: door_type.clone(),
+            ..Door::default()
+        });
+        list.save(&path).unwrap();
+        let mut page = DoorEditor::new(&path).unwrap();
+        page.handle_key_press(KeyEvent::from(KeyCode::Tab));
+        page.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        let topics = door_help_topics(&mut page, 17);
+        assert_eq!(topics.contains(&socket_help), offered, "{door_type} door");
+        assert!(
+            topics.contains(&get_text(&format!("{path_key}-help"))),
+            "{door_type} door lost its other fields"
+        );
+    }
 }
 
 #[test]

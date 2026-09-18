@@ -287,6 +287,14 @@ impl<T> ListItem<T> {
         self.editable
     }
 
+    pub fn set_editable(&mut self, editable: bool) {
+        self.editable = editable;
+    }
+
+    pub fn set_title(&mut self, title: impl Into<String>) {
+        self.title = title.into();
+    }
+
     pub fn with_path_initial_content(mut self, content: impl Into<String>) -> Self {
         self.path_initial_content = Some(content.into());
         self

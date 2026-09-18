@@ -3631,9 +3631,33 @@ doors_editor_bbslink_credentials=BBSLink-Zugangsdaten
 doors_editor_system_code=Systemcode
 doors_editor_auth_code=Authentifizierungscode
 doors_editor_scheme_code=Schemacode
-door_editor_dos_command=DOS-Befehl
+door_editor_unused_for_type=wird vom gewählten Door-Typ nicht verwendet
+door_editor_dos_command=Befehl
+door_editor_dos_command-status=Im DOS-Rechner ausgeführter Befehl
+door_editor_dos_command-help=
+    # Befehl
+
+    Befehl, der im DOS-Rechner ausgeführt wird, etwa GAME.EXE oder START.BAT.
+    Das Door-Verzeichnis ist dort C:\DOOR; von dort wird der Befehl aufgerufen.
+
+    Nach dem Programmnamen können Argumente folgen; das Feld Argumente wird
+    angehängt. Ein einzelner Name mit der Endung .exe, .com oder .bat wird vor
+    dem Start im Door-Verzeichnis gesucht.
 door_editor_dos_memory=DOS-Speicher (MB)
+door_editor_dos_memory-status=Speicher für den DOS-Rechner
+door_editor_dos_memory-help=
+    # DOS-Speicher (MB)
+
+    Speichermenge für den DOS-Rechner. Doors dieser Zeit benötigen sehr wenig;
+    erhöhen Sie den Wert nur, wenn ein Door mehr verlangt.
 door_editor_dos_max_seconds=DOS-Zeitlimit (Sek.)
+door_editor_dos_max_seconds-status=Zeit, nach der der DOS-Rechner beendet wird
+door_editor_dos_max_seconds-help=
+    # DOS-Zeitlimit (Sek.)
+
+    Beendet den DOS-Rechner nach dieser Anzahl Sekunden, damit ein hängendes
+    Door den Node nicht blockiert. Null verwendet eine Stunde. Das Zeitkonto des
+    Benutzers gilt weiterhin und kann den Aufruf früher beenden.
 door_editor_name=Name
 door_editor_name-status=Name
 door_editor_name-help=
@@ -3652,12 +3676,31 @@ door_editor_password-help=
     # Passwort
 
     Vor dem Start des Doors erforderliches Passwort.
-door_editor_path=Pfad
-door_editor_path-status=Pfad
-door_editor_path-help=
-    # Pfad
+door_editor_path_local=Programm
+door_editor_path_local-status=Programm oder PPE, das für dieses Door gestartet wird
+door_editor_path_local-help=
+    # Programm
 
-    Programm, das für dieses Door ausgeführt wird.
+    Programm, das für dieses Door gestartet wird. Eine .ppe-Datei führt das
+    Board selbst aus, statt sie als eigenen Prozess zu starten.
+
+    Hierher gehört nur das Programm; seine Argumente gehören in das Feld
+    Argumente.
+door_editor_path_dos=Door-Verzeichnis
+door_editor_path_dos-status=Verzeichnis mit dem installierten DOS-Door
+door_editor_path_dos-help=
+    # Door-Verzeichnis
+
+    Verzeichnis mit dem installierten DOS-Door. Sein Inhalt wird im DOS-Rechner
+    zu C:\DOOR; von dort wird der Befehl ausgeführt.
+door_editor_path_bbslink=Door-Code
+door_editor_path_bbslink-status=Code, unter dem BBSLink dieses Spiel kennt
+door_editor_path_bbslink-help=
+    # Door-Code
+
+    Code, unter dem BBSLink dieses Spiel kennt. Er wird zusammen mit den
+    BBSLink-Zugangsdaten übertragen, wenn der Benutzer übergeben wird, und ist
+    weder ein Programm noch ein Verzeichnis auf diesem Rechner.
 door_editor_door_type=Door-Typ
 door_editor_door_type-status=Door-Typ
 door_editor_door_type-help=
@@ -3692,10 +3735,17 @@ door_editor_args-help=
     Argumente für das Door, wie eine Befehlszeile zitiert. Jedes Argument wird
     einzeln übergeben; ein Wert mit Leerzeichen bleibt ein Argument.
 
-    {"{"}dropFilePath{"}"}, {"{"}dropFile{"}"} und {"{"}dropFileDir{"}"} liefern die für diesen Aufruf
-    erzeugte Drop-Datei, {"{"}socketHandle{"}"} den vererbten Socket sowie {"{"}node{"}"},
-    {"{"}userId{"}"}, {"{"}userName{"}"}, {"{"}timeLeftSeconds{"}"}, {"{"}termWidth{"}"} und {"{"}termHeight{"}"}
-    Angaben zum Benutzer.
+    Diese Platzhalter werden bei jedem Aufruf ersetzt:
+
+    - {"{"}dropFilePath{"}"}: vollständiger Pfad der Drop-Datei dieses Aufrufs
+    - {"{"}dropFile{"}"}: nur ihr Dateiname
+    - {"{"}dropFileDir{"}"}: ihr Verzeichnis
+    - {"{"}socketHandle{"}"}: der vererbte Socket, bei Socket-Verbindung
+    - {"{"}node{"}"}: die Node-Nummer
+    - {"{"}userId{"}"}: die Benutzernummer
+    - {"{"}userName{"}"}: der Benutzername
+    - {"{"}timeLeftSeconds{"}"}: die verbleibenden Sekunden des Benutzers
+    - {"{"}termWidth{"}"} und {"{"}termHeight{"}"}: die Terminalgröße
 door_editor_working_directory=Arbeitsverzeichnis
 door_editor_working_directory-status=Verzeichnis, in dem das Door läuft
 door_editor_working_directory-help=

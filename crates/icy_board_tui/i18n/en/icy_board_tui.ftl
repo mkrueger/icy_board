@@ -4078,9 +4078,36 @@ doors_editor_bbslink_credentials=BBSLink credentials
 doors_editor_system_code=System Code
 doors_editor_auth_code=Auth Code
 doors_editor_scheme_code=Scheme Code
-door_editor_dos_command=DOS command
+door_editor_unused_for_type=not used by the selected door type
+
+door_editor_dos_command=Command
+door_editor_dos_command-status=Command run inside the DOS machine
+door_editor_dos_command-help=
+    # Command
+
+    The command run inside the DOS machine, such as GAME.EXE or START.BAT. The
+    door directory is C:\DOOR there, and the command is called from it.
+
+    Arguments may follow the program name, and the arguments field is appended
+    to it. A plain .exe, .com or .bat name is checked against the door directory
+    before the machine starts.
+
 door_editor_dos_memory=DOS memory MB
+door_editor_dos_memory-status=Memory given to the DOS machine
+door_editor_dos_memory-help=
+    # DOS memory MB
+
+    How much memory the DOS machine is given. Doors of the era need very little;
+    raise it only when a door asks for more.
+
 door_editor_dos_max_seconds=DOS max seconds
+door_editor_dos_max_seconds-status=Time after which the DOS machine is stopped
+door_editor_dos_max_seconds-help=
+    # DOS max seconds
+
+    Stops the DOS machine after this many seconds, so a door that hangs cannot
+    hold the node. Zero uses the default of one hour. The caller's own time
+    limit still applies and can end the call earlier.
 
 door_editor_name=Name
 door_editor_name-status=Name
@@ -4103,12 +4130,32 @@ door_editor_password-help=
 
     A password callers must give before this door starts.
 
-door_editor_path=Path
-door_editor_path-status=Path
-door_editor_path-help=
-    # Path
+door_editor_path_local=Program
+door_editor_path_local-status=Program or PPE started for this door
+door_editor_path_local-help=
+    # Program
 
-    The program that is run for this door.
+    The program started for this door. A .ppe file is run by the board itself
+    rather than started as a separate process.
+
+    Only the program belongs here; its arguments belong in the arguments field.
+
+door_editor_path_dos=Door directory
+door_editor_path_dos-status=Directory holding the installed DOS door
+door_editor_path_dos-help=
+    # Door directory
+
+    The directory holding the installed DOS door. Its contents become C:\DOOR
+    inside the DOS machine, and the command is run from there.
+
+door_editor_path_bbslink=Door code
+door_editor_path_bbslink-status=Code BBSLink knows this game by
+door_editor_path_bbslink-help=
+    # Door code
+
+    The code BBSLink knows this game by. It is sent together with the BBSLink
+    credentials when the caller is handed over, and is not a program or a
+    directory on this machine.
 
 door_editor_door_type=Door Type
 door_editor_door_type-status=Door Type
@@ -4148,9 +4195,17 @@ door_editor_args-help=
     Arguments handed to the door, quoted like a command line. Each argument is
     passed on its own, so a value containing spaces stays one argument.
 
-    {"{"}dropFilePath{"}"}, {"{"}dropFile{"}"} and {"{"}dropFileDir{"}"} give the drop file written for this
-    call, {"{"}socketHandle{"}"} the inherited socket, and {"{"}node{"}"}, {"{"}userId{"}"}, {"{"}userName{"}"},
-    {"{"}timeLeftSeconds{"}"}, {"{"}termWidth{"}"} and {"{"}termHeight{"}"} describe the caller.
+    These placeholders are replaced for every call:
+
+    - {"{"}dropFilePath{"}"}: full path of the drop file written for this call
+    - {"{"}dropFile{"}"}: its file name on its own
+    - {"{"}dropFileDir{"}"}: the directory holding it
+    - {"{"}socketHandle{"}"}: the inherited socket, with the socket connection
+    - {"{"}node{"}"}: the node number
+    - {"{"}userId{"}"}: the caller's user number
+    - {"{"}userName{"}"}: the caller's name
+    - {"{"}timeLeftSeconds{"}"}: the caller's remaining seconds
+    - {"{"}termWidth{"}"} and {"{"}termHeight{"}"}: the terminal size
 
 door_editor_working_directory=Work Directory
 door_editor_working_directory-status=Directory the door runs in
