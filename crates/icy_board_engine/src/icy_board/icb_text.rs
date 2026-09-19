@@ -1613,9 +1613,11 @@ pub enum IceText {
     RecoveryRequestAccepted = 782,
     RecoveryChangeRequired = 783,
     RecoveryPasswordChanged = 784,
+    PreparingDosAssets = 785,
+    DosPreparationFailed = 786,
 }
 
-const LAST_ENTRY: usize = 784;
+const LAST_ENTRY: usize = 786;
 
 impl IceText {
     /// A number a file or a PPE names. Anything past the last message has no
@@ -2039,7 +2041,7 @@ mod tests {
     fn text_numbers_are_checked_before_they_become_an_enum() {
         assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
         assert_eq!(IceText::try_from_number(780), Some(IceText::ReadingBulletins));
-        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::RecoveryPasswordChanged));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::DosPreparationFailed));
         assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
         assert_eq!(IceText::try_from_number(usize::MAX), None);
     }

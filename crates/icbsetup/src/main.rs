@@ -16,7 +16,7 @@ use icy_board_tui::{app::SaveChoice, print_error, term, theme::set_admin_theme};
 use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
 use std::{
-    fs::{self, File},
+    fs,
     path::{Path, PathBuf},
     process::{self, exit},
     sync::{Arc, Mutex},
@@ -69,6 +69,8 @@ enum Commands {
     DosImage(DosImage),
     #[command(name = "dos-copy", about = icy_board_cli::text("icbsetup", "dos-copy-about"))]
     DosCopy(DosCopy),
+    #[command(name = "dos-fossil", about = icy_board_cli::text("icbsetup", "dos-fossil-about"))]
+    DosFossil(DosFossil),
 }
 
 #[derive(Args, PartialEq, Debug)]
@@ -121,6 +123,18 @@ struct DosCopy {
     source: PathBuf,
     #[arg(help = icy_board_cli::text("icbsetup", "dos-copy-destination"))]
     destination: String,
+}
+
+#[derive(Args, PartialEq, Debug)]
+struct DosFossil {
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-image-directory"))]
+    directory: PathBuf,
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-fossil-archive"))]
+    archive: PathBuf,
+    #[arg(long, help = icy_board_cli::text("icbsetup", "dos-fossil-door"))]
+    door: Option<String>,
+    #[arg(long, required = true, help = icy_board_cli::text("icbsetup", "dos-fossil-license"))]
+    accept_license: bool,
 }
 
 #[cfg(test)]
@@ -178,6 +192,29 @@ mod cli_tests {
             }))
         );
         assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["icbsetup", "ppe-convert"]).is_err());
+    }
+
+    #[test]
+    fn cli_dos_fossil_requires_license_acknowledgement() {
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["icbsetup", "dos-fossil", "board", "x00.zip"]).is_err());
+        assert_eq!(
+            parse(&["dos-fossil", "board", "x00.zip", "--accept-license"]).command,
+            Some(Commands::DosFossil(DosFossil {
+                directory: "board".into(),
+                archive: "x00.zip".into(),
+                door: None,
+                accept_license: true,
+            }))
+        );
+        assert_eq!(
+            parse(&["dos-fossil", "board", "x00.zip", "--door", "LORD", "--accept-license"]).command,
+            Some(Commands::DosFossil(DosFossil {
+                directory: "board".into(),
+                archive: "x00.zip".into(),
+                door: Some("LORD".into()),
+                accept_license: true,
+            }))
+        );
     }
 
     #[test]
@@ -339,6 +376,10 @@ fn main() -> Result<()> {
             prepare_dos_image(directory)?;
             return Ok(());
         }
+        Some(Commands::DosFossil(command)) => {
+            install_dos_fossil(command)?;
+            return Ok(());
+        }
         Some(Commands::DosCopy(DosCopy { image, source, destination })) => {
             icy_board_engine::icy_board::doors::dos::copy_file_into_image(image, source, destination).map_err(|error| eyre!(error.to_string()))?;
             println!("Copied {} to {} in {}", source.display(), destination, image.display());
@@ -497,39 +538,31 @@ fn init_log(path: &Path) -> Result<()> {
 }
 
 fn prepare_dos_image(board_directory: &Path) -> Result<()> {
-    use sha2::{Digest, Sha256};
-    use std::io::Cursor;
-
-    const FREEDOS_URL: &str = "https://download.freedos.org/1.4/FD14-LiteUSB.zip";
-    const FREEDOS_SHA256: &str = "857dcd2ebf9d3d094320154db5fb5b830acba6fb98f981a95a0ca7ab3350338b";
-    const BIOS_URL: &str = "https://raw.githubusercontent.com/copy/v86/master/bios/seabios.bin";
-    const BIOS_SHA256: &str = "73e3f359102e3a9982c35fce98eb7cd08f18303ac7f1ba6ebfbe6cdc1c244d98";
-    const VGA_BIOS_URL: &str = "https://raw.githubusercontent.com/copy/v86/master/bios/vgabios.bin";
-    const VGA_BIOS_SHA256: &str = "a4bc0d80cc3ca028c73dafa8fee396b8d054ce87ebd8abfbd31b06b437607880";
-
-    fn download(url: &str, expected: &str) -> Result<Vec<u8>> {
-        let bytes = reqwest::blocking::get(url)?.error_for_status()?.bytes()?.to_vec();
-        let actual = format!("{:x}", Sha256::digest(&bytes));
-        if actual != expected {
-            return Err(eyre!("checksum mismatch for {url}: expected {expected}, got {actual}"));
-        }
-        Ok(bytes)
-    }
-
     let destination = board_directory.join("assets/dos");
-    fs::create_dir_all(&destination)?;
-    println!("Downloading FreeDOS 1.4 LiteUSB...");
-    let archive = download(FREEDOS_URL, FREEDOS_SHA256)?;
-    let mut archive = zip::ZipArchive::new(Cursor::new(archive))?;
-    let mut image = archive.by_name("FD14LITE.img")?;
-    let image_path = destination.join("freedos.img");
-    let mut output = File::create(&image_path)?;
-    std::io::copy(&mut image, &mut output)?;
-    drop(output);
-    icy_board_engine::icy_board::doors::dos::configure_base_image(&image_path).map_err(|error| eyre!(error.to_string()))?;
-    fs::write(destination.join("seabios.bin"), download(BIOS_URL, BIOS_SHA256)?)?;
-    fs::write(destination.join("vgabios.bin"), download(VGA_BIOS_URL, VGA_BIOS_SHA256)?)?;
-    println!("Native DOS assets prepared in {}", destination.display());
+    println!("{}: {}", icy_board_cli::text("icbsetup", "dos-preparing"), destination.display());
+    icy_board_engine::icy_board::doors::dos::prepare_dos_assets(&destination).map_err(|error| eyre!(error.to_string()))?;
+    println!("{}: {}", icy_board_cli::text("icbsetup", "dos-ready"), destination.display());
+    Ok(())
+}
+
+fn install_dos_fossil(command: &DosFossil) -> Result<()> {
+    use icy_board_engine::icy_board::doors::dos;
+
+    let _board_lock = BoardLock::acquire(&command.directory).map_err(|error| eyre!(error.to_string()))?;
+    let assets = command.directory.join("assets/dos");
+    let image = if let Some(door) = &command.door {
+        let image = assets.join("doors").join(dos::image_file_name(door));
+        if !image.is_file() {
+            return Err(eyre!("{}: {}", icy_board_cli::text("icbsetup", "dos-fossil-missing-door"), image.display()));
+        }
+        image
+    } else {
+        prepare_dos_image(&command.directory)?;
+        assets.join("freedos.img")
+    };
+    let backup = dos::install_x00_fossil(&image, &command.archive).map_err(|error| eyre!(error.to_string()))?;
+    println!("{}: {}", icy_board_cli::text("icbsetup", "dos-fossil-installed"), image.display());
+    println!("{}: {}", icy_board_cli::text("icbsetup", "dos-fossil-backup"), backup.display());
     Ok(())
 }
 

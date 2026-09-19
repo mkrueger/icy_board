@@ -118,6 +118,53 @@ fn door_payload_before_reset(bytes: &[u8]) -> &[u8] {
 }
 
 #[tokio::test]
+#[ignore = "downloads the pinned FreeDOS/BIOS assets and boots the native emulator"]
+async fn dos_first_launch_downloads_assets_and_runs_door() {
+    let (root, mut state, mut peer) = fixture(false).await;
+    state.session.time_limit = 0;
+    let source = root.path().join("game");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::write(source.join("START.BAT"), b"@ECHO OFF\r\nECHO FIRST-LAUNCH-OK > COM1\r\n").unwrap();
+    let game = Door {
+        door_type: DoorType::Dos,
+        dos_command: "CALL START.BAT".into(),
+        ..door(source.to_str().unwrap())
+    };
+    state.run_door(&DoorList::default(), &game, 0).await.unwrap();
+    let text = output(&mut peer).await;
+    assert!(text.contains("Preparing DOS files"), "{text}");
+    assert!(text.contains("FIRST-LAUNCH-OK"), "{text}");
+    let assets = root.path().join("assets/dos");
+    assert!(crate::icy_board::doors::dos::dos_assets_ready(&assets));
+    assert!(assets.join("doors/game.img").is_file());
+    state.run_door(&DoorList::default(), &game, 0).await.unwrap();
+    let text = output(&mut peer).await;
+    assert!(!text.contains("Preparing DOS files"), "{text}");
+    assert!(text.contains("FIRST-LAUNCH-OK"), "{text}");
+}
+
+#[tokio::test]
+async fn dos_preparation_failure_is_visible_and_not_billed() {
+    let (root, mut state, mut peer) = fixture(true).await;
+    let source = root.path().join("game");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::write(source.join("GAME.EXE"), []).unwrap();
+    std::fs::create_dir_all(root.path().join("assets/dos/freedos.img")).unwrap();
+    let game = Door {
+        door_type: DoorType::Dos,
+        dos_command: "GAME.EXE".into(),
+        ..door(source.to_str().unwrap())
+    };
+    let error = state.run_door(&DoorList::default(), &game, 0).await.unwrap_err();
+    assert!(error.to_string().contains("DOS asset is not a file"), "{error}");
+    let text = output(&mut peer).await;
+    assert!(text.contains("Preparing DOS files"), "{text}");
+    assert!(text.contains("DOS preparation failed"), "{text}");
+    assert_eq!(account(&state).debit_tpu, 0.0);
+    assert!(!root.path().join("assets/dos/doors/game.img").exists());
+}
+
+#[tokio::test]
 async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() {
     let (root, mut state, mut peer) = fixture(true).await;
     let file = root.path().join("final-balance");

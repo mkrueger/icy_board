@@ -584,11 +584,15 @@ impl IcyBoardState {
             return Err(format!("DOS command is empty for door '{}'", door.name).into());
         }
         crate::icy_board::doors::dos::validate_simple_command(&source_path, &door.dos_command)?;
-        for path in [&base_image_path, &bios_path, &vga_bios_path] {
-            if !path.is_file() {
+        if !crate::icy_board::doors::dos::dos_assets_ready(&assets) {
+            log::info!("Preparing missing DOS assets in {}", assets.display());
+            self.display_text(IceText::PreparingDosAssets, display_flags::NEWLINE).await?;
+            let prepare_assets = assets.clone();
+            let prepared = tokio::task::spawn_blocking(move || crate::icy_board::doors::dos::prepare_dos_assets(&prepare_assets)).await?;
+            if let Err(error) = prepared {
+                self.display_text(IceText::DosPreparationFailed, display_flags::NEWLINE).await?;
                 return Err(format!(
-                    "native DOS asset not found: {}. Run 'icbsetup dos-image {}' first",
-                    path.display(),
+                    "Could not prepare native DOS assets: {error}. Retry or run 'icbsetup dos-image {}' before opening the door",
                     self.root_path.display()
                 )
                 .into());

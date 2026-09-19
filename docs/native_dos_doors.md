@@ -24,13 +24,18 @@ isolated machine instances.
 
 ## Prepare FreeDOS
 
-From an Icy Board build, run:
+The first DOS-door launch automatically downloads and prepares any missing
+FreeDOS and BIOS assets. The caller sees a preparation message; the first
+launch needs Internet access and can take a few minutes. Subsequent launches
+use the installed files without downloading them again.
+
+To prepare these files ahead of time, run:
 
 ```bash
 icbsetup dos-image /path/to/board
 ```
 
-This reproducibly downloads and verifies:
+Both paths download and verify pinned SHA-256 checksums for:
 
 - FreeDOS 1.4 LiteUSB from the official FreeDOS site
 - SeaBIOS and the VGA BIOS used by upstream v86
@@ -43,9 +48,16 @@ assets/dos/seabios.bin
 assets/dos/vgabios.bin
 ```
 
-The command patches the image to call `C:\ICB\RUN.BAT` and then execute the
+New files are staged before publication. Existing files, including customized
+base images, are never replaced. Failed downloads can be retried by launching
+the door again or running `dos-image`; the error details are logged. Existing
+files are trusted, so damaged assets require manual repair or removal while
+the board is stopped.
+
+The new base image is patched to call `C:\ICB\RUN.BAT` and then execute the
 small ACPI shutdown helper injected by Icy Board. The image remains a normal
-MBR/FAT16 raw disk and can also be opened by standard image tools.
+MBR/FAT16 raw disk and can also be opened by standard image tools. Door game
+files and licensed third-party drivers are not downloaded automatically.
 
 ## Install a door
 
@@ -58,24 +70,50 @@ mounting it, stop the door and use, for example:
 icbsetup dos-copy assets/dos/doors/lord.img LORD.EXE DOOR/LORD.EXE
 ```
 
-Doors that require a FOSSIL driver need one installed separately. FreeDOS does
-not ship X00, and Icy Board does not redistribute it. Install a driver whose
-license permits your use under `C:\FOSSIL`. `X00.SYS` is a device driver, not
-an executable: do not put `C:\FOSSIL\X00.SYS` in `START.BAT` or `dos_command`.
-Load it at boot by adding this line to the image's `C:\FDCONFIG.SYS`, preserving
-the existing configuration, and follow your driver's documentation for options:
+### Optional FOSSIL driver
 
-```dos
-DEVICE=C:\FOSSIL\X00.SYS
+Doors that support direct serial I/O, including the tested LORD 4.06 setup,
+can use COM1 without a FOSSIL driver. Install one only when your door needs it.
+FreeDOS Lite does not include X00, and Icy Board does not redistribute it.
+
+For X00, obtain the complete original ZIP distribution and read its license.
+Only proceed if the terms permit your intended use. Stop Icy Board, then run:
+
+```bash
+icbsetup dos-fossil /path/to/board /path/to/x00153a.zip --accept-license
 ```
 
-Use a DOS-aware image tool to edit that file, or `dos-copy` to install a
-complete replacement. Configure `assets/dos/freedos.img` before creating any
-per-door images, or modify the existing per-door image. Changes to the base
-image do not update images already created. A driver distributed as an
-executable TSR may instead be loaded by the batch file according to its own
-instructions. Doors that support direct serial I/O can use COM1 without a
-FOSSIL.
+This prepares missing base assets and installs X00 into the **base image**
+for future doors. For a door whose persistent image already exists, use:
+
+```bash
+icbsetup dos-fossil /path/to/board /path/to/x00153a.zip --door LORD --accept-license
+```
+
+The command takes the board lock and stages changes in a temporary image. It
+keeps the original image as `<image>.pre-fossil.bak`, preserves the existing
+configuration, copies the archive's files (including license and documentation)
+into `C:\FOSSIL`, and appends this boot entry to `C:\FDCONFIG.SYS`:
+
+```dos
+DEVICE=C:\FOSSIL\X00.SYS E B,0,57600
+```
+
+Select **FOSSIL**, **COM1**, and a locked baud rate of **57600** in the game's
+own setup. X00 numbers COM1 as port zero. The helper supports flat X00 ZIP
+distributions; it does not configure arbitrary FOSSIL drivers. Existing
+FOSSIL directories, driver references, or backup files cause a refusal rather
+than being overwritten. Restore the backup while the board is stopped to undo
+the installation. X00 1.53a initialization and serial output have been tested
+with the native emulator; compatibility with every door is not implied.
+
+Changes to the base image do not update existing per-door images. Installing
+into one door image does not affect other doors. Do not redistribute an image
+containing X00 without checking its distribution terms.
+
+Other drivers still require their documented installation procedure, using a
+DOS-aware image tool or `dos-copy`. `X00.SYS` is loaded as a device driver by
+the helper; do not invoke that filename as a command in `START.BAT`.
 
 ## Configure a door
 
