@@ -561,7 +561,8 @@ impl Tui {
         }
         let pos: icy_engine::Position = screen.caret.position();
         let cursor_y = pos.y - screen.first_visible_line();
-        if self.display_visible && pos.x >= 0 && pos.x < i32::from(area.width) && cursor_y >= 0 && cursor_y < i32::from(area.height) {
+        // A local caller sees the console cursor, so DECTCEM has to reach it too.
+        if self.display_visible && screen.caret.visible && pos.x >= 0 && pos.x < i32::from(area.width) && cursor_y >= 0 && cursor_y < i32::from(area.height) {
             frame.set_cursor_position((area.x + pos.x as u16, area.y + cursor_y as u16));
         }
 
@@ -1268,6 +1269,29 @@ EXIT
             assert!(row(23).starts_with("1(Local)"));
             assert_eq!(terminal.get_cursor_position().unwrap(), (label.len() as u16, 22).into());
         }
+    }
+
+    /// A PPE that hides the cursor with DECTCEM means it for the local console too.
+    #[test]
+    fn the_local_console_hides_the_cursor_on_request() {
+        let tui = test_tui();
+        let mut parser = AnsiParser::default();
+        let draw = || {
+            let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+            terminal.draw(|frame| tui.ui(frame, StatusBarInfo::default())).unwrap();
+            terminal
+        };
+
+        parser.parse(
+            b"\x1b[2J\x1b[HLIST\x1b[?25l",
+            &mut icy_engine::ScreenSink::new(&mut *tui.screen.lock().unwrap()),
+        );
+        assert!(!draw().backend().cursor_visible());
+
+        parser.parse(b"\x1b[?25h", &mut icy_engine::ScreenSink::new(&mut *tui.screen.lock().unwrap()));
+        let terminal = draw();
+        assert!(terminal.backend().cursor_visible());
+        assert_eq!(terminal.backend().cursor_position(), (4, 0).into());
     }
 
     /// The console measures the screen, not the terminal it happens to be shown in.
