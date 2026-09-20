@@ -1470,7 +1470,7 @@ pub async fn wrusysdoor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     write_user_sys(vm, &door_name).await
 }
 
-/// `WRUSYS` - writes USER.SYS so an external program can read the caller.
+/// `WRUSYS` - writes USERS.SYS so an external program can read the caller.
 pub async fn wrusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     write_user_sys(vm, "").await
 }
@@ -1478,16 +1478,16 @@ pub async fn wrusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 async fn write_user_sys(vm: &mut VirtualMachine<'_>, tpa_name: &str) -> Res<()> {
     let path = user_sys_dir(vm).await;
     if let Err(err) = crate::icy_board::doors::pcboard::create_user_sys(vm.icy_board_state, &path, tpa_name).await {
-        log::error!("Can't write USER.SYS to {}: {}", path.display(), err);
+        log::error!("Can't write USERS.SYS to {}: {}", path.display(), err);
     }
     Ok(())
 }
 
-/// `RDUSYS` - takes back whatever the external program changed in USER.SYS.
+/// `RDUSYS` - takes back whatever the external program changed in USERS.SYS.
 pub async fn rdusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let path = user_sys_dir(vm).await;
     if let Err(err) = crate::icy_board::doors::pcboard::read_user_sys(&mut vm.user, &path) {
-        log::error!("Can't read USER.SYS from {}: {}", path.display(), err);
+        log::error!("Can't read USERS.SYS from {}: {}", path.display(), err);
         return Ok(());
     }
     vm.icy_board_state.session.cur_security = vm.user.security_level;
@@ -1495,7 +1495,7 @@ pub async fn rdusys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-/// USER.SYS lives beside the board, the way a node work directory used to hold it.
+/// USERS.SYS lives beside the board, the way a node work directory used to hold it.
 async fn user_sys_dir(vm: &mut VirtualMachine<'_>) -> std::path::PathBuf {
     vm.icy_board_state.get_board().await.root_path.clone()
 }

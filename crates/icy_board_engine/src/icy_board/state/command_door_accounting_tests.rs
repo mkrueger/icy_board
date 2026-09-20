@@ -118,6 +118,109 @@ fn door_payload_before_reset(bytes: &[u8]) -> &[u8] {
 }
 
 #[tokio::test]
+async fn pcboard_drop_file_advertises_the_serial_door_connection() {
+    let (root, mut state, _peer) = fixture(false).await;
+    state.session.is_local = true;
+    state.session.cur_user_id = 0;
+    state.session.login_date = chrono::Utc::now() - chrono::Duration::minutes(12);
+    state.session.current_conference_number = 300;
+    for node in [0, 1, 254, 255] {
+        state.node = node;
+        crate::icy_board::doors::pcboard::create_pcboard(&state, root.path()).await.unwrap();
+        let contents = std::fs::read(root.path().join("PCBOARD.SYS")).unwrap();
+        assert_eq!(contents.len(), 148);
+        assert_eq!(i16::from_le_bytes(contents[54..56].try_into().unwrap()), -12);
+        assert_eq!(contents[65], 255);
+        assert_eq!(u16::from_le_bytes(contents[131..133].try_into().unwrap()), 437);
+        assert_eq!(contents[125], b'1', "PCBoard stores the COM port as an ASCII digit");
+        assert_eq!(&contents[13..18], b"57600");
+        assert_eq!(&contents[18..23], b"57600", "even a local caller reaches a DOS door over COM1");
+        assert_eq!(u16::from_le_bytes(contents[23..25].try_into().unwrap()), 1);
+        assert_eq!(contents[111], (node + 1).min(255) as u8);
+        assert_eq!(u16::from_le_bytes(contents[146..148].try_into().unwrap()), (node + 1) as u16);
+    }
+}
+
+#[tokio::test]
+async fn pcboard_users_sys_matches_the_fixed_record_contract() {
+    use crate::icy_board::doors::pcboard::{create_pcboard, read_user_sys};
+    let (root, mut state, _peer) = fixture(false).await;
+    state.session.page_len = 43;
+    state.session.login_date = chrono::Utc::now() - chrono::Duration::minutes(12);
+    let user = state.session.current_user.as_mut().unwrap();
+    user.alias = "ALIAS".into();
+    user.street1 = "STREET".into();
+    user.verify_answer = "VERIFY".into();
+    user.stats.num_times_on = 123;
+    user.stats.total_dnld_bytes = (1u64 << 33) + 456789;
+    create_pcboard(&state, root.path()).await.unwrap();
+    assert!(!root.path().join("USER.SYS").exists());
+    let path = root.path().join("USERS.SYS");
+    let mut bytes = std::fs::read(&path).unwrap();
+    assert_eq!(u16::from_le_bytes(bytes[0..2].try_into().unwrap()), 1530);
+    assert_eq!(u32::from_le_bytes(bytes[2..6].try_into().unwrap()), 1);
+    assert_eq!(u16::from_le_bytes(bytes[6..8].try_into().unwrap()), 1007);
+    assert_eq!(&bytes[8..14], &[1, 0, 7, 0, 5, 0]);
+    assert_eq!(bytes.len(), 40 + 1007 + 4 + 35);
+    let record = &bytes[40..1047];
+    assert_eq!(&record[..10], b"USAGE TEST");
+    assert_eq!(record[99], 0);
+    assert_eq!(&record[105..110], &[10, 0, 123, 0, 43]);
+    assert_eq!(i16::from_le_bytes(record[180..182].try_into().unwrap()), 12);
+    assert_eq!(&record[197..201], &[1, 0, 0, 0]);
+    assert_eq!(&record[218..225], b"\x01ALIAS\0");
+    assert_eq!(&record[458..466], b"\x01VERIFY\0");
+    assert_eq!(f64::from_le_bytes(record[991..999].try_into().unwrap()), ((1u64 << 33) + 456789) as f64);
+    bytes[40 + 105..40 + 107].copy_from_slice(&25u16.to_le_bytes());
+    std::fs::write(&path, &bytes).unwrap();
+    let mut returned = User::default();
+    read_user_sys(&mut returned, root.path()).unwrap();
+    assert_eq!(returned.name, "USAGE TEST");
+    assert_eq!(returned.security_level, 25);
+    assert_eq!(returned.stats.num_times_on, 123);
+    assert_eq!(returned.page_len, 43);
+    assert_eq!(returned.alias, "ALIAS");
+    assert_eq!(returned.street1, "STREET");
+    assert_eq!(returned.verify_answer, "VERIFY");
+    assert_eq!(returned.stats.total_dnld_bytes, (1u64 << 33) + 456789);
+    for length in [0, 39, 100, bytes.len() - 1] {
+        std::fs::write(&path, &bytes[..length]).unwrap();
+        assert!(read_user_sys(&mut returned, root.path()).is_err());
+        assert_eq!(returned.name, "USAGE TEST");
+        assert_eq!(returned.security_level, 25);
+    }
+    let mut malformed = bytes.clone();
+    malformed[8..14].fill(255);
+    std::fs::write(&path, malformed).unwrap();
+    assert!(read_user_sys(&mut returned, root.path()).is_err());
+    bytes[40 + 991..40 + 999].copy_from_slice(&f64::NAN.to_le_bytes());
+    std::fs::write(&path, bytes).unwrap();
+    assert!(read_user_sys(&mut returned, root.path()).is_err());
+    assert_eq!(returned.stats.total_dnld_bytes, (1u64 << 33) + 456789);
+    while state.get_board().await.conferences.len() < 41 {
+        state.get_board().await.conferences.push(Default::default());
+    }
+    state
+        .session
+        .current_user
+        .as_mut()
+        .unwrap()
+        .lastread_ptr_flags
+        .entry((40, 0))
+        .or_default()
+        .last_read = 1234;
+    create_pcboard(&state, root.path()).await.unwrap();
+    let contents = std::fs::read(&path).unwrap();
+    assert_eq!(&contents[8..14], &[41, 0, 7, 0, 6, 0]);
+    assert_eq!(contents.len(), 40 + 1007 + 41 * 4 + 7 * 6);
+    assert_eq!(&contents[1047 + 40 * 4..1047 + 41 * 4], &1234u32.to_le_bytes());
+    state.session.current_user = None;
+    create_pcboard(&state, root.path()).await.unwrap();
+    let contents = std::fs::read(&path).unwrap();
+    assert!(contents[40..].iter().all(|byte| *byte == 0));
+}
+
+#[tokio::test]
 #[ignore = "downloads the pinned FreeDOS/BIOS assets and boots the native emulator"]
 async fn dos_first_launch_downloads_assets_and_runs_door() {
     let (root, mut state, mut peer) = fixture(false).await;
@@ -141,6 +244,32 @@ async fn dos_first_launch_downloads_assets_and_runs_door() {
     let text = output(&mut peer).await;
     assert!(!text.contains("Preparing DOS files"), "{text}");
     assert!(text.contains("FIRST-LAUNCH-OK"), "{text}");
+}
+
+#[tokio::test]
+#[ignore = "requires ICB_DOS_ASSETS; validates both PCBoard drop files inside DOS"]
+async fn dos_pcboard_launch_uses_the_primary_drop_file() {
+    let (root, mut state, mut peer) = fixture(false).await;
+    state.session.time_limit = 0;
+    let assets = std::path::PathBuf::from(std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS"));
+    let destination = root.path().join("assets/dos");
+    std::fs::create_dir_all(&destination).unwrap();
+    for name in ["freedos.img", "seabios.bin", "vgabios.bin"] {
+        std::fs::copy(assets.join(name), destination.join(name)).unwrap();
+    }
+    let source = root.path().join("game");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::write(source.join("START.BAT"), b"@ECHO OFF\r\nIF NOT \"%1\"==\"PCBOARD.SYS\" GOTO FAIL\r\nIF NOT EXIST PCBOARD.SYS GOTO FAIL\r\nIF NOT EXIST USERS.SYS GOTO FAIL\r\nECHO PCBOARD-DROP-OK > COM1\r\nGOTO END\r\n:FAIL\r\nECHO PCBOARD-DROP-FAILED > COM1\r\n:END\r\n").unwrap();
+    let game = Door {
+        door_type: DoorType::Dos,
+        drop_file: crate::icy_board::doors::DropFile::PCBoard,
+        dos_command: "CALL START.BAT {dropFile}".into(),
+        ..door(source.to_str().unwrap())
+    };
+    state.run_door(&DoorList::default(), &game, 0).await.unwrap();
+    let text = output(&mut peer).await;
+    assert!(text.contains("PCBOARD-DROP-OK"), "{text}");
+    assert!(!text.contains("PCBOARD-DROP-FAILED"), "{text}");
 }
 
 #[tokio::test]

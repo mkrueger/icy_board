@@ -167,6 +167,21 @@ pub fn configure_base_image(image: &Path) -> Res<()> {
     Ok(())
 }
 
+pub fn replace_image_startup(image: &Path, contents: &[u8]) -> Res<Vec<u8>> {
+    let file_system = FileSystem::new(PartitionFile::open(image)?, FsOptions::new())?;
+    let mut previous = Vec::new();
+    {
+        let root = file_system.root_dir();
+        let mut startup = root.open_file("FDAUTO.BAT")?;
+        startup.read_to_end(&mut previous)?;
+        startup.seek(SeekFrom::Start(0))?;
+        startup.truncate()?;
+        startup.write_all(contents)?;
+    }
+    file_system.unmount()?;
+    Ok(previous)
+}
+
 const DOS_ASSETS: [(&str, &str, &str); 3] = [
     (
         "freedos.img",
@@ -824,6 +839,66 @@ mod tests {
         validate_simple_command(directory.path(), "bre.exe").unwrap();
         let error = validate_simple_command(directory.path(), "BRE.BAT").unwrap_err();
         assert!(error.to_string().contains("Install/configure the door"));
+    }
+
+    #[test]
+    #[ignore = "requires ICB_DOS_ASSETS; probes the native VGA console keyboard"]
+    fn freedos_console_accepts_keyboard_commands() {
+        let assets = std::path::PathBuf::from(std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS"));
+        let root = tempfile::tempdir().unwrap();
+        let image = root.path().join("console.img");
+        std::fs::copy(assets.join("freedos.img"), &image).unwrap();
+        inject_session_files(&image, &[], "").unwrap();
+        let startup = root.path().join("FDAUTO.BAT");
+        std::fs::write(
+            &startup,
+            b"@ECHO OFF\r\nSET DOSDIR=C:\\FREEDOS\r\nSET PATH=%DOSDIR%\\BIN\r\nCTTY CON\r\nCD C:\\DOOR\r\nECHO CONSOLE-READY\r\n",
+        )
+        .unwrap();
+        copy_file_into_image(&image, &startup, "FDAUTO.BAT").unwrap();
+        let mut machine = Machine::new(MachineConfig::default().with_ram_bytes(64 * 1024 * 1024).with_vga_memory_bytes(2 * 1024 * 1024));
+        machine
+            .set_bios(Image::from_file(ImageKind::Bios, assets.join("seabios.bin")).unwrap())
+            .unwrap();
+        machine
+            .set_vga_bios(Image::from_file(ImageKind::VgaBios, assets.join("vgabios.bin")).unwrap())
+            .unwrap();
+        machine.set_disk(Image::from_file(ImageKind::RawDisk, &image).unwrap()).unwrap();
+        machine.attach_backend(NativeBackend::new().with_instructions_per_step(10_000));
+        machine.prepare().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut injected = false;
+        let mut command = "ECHO CONSOLE-OK > CONSOLE.TXT\nC:\\ICB\\POWEROFF.COM\n".chars();
+        let mut next_key = std::time::Instant::now();
+        let mut screen = String::new();
+        while std::time::Instant::now() < deadline {
+            let report = machine
+                .run(RunOptions {
+                    max_steps: Some(1),
+                    ..Default::default()
+                })
+                .unwrap();
+            if report.halted {
+                assert!(injected);
+                std::fs::write(&image, machine.hard_disk_snapshot(0).unwrap()).unwrap();
+                let output = read_editor_file(&image, "CONSOLE.TXT", 128).unwrap();
+                assert!(String::from_utf8_lossy(&output).contains("CONSOLE-OK"));
+                return;
+            }
+            if let Some((_, _, cells)) = machine.vga_text_snapshot() {
+                screen = cells.chunks_exact(2).map(|cell| cell[0] as char).collect();
+                if !injected && screen.contains("CONSOLE-READY") {
+                    injected = true;
+                }
+            }
+            if injected && std::time::Instant::now() >= next_key {
+                if let Some(character) = command.next() {
+                    assert_eq!(machine.inject_text(&character.to_string()).unwrap(), 1);
+                }
+                next_key = std::time::Instant::now() + std::time::Duration::from_millis(10);
+            }
+        }
+        panic!("console command did not finish; injected={injected}; screen={screen:?}");
     }
 
     #[tokio::test]

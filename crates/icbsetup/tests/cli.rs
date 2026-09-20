@@ -22,6 +22,147 @@ fn icbsetup() -> Command {
     command
 }
 
+#[cfg(unix)]
+#[test]
+#[ignore = "requires ICB_DOS_ASSETS and mtype"]
+fn dos_console_saves_and_discards_the_persistent_image() {
+    use icy_board_engine::icy_board::doors::dos;
+    use icy_engine::{Position, TextPane};
+    use std::io::{Read, Write};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let assets = std::path::PathBuf::from(std::env::var_os("ICB_DOS_ASSETS").expect("ICB_DOS_ASSETS"));
+    let board = tempfile::tempdir().unwrap();
+    let destination = board.path().join("assets/dos");
+    fs::create_dir_all(&destination).unwrap();
+    for name in ["freedos.img", "seabios.bin", "vgabios.bin"] {
+        fs::copy(assets.join(name), destination.join(name)).unwrap();
+    }
+    let source = board.path().join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("KEEP.TXT"), b"original").unwrap();
+    let lord_source = std::env::var_os("ICB_DOS_LORD_SOURCE").map(std::path::PathBuf::from);
+    let image = destination.join("doors/demo.img");
+    dos::create_door_image(&destination.join("freedos.img"), &image, lord_source.as_ref().unwrap_or(&source)).unwrap();
+    let original = fs::read(&image).unwrap();
+    let read_dos_file = |path: &std::path::Path, name: &str| {
+        let output = Command::new("mtype")
+            .args(["-i", &format!("{}@@32256", path.display()), name])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        output.stdout
+    };
+    let startup = read_dos_file(&image, "::FDAUTO.BAT");
+    let mut cases = vec![("en", true, "SAVED"), ("de", false, "DISCARDED")];
+    if lord_source.is_some() {
+        cases.push(("en", false, "LORD"));
+    }
+    for (locale, save, marker) in cases {
+        let before = fs::read(&image).unwrap();
+        let (pty, pts) = pty_process::blocking::open().unwrap();
+        pty.resize(pty_process::Size::new(25, 80)).unwrap();
+        let mut child = pty_process::blocking::Command::new(env!("CARGO_BIN_EXE_icbsetup"))
+            .arg("dos-console")
+            .arg(board.path())
+            .arg("demo")
+            .env("LANG", locale)
+            .env("LC_ALL", locale)
+            .env("LANGUAGE", locale)
+            .env("TERM", "xterm-256color")
+            .spawn(pts)
+            .unwrap();
+        let descriptor: std::os::fd::OwnedFd = pty.into();
+        let mut input = fs::File::from(descriptor);
+        let mut output = input.try_clone().unwrap();
+        let (sender, receiver) = mpsc::channel();
+        let reader = std::thread::spawn(move || {
+            let mut bytes = [0; 8192];
+            while let Ok(count) = output.read(&mut bytes) {
+                if count == 0 {
+                    break;
+                }
+                if sender.send(bytes[..count].to_vec()).is_err() {
+                    break;
+                }
+            }
+        });
+        let deadline = Instant::now() + Duration::from_secs(25);
+        let mut transcript = Vec::new();
+        let mut entered = false;
+        let mut discarded = false;
+        let mut cursor_queries = 0;
+        let mut screen = icy_board_engine::icy_board::state::virtual_screen::VirtualScreen::new(icy_engine::parsers::ansi::default());
+        let mut rendered = String::new();
+        while Instant::now() < deadline {
+            match receiver.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+                Ok(bytes) => {
+                    screen.write_bytes(&bytes);
+                    transcript.extend(bytes);
+                }
+                Err(_) => break,
+            }
+            rendered = (0..25)
+                .map(|row| (0..80).map(|column| screen.buffer.char_at(Position::new(column, row)).ch).collect::<String>())
+                .collect::<Vec<_>>()
+                .join("\n");
+            let text = String::from_utf8_lossy(&transcript);
+            let queries = text.matches("\x1b[6n").count();
+            if queries > cursor_queries {
+                for _ in cursor_queries..queries {
+                    input.write_all(b"\x1b[1;1R").unwrap();
+                }
+                input.flush().unwrap();
+                cursor_queries = queries;
+            }
+            if !entered && rendered.contains("C:\\DOOR>") {
+                let command = if marker == "LORD" {
+                    "lordcfg.exe\r".to_string()
+                } else {
+                    format!("echo {marker} > CONSOLE.TXT\r{}", if save { "exit\r" } else { "echo DISCARD-READY\r" })
+                };
+                input.write_all(command.as_bytes()).unwrap();
+                input.flush().unwrap();
+                entered = true;
+            }
+            if !save && !discarded && (rendered.contains("DISCARD-READY") || (marker == "LORD" && rendered.contains("Configure Nodes"))) {
+                input.write_all(&[0x11]).unwrap();
+                input.flush().unwrap();
+                discarded = true;
+            }
+        }
+        if child.try_wait().unwrap().is_none() {
+            child.kill().unwrap();
+        }
+        let status = child.wait().unwrap();
+        drop(receiver);
+        reader.join().unwrap();
+        assert!(
+            status.success() && entered,
+            "{marker}: {status}, entered={entered}, discarded={discarded}: {rendered:?}"
+        );
+        assert!(
+            transcript.windows(8).any(|bytes| bytes == b"\x1b[?1049l"),
+            "terminal alternate screen not restored"
+        );
+        if save {
+            assert!(String::from_utf8_lossy(&read_dos_file(&image, "::DOOR/CONSOLE.TXT")).contains("SAVED"));
+            let backups: Vec<_> = fs::read_dir(image.parent().unwrap())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| path.extension().is_some_and(|extension| extension == "bak"))
+                .collect();
+            assert_eq!(backups.len(), 1);
+            assert_eq!(fs::read(&backups[0]).unwrap(), original);
+        } else {
+            assert!(discarded);
+            assert_eq!(fs::read(&image).unwrap(), before);
+        }
+        assert_eq!(read_dos_file(&image, "::FDAUTO.BAT"), startup);
+    }
+}
+
 #[test]
 fn cli_help_errors_and_version_are_localized() {
     for (locale, help, error) in [("en", "Use the full screen", "error"), ("de", "Vollbild verwenden", "Fehler")] {
@@ -38,7 +179,7 @@ fn cli_help_errors_and_version_are_localized() {
         assert!(output.status.success() && output.stderr.is_empty());
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(stdout.contains(help), "{stdout}");
-        for subcommand in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy"] {
+        for subcommand in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy", "dos-console"] {
             assert!(stdout.contains(subcommand), "{stdout}");
         }
         let output = run(&["--unknown-option"]);
@@ -67,6 +208,7 @@ fn cli_subcommand_help_and_errors_are_localized_recursively() {
                 "Offer to create",
                 "Board directory",
                 "Host file to copy",
+                "Ctrl+Q discards",
             ],
             "error",
         ),
@@ -79,11 +221,12 @@ fn cli_subcommand_help_and_errors_are_localized_recursively() {
                 "Das Erstellen",
                 "Mailbox-Verzeichnis",
                 "Zu kopierende Host-Datei",
+                "Strg+Q verwirft",
             ],
             "Fehler",
         ),
     ] {
-        for (subcommand, description) in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy"]
+        for (subcommand, description) in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy", "dos-console"]
             .into_iter()
             .zip(descriptions)
         {

@@ -137,7 +137,8 @@ CALL START.BAT {node}
 ```
 
 `START.BAT` must be configured for the game's launch syntax, selected drop
-file, and COM1. The literal TOML string also permits DOS backslashes without
+file, and COM1. For `PCBoard`, Icy Board supplies both `PCBOARD.SYS` and
+`USERS.SYS`; `{dropFile}` selects `PCBOARD.SYS`. The literal TOML string also permits DOS backslashes without
 escaping them.
 
 The setup editor exposes the security expression, door type, host path, shell
@@ -153,72 +154,80 @@ The DOS command supports these case-sensitive substitutions:
 `path` is the door's host directory, not a disk image. On first launch Icy Board
 copies `assets/dos/freedos.img` to `assets/dos/doors/<door-name>.img`, imports the
 directory as `C:\DOOR`, and then preserves that image as the door's game state.
-Delete the per-door image to reinstall it from the host directory. A normal
+Deleting the per-door image reinstalls from the host directory and loses its
+saved game state; it is not necessary for routine configuration. A normal
 guest shutdown saves the modified image. Cancellation or a runtime timeout
 does not save that run's disk changes.
 
 Before every launch Icy Board refreshes the selected drop file in both
 `C:\ICB` and `C:\DOOR`, along with `RUN.BAT`, `FDAUTO.BAT`, and
 `POWEROFF.COM`. Changes to those session settings therefore do not require an
-image rebuild. Changes to installed game files require either `dos-copy` or
-deleting the per-door image; deleting it also resets game state.
+image rebuild. Use `dos-copy` for updated host files and `dos-console` for
+configuration inside the installed game's image.
 
-## Run game setup outside Icy Board
+## Run game setup from the command line
 
-The image is a bootable raw hard disk, not an emulator-specific container.
-For interactive VGA/keyboard setup, it can be booted with QEMU. This is an
-external maintenance option; Icy Board itself still uses `x86-native`.
+Stop Icy Board, then open the door's persistent image with the same native
+emulator used by the BBS:
 
-1. Stop Icy Board before modifying or booting an image. Back up the per-door
-   image, for example `assets/dos/doors/dostest.img` for a door named `dostest`.
-   Do not use the base `freedos.img` to configure an already installed game.
-2. Temporarily replace that image's `FDAUTO.BAT`. Its normal startup redirects
-   DOS to COM1, runs the door, and powers off, so it is unsuitable for a local
-   setup session. Create a host file named `SETUP.BAT` containing:
+```bash
+icbsetup dos-console /path/to/board LORD
+```
 
-   ```dos
-   @ECHO OFF
-   SET DOSDIR=C:\FREEDOS
-   SET PATH=%DOSDIR%\BIN
-   CTTY CON
-   CD C:\DOOR
-   ```
+Use the configured door name, not an image filename. The command takes the
+board lock and boots a temporary copy of `assets/dos/doors/lord.img`. It does
+not modify the base image or reimport an existing game from the host.
 
-   Copy it into the image as the startup file:
+For a game that has not yet been launched, supply its host directory once:
 
-   ```bash
-   icbsetup dos-copy assets/dos/doors/dostest.img SETUP.BAT FDAUTO.BAT
-   ```
+```bash
+icbsetup dos-console /path/to/board LORD --source /path/to/board/doors/lord
+```
 
-3. With QEMU installed, boot the image in its graphical console:
+This creates the persistent image and imports the game into `C:\DOOR` before
+starting the temporary session. `--source` is ignored when the image already
+exists. Discarding the first session leaves that initial imported image intact.
 
-   ```bash
-   qemu-system-i386 -m 64 -boot c -nic none \
-     -drive file=assets/dos/doors/dostest.img,format=raw,if=ide
-   ```
+The console starts at `C:\DOOR>`. Run the game's setup program there, for
+example `LORDCFG.EXE`. Configure game paths as `C:\DOOR`, so programs that
+validate paths see exactly the directory used during normal door launches.
+Select the BBS drop-file format configured in Icy Board, COM1, and 57600 baud.
+The console does not generate a fresh caller drop file.
 
-   Run the setup executable supplied with your LORD distribution at the
-   `C:\DOOR>` prompt. Save the configuration and exit setup before shutting
-   down QEMU. Do not use `-snapshot` if you want these changes saved.
-4. Close QEMU before restarting Icy Board. The next door launch automatically
-   restores its normal `FDAUTO.BAT`; game configuration and `FDCONFIG.SYS`
-   remain in the persistent image.
+Save and close the game's setup program, then type `EXIT` at the DOS prompt.
+This shuts down the guest, restores the image's original `FDAUTO.BAT`, and
+atomically saves the modified image. A uniquely named
+`<image>.pre-console-<suffix>.bak` beside it preserves the original image.
+Game files and `FDCONFIG.SYS` changes remain in the saved image; manual changes
+to the temporary `FDAUTO.BAT` do not. Restore a backup only with the board stopped.
 
-The QEMU procedure is not an assertion of compatibility with every door or
-setup program; it has not been validated with the reported LORD installation.
+Press **Ctrl+Q** to discard the session instead, including when a guest program
+hangs. Escape, Ctrl+C, arrows, and function keys are passed to DOS. An emulator
+error also discards the temporary session. Memory defaults to 64 MiB; use
+`--memory 32`, for example, to match a differently configured door.
+
+This is a text-mode VGA/keyboard console for a terminal of at least 80x25.
+CP437 characters, colors, and the cursor are rendered in the host terminal.
+Keyboard text uses the US ASCII mapping; graphics modes and mouse input are
+not supported. Larger guest text modes are clipped to the host terminal size.
+Pasted input is paced and capped at 4096 queued characters. Real FreeDOS shell
+save/discard and the LORD 4.06 setup menu have been tested; compatibility with
+every setup program is not implied.
+
+The image remains a standard MBR/FAT16 raw disk for external maintenance tools.
+Do not boot or modify it concurrently with Icy Board or the native console.
 
 ## x86-native development
 
 The workspace depends on the Git repository at
-<https://github.com/mkrueger/x86>; `Cargo.lock` records the selected revision.
+<https://github.com/mkrueger/x86>; the workspace manifest pins a tested revision.
 The x86 repository also provides a standalone `x86-console` diagnostic host;
-Icy Board does not bundle it as an interactive DOS setup command. It contains an
-asset-gated FreeDOS smoke test:
+use `icbsetup dos-console` for Icy Board's persistent door images. The emulator
+repository contains asset-gated firmware tests:
 
 ```bash
 X86_BIOS=assets/dos/seabios.bin \
 X86_VGA_BIOS=assets/dos/vgabios.bin \
 X86_DISK=assets/dos/freedos.img \
-X86_EXPECT_SERIAL='No DOS door configured.' \
-cargo test --test freedos_boot -- --ignored
+cargo test --test freedos_boot -- --ignored --test-threads=1
 ```

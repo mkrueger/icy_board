@@ -135,7 +135,7 @@ impl DropFile {
         .into_iter()
     }
 
-    /// File a door is pointed at; `PCBoard` additionally writes USER.SYS.
+    /// File a door is pointed at; `PCBoard` additionally writes USERS.SYS.
     pub fn file_name(&self, node: usize) -> Option<String> {
         Some(match self {
             DropFile::None => return None,
@@ -159,7 +159,7 @@ impl std::fmt::Display for DropFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             DropFile::None => "None",
-            DropFile::PCBoard => "PCBOARD.SYS + USER.SYS",
+            DropFile::PCBoard => "PCBOARD.SYS + USERS.SYS",
             DropFile::DoorSys => "DOOR.SYS",
             DropFile::Door32Sys => "DOOR32.SYS",
             DropFile::DorInfo => "DORINFOx.DEF",

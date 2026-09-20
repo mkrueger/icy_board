@@ -12,7 +12,7 @@ fields in binary files are little-endian.
 | Drop-file setting | Generated file | Specification |
 | --- | --- | --- |
 | `PCBoard` | `PCBOARD.SYS` | [pcboard_sys.md](pcboard_sys.md) |
-| `PCBoard` | `USER.SYS` | [user_sys.md](user_sys.md) |
+| `PCBoard` | `USERS.SYS` | [user_sys.md](user_sys.md) |
 | `DoorSys` | `DOOR.SYS` | [door_sys.md](door_sys.md) |
 | `Door32Sys` | `door32.sys` | [door32_sys.md](door32_sys.md) |
 | `DorInfo` | `DORINFO{node}.DEF` | [dorinfo_def.md](dorinfo_def.md) |

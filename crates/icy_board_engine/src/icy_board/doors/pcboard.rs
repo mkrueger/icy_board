@@ -11,14 +11,17 @@ use crate::{
     tables::{export_cp437_string, import_cp437_string},
 };
 use chrono::{Timelike, Utc};
+const USERS_HEADER_SIZE: usize = 40;
+const USERS_RECORD_SIZE: usize = 1007;
+
 pub async fn create_pcboard(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
-    create_pcboard_sys(state, path)?;
+    create_pcboard_sys(state, path, &state.door_user_password().await)?;
     create_user_sys(state, path, "").await?;
 
     Ok(())
 }
 
-fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
+fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path, password: &str) -> Res<()> {
     let mut contents = Vec::new();
     contents.extend(b"-1"); // DISPLAY ON
     contents.extend(b" 0"); // Printer OFF
@@ -34,19 +37,21 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     }
     contents.push(b'U'); // Node Chat Status unavailable
     contents.extend(b"57600"); // DTE Port Speed (5 chars)
-    contents.extend(b"Local"); // Connect Speed (5 chars)
-    contents.extend(u16::to_le_bytes(state.session.cur_user_id as u16)); // Users record number
+    contents.extend(b"57600"); // Connect Speed (5 chars)
+    contents.extend(u16::to_le_bytes(state.session.cur_user_id.saturating_add(1).clamp(0, u16::MAX as i32) as u16)); // Users record number
     contents.extend(export_cp437_string(&state.session.get_first_name(), 15, b' ')); // User's First Name (padded to 15 characters)
-    contents.extend(export_cp437_string("SECRET", 12, b' ')); // User's Password (padded to 12 characters)
+    contents.extend(export_cp437_string(password, 12, b' ')); // User's Password (padded to 12 characters)
     contents.extend(u16::to_le_bytes((state.session.login_date.time().num_seconds_from_midnight() / 60) as u16)); // Time User Logged On (in minutes since midnight)
-    contents.extend(u16::to_le_bytes((Utc::now() - state.session.login_date).num_minutes() as u16)); // Time used so far today (negative number of minutes)
+    contents.extend(i16::to_le_bytes(
+        -((Utc::now() - state.session.login_date).num_minutes().clamp(0, i16::MAX as i64) as i16),
+    )); // Time used so far today (negative number of minutes)
     contents.extend(state.session.login_date.format("%H:%M").to_string().as_bytes()); // Time User Logged On (in "HH:MM" format)
     contents.extend(u16::to_le_bytes(32767)); // Time Allowed On (from PWRD file)
     contents.extend(u16::to_le_bytes(32767)); // Allowed K-Bytes for Download
     contents.push(if state.session.current_conference_number <= 255 {
         state.session.current_conference_number as u8
     } else {
-        0
+        255
     }); // Conference Area user was in (if <= 255)
 
     contents.extend([0, 0, 0, 0, 0]); // Conference Areas the user has joined this session - 5 bytes
@@ -56,12 +61,12 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     contents.extend(export_cp437_string(&state.session.language, 4, b' ')); // Language Extension
     contents.extend(export_cp437_string(&state.session.user_name, 25, b' ')); // User's Full Name (padded to 25 characters)
     contents.extend(u16::to_le_bytes(state.session.minutes_left() as u16)); // Calculated Minutes Remaining
-    contents.push(if state.node > 255 { 255 } else { state.node as u8 }); // Node Number
+    contents.push(state.node.saturating_add(1).min(255) as u8); // Node Number
     contents.extend(b"00:00"); // Event Time
     contents.extend(b" 0"); // Is Event Active - Off
     contents.extend(b"  "); // Reserved
     contents.extend([0, 0, 0, 0]); // Memorized Message Number
-    contents.push(DOOR_COM_PORT); // Comm Port Number (0=none, 1-8)
+    contents.push(b'0' + DOOR_COM_PORT); // Comm Port Number (0=none, 1-8)
     contents.push(0); // Reserved for PCBoard
     contents.push(0); // Unknown
     // Use ANSI (1 = Yes, 0 = No)
@@ -72,7 +77,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     }
 
     contents.extend(u16::to_le_bytes(1)); // Country Code
-    contents.extend(u16::to_le_bytes(1)); // Code Page
+    contents.extend(u16::to_le_bytes(437)); // Code Page
     contents.push(state.session.yes_char as u8);
     contents.push(state.session.no_char as u8);
     contents.push(0); // Language 0 = None
@@ -84,7 +89,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
 
     contents.push(0); // High Conference Areas the user has joined
     contents.push(0); // High Conference Areas the user has scanned
-    contents.extend(u16::to_le_bytes(state.node as u16)); // Node Number if offset 111 is set to 255
+    contents.extend(u16::to_le_bytes(state.node.saturating_add(1).min(u16::MAX as usize) as u16)); // Node Number if offset 111 is set to 255
 
     let path = path.join("PCBOARD.SYS");
     log::info!("create PCBOARD.SYS: {}", path.display());
@@ -92,17 +97,22 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     Ok(())
 }
 
-/// Writes USER.SYS into `path`. `tpa_name` names the third party application the
+/// Writes USERS.SYS into `path`. `tpa_name` names the third party application the
 /// record is meant for, and is empty when no TPA record was asked for.
 pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_name: &str) -> Res<()> {
     let mut contents = Vec::new();
+    let num_areas = state.get_board().await.conferences.len().clamp(1, u16::MAX as usize);
+    let bitmap_size = num_areas.div_ceil(8).max(5);
+    let record_number = state.session.cur_user_id.saturating_add(1).max(0) as u32;
 
     // HEADER
     contents.extend(u16::to_le_bytes(1530)); // PCBoard version number (i.e. 1500)
-    contents.extend(u32::to_le_bytes(state.session.cur_user_id as u32)); // Record number from USER's file
-    contents.extend(u16::to_le_bytes(crate::icy_board::users::PcbUserRecord::RECORD_SIZE as u16)); // Size of "fixed" user record (current size)
-    contents.extend(u16::to_le_bytes(5)); // SizeOfBitFields
-    contents.extend(export_cp437_string(tpa_name, 15, b' ')); // Name of the Third Party Application (if any)
+    contents.extend(u32::to_le_bytes(record_number)); // Record number from USER's file
+    contents.extend(u16::to_le_bytes(USERS_RECORD_SIZE as u16)); // Size of "fixed" user record (current size)
+    contents.extend(u16::to_le_bytes(num_areas as u16));
+    contents.extend(u16::to_le_bytes(7));
+    contents.extend(u16::to_le_bytes(bitmap_size as u16)); // SizeOfBitFields
+    contents.extend(export_cp437_string(tpa_name, 15, 0)); // Name of the Third Party Application (if any)
     contents.extend(u16::to_le_bytes(0)); // Version number for the application (if any)
     contents.extend(u16::to_le_bytes(0)); // Size of a "fixed length" record (if any)
     contents.extend(u16::to_le_bytes(0)); // Size of each conference record (if any)
@@ -116,6 +126,7 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         contents.extend(export_cp437_string(&user.bus_data_phone, 14, 0));
         contents.extend(export_cp437_string(&user.home_voice_phone, 14, 0));
         contents.extend(u16::to_le_bytes(IcbDate::from_utc(&user.stats.last_on).to_pcboard_date() as u16));
+        contents.extend(export_cp437_string(&user.stats.last_on.format("%H:%M").to_string(), 6, 0));
         if state.session.expert_mode() {
             contents.push(1);
         } else {
@@ -151,7 +162,7 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         contents.push(packet_flag);
 
         contents.extend(u16::to_le_bytes(0)); // Date for Last DIR Scan (most recent file)
-        contents.extend(u32::to_le_bytes(state.session.cur_security as u32)); // Security Level
+        contents.extend(u16::to_le_bytes(state.session.cur_security as u16)); // Security Level
         contents.extend(u16::to_le_bytes(user.stats.num_times_on as u16));
         contents.push(state.session.page_len as u8);
         contents.extend(u16::to_le_bytes(user.stats.num_uploads as u16));
@@ -159,15 +170,16 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         contents.extend(u32::to_le_bytes(user.stats.today_dnld_bytes as u32));
         contents.extend(export_cp437_string(&user.user_comment, 31, 0));
         contents.extend(export_cp437_string(&user.sysop_comment, 31, 0));
-        contents.extend(u32::to_le_bytes(user.stats.today_dnld_bytes as u32));
-        contents.extend(u32::to_le_bytes((Utc::now() - state.session.login_date).num_minutes() as u32));
+        contents.extend(i16::to_le_bytes(
+            (Utc::now() - state.session.login_date).num_minutes().clamp(0, i16::MAX as i64) as i16,
+        ));
         contents.extend(u16::to_le_bytes(0)); // Julian date for Registration Expiration Date
-        contents.extend(u32::to_le_bytes(0)); // Expired Security Level
-        contents.extend(u16::to_le_bytes(0)); // LastConference
+        contents.extend(u16::to_le_bytes(0)); // Expired Security Level
+        contents.extend(u16::to_le_bytes(state.session.current_conference_number)); // LastConference
         contents.extend(u32::to_le_bytes(user.stats.total_dnld_bytes as u32));
         contents.extend(u32::to_le_bytes(user.stats.total_upld_bytes as u32));
         contents.push(0); //1=delete this record, 0=keep
-        contents.extend(u32::to_le_bytes(state.session.cur_user_id as u32)); // Record Number in USERS.INF file
+        contents.extend(u32::to_le_bytes(record_number)); // Record Number in USERS.INF file
         contents.push(0);
         contents.extend(&[0; 8]); // Reserved
         contents.extend(u32::to_le_bytes(user.stats.messages_read as u32));
@@ -183,30 +195,75 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         contents.extend(export_cp437_string(&user.country, 16, 0));
 
         contents.push(0); // PasswordSupport
+        contents.extend([0; 45]);
         contents.push(1); // VerifySupport
         contents.extend(export_cp437_string(&user.verify_answer, 26, 0));
         contents.push(0); // StatsSuppport
+        contents.extend([0; 30]);
         contents.push(0); // NotesSupport
+        contents.extend([0; 305]);
         contents.push(0); // AccountSupport
+        contents.extend([0; 137]);
         contents.push(0); // QwkSupport
+        contents.extend([0; 30]);
+        contents.extend((user.stats.total_dnld_bytes as f64).to_le_bytes());
+        contents.extend((user.stats.total_upld_bytes as f64).to_le_bytes());
+    } else {
+        contents.resize(USERS_HEADER_SIZE + USERS_RECORD_SIZE, 0);
     }
+    debug_assert_eq!(contents.len(), USERS_HEADER_SIZE + USERS_RECORD_SIZE);
+    for conference in 0..num_areas {
+        let last_read = state
+            .session
+            .current_user
+            .as_ref()
+            .and_then(|user| user.lastread_ptr_flags.get(&(conference, 0)))
+            .map_or(0, |status| status.last_read.min(u32::MAX as usize) as u32);
+        contents.extend(last_read.to_le_bytes());
+    }
+    contents.resize(contents.len() + 7 * bitmap_size, 0);
 
-    let path = path.join("USER.SYS");
-    log::info!("create USER.SYS: {}", path.display());
+    let path = path.join("USERS.SYS");
+    log::info!("create USERS.SYS: {}", path.display());
     fs::write(path, contents)?;
     Ok(())
 }
 
-/// Reads a USER.SYS back after something else may have changed it.
+/// Reads a USERS.SYS back after something else may have changed it.
 ///
 /// Only the fields a door has any business changing are taken over; the rest of
 /// the record is what we wrote out ourselves and is left alone.
 pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
-    let path = path.join("USER.SYS");
+    let path = path.join("USERS.SYS");
     let contents = fs::read(&path)?;
+    if contents.len() < USERS_HEADER_SIZE {
+        return Err("truncated USERS.SYS header".into());
+    }
+    let mut header = Reader { data: &contents, pos: 6 };
+    let record_size = header.u16() as usize;
+    let num_areas = header.u16() as usize;
+    let num_bitmaps = header.u16() as usize;
+    let bitmap_size = header.u16() as usize;
+    let expected_size = USERS_HEADER_SIZE as u64 + record_size as u64 + num_areas as u64 * 4 + num_bitmaps as u64 * bitmap_size as u64;
+    if record_size < 991 || (contents.len() as u64) < expected_size {
+        return Err("truncated or unsupported USERS.SYS record".into());
+    }
+    let totals = if record_size >= USERS_RECORD_SIZE {
+        let downloaded = f64::from_le_bytes(contents[USERS_HEADER_SIZE + 991..USERS_HEADER_SIZE + 999].try_into()?);
+        let uploaded = f64::from_le_bytes(contents[USERS_HEADER_SIZE + 999..USERS_HEADER_SIZE + 1007].try_into()?);
+        if !downloaded.is_finite() || downloaded < 0.0 || !uploaded.is_finite() || uploaded < 0.0 {
+            return Err("invalid USERS.SYS transfer totals".into());
+        }
+        Some((downloaded as u64, uploaded as u64))
+    } else {
+        None
+    };
 
     // Fixed header, then the user record laid out exactly as `create_user_sys` writes it.
-    let mut r = Reader { data: &contents, pos: 36 };
+    let mut r = Reader {
+        data: &contents,
+        pos: USERS_HEADER_SIZE,
+    };
 
     user.name = r.string(26);
     user.city_or_state = r.string(25);
@@ -214,6 +271,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     user.bus_data_phone = r.string(14);
     user.home_voice_phone = r.string(14);
     r.skip(2); // last on date
+    r.skip(6);
     r.skip(1); // expert mode
     let protocol = r.u8();
     if protocol.is_ascii_graphic() {
@@ -233,7 +291,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     user.flags.wide_editor = packet_flag & (1 << 7) != 0;
 
     r.skip(2); // last DIR scan date
-    user.security_level = r.u32().min(u8::MAX as u32) as u8;
+    user.security_level = (r.u16() as i16).clamp(0, u8::MAX as i16) as u8;
     user.stats.num_times_on = r.u16() as u64;
     user.page_len = r.u8() as u16;
     user.stats.num_uploads = r.u16() as u64;
@@ -241,13 +299,16 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     user.stats.today_dnld_bytes = r.u32() as i64;
     user.user_comment = r.string(31);
     user.sysop_comment = r.string(31);
-    r.skip(4); // daily download bytes, written a second time
-    r.skip(4); // elapsed time on
+    r.skip(2); // elapsed time on
     r.skip(2); // registration expiration date
-    r.skip(4); // expired security level
+    r.skip(2); // expired security level
     r.skip(2); // last conference
     user.stats.total_dnld_bytes = r.u32() as u64;
     user.stats.total_upld_bytes = r.u32() as u64;
+    if let Some((downloaded, uploaded)) = totals {
+        user.stats.total_dnld_bytes = downloaded;
+        user.stats.total_upld_bytes = uploaded;
+    }
     r.skip(1); // delete this record
     r.skip(4); // record number
     r.skip(1);
@@ -271,13 +332,14 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
         r.skip(166);
     }
     r.skip(1); // password support
+    r.skip(45);
     if r.u8() != 0 {
         user.verify_answer = r.string(26);
     }
     Ok(())
 }
 
-/// Walks a USER.SYS record, treating a truncated file as all zeroes.
+/// Walks the validated USERS.SYS record.
 struct Reader<'a> {
     data: &'a [u8],
     pos: usize,

@@ -611,8 +611,8 @@ impl IcyBoardState {
                 files.push((entry.file_name().to_string_lossy().to_string(), std::fs::read(entry.path())?));
             }
         }
-        let drop_file = files.first().map(|(name, _)| name.as_str()).unwrap_or("");
-        let run_batch = crate::icy_board::doors::dos::expand_run_batch(door, self.node, drop_file)?;
+        let drop_file = door.drop_file.file_name(self.node).unwrap_or_default();
+        let run_batch = crate::icy_board::doors::dos::expand_run_batch(door, self.node, &drop_file)?;
         crate::icy_board::doors::dos::inject_session_files(&image_path, &files, &run_batch)?;
 
         let runtime_remaining = dos_runtime_remaining(self.session.login_date, self.session.time_limit, door.dos_max_runtime_seconds)

@@ -25,6 +25,7 @@ use walkdir::WalkDir;
 
 pub mod app;
 mod create;
+mod dos_console;
 pub mod editors;
 pub mod genhelp;
 mod import;
@@ -71,6 +72,8 @@ enum Commands {
     DosCopy(DosCopy),
     #[command(name = "dos-fossil", about = icy_board_cli::text("icbsetup", "dos-fossil-about"))]
     DosFossil(DosFossil),
+    #[command(name = "dos-console", about = icy_board_cli::text("icbsetup", "dos-console-about"))]
+    DosConsole(dos_console::DosConsole),
 }
 
 #[derive(Args, PartialEq, Debug)]
@@ -378,6 +381,10 @@ fn main() -> Result<()> {
         }
         Some(Commands::DosFossil(command)) => {
             install_dos_fossil(command)?;
+            return Ok(());
+        }
+        Some(Commands::DosConsole(command)) => {
+            dos_console::run(command)?;
             return Ok(());
         }
         Some(Commands::DosCopy(DosCopy { image, source, destination })) => {
