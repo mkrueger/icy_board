@@ -103,7 +103,8 @@ Every command takes a target, which is one of:
   Convenient for a quick look at a directory that is not wired into a board yet.
 * **a `file_areas.toml` plus `--area`** — resolves `path` and `metadata_path` exactly the
   way the BBS does, so the database ends up where the board will look for it.
-  `--area` takes either the area name (case-insensitive) or its index.
+  `--area` takes either the area name (case-insensitive) or its index. For `check`,
+  omitting `--area` checks every area in the supplied list.
 
 Use the second form for anything on a live board. Use `icbfile areas` to see the indices:
 
@@ -268,14 +269,21 @@ icbfile set uploads RULES.TXT --free true
 
 A description set this way is authored, so scans leave it alone.
 
-### Checking an area
+### Checking file areas
 
 ```sh
+icbfile check config/file_areas.toml
 icbfile check config/file_areas.toml --area 0
 ```
 
-Reports entries whose file has gone and entries whose size no longer matches what was
-recorded. Add `--prune` to drop the missing ones.
+Without `--area`, checks every area in the supplied list. Use `--area` to check just
+one area by name or index. Reports entries whose file has gone and entries whose size
+no longer matches what was recorded. If an area fails, the remaining areas are still
+checked and the command exits with an error.
+
+Add `--prune` to drop missing entries from the checked areas. Without it, missing
+entries are retained. Ensure all storage is mounted and accessible before pruning:
+missing entries lose their descriptions and download counters permanently.
 
 ### Exporting
 

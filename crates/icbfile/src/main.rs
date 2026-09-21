@@ -99,7 +99,7 @@ struct Scan {
 #[derive(Args)]
 #[command(about = text("icbfile", "check-about"))]
 struct Check {
-    #[arg(value_name = "target", help = text("icbfile", "target"))]
+    #[arg(value_name = "target", help = text("icbfile", "check-target"))]
     target: PathBuf,
 
     #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
@@ -265,7 +265,7 @@ fn run(cli: Cli) -> Res<()> {
         Command::Areas(cmd) => areas(&cmd.areas),
         Command::List(cmd) => list(open(&cmd.target, &cmd.area)?, cmd.long),
         Command::Scan(cmd) => scan_command(&cmd),
-        Command::Check(cmd) => check(open(&cmd.target, &cmd.area)?, cmd.prune),
+        Command::Check(cmd) => check_command(&cmd),
         Command::Import(cmd) => import(&cmd),
         Command::Export(cmd) => export(open(&cmd.target, &cmd.area)?, cmd.output.as_deref()),
         Command::Set(cmd) => set(&cmd),
@@ -430,6 +430,29 @@ fn scan_files(base: &mut FileBase, force: bool) -> Res<ScanReport> {
         }
     }
     Ok(report)
+}
+
+fn check_command(cmd: &Check) -> Res<()> {
+    if cmd.area.is_some() || !cmd.target.is_file() {
+        return check(open(&cmd.target, &cmd.area)?, cmd.prune);
+    }
+
+    let list = DirectoryList::load(&cmd.target).map_err(|err| format!("can't read {}: {}", cmd.target.display(), err))?;
+    let mut failures = 0;
+    for (index, area) in list.iter().enumerate() {
+        println!("\n[{index}] {}", area.name);
+        match open_area(&cmd.target, area).and_then(|base| check(base, cmd.prune)) {
+            Ok(()) => {}
+            Err(err) => {
+                failures += 1;
+                eprintln!("area failed: {err}");
+            }
+        }
+    }
+    if failures > 0 {
+        return Err(format!("{failures} area(s) failed").into());
+    }
+    Ok(())
 }
 
 fn check(mut base: FileBase, prune: bool) -> Res<()> {

@@ -11,6 +11,7 @@ repack-about = rewrite the archives of an area as zip files, without the intros 
 fingerprints-about = record the files in a directory so that repack can recognise them again
 areas = path to the area list
 target = a file directory, or a file_areas.toml together with --area
+check-target = a file directory or file_areas.toml; defaults to all areas
 scan-target = a file directory, or a file_areas.toml together with --area or --all
 area = area name or index when the target is a file_areas.toml
 long = show size, date and download count as well

@@ -11,6 +11,7 @@ repack-about = Archive eines Bereichs ohne enthaltene Intros als zip-Dateien neu
 fingerprints-about = Dateien eines Verzeichnisses erfassen, damit repack sie wiedererkennt
 areas = Pfad zur Bereichsliste
 target = ein Dateiverzeichnis oder eine file_areas.toml zusammen mit --area
+check-target = Dateiverzeichnis oder file_areas.toml; standardmäßig alle Bereiche
 scan-target = ein Dateiverzeichnis oder eine file_areas.toml zusammen mit --area oder --all
 area = Bereichsname oder Index, wenn das Ziel eine file_areas.toml ist
 long = auch Größe, Datum und Download-Anzahl anzeigen
