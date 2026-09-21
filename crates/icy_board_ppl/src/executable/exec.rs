@@ -1,4 +1,8 @@
-use std::{fs, io::stdout, path::Path};
+use std::{
+    fs,
+    io::{Read, stdout},
+    path::Path,
+};
 
 use crossterm::execute;
 use crossterm::style::{Attribute, Print, SetAttribute};
@@ -245,8 +249,27 @@ impl Executable {
     ///
     /// Panics if .
     pub fn read_file<P: AsRef<Path>>(file_name: &P, print_header_information: bool) -> Res<Self> {
-        let mut buffer = fs::read(file_name)?;
+        let mut buffer = Self::read_buffer(fs::File::open(file_name)?, &super::container::LoadLimits::default())?;
         Self::from_buffer(&mut buffer, print_header_information)
+    }
+
+    fn read_buffer(mut reader: impl Read, limits: &super::container::LoadLimits) -> Res<Vec<u8>> {
+        let mut buffer = Vec::new();
+        reader.by_ref().take(super::container::MAGIC.len() as u64).read_to_end(&mut buffer)?;
+        if buffer.starts_with(super::container::MAGIC) {
+            if buffer.len() as u64 > limits.file_bytes {
+                return Err(super::container::ContainerError::Limit("file bytes").into());
+            }
+            reader
+                .take(limits.file_bytes.saturating_sub(buffer.len() as u64).saturating_add(1))
+                .read_to_end(&mut buffer)?;
+            if buffer.len() as u64 > limits.file_bytes {
+                return Err(super::container::ContainerError::Limit("file bytes").into());
+            }
+        } else {
+            reader.read_to_end(&mut buffer)?;
+        }
+        Ok(buffer)
     }
 
     /// .
@@ -545,6 +568,27 @@ impl Default for Executable {
 mod tests {
     use super::*;
     use crate::executable::OpCode;
+
+    #[test]
+    fn container_read_stops_at_the_file_budget_without_limiting_legacy() {
+        use super::super::container::{ContainerError, LoadLimits, MAGIC};
+        let limits = LoadLimits {
+            file_bytes: 64,
+            ..Default::default()
+        };
+        let mut bytes = MAGIC.to_vec();
+        bytes.resize(1024, 0);
+        let mut reader = std::io::Cursor::new(&bytes);
+        let error = Executable::read_buffer(&mut reader, &limits).unwrap_err();
+        assert!(matches!(error.downcast_ref::<ContainerError>(), Some(ContainerError::Limit("file bytes"))));
+        assert_eq!(reader.position(), limits.file_bytes + 1);
+        assert_eq!(Executable::read_buffer(&bytes[..64], &limits).unwrap(), bytes[..64]);
+        assert_eq!(Executable::read_buffer(&bytes[..63], &limits).unwrap(), bytes[..63]);
+        let tiny = LoadLimits { file_bytes: 0, ..limits };
+        assert!(Executable::read_buffer(bytes.as_slice(), &tiny).is_err());
+        bytes[..PREAMBLE.len()].copy_from_slice(PREAMBLE);
+        assert_eq!(Executable::read_buffer(bytes.as_slice(), &limits).unwrap(), bytes);
+    }
 
     #[test]
     fn version_300_is_plaintext_and_301_adds_encryption_and_rle() {

@@ -7,7 +7,7 @@
 
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
-    executable::Executable,
+    executable::{Executable, container::Compression},
     icy_board::{
         IcyBoard,
         bbs::BBS,
@@ -122,8 +122,7 @@ fn stored_programs_keep_loading_and_behaving() {
             std::fs::write(&binary, compile(&directory.join(format!("{name}.pps")))).unwrap();
         }
 
-        let mut bytes = std::fs::read(&binary).unwrap_or_else(|error| panic!("{}: {error}", binary.display()));
-        let executable = Executable::from_buffer(&mut bytes, false).unwrap_or_else(|error| panic!("{name} no longer loads: {error}"));
+        let executable = Executable::read_file(&binary, false).unwrap_or_else(|error| panic!("{name} no longer loads: {error}"));
         assert_eq!(executable.runtime, 400, "{name} is not a 4.00 file");
 
         let output = run(name, &executable);
@@ -133,5 +132,10 @@ fn stored_programs_keep_loading_and_behaving() {
         }
         let expected = std::fs::read_to_string(&expected_path).unwrap_or_default().replace("\r\n", "\n");
         assert_eq!(output, expected, "{name} behaves differently than when it was stored");
+        for compression in [Compression::None, Compression::Zstd] {
+            let mut bytes = executable.to_buffer_with_compression(compression).unwrap();
+            let reloaded = Executable::from_buffer(&mut bytes, false).unwrap();
+            assert_eq!(run(name, &reloaded), expected, "{name} changed after {compression:?} rewriting");
+        }
     }
 }

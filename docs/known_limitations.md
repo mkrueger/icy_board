@@ -125,9 +125,9 @@ will arrive before release.
 - Recompile unreleased 400 files written in the old container and older beta
 	programs using unmarked array formals. Classic PPE compatibility is backed by
 	the checked-in fixtures, not by a claim that every third-party PPE was tested.
-- The loader validates container and section budgets, but `Executable::read_file`
-	reads the whole file before those checks. The 64 MiB container budget does
-	not cap that initial allocation. Install PPEs from trusted sources.
+- The loader bounds 400 file reads and validates section and constant-allocation
+	budgets. These are not a total process-memory limit or a sandbox; legacy file
+	reads are unchanged. Install PPEs from trusted sources.
 - Debug data can preserve symbol names, not source positions, source text or a
 	separate debug file. Content identity is not authentication or encryption.
 - The current release validation ran on Linux, where Zstd was built and tested.

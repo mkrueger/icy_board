@@ -31,9 +31,10 @@ for legacy encryption and packing.
 
 The 400 container is a header, a section directory and the section payloads.
 Every section has an explicit offset and length. The decoder checks section
-bounds before interpreting payloads. The current `Executable::read_file` entry
-point nevertheless reads the entire file into memory before decoding it;
-the container layout is not a streaming-loader guarantee.
+bounds before interpreting payloads. `Executable::read_file` identifies the
+container from its magic bytes and bounds the 400 file read to the file-size
+budget plus one overflow-detection byte. It still buffers the accepted file
+before decoding; this is not a streaming loader. Legacy file reads are unchanged.
 
 ```text
 +--------------------------------------+
@@ -107,6 +108,12 @@ writing the file back does not lose a future writer's data. An unknown
 compression value is not a future section but a malformed one: compression is a
 container-version-1 mechanic, so the whole file is rejected. `META` is reserved
 for future metadata and is treated like any other optional section today.
+
+Only schema 1 of `IDEN` and `DBUG` is interpreted. Unknown optional schemas of
+these sections are preserved, including when rewriting without debug names,
+and take precedence over generating a same-kind section. Their contents cannot
+be validated or updated by this loader; preservation does not guarantee that
+opaque metadata remains meaningful after program changes.
 
 ### Temporal values
 
@@ -209,6 +216,12 @@ the legacy 16 bit pass mask.
 the members the program actually uses, each with id, name, kind, static flag,
 result type, rank, required argument count and parameter types.
 
+New files import only host types referenced by the program's declarations,
+expressions and used member signatures, including parameter and result types.
+Unused host types do not become dependencies merely because the compiler knows
+them. Older files with complete host catalogs remain readable and retain their
+stored requirements when loaded.
+
 **Host binding is by name and signature, not by stored number.** On load the file's
 host ids are matched against the current catalog by qualified name, and every used
 member must still exist with the same kind, static flag, rank and result type.
@@ -232,15 +245,17 @@ The wire format uses 32 bit counts and 64 bit offsets. The limits below are
 operating budgets that keep a corrupt or hostile file from allocating without
 bound; they are not the widths the format can express.
 
-These checks apply during container decoding. The initial whole-file read
-described above happens first, so the file-size budget does not cap that
-initial allocation. PPE files should be installed from trusted sources.
+The file-size budget is enforced during 400 file reads as well as during
+container decoding. The other budgets apply while decoding. PPE files should
+still be installed from trusted sources; these are not a sandbox or a total
+process-memory limit.
 
 | Limit | Value |
 | :--- | ---: |
 | File size | 64 MiB |
 | One decoded section | 32 MiB |
 | All decoded sections | 64 MiB |
+| Constant payload allocations, including BYTES copies | 64 MiB |
 | Sections per file | 64 |
 | Zstd window | 2^25 |
 | Items in a section | 1,000,000 |
@@ -249,6 +264,11 @@ initial allocation. PPE files should be installed from trusted sources.
 | Fields per record | 4,096 |
 | Parameters per routine | 4,096 |
 | Locals per routine | 65,536 |
+
+`LoadLimits::constant_bytes` bounds text and byte payloads in the constant pool
+plus every independent BYTES copy into the variable table. Shared string
+references are counted only once per pool entry. This budget is checked before
+allocation; value counts and section byte budgets remain separate limits.
 
 Record field bounds are stored and held in memory as 32 bit values; only the
 abandoned legacy type table was limited to 16 bit. The compiler measures a
@@ -267,7 +287,11 @@ these is refused; it does not run half way and stop.
 ### Compatibility
 
 Pre-400 PPEs keep their container, their encryption and their execution semantics
-unchanged. Unreleased beta 400 PPEs written in the old container are refused with
+unchanged. The bounded reads, constant allocation budget, optional-schema
+preservation and reduced import tables do not change the wire format. Existing
+400 files remain readable subject to the resource budgets; files that previously
+amplified small byte constants into excessive allocations can now be rejected.
+Unreleased beta 400 PPEs written in the old container are refused with
 a message asking for a recompile; that break was decided explicitly rather than
 guessed at from the file.
 

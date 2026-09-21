@@ -23,6 +23,7 @@ pub struct LoadLimits {
     pub file_bytes: u64,
     pub section_bytes: u64,
     pub decoded_bytes: u64,
+    pub constant_bytes: u64,
     pub sections: u32,
     pub zstd_window_log: u32,
 }
@@ -33,6 +34,7 @@ impl Default for LoadLimits {
             file_bytes: 64 * 1024 * 1024,
             section_bytes: 32 * 1024 * 1024,
             decoded_bytes: 64 * 1024 * 1024,
+            constant_bytes: 64 * 1024 * 1024,
             sections: 64,
             zstd_window_log: 25,
         }

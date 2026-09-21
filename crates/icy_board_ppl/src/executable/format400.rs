@@ -238,16 +238,18 @@ pub(super) fn encode(executable: &Executable, compression: Compression, debug_na
             code,
         ],
     };
-    let mut identity = Section::new(*b"IDEN", 1, content_identity(&container).to_vec());
-    identity.flags = 0;
-    container.sections.push(identity);
+    if !executable.extra_sections.iter().any(|section| section.kind == *b"IDEN") {
+        let mut identity = Section::new(*b"IDEN", 1, content_identity(&container).to_vec());
+        identity.flags = 0;
+        container.sections.push(identity);
+    }
     for section in &executable.extra_sections {
-        if REQUIRED_SECTIONS.contains(&section.kind) || section.kind == *b"IDEN" || section.kind == *b"DBUG" {
+        if REQUIRED_SECTIONS.contains(&section.kind) || (section.schema == 1 && (section.kind == *b"IDEN" || section.kind == *b"DBUG")) {
             return Err(invalid("preserved section kind"));
         }
         container.sections.push(section.clone());
     }
-    if debug_names {
+    if debug_names && !executable.extra_sections.iter().any(|section| section.kind == *b"DBUG") {
         container.sections.push(debug);
     }
     let bytes = container.encode(compression, limits)?;
@@ -280,7 +282,7 @@ pub(super) fn decode(bytes: &[u8], limits: &LoadLimits) -> Result<Executable> {
 
 pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: &UserTypeRegistry) -> Result<Executable> {
     let container = Container::decode(bytes, limits)?;
-    if let Some(identity) = container.sections.iter().find(|section| section.kind == *b"IDEN") {
+    if let Some(identity) = container.sections.iter().find(|section| section.kind == *b"IDEN" && section.schema == 1) {
         if identity.entries != 1 || identity.data.as_slice() != content_identity(&container) {
             return Err(invalid("content identity mismatch"));
         }
@@ -306,7 +308,7 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
     let extra_sections: Vec<_> = container
         .sections
         .iter()
-        .filter(|section| !REQUIRED_SECTIONS.contains(&section.kind) && section.kind != *b"IDEN" && section.kind != *b"DBUG")
+        .filter(|section| !REQUIRED_SECTIONS.contains(&section.kind) && (section.schema != 1 || (section.kind != *b"IDEN" && section.kind != *b"DBUG")))
         .cloned()
         .collect();
     let mut table = VariableTable::default();
@@ -403,6 +405,14 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
     let constant_section = section(b"CONS")?;
     let mut input = Reader::new(&constant_section.data);
     let mut constants = Vec::new();
+    let mut constant_bytes = 0u64;
+    let mut reserve_constant_bytes = |bytes: usize| -> Result<()> {
+        constant_bytes = constant_bytes
+            .checked_add(bytes as u64)
+            .filter(|total| *total <= limits.constant_bytes)
+            .ok_or(ContainerError::Limit("constant allocation"))?;
+        Ok(())
+    };
     for _ in 0..constant_section.entries {
         let typ = variable_type(input.word()?)?;
         let tag = input.word()?;
@@ -433,11 +443,15 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
                 value.data.u64_value = u64::from_le_bytes(payload.try_into().unwrap());
             }
             2 if matches!(typ, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) => {
+                reserve_constant_bytes(payload.len())?;
                 value.generic_data = GenericVariableData::String(std::sync::Arc::new(
                     std::str::from_utf8(payload).map_err(|_| invalid("invalid UTF-8 constant"))?.to_string(),
                 ));
             }
-            3 if typ == VariableType::Bytes => value.generic_data = GenericVariableData::Bytes(payload.to_vec()),
+            3 if typ == VariableType::Bytes => {
+                reserve_constant_bytes(payload.len())?;
+                value.generic_data = GenericVariableData::Bytes(payload.to_vec());
+            }
             4 if typ.is_temporal() => {
                 value.generic_data = GenericVariableData::Temporal(typ.empty_temporal().unwrap().decode(payload).map_err(|_| invalid("temporal constant"))?)
             }
@@ -487,6 +501,9 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
             let value = constants.get(constant - 1).ok_or(invalid("constant reference"))?;
             if value.vtype != typ || dim != 0 {
                 return Err(invalid("constant assignment"));
+            }
+            if let GenericVariableData::Bytes(bytes) = &value.generic_data {
+                reserve_constant_bytes(bytes.len())?;
             }
             value.clone()
         };
@@ -586,7 +603,7 @@ pub(super) fn decode_with_registry(bytes: &[u8], limits: &LoadLimits, registry: 
     validate_code(&script, &table, &user_types)?;
     table.generate_names();
     let mut debug_info = None;
-    if let Some(debug) = container.sections.iter().find(|section| section.kind == *b"DBUG") {
+    if let Some(debug) = container.sections.iter().find(|section| section.kind == *b"DBUG" && section.schema == 1) {
         if debug.entries as usize != table.len() {
             return Err(invalid("debug variable count"));
         }
@@ -807,6 +824,126 @@ mod tests {
         ast::BinOp,
         executable::{PPEStatement, VariableValue},
     };
+
+    fn end_program() -> Executable {
+        Executable {
+            in_memory_script: Some(PPEScript {
+                statements: vec![PPEStatement {
+                    span: 0..1,
+                    command: PPECommand::End,
+                }],
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn constant_allocation_budget_counts_byte_copies_but_not_shared_strings() {
+        for typ in [VariableType::Bytes, VariableType::UnboundedString] {
+            let mut executable = end_program();
+            let mut value = typ.create_empty_value();
+            value.generic_data = if typ == VariableType::Bytes {
+                GenericVariableData::Bytes(vec![42; 64])
+            } else {
+                GenericVariableData::String(std::sync::Arc::new("x".repeat(64)))
+            };
+            executable.variable_table.push(TableEntry::new(
+                "value",
+                VarHeader {
+                    id: 1,
+                    variable_type: typ,
+                    ..Default::default()
+                },
+                value,
+                EntryType::Variable,
+            ));
+            let limits = LoadLimits::default();
+            let mut container = Container::decode(&executable.to_buffer().unwrap(), &limits).unwrap();
+            container.sections.retain(|section| section.kind != *b"IDEN" && section.kind != *b"DBUG");
+            let variables = container.sections.iter_mut().find(|section| section.kind == *b"VARS").unwrap();
+            variables.entries = 3;
+            variables.data = variables.data.repeat(3);
+            let bytes = container.encode(Compression::None, &limits).unwrap();
+            let budget = if typ == VariableType::Bytes { 256 } else { 64 };
+            let limits = LoadLimits {
+                constant_bytes: budget,
+                ..limits
+            };
+            let loaded = decode(&bytes, &limits).unwrap();
+            assert_eq!(loaded.variable_table.len(), 3);
+            assert!(matches!(
+                decode(
+                    &bytes,
+                    &LoadLimits {
+                        constant_bytes: budget - 1,
+                        ..limits
+                    }
+                ),
+                Err(ContainerError::Limit("constant allocation"))
+            ));
+        }
+    }
+
+    #[test]
+    fn unused_host_types_are_not_required_by_new_programs() {
+        let limits = LoadLimits::default();
+        let bytes = end_program().to_buffer().unwrap();
+        let container = Container::decode(&bytes, &limits).unwrap();
+        let imports = HostCatalog::decode(container.sections.iter().find(|section| section.kind == *b"IMPT").unwrap()).unwrap();
+        assert!(imports.types.is_empty());
+        decode_with_registry(&bytes, &limits, &UserTypeRegistry::default()).unwrap();
+        let mut registry = UserTypeRegistry::icy_board_registry();
+        registry.registered_types.retain(|name, _| !name.as_str().eq_ignore_ascii_case("ZIP"));
+        decode_with_registry(&bytes, &limits, &registry).unwrap();
+    }
+
+    #[test]
+    fn unknown_optional_schemas_survive_repacking_without_interpretation() {
+        let limits = LoadLimits::default();
+        let mut container = Container::decode(&end_program().to_buffer().unwrap(), &limits).unwrap();
+        let mut future_sections = Vec::new();
+        for kind in [*b"IDEN", *b"DBUG", *b"META", *b"FUTR"] {
+            container.sections.retain(|section| section.kind != kind);
+            let mut section = Section::new(kind, 7, b"opaque future payload".repeat(256));
+            section.schema = 2;
+            section.flags = 0;
+            container.sections.push(section.clone());
+            future_sections.push(section);
+        }
+        for compression in [Compression::None, Compression::Zstd] {
+            let bytes = container.encode(compression, &limits).unwrap();
+            let loaded = decode(&bytes, &limits).unwrap();
+            assert_eq!(loaded.extra_sections, future_sections);
+            assert!(loaded.debug_info.is_none());
+            for debug_names in [false, true] {
+                let rewritten = encode(&loaded, compression, debug_names, &limits).unwrap();
+                let reloaded = decode(&rewritten, &limits).unwrap();
+                assert_eq!(reloaded.extra_sections, future_sections);
+                let sections = Container::decode(&rewritten, &limits).unwrap().sections;
+                for future in &future_sections {
+                    assert_eq!(sections.iter().find(|section| section.kind == future.kind), Some(future));
+                }
+            }
+        }
+        for future in future_sections {
+            let mut required = container.clone();
+            required.sections.iter_mut().find(|section| section.kind == future.kind).unwrap().flags = REQUIRED;
+            let bytes = required.encode(Compression::None, &limits).unwrap();
+            assert!(matches!(decode(&bytes, &limits), Err(ContainerError::Unsupported(_))));
+        }
+    }
+
+    #[test]
+    fn supported_optional_schemas_still_validate_their_payloads() {
+        let limits = LoadLimits::default();
+        for kind in [*b"IDEN", *b"DBUG"] {
+            let mut container = Container::decode(&end_program().to_buffer().unwrap(), &limits).unwrap();
+            container.sections.iter_mut().find(|section| section.kind == kind).unwrap().data = vec![42];
+            let bytes = container.encode(Compression::None, &limits).unwrap();
+            assert!(matches!(decode(&bytes, &limits), Err(ContainerError::Invalid(_))));
+        }
+    }
 
     #[test]
     fn temporal_constants_validate_payloads_and_preserve_empty_and_epoch() {

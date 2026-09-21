@@ -31,6 +31,12 @@ pub struct HostCatalog {
     pub types: BTreeMap<u32, TypeImport>,
 }
 
+#[derive(Default)]
+pub(super) struct UsedImports {
+    types: BTreeSet<u32>,
+    members: BTreeSet<(u32, usize)>,
+}
+
 fn invalid() -> ContainerError {
     ContainerError::Invalid("host import contract")
 }
@@ -117,14 +123,25 @@ impl HostCatalog {
         Self { types }
     }
 
-    pub(super) fn encode(&self, used: &BTreeSet<(u32, usize)>) -> Result<Section> {
+    pub(super) fn encode(&self, used: &UsedImports) -> Result<Section> {
+        let mut types = used.types.clone();
+        for &(type_id, member_id) in &used.members {
+            types.insert(type_id);
+            let member = self.types.get(&type_id).and_then(|typ| typ.members.get(&member_id)).ok_or_else(invalid)?;
+            for typ in member.parameters.iter().chain(std::iter::once(&member.result)) {
+                if let VariableType::UserData(id) = typ {
+                    types.insert(*id);
+                }
+            }
+        }
         let mut output = Vec::new();
         word(&mut output, 1)?;
-        for (&id, typ) in &self.types {
+        for &id in &types {
+            let typ = self.types.get(&id).ok_or_else(invalid)?;
             word(&mut output, id as usize)?;
             word(&mut output, typ.kind as usize)?;
             blob(&mut output, typ.name.as_bytes())?;
-            let members: Vec<_> = typ.members.iter().filter(|(member, _)| used.contains(&(id, **member))).collect();
+            let members: Vec<_> = typ.members.iter().filter(|(member, _)| used.members.contains(&(id, **member))).collect();
             word(&mut output, members.len())?;
             for (&id, member) in members {
                 word(&mut output, id)?;
@@ -140,7 +157,7 @@ impl HostCatalog {
                 }
             }
         }
-        Ok(Section::new(*b"IMPT", self.types.len() as u32, output))
+        Ok(Section::new(*b"IMPT", types.len() as u32, output))
     }
 
     pub(super) fn decode(section: &Section) -> Result<Self> {
@@ -258,25 +275,33 @@ impl HostCatalog {
         records: &[Vec<RecordField>],
         types: &HashMap<u32, u32>,
         members: &BTreeMap<(u32, usize), usize>,
-    ) -> Result<(BTreeSet<(u32, usize)>, Vec<super::TableEntry>)> {
+    ) -> Result<(UsedImports, Vec<super::TableEntry>)> {
         struct Rewrite<'a> {
             catalog: &'a HostCatalog,
             table: &'a VariableTable,
             records: &'a [Vec<RecordField>],
             types: &'a HashMap<u32, u32>,
             members: &'a BTreeMap<(u32, usize), usize>,
-            used: BTreeSet<(u32, usize)>,
+            used: UsedImports,
             type_constants: Vec<super::TableEntry>,
             constant_ids: BTreeMap<usize, usize>,
         }
         impl Rewrite<'_> {
+            fn use_type(&mut self, typ: VariableType) {
+                if let VariableType::UserData(id) = typ
+                    && self.catalog.types.contains_key(&id)
+                {
+                    self.used.types.insert(id);
+                }
+            }
+
             fn member(&mut self, receiver: VariableType, id: &mut usize) -> Result<VariableType> {
                 let VariableType::UserData(type_id) = receiver else {
                     return Err(invalid());
                 };
                 if let Some(typ) = self.catalog.types.get(&type_id) {
                     let member = typ.members.get(id).ok_or_else(invalid)?;
-                    self.used.insert((type_id, *id));
+                    self.used.members.insert((type_id, *id));
                     if let Some(new_id) = self.members.get(&(type_id, *id)) {
                         *id = *new_id;
                     }
@@ -298,7 +323,7 @@ impl HostCatalog {
             }
 
             fn expr(&mut self, value: &mut PPEExpr) -> Result<VariableType> {
-                Ok(match value {
+                let result = match value {
                     PPEExpr::Value(id) | PPEExpr::Dim(id, _) => {
                         let result = self.table.try_get_entry(*id).ok_or_else(invalid)?.header.variable_type;
                         if let PPEExpr::Dim(_, args) = value {
@@ -371,6 +396,7 @@ impl HostCatalog {
                                 return Err(invalid());
                             }
                             let type_id = constant.value.as_int() as u32;
+                            self.use_type(VariableType::UserData(type_id));
                             let mapped = self.types.get(&type_id).copied().unwrap_or(type_id);
                             let result = if definition.opcode == FuncOpCode::EnumHas {
                                 VariableType::Boolean
@@ -414,7 +440,9 @@ impl HostCatalog {
                         VariableType::Boolean
                     }
                     PPEExpr::Invalid => return Err(invalid()),
-                })
+                };
+                self.use_type(result);
+                Ok(result)
             }
         }
         let mut rewrite = Rewrite {
@@ -423,10 +451,19 @@ impl HostCatalog {
             records,
             types,
             members,
-            used: BTreeSet::new(),
+            used: UsedImports::default(),
             type_constants: Vec::new(),
             constant_ids: BTreeMap::new(),
         };
+        for entry in table.get_entries() {
+            rewrite.use_type(entry.header.variable_type);
+        }
+        for &id in table.enums.keys() {
+            rewrite.use_type(VariableType::UserData(id));
+        }
+        for field in records.iter().flatten() {
+            rewrite.use_type(field.variable_type);
+        }
         for statement in &mut script.statements {
             match &mut statement.command {
                 PPECommand::IfNot(value, _) | PPECommand::MemberCall(value) | PPECommand::ForEach(_, value, _) => {
@@ -448,14 +485,89 @@ impl HostCatalog {
 mod tests {
     use super::*;
 
+    fn all_imports(catalog: &HostCatalog) -> UsedImports {
+        UsedImports {
+            types: catalog.types.keys().copied().collect(),
+            members: catalog
+                .types
+                .iter()
+                .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn encodes_only_used_types_and_signature_dependencies() {
+        let catalog = HostCatalog {
+            types: (30..35)
+                .map(|id| {
+                    (
+                        id,
+                        TypeImport {
+                            name: format!("host.Type{id}"),
+                            kind: 1,
+                            members: if id == 30 {
+                                BTreeMap::from([(
+                                    0,
+                                    MemberImport {
+                                        name: "Call".into(),
+                                        kind: 3,
+                                        is_static: true,
+                                        parameters: vec![VariableType::UserData(31)],
+                                        required: 1,
+                                        result: VariableType::UserData(32),
+                                        rank: 0,
+                                    },
+                                )])
+                            } else {
+                                BTreeMap::new()
+                            },
+                        },
+                    )
+                })
+                .collect(),
+        };
+        let used = UsedImports {
+            types: BTreeSet::from([33]),
+            members: BTreeSet::from([(30, 0)]),
+        };
+        let loaded = HostCatalog::decode(&catalog.encode(&used).unwrap()).unwrap();
+        assert_eq!(loaded.types.keys().copied().collect::<Vec<_>>(), vec![30, 31, 32, 33]);
+        assert_eq!(loaded.types[&30].members.len(), 1);
+        let mut current = catalog.clone();
+        current.types.remove(&34);
+        loaded.bind(&current).unwrap();
+        current.types.remove(&31);
+        assert!(loaded.bind(&current).is_err());
+        assert!(HostCatalog::decode(&catalog.encode(&UsedImports::default()).unwrap()).unwrap().types.is_empty());
+    }
+
+    /// Importing a member pulls in its signature types, so a host type naming one
+    /// the catalog does not list would make every program using it unwritable.
+    #[test]
+    fn every_host_signature_type_is_itself_a_catalog_type() {
+        let catalog = HostCatalog::from_registry(&UserTypeRegistry::icy_board_registry());
+        for (id, typ) in &catalog.types {
+            for member in typ.members.values() {
+                for signature in member.parameters.iter().chain(std::iter::once(&member.result)) {
+                    if let VariableType::UserData(referenced) = signature {
+                        assert!(
+                            catalog.types.contains_key(referenced),
+                            "{}.{} names unlisted type {referenced} (host type {id})",
+                            typ.name,
+                            member.name
+                        );
+                    }
+                }
+            }
+        }
+        catalog.encode(&all_imports(&catalog)).unwrap();
+    }
+
     #[test]
     fn binds_reordered_types_and_members_without_enum_domains() {
         let catalog = HostCatalog::from_registry(&UserTypeRegistry::icy_board_registry());
-        let used = catalog
-            .types
-            .iter()
-            .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
-            .collect();
+        let used = all_imports(&catalog);
         let frozen = catalog.encode(&used).unwrap();
         let mut current = catalog.clone();
         let old_ids: Vec<_> = current.types.iter().filter(|(_, typ)| typ.kind == 1).map(|(&id, _)| id).collect();
@@ -494,11 +606,7 @@ mod tests {
     #[test]
     fn binds_against_a_host_that_gained_optional_parameters() {
         let catalog = HostCatalog::from_registry(&UserTypeRegistry::icy_board_registry());
-        let used = catalog
-            .types
-            .iter()
-            .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
-            .collect();
+        let used = all_imports(&catalog);
         let loaded = HostCatalog::decode(&catalog.encode(&used).unwrap()).unwrap();
 
         let with_optional = |extra: usize, required: Option<usize>| {
@@ -533,11 +641,7 @@ mod tests {
 
         // A program built against the longer signature must not load on the older host.
         let longer = with_optional(1, None);
-        let used = longer
-            .types
-            .iter()
-            .flat_map(|(&id, typ)| typ.members.keys().map(move |&member| (id, member)))
-            .collect();
+        let used = all_imports(&longer);
         let newer = HostCatalog::decode(&longer.encode(&used).unwrap()).unwrap();
         assert!(newer.bind(&catalog).is_err(), "compatibility only relaxes towards newer hosts");
 
