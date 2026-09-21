@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-icy_board_engine = { path = "../crates/icy_board_engine" }
+icy_board_engine = { path = "../crates/icy_board_engine", default-features = false }
 arbitrary = { version = "1", features = ["derive"] }
 
 [lib]
@@ -43,6 +43,20 @@ bench = false
 [[bin]]
 name = "ppe_roundtrip"
 path = "fuzz_targets/ppe_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppe400_container"
+path = "fuzz_targets/ppe400_container.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppe400_sections"
+path = "fuzz_targets/ppe400_sections.rs"
 test = false
 doc = false
 bench = false

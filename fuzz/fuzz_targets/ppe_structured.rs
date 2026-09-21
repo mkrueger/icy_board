@@ -6,11 +6,14 @@ use icy_board_engine::{
 };
 use libfuzzer_sys::fuzz_target;
 
-const SEEDS: [&[u8]; 4] = [
+const SEEDS: [&[u8]; 7] = [
     include_bytes!("../../crates/icy_board_engine/tests/test_data/test_dim1.ppe"),
     include_bytes!("../../crates/icy_board_engine/tests/test_data/local_variables.ppe"),
     include_bytes!("../../crates/icy_board_engine/tests/test_ppe/test_pplc_100.ppe"),
     include_bytes!("../../crates/icy_board_engine/tests/test_ppe/test_pplc_340.ppe"),
+    include_bytes!("../../crates/icy_board_engine/tests/stored_ppe/host_objects.ppe"),
+    include_bytes!("../../crates/icy_board_engine/tests/stored_ppe/optional_arguments.ppe"),
+    include_bytes!("../../crates/icy_board_engine/tests/stored_ppe/language_core.ppe"),
 ];
 
 fuzz_target!(|data: &[u8]| {

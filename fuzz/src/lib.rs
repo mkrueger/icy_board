@@ -10,6 +10,8 @@ use arbitrary::Arbitrary;
 use icy_board_engine::{executable::SUPPORTED_PPL_LANGUAGE_VERSIONS, parser::ErrorReporter};
 use std::path::Path;
 
+pub mod ppe400;
+
 /// Deep enough to cross the parser nesting limit, shallow enough to stay cheap.
 const MAX_NESTING: usize = 96;
 const MAX_SOURCE_LEN: usize = 48 * 1024;
