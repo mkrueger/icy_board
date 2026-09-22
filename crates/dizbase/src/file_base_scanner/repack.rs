@@ -429,6 +429,17 @@ mod tests {
         FingerprintData::load(&file.path()).unwrap()
     }
 
+    /// A case insensitive filesystem answers `exists` for either spelling, so the name a
+    /// repack left behind has to be read back from the directory.
+    fn only_entry(directory: &Path) -> String {
+        let mut entries: Vec<_> = fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(1, entries.len(), "{entries:?}");
+        entries.pop().unwrap()
+    }
+
     #[test]
     fn test_a_member_cannot_climb_out_of_the_archive() {
         assert_eq!(member_name("../../etc/passwd").as_deref(), Some("etc/passwd"));
@@ -641,10 +652,7 @@ mod tests {
                         assert_eq!(archive_comment_mode != ArchiveCommentMode::Preserve, archive_comment_changed);
                     }
                     assert_eq!(before, fs::read(&path).unwrap());
-                    assert_eq!(1, fs::read_dir(directory.path()).unwrap().count());
-                    if name != "upload.zip" {
-                        assert!(!directory.path().join("upload.zip").exists());
-                    }
+                    assert_eq!(only_entry(directory.path()), name);
                 }
             }
         }
@@ -679,9 +687,7 @@ mod tests {
                         }
                         if dry_run || archive_comment_mode == ArchiveCommentMode::Replace {
                             assert_eq!(before, fs::read(&path).unwrap());
-                            if name != "upload.zip" {
-                                assert!(!directory.path().join("upload.zip").exists());
-                            }
+                            assert_eq!(only_entry(directory.path()), name);
                         }
                         assert_eq!(1, fs::read_dir(directory.path()).unwrap().count());
                     }
