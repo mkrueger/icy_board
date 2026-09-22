@@ -386,8 +386,10 @@ impl VirtualMachine<'_> {
             self.variable_table
                 .set_value(U_SHORTDESC, VariableValue::new_bool(cur_user.flags.use_short_filedescr))?;
             self.variable_table.set_value(U_GENDER, VariableValue::new_string(cur_user.gender.clone()))?;
-            self.variable_table
-                .set_value(U_BIRTHDATE, VariableValue::new_date(IcbDate::from_utc(&cur_user.birth_date).to_pcboard_date()))?;
+            self.variable_table.set_value(
+                U_BIRTHDATE,
+                VariableValue::new_date(cur_user.birth_date.map(IcbDate::from).unwrap_or_default().to_pcboard_date()),
+            )?;
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()))?;
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()))?;
         }
@@ -507,8 +509,7 @@ impl VirtualMachine<'_> {
             field!(
                 U_BIRTHDATE,
                 cur_user.birth_date,
-                IcbDate::from_pcboard_full(self.variable_table.get_value(U_BIRTHDATE).clone().convert_to(VariableType::Date)?.as_int() as u32)
-                    .to_utc_date_time()
+                IcbDate::from_pcboard_full(self.variable_table.get_value(U_BIRTHDATE).clone().convert_to(VariableType::Date)?.as_int() as u32).to_naive_date()
             );
             string!(U_EMAIL, cur_user.email);
             string!(U_WEB, cur_user.web);

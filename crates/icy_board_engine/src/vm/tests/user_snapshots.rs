@@ -159,7 +159,7 @@ async fn compiled_stale_password_and_dates_are_not_implicit_credential_edits() {
                 };
                 users[1].expiration_date = chrono::Utc::now();
                 users[1].password.expire_date = chrono::Utc::now();
-                users[1].birth_date = chrono::Utc::now();
+                users[1].birth_date = Some(chrono::Utc::now().date_naive());
                 Ok(())
             })
             .unwrap();

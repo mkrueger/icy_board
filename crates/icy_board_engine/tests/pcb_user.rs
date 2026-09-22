@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::DateTime;
+use chrono::{DateTime, NaiveDate};
 use icy_board_engine::{
     datetime::*,
     icy_board::{PcbUser, icb_config::*, user_base::*, user_inf::*, users::*},
@@ -27,7 +27,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
         language: "EN".to_string(),
         bus_data_phone: format!("555-{:04}", (idx as u32) * 100),
         home_voice_phone: format!("555-{:04}", (idx as u32) * 101),
-        birth_date: IcbDate::new(idx, idx % 12 + 1, 1980 + idx as u16).to_utc_date_time(),
+        birth_date: IcbDate::new(idx, idx % 12 + 1, 1980 + idx as u16).to_naive_date(),
         user_comment: format!("User comment {}", idx),
         sysop_comment: format!("Sysop comment {}", idx),
         custom_comment1: format!("Custom 1-{}", idx),
@@ -610,7 +610,7 @@ fn test_optional_inf_sections_keep_their_dates() {
     user.gender = String::new();
     user.email = String::new();
     user.web = String::new();
-    user.birth_date = DateTime::parse_from_rfc3339("1974-03-08T00:00:00Z").unwrap().to_utc();
+    user.birth_date = NaiveDate::from_ymd_opt(1974, 3, 8);
     user.password.prev_pwd.clear();
     user.password.times_changed = 0;
     user.password.last_change = DateTime::parse_from_rfc3339("2026-01-02T00:00:00Z").unwrap().to_utc();
@@ -626,7 +626,7 @@ fn test_optional_inf_sections_keep_their_dates() {
         user: pcb_users[0].clone(),
         inf: pcb_infs[0].clone(),
     }]);
-    assert_eq!(imported[0].birth_date.date_naive(), user.birth_date.date_naive());
+    assert_eq!(imported[0].birth_date, user.birth_date);
     assert_eq!(imported[0].password.expire_date.date_naive(), user.password.expire_date.date_naive());
     assert_eq!(imported[0].password.last_change.date_naive(), user.password.last_change.date_naive());
 }

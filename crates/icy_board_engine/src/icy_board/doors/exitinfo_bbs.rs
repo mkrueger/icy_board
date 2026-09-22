@@ -94,7 +94,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
         contents.extend(u16::to_le_bytes(0));
     }
     contents.extend(user.stats.first_date_on.format("%m-%d-%y").to_string().as_bytes());
-    let birth_day = &user.birth_date;
+    let birth_day = user.birth_date.unwrap_or_default();
     contents.extend(
         format!("{:02}-{:02}-{:02}", birth_day.day(), birth_day.month(), birth_day.year() % 100)
             .to_string()
@@ -117,7 +117,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
 
     contents.extend(user.stats.last_on.format("%C").to_string().as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes());
-    let day = &user.birth_date;
+    let day = user.birth_date.unwrap_or_default();
     contents.extend(format!("{:02}", (day.year() / 100)).as_bytes());
     contents.extend(user.stats.first_date_on.format("%C").to_string().as_bytes()); // SubDate ?
 

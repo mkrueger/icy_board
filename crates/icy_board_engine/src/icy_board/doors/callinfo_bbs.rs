@@ -55,8 +55,8 @@ pub async fn create_callinfo_bbs(state: &IcyBoardState, path: &std::path::Path, 
         contents.push_str("REMOTE\r\n"); // LOCAL or REMOTE
     }
     let _ = write!(contents, "COM{DOOR_COM_PORT}\r\n"); // COM Port
-    let day = &state.session.current_user.as_ref().unwrap().birth_date;
-    let _ = write!(contents, "{}\r\n", IcbDate::from_utc(day).to_country_date()); // Birth Date
+    let day = state.session.current_user.as_ref().unwrap().birth_date.map(IcbDate::from).unwrap_or_default();
+    let _ = write!(contents, "{}\r\n", day.to_country_date()); // Birth Date
     let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Com Port Speed
     contents.push_str("TRUE\r\n"); // Already Connected
     contents.push_str("Normal Connection \r\n"); // MNP/ARQ or Normal Connection

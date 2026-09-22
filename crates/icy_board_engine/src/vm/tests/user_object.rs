@@ -25,7 +25,7 @@ fn temporal_native_user_fields_preserve_utc_and_subseconds() {
         "1\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883-09-15|2400-02-29T00:00:00.123456789Z\n1883|1883|2400-02-29\n111\n111111\n"
     );
     let saved = UserBase::load(&user_file).unwrap();
-    assert_eq!(saved[0].birth_date.date_naive().to_string(), "1883-09-15");
+    assert_eq!(saved[0].birth_date.unwrap().to_string(), "1883-09-15");
     assert_eq!(saved[0].expiration_date.to_rfc3339(), "2400-02-29T00:00:00.123456789+00:00");
 }
 
@@ -59,7 +59,7 @@ PRINTLN YEAR(U_BIRTHDATE), "|", YEAR(U_EXPDATE), "|", YEAR(U_PWDEXP)
         let output = run_ppl_on(source, |board| board.config.paths.user_file = user_file.clone());
         assert_eq!(output, "1\n1996|2079|2024\n");
         let saved = UserBase::load(&user_file).unwrap();
-        assert_eq!(saved[0].birth_date.year(), 1996);
+        assert_eq!(saved[0].birth_date.unwrap().year(), 1996);
         assert_eq!(saved[0].expiration_date.year(), 2079);
         assert_eq!(saved[0].password.expire_date.year(), 2024);
         assert_eq!(saved[0].password.expire_date.day(), 29);

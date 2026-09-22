@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bitflag::bitflag;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 pub use icy_board_ppl::password::Password;
 use serde::{Deserialize, Serialize};
 
@@ -329,6 +329,33 @@ pub struct UserContact {
 /// The most contacts one user record may hold, so a runaway PPE cannot grow it without bound.
 pub const MAX_CONTACTS: usize = 100;
 
+/// User files written before the birth date became a calendar date hold a UTC
+/// timestamp, whose epoch value was the way to say that no date was given.
+fn deserialize_birth_date<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let Some(value) = Option::<toml::Value>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    match value {
+        toml::Value::Datetime(datetime) => Ok(datetime
+            .date
+            .and_then(|date| NaiveDate::from_ymd_opt(i32::from(date.year), u32::from(date.month), u32::from(date.day)))),
+        toml::Value::String(text) if text.is_empty() => Ok(None),
+        toml::Value::String(text) => {
+            if let Ok(date) = NaiveDate::parse_from_str(&text, "%Y-%m-%d") {
+                return Ok(Some(date));
+            }
+            let timestamp = DateTime::parse_from_rfc3339(&text).map_err(D::Error::custom)?.to_utc();
+            Ok((timestamp != DateTime::<Utc>::default()).then(|| timestamp.date_naive()))
+        }
+        other => Err(D::Error::custom(format!("expected a birth date, found {}", other.type_str()))),
+    }
+}
+
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct User {
     /// Path to the user file
@@ -400,8 +427,8 @@ pub struct User {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub home_voice_phone: String,
 
-    #[serde(default)]
-    pub birth_date: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deserialize_birth_date")]
+    pub birth_date: Option<NaiveDate>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -731,12 +758,12 @@ impl User {
         let (gender, birth_date, email, web) = if let Some(personal) = &u.inf.personal {
             (
                 personal.gender.clone(),
-                personal.birth_date.to_utc_date_time(),
+                personal.birth_date.to_naive_date(),
                 personal.email.clone(),
                 personal.web.clone(),
             )
         } else {
-            (String::new(), IcbDate::new(0, 0, 0).to_utc_date_time(), String::new(), String::new())
+            (String::new(), None, String::new(), String::new())
         };
 
         let (street1, street2, city, state, zip, country) = if let Some(address) = &u.inf.address {
@@ -1084,8 +1111,8 @@ impl User {
                 country: self.country.clone(),
             });
         }
-        if !(self.gender.is_empty() && self.email.is_empty() && self.web.is_empty() && self.birth_date.timestamp() == 0) {
-            let birth_date = IcbDate::from_utc(&self.birth_date);
+        if !(self.gender.is_empty() && self.email.is_empty() && self.web.is_empty() && self.birth_date.is_none()) {
+            let birth_date = self.birth_date.map(IcbDate::from).unwrap_or_default();
 
             inf.personal = Some(PersonalUserInf {
                 gender: self.gender.clone(),
@@ -1383,6 +1410,50 @@ mod snapshot_tests {
         edited[0].name = "Edited import".into();
         assert_eq!(users[0].name, "Original user");
         assert_eq!(edited[0].name, "Edited import");
+    }
+}
+
+#[cfg(test)]
+mod birth_date_tests {
+    use super::*;
+
+    fn load(line: &str) -> Option<NaiveDate> {
+        let rest = toml::to_string(&User::default()).unwrap();
+        toml::from_str::<User>(&format!("{line}\n{rest}")).unwrap().birth_date
+    }
+
+    #[test]
+    fn user_files_written_before_the_calendar_date_still_load() {
+        let born = NaiveDate::from_ymd_opt(1974, 3, 8);
+        assert_eq!(load("birth_date = \"1974-03-08T00:00:00Z\""), born);
+        assert_eq!(load("birth_date = \"1974-03-08\""), born);
+        assert_eq!(load("birth_date = 1974-03-08"), born);
+        // The epoch was how the timestamp said that no date was given.
+        assert_eq!(load("birth_date = \"1970-01-01T00:00:00Z\""), None);
+        assert_eq!(load("birth_date = \"\""), None);
+        assert_eq!(load(""), None);
+    }
+
+    #[test]
+    fn an_unset_birth_date_is_left_out_of_the_file() {
+        let mut user = User::default();
+        assert!(!toml::to_string(&user).unwrap().contains("birth_date"));
+
+        user.birth_date = NaiveDate::from_ymd_opt(1974, 3, 8);
+        let encoded = toml::to_string(&user).unwrap();
+        assert!(encoded.contains("birth_date = \"1974-03-08\""), "{encoded}");
+        assert_eq!(toml::from_str::<User>(&encoded).unwrap().birth_date, user.birth_date);
+    }
+
+    #[test]
+    fn a_missing_birth_date_stays_out_of_the_pcboard_record() {
+        let mut user = User::default();
+        assert!(user.to_pcboard().inf.personal.is_none());
+
+        user.birth_date = NaiveDate::from_ymd_opt(1974, 3, 8);
+        let personal = user.to_pcboard().inf.personal.expect("a birth date is personal information");
+        assert_eq!(personal.birth_date, IcbDate::new(3, 8, 1974));
+        assert_eq!(User::import_pcb(&user.to_pcboard()).birth_date, user.birth_date);
     }
 }
 

@@ -52,7 +52,8 @@ can disappear on the next save.
 | `contacts` | Array of tables / `[]` | Each entry requires string `service` and `account`. It can be written as `[[users.contacts]]` or inline tables. The mutation API caps a user at 100 contacts; plain Serde deserialization does not enforce that cap. |
 | `date_format` | String / `""` | User date-display format. Empty falls back through board display logic; do not confuse it with the timestamp serialization format. |
 | `language` | String / `""` | User language selection, not a fixed enum. Used to select language text. |
-| `birth_date`, `expiration_date`, `date_last_dir_read` | UTC timestamp strings / epoch | Birth date, account expiration and most recent directory scan date. |
+| `birth_date` | `YYYY-MM-DD` date string; omitted when unset | Birth date. A UTC timestamp written by an earlier version is still read, and its epoch value keeps meaning "not given". |
+| `expiration_date`, `date_last_dir_read` | UTC timestamp strings / epoch | Account expiration and most recent directory scan date. |
 | `user_comment`, `sysop_comment` | Strings / `""` | User/sysop notes. |
 | `custom_comment1`, `custom_comment2`, `custom_comment3`, `custom_comment4`, `custom_comment5` | Strings / `""` | Five independent custom notes. |
 | `security_level`, `exp_security_level` | `u8`; required | Current and expired-account security levels. Zero is accepted, not an implicit omission default. |

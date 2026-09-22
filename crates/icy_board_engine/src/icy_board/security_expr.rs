@@ -1,6 +1,6 @@
 use std::{fmt::Display, iter::Peekable, str::FromStr};
 
-use chrono::{DateTime, Local, NaiveTime, Timelike, Utc};
+use chrono::{Local, NaiveDate, NaiveTime, Timelike};
 use logos::{Lexer, Logos};
 use serde::{Deserialize, Serialize};
 
@@ -184,7 +184,7 @@ enum Token {
 
 pub trait SecData {
     fn cur_security(&self) -> u8;
-    fn birth_day(&self) -> Option<DateTime<Utc>>;
+    fn birth_day(&self) -> Option<NaiveDate>;
     fn is_in_goup(&self, group: &str) -> bool;
     fn minutes_left(&self) -> i32 {
         0
@@ -196,9 +196,9 @@ impl SecData for Session {
         self.cur_security
     }
 
-    fn birth_day(&self) -> Option<DateTime<Utc>> {
+    fn birth_day(&self) -> Option<NaiveDate> {
         if let Some(user) = &self.current_user {
-            return Some(user.birth_date);
+            return user.birth_date;
         }
         None
     }
@@ -217,8 +217,8 @@ impl SecData for User {
         self.security_level
     }
 
-    fn birth_day(&self) -> Option<DateTime<Utc>> {
-        Some(self.birth_date)
+    fn birth_day(&self) -> Option<NaiveDate> {
+        self.birth_date
     }
 
     fn is_in_goup(&self, _group: &str) -> bool {
@@ -299,8 +299,8 @@ impl SecurityExpression {
                 U_SEC_FUNC => Ok(Value::Integer(sec_data.cur_security() as i64)),
 
                 U_AGE_FUNC => {
-                    let age = if let Some(day) = &sec_data.birth_day() {
-                        chrono::Utc::now().years_since(*day).unwrap_or(0)
+                    let age = if let Some(day) = sec_data.birth_day() {
+                        chrono::Utc::now().date_naive().years_since(day).unwrap_or(0)
                     } else {
                         0
                     };

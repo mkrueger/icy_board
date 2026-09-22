@@ -58,6 +58,16 @@ impl From<NaiveDateTime> for IcbDate {
     }
 }
 
+impl From<NaiveDate> for IcbDate {
+    fn from(date: NaiveDate) -> Self {
+        Self {
+            month: date.month() as u8,
+            day: date.day() as u8,
+            year: date.year() as u16,
+        }
+    }
+}
+
 impl From<Datetime> for IcbDate {
     fn from(datetime: Datetime) -> Self {
         let date = &datetime.date.unwrap();
@@ -272,6 +282,14 @@ impl IcbDate {
             .from_local_datetime(&utc.naive_utc())
             .earliest()
             .unwrap_or_else(|| utc.with_timezone(&Local))
+    }
+
+    /// `None` for the empty date, which is how `PCBoard` stored "no date given".
+    pub fn to_naive_date(&self) -> Option<NaiveDate> {
+        if self.is_empty() {
+            return None;
+        }
+        Some(self.to_utc_date_time().date_naive())
     }
 
     pub fn from_utc(date_time: &chrono::prelude::DateTime<chrono::prelude::Utc>) -> Self {

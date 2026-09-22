@@ -58,7 +58,15 @@ pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> R
     let _ = write!(
         contents,
         "{}\r\n",
-        IcbDate::from_utc(&state.session.current_user.as_ref().unwrap().birth_date).to_country_date()
+        state
+            .session
+            .current_user
+            .as_ref()
+            .unwrap()
+            .birth_date
+            .map(IcbDate::from)
+            .unwrap_or_default()
+            .to_country_date()
     ); // Birth Date
     contents.push_str("C:\\HOME\r\n"); // Path to the user database files
     contents.push_str("C:\\MSGS\r\n"); // Path to the message database files

@@ -84,9 +84,13 @@ Identity, contact and display fields
    * - ``language``
      - String / ``""``
      - User language selection, not a fixed enum. Used to select language text.
-   * - ``birth_date``, ``expiration_date``, ``date_last_dir_read``
+   * - ``birth_date``
+     - ``YYYY-MM-DD`` date string; omitted when unset
+     - Birth date. A UTC timestamp written by an earlier version is still read,
+       and its epoch value keeps meaning "not given".
+   * - ``expiration_date``, ``date_last_dir_read``
      - UTC timestamp strings / epoch
-     - Birth date, account expiration and most recent directory scan date.
+     - Account expiration and most recent directory scan date.
    * - ``user_comment``, ``sysop_comment``
      - Strings / ``""``
      - User/sysop notes.

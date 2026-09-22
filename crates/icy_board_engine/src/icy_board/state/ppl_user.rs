@@ -216,7 +216,7 @@ impl UserDataValue for PplUser {
         use crate::executable::temporal::TemporalValue;
         let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_temporal(TemporalValue::Date(self.valid(vm).then_some(value.date_naive())));
         let native = match name.as_str().to_ascii_lowercase().as_str() {
-            "birthday" => Some(TemporalValue::Date(self.valid(vm).then_some(user.birth_date.date_naive()))),
+            "birthday" => Some(TemporalValue::Date(self.valid(vm).then_some(user.birth_date).flatten())),
             "expiresat" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.expiration_date))),
             "passwordexpiresat" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.password.expire_date))),
             "firston" => Some(TemporalValue::Timestamp(self.valid(vm).then_some(user.stats.first_date_on))),
@@ -275,7 +275,7 @@ impl UserDataValue for PplUser {
         } else if *name == *DATE_FORMAT {
             string(&user.date_format)
         } else if *name == *BIRTH_DATE {
-            date(&user.birth_date)
+            VariableValue::new_temporal(TemporalValue::Date(self.valid(vm).then_some(user.birth_date).flatten()))
         } else if *name == *EXPIRATION_DATE {
             date(&user.expiration_date)
         } else if *name == *PASSWORD_EXPIRES {
@@ -376,7 +376,7 @@ impl UserDataValue for PplUser {
                 return Ok(());
             };
             match native_name.as_str() {
-                "birthday" | "birthdate" => user.birth_date = value,
+                "birthday" | "birthdate" => user.birth_date = Some(value.date_naive()),
                 "expiresat" | "expirationdate" => user.expiration_date = value,
                 _ => user.password.expire_date = value,
             }

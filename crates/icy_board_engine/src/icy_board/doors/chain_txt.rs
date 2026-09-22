@@ -21,8 +21,8 @@ pub async fn create_chain_txt(state: &IcyBoardState, path: &std::path::Path) -> 
     let _ = write!(contents, "{}\r\n", state.session.user_name);
     contents.push_str("\r\n"); // User callsign (HAM radio)
 
-    let day = &state.session.current_user.as_ref().unwrap().birth_date;
-    let _ = write!(contents, "{}\r\n", Utc::now().years_since(*day).unwrap_or(0)); // Age
+    let day = state.session.current_user.as_ref().unwrap().birth_date;
+    let _ = write!(contents, "{}\r\n", day.and_then(|day| Utc::now().date_naive().years_since(day)).unwrap_or(0)); // Age
 
     let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().gender);
     contents.push_str("0\r\n"); // Users Gold

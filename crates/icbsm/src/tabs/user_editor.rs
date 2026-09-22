@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveTime, Utc};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -471,14 +471,18 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_birthdate"), ListValue::date(user.birth_date))
-                        .with_label_width(label_width)
-                        .with_status(get_text("user_editor_birthdate-status"))
-                        .with_help(get_text("user_editor_birthdate-help"))
-                        .with_update_date_value(&|board: &Arc<Mutex<User>>, value: DateTime<Utc>| {
-                            let mut user = board.lock().unwrap();
-                            user.birth_date = value;
-                        }),
+                    ListItem::new(
+                        get_text("user_editor_birthdate"),
+                        ListValue::date(user.birth_date.map(|date| date.and_time(NaiveTime::MIN).and_utc()).unwrap_or_default()),
+                    )
+                    .with_label_width(label_width)
+                    .with_status(get_text("user_editor_birthdate-status"))
+                    .with_help(get_text("user_editor_birthdate-help"))
+                    .with_update_date_value(&|board: &Arc<Mutex<User>>, value: DateTime<Utc>| {
+                        let mut user = board.lock().unwrap();
+                        // The editor has no empty date, so the epoch keeps meaning "not given".
+                        user.birth_date = (value != DateTime::<Utc>::default()).then(|| value.date_naive());
+                    }),
                 ),
                 ConfigEntry::Item(
                     ListItem::new(get_text("user_editor_email"), ListValue::Text(60, TextFlags::None, user.email.clone()))
