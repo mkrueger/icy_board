@@ -25,7 +25,7 @@ pub struct LocalFilePickerRequest {
 
 impl IcyBoardState {
     async fn local_picker_sender(&self) -> Option<mpsc::Sender<LocalFilePickerRequest>> {
-        if !self.session.is_local || self.session.request_logoff {
+        if !self.session.is_local || self.session.is_logoff_requested() {
             return None;
         }
         self.node_state

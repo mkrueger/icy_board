@@ -76,7 +76,7 @@ impl EditState {
             let Some(source) = state.request_local_path(LocalFilePickerKind::UploadFile).await? else {
                 return Ok(());
             };
-            if state.session.request_logoff {
+            if state.session.is_logoff_requested() {
                 return Ok(());
             }
             let result = tokio::task::spawn_blocking(move || -> Res<Vec<u8>> {
@@ -93,7 +93,7 @@ impl EditState {
             })
             .await?;
             let accepted = match result {
-                Ok(bytes) => !state.session.request_logoff && self.append_uploaded_text(&bytes),
+                Ok(bytes) => !state.session.is_logoff_requested() && self.append_uploaded_text(&bytes),
                 Err(error) => {
                     log::warn!("Local message text upload rejected: {error}");
                     false
@@ -108,7 +108,7 @@ impl EditState {
             return Ok(());
         }
         let answer = state.ask_transfer_protocol("N").await?;
-        if answer.is_empty() || answer.eq_ignore_ascii_case("N") || state.session.request_logoff {
+        if answer.is_empty() || answer.eq_ignore_ascii_case("N") || state.session.is_logoff_requested() {
             return Ok(());
         }
         let protocol = state
@@ -154,7 +154,7 @@ impl EditState {
                 || info.file_size > Self::MAX_UPLOAD_BYTES as u64
                 || received.len() > 1
                 || transfer.request_cancel
-                || state.session.request_logoff
+                || state.session.is_logoff_requested()
             {
                 failed = true;
             }
@@ -173,7 +173,7 @@ impl EditState {
             let _ = timeout(Duration::from_secs(2), protocol.cancel_transfer(&mut *state.connection)).await;
         }
         let mut accepted = false;
-        if !failed && received.len() == 1 && !state.session.request_logoff {
+        if !failed && received.len() == 1 && !state.session.is_logoff_requested() {
             let mut bytes = Vec::new();
             if let Ok(file) = std::fs::File::open(&received[0])
                 && file.take(Self::MAX_UPLOAD_BYTES as u64 + 1).read_to_end(&mut bytes).is_ok()

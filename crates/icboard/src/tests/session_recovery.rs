@@ -875,7 +875,7 @@ async fn suspended_event_denies_new_user_before_registration() {
         .await
         .expect("suspended login waited for registration input")
         .unwrap();
-    let logged_off = command.state.session.request_logoff;
+    let logged_off = command.state.session.is_logoff_requested();
     let has_user = command.state.session.current_user.is_some();
     drop(command);
     let mut output = Vec::new();

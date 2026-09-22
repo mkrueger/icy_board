@@ -246,7 +246,7 @@ impl IcyBoardState {
             if self.attach_message_file(message).await? {
                 return Ok(EditResult::SendMessage);
             }
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(EditResult::Abort);
             }
             // Denial/cancellation returns to composition with the SAME editor,
@@ -287,7 +287,7 @@ impl IcyBoardState {
         saved: &mut Option<crate::icy_board::state::ppl_message::PplMessage>,
     ) -> Res<EditResult> {
         if !self.message_write_allowed(conf, &message).await? {
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(EditResult::Abort);
             }
             return Err(super::message_attachment::MessageCreditDenied.into());
@@ -295,7 +295,7 @@ impl IcyBoardState {
         let mut attachments = self.message_attachment_cleanup(&message);
         let result = self.edit_message_context(&mut message, quote_text).await?;
         attachments.track(&message)?;
-        if result == EditResult::Abort || self.session.request_logoff {
+        if result == EditResult::Abort || self.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         if !message.header().sub_fields.iter().any(|field| field.field_type() == SubfieldType::MsgID) {

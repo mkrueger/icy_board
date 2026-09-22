@@ -22,9 +22,9 @@ async fn logoff_request_allows_ppe_but_forced_logoff_aborts() {
         let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
         state.session.page_len = 0;
         match scenario {
-            "normal" => state.session.request_logoff = true,
+            "normal" => state.session.request_logoff(),
             "forced" => {
-                state.session.request_logoff = true;
+                state.session.request_logoff();
                 state.session.force_logoff();
             }
             "session_timeout" => {
@@ -66,7 +66,7 @@ async fn logoff_request_allows_ppe_but_forced_logoff_aborts() {
             assert!(root.path().join("ran.txt").exists());
             assert_eq!(output, b"[logoff-ppe]");
         }
-        assert!(state.session.request_logoff, "{scenario}");
+        assert!(state.session.is_logoff_requested(), "{scenario}");
         assert_eq!(state.session.is_logoff_forced(), forced, "{scenario}");
     }
 }
@@ -224,7 +224,7 @@ EXIT
                         assert_eq!(screen.buffer.unicode_width(), utf8, "{context}");
                     }
                     assert_eq!(state.session.term_caps.term_size, (width as u16, height as u16));
-                    assert!(!state.session.request_logoff);
+                    assert!(!state.session.is_logoff_requested());
                 }
             }
         }
@@ -405,7 +405,7 @@ EXIT
             assert_eq!(state.session.term_caps.term_size, expected_size);
             assert_eq!(state.session.term_caps.reported_term_size, expected_size);
             assert_eq!(state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(), ["caller argument"]);
-            assert_eq!(state.session.request_logoff, disconnect);
+            assert_eq!(state.session.is_logoff_requested(), disconnect);
             if with_keys {
                 assert!(state.session.keyboard_timer_started > idle_since);
             } else {

@@ -26,7 +26,7 @@ impl IcyBoardState {
         if config.path.trim().is_empty() {
             return Err("external editor path is empty".into());
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         let directory = tempfile::tempdir()?;
@@ -129,7 +129,7 @@ impl IcyBoardState {
             ExternalEditorMode::Dos => self.run_dos_editor(config, directory.path(), remaining).await?,
             ExternalEditorMode::Program | ExternalEditorMode::Script => self.run_native_editor(config, directory.path(), remaining).await?,
         };
-        if !saved || self.session.request_logoff {
+        if !saved || self.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         let Some(output) = read_output(directory.path(), editor.max_lines, false)? else {
@@ -377,7 +377,7 @@ mod tests {
                 assert_eq!(editor.msg, vec!["original"]);
                 assert_eq!(editor.subj, "Original subject");
             }
-            assert_eq!(state.session.request_logoff, status == 2);
+            assert_eq!(state.session.is_logoff_requested(), status == 2);
         }
     }
 
@@ -703,7 +703,7 @@ mod tests {
         }
         if !idle_abort {
             assert!(typed_text_visible, "typed text never appeared in the rendered terminal");
-            assert!(!state.session.request_logoff, "editor requested a disconnect");
+            assert!(!state.session.is_logoff_requested(), "editor requested a disconnect");
         }
     }
 
@@ -739,7 +739,7 @@ mod tests {
                 1 | 2 => assert!(!result.unwrap()),
                 _ => assert!(result.is_err()),
             }
-            assert_eq!(state.session.request_logoff, status == 2);
+            assert_eq!(state.session.is_logoff_requested(), status == 2);
             let output = read_output(directory.path(), 100, false).unwrap().unwrap();
             assert_eq!(output.text.trim(), if status == 0 { "edited body" } else { "original" });
             assert_eq!(output.subject, None);

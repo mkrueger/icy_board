@@ -201,7 +201,7 @@ impl IcyBoardState {
             self.display_text(IceText::AttachNotAllOWed, display_flags::NEWLINE).await?;
             return Ok(false);
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(false);
         }
         if let Some(window) = self.event_window().await
@@ -221,7 +221,7 @@ impl IcyBoardState {
                 let Some(source) = self.request_local_path(LocalFilePickerKind::UploadFile).await? else {
                     return Ok(None);
                 };
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     return Ok(None);
                 }
                 return tokio::task::spawn_blocking(move || -> Res<_> {
@@ -242,7 +242,7 @@ impl IcyBoardState {
                 .await?;
             }
             let answer = self.ask_transfer_protocol("N").await?;
-            if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.request_logoff {
+            if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.is_logoff_requested() {
                 return Ok(None);
             }
             let protocol = self
@@ -274,7 +274,7 @@ impl IcyBoardState {
                         }
                     }
                 }
-                failed |= transfer_rejected(&transfer.0, received.len(), self.session.request_logoff);
+                failed |= transfer_rejected(&transfer.0, received.len(), self.session.is_logoff_requested());
                 if failed || transfer.0.is_finished {
                     break;
                 }
@@ -312,7 +312,7 @@ impl IcyBoardState {
         // Until this notification completes, dropping this future deletes the
         // durable staging file and leaves the draft entirely unchanged.
         self.display_text(IceText::TransferSuccessful, display_flags::NEWLINE).await?;
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(false);
         }
         let bytes = std::fs::metadata(&owned)?.len();
@@ -364,12 +364,12 @@ impl IcyBoardState {
 
     pub(crate) async fn message_write_allowed(&mut self, conf: i32, message: &JamMessage) -> Res<bool> {
         let charge = self.message_charge(conf, message).await?;
-        Ok(!self.session.request_logoff && !self.accounting_insufficient(charge.rate, 0.0).await?)
+        Ok(!self.session.is_logoff_requested() && !self.accounting_insufficient(charge.rate, 0.0).await?)
     }
 
     pub(crate) async fn preflight_message_write(&mut self, conf: i32, message: &JamMessage) -> Res<MessageCharge> {
         let charge = self.message_charge(conf, message).await?;
-        if self.session.request_logoff || self.accounting_insufficient(charge.rate, 0.0).await? {
+        if self.session.is_logoff_requested() || self.accounting_insufficient(charge.rate, 0.0).await? {
             return Err(MessageCreditDenied.into());
         }
         Ok(charge)

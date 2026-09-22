@@ -394,7 +394,7 @@ async fn accounting_message_post_save_error_commits_once_and_blocks_retry() {
         .await
         .unwrap_err();
     assert!(error.is::<MessagePersistedError>());
-    assert!(state.session.request_logoff);
+    assert!(state.session.is_logoff_requested());
     assert_eq!(state.session.calculate_balance(), 95.0);
     assert_eq!(state.session.current_user.as_ref().unwrap().stats.messages_left, 1);
     let error = state
@@ -414,8 +414,8 @@ async fn accounting_logoff_displays_once_after_pending_activity_settles() {
     std::fs::write(&file, b"ACCOUNT-LOGOFF @HANGUP@\r\n").unwrap();
     state.session.accounting.options.logoff_file = file;
     state.accounting_begin_invocation();
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     assert!(state.accounting_active(), "G must not finish an enclosing command's accounting");
     assert!(output(&mut peer).await.is_empty(), "no premature final summary");
     state.accounting_record(12, "COMMAND", "G", 4.0, 1).unwrap();
@@ -442,7 +442,7 @@ async fn accounting_logoff_auto_skips_file_and_disabled_skips_all_credit_output(
         if !active {
             state.session.accounting = Default::default();
         }
-        state.logoff_user(Logoff::AUTOMATIC).await.unwrap();
+        state.logoff_user(Logoff::Automatic).await.unwrap();
         let text = output(&mut peer).await;
         assert!(!text.contains("ACCOUNT-LOGOFF"));
         assert_eq!(text.matches("Credits Used:").count(), usize::from(active));
@@ -460,7 +460,7 @@ async fn accounting_logoff_tracking_shows_used_but_not_enforced_balance() {
         board.config.accounting.tracking_file = root.path().join("accounting.dbf");
     }
     state.accounting_refresh().await.unwrap();
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     let text = output(&mut peer).await;
     assert_eq!(text.matches("Credits Used:").count(), 1);
     assert!(!text.contains("Credits Left:"));

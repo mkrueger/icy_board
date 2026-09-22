@@ -320,7 +320,7 @@ impl IcyBoardState {
             }
         }
 
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(());
         }
         let usage = ActivityUsage::new("DOOR USAGE", "DOOR USAGE MIN", &door.name, door.charge_per_use, door.charge_per_minute);
@@ -347,7 +347,7 @@ impl IcyBoardState {
             DoorType::Dos => self.run_dos_door(door, door_number, &mut usage).await,
         };
         let result = if usage.restore_terminal
-            && !self.session.request_logoff
+            && !self.session.is_logoff_requested()
             && self.session.disp_options.grapics_mode != crate::icy_board::state::GraphicsMode::Ctty
         {
             let reset = b"\x18\x1b[?6l\x1b[r\x1b[?69l\x1b[?7h\x1b[?25h\x1b[0m";

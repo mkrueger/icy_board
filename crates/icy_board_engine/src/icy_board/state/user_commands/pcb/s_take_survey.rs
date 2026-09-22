@@ -187,7 +187,7 @@ impl IcyBoardState {
                 };
                 if txt.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
                     for question in &lines[start_line..] {
-                        if self.session.request_logoff {
+                        if self.session.is_logoff_requested() {
                             return Ok(());
                         }
                         if registration && let Some(text) = question.strip_prefix(';') {
@@ -211,7 +211,7 @@ impl IcyBoardState {
                                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
                                 )
                                 .await?;
-                            if self.session.request_logoff {
+                            if self.session.is_logoff_requested() {
                                 return Ok(());
                             }
                             if !registration || !answer.is_empty() {

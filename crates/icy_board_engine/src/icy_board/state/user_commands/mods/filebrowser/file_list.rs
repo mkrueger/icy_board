@@ -237,7 +237,7 @@ impl FileList {
             {
                 continue;
             }
-            if cmd.session.request_logoff {
+            if cmd.session.is_logoff_requested() {
                 break;
             }
             if cmd.session.disp_options.abort_printout {

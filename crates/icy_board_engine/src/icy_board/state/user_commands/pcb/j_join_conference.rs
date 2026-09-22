@@ -163,7 +163,7 @@ impl IcyBoardState {
             }
 
             self.accounting_settle_conference().await?;
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(());
             }
             if conf_num == 0 {

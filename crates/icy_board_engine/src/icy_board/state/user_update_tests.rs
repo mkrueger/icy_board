@@ -190,7 +190,7 @@ fn session_snapshot(state: &IcyBoardState) -> SessionSnapshot {
         accounting_baseline: toml::to_string(&accounting_baseline).unwrap(),
         authenticated: state.session.authenticated_security.clone(),
         saved_minutes: state.session.saved_session_minutes,
-        request_logoff: state.session.request_logoff,
+        request_logoff: state.session.is_logoff_requested(),
     }
 }
 
@@ -310,7 +310,7 @@ async fn cancelled_save_does_not_reauthorize_credentials_changed_before_acknowle
     f.first.accounting_finish().await.unwrap();
     assert_eq!(security_fingerprint(&f.disk()[CALLER]), live);
     assert_eq!(f.first.session.authenticated_security, authorization);
-    assert!(f.first.session.request_logoff);
+    assert!(f.first.session.is_logoff_requested());
     assert!(!f.first.credentials_still_current().await);
     assert_eq!(f.disk()[CALLER].stats.messages_read, 25);
     assert_eq!(f.disk()[CALLER].account.as_ref().unwrap().debit_msg_read, 5.0);
@@ -611,7 +611,9 @@ async fn final_save_keeps_live_conflicts_and_posts_activity_once_even_after_io_r
         let before = std::fs::read(f.root.path().join("users.toml")).unwrap();
         let baseline = f.second.session.user_baseline.clone().unwrap();
         f.second.get_board().await.config.paths.user_file = f.root.path().into();
-        f.second.session.request_logoff = explicit_logoff;
+        if explicit_logoff {
+            f.second.session.request_logoff();
+        }
         let result = if explicit_logoff {
             f.second.save_current_user().await
         } else {
@@ -667,7 +669,7 @@ async fn final_save_preserves_changed_credentials_without_reauthorizing_the_stal
     assert_eq!(disk[CALLER].stats.messages_read, 23);
     assert_eq!(disk[CALLER].account.as_ref().unwrap().debit_msg_read, 3.0);
     assert_eq!(f.second.session.authenticated_security, authorization);
-    assert!(f.second.session.request_logoff);
+    assert!(f.second.session.is_logoff_requested());
     assert!(f.second.session.is_logoff_forced());
 }
 
@@ -863,7 +865,7 @@ async fn change_password_persists_without_an_extra_save_and_stale_profile_cannot
     assert_refreshed(&f.first);
     edit(&mut f.second).city = "Stale profile edit".into();
     f.second.persist_current_user().await.unwrap();
-    assert!(f.second.session.request_logoff);
+    assert!(f.second.session.is_logoff_requested());
     f.first.persist_current_user().await.unwrap();
     let disk = f.disk();
     assert!(disk[CALLER].password.password.is_valid("fresh-secret"));

@@ -265,7 +265,7 @@ impl IcyBoardState {
     }
 
     async fn upload_description_input_available(&mut self) -> bool {
-        !self.session.request_logoff
+        !self.session.is_logoff_requested()
             && (self.session.is_local
                 || matches!(
                     timeout(Duration::from_secs(2), self.connection.poll()).await,
@@ -305,7 +305,7 @@ impl IcyBoardState {
                 )
                 .await?;
 
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(None);
             }
             if lines.is_empty() {
@@ -337,7 +337,7 @@ impl IcyBoardState {
         self.transfer_statistics.uploaded_files = 0;
         self.transfer_statistics.uploaded_bytes = 0;
         self.transfer_statistics.uploaded_cps = 0;
-        if self.session.request_logoff || !self.session.user_command_level.cmd_u.session_can_access(&self.session) {
+        if self.session.is_logoff_requested() || !self.session.user_command_level.cmd_u.session_can_access(&self.session) {
             return Ok(());
         }
         if let Some(window) = self.event_window().await
@@ -380,7 +380,7 @@ impl IcyBoardState {
         let mut requests: Vec<UploadRequest> = Vec::new();
         // receive()/scanfornames scans ALL stacked names even for normal U.
         // Only the interactive name loop stops after one non-batch request.
-        while requests.len() < limit && !self.session.request_logoff && (batch || requests.is_empty() || !names.is_empty()) {
+        while requests.len() < limit && !self.session.is_logoff_requested() && (batch || requests.is_empty() || !names.is_empty()) {
             // No local source path is ever accepted from a terminal token.
             let selected = if local {
                 let Some(path) = self.request_local_path(LocalFilePickerKind::UploadFile).await? else {
@@ -462,7 +462,7 @@ impl IcyBoardState {
                 local_cps,
             });
         }
-        if requests.is_empty() || self.session.request_logoff {
+        if requests.is_empty() || self.session.is_logoff_requested() {
             return Ok(());
         }
         // Local-only bridge bypasses protocols even for a caller with no default.
@@ -658,7 +658,7 @@ impl IcyBoardState {
             }
             receipt.errors = transfer.0.recieve_state.errors;
             receipt.failed |= transfer.0.request_cancel
-                || self.session.request_logoff
+                || self.session.is_logoff_requested()
                 || crate::icy_board::limits::session_expired(self.session.time_limit, (Utc::now() - self.session.login_date).num_minutes())
                 || started.elapsed() > Duration::from_secs(3600);
             if receipt.failed || transfer.0.is_finished {

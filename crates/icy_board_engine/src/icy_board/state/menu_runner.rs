@@ -100,7 +100,7 @@ impl ActivityUsage {
         }
         // A logoff must settle all enclosing usage before any security change
         // can disable posting. No further admission is needed while leaving.
-        let checked = if self.billable && !state.session.request_logoff {
+        let checked = if self.billable && !state.session.is_logoff_requested() {
             state.accounting_check_balance().await
         } else {
             Ok(())
@@ -184,7 +184,7 @@ impl IcyBoardState {
         self.autorun_times.clear();
         self.autorun_commands(mnu, AutoRun::FirstCmd, 0).await?;
         let menu_start_time = Instant::now();
-        while !self.session.request_logoff {
+        while !self.session.is_logoff_requested() {
             if self.exit_menus {
                 return Ok(());
             }
@@ -283,7 +283,7 @@ impl IcyBoardState {
         if !self.check_sec(command_str, &command.security).await? {
             return Ok(true);
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(true);
         }
         let actions: Vec<_> = command
@@ -311,7 +311,7 @@ impl IcyBoardState {
         let result = async {
             for cmd_action in actions {
                 self.run_action(command, cmd_action, false, Some(&mut usage)).await?;
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     break;
                 }
             }
@@ -980,7 +980,7 @@ impl IcyBoardState {
             .await?;
             self.display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
-            self.logoff_user(super::Logoff::ABNORMAL).await?;
+            self.logoff_user(super::Logoff::Abnormal).await?;
         }
 
         Ok(false)

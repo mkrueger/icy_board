@@ -218,7 +218,7 @@ impl IcyBoardState {
                     snapshot.message.header().is_password_valid(pwd)
                 })
                 .await?;
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(false);
         }
         if needs_password && !password_valid {

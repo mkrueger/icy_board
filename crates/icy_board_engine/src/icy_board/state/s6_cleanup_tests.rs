@@ -86,7 +86,7 @@ PRINT "handler-unreachable"
         let mut state = IcyBoardState::new(bbs, Arc::new(Mutex::new(IcyBoard::new())), nodes, node, Box::new(connection)).await;
         state.session.disp_options.grapics_mode = GraphicsMode::Graphics;
         let result = tokio::time::timeout(Duration::from_secs(2), state.run_ppe(&path, None)).await.unwrap();
-        assert!(state.session.request_logoff);
+        assert!(state.session.is_logoff_requested());
         assert!(!result.unwrap());
         assert_eq!(state.session.op_text, icy_net::NetError::ConnectionClosed.to_string());
         assert_eq!(state.ppe_nesting, 0);

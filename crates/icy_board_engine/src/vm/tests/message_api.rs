@@ -778,7 +778,7 @@ async fn message_api_liquid_read_real_package() {
         assert_eq!(base.highest_message_number(), if abort { 1 } else { 2 }, "abort={abort}\n{screen}");
         if editor_kind != "ppe" {
             assert!(typed_text_visible, "editor input was not rendered; editor={editor_kind}, abort={abort}");
-            assert!(!state.session.request_logoff);
+            assert!(!state.session.is_logoff_requested());
         }
         if matches!(editor_kind.as_str(), "lredit" | "ledit") {
             assert!(editor_header_visible);
@@ -932,7 +932,7 @@ EXIT
         }
         assert_eq!(execute(&mut state, session_root.path(), last_read).await, if phase == 0 { "0" } else { "5" });
         assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -1172,7 +1172,7 @@ EXIT
                 .collect::<Vec<_>>();
             assert_eq!(result, if saved { "1:1" } else { "0:1" }, "{language}/{scenario}: {final_screen:?}");
             assert_eq!(rendered_initial && rendered_edit, !rejected, "{language}/{scenario}");
-            assert!(!state.session.request_logoff);
+            assert!(!state.session.is_logoff_requested());
             assert_eq!(state.session.tokens.iter().cloned().collect::<Vec<_>>(), ["caller argument"]);
             let base = JamMessageBase::open(root.path().join("area1")).unwrap();
             let new_message = matches!(scenario, "reply" | "post");

@@ -442,6 +442,138 @@ async fn normal_logoff_allows_parent_ppe_to_finish_before_hooks() {
 }
 
 #[tokio::test]
+async fn logoff_guarded_ppe_goodbye_continues_only_when_cancelled() {
+    use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
+
+    for accepted in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let ppe = crate::tests::compile_test_ppe("GOODBYE\nPRINTLN \"[goodbye-cancelled]\"\nEXIT");
+        let hook = crate::tests::compile_test_ppe("PRINTLN \"[logoff-hook]\"\nEXIT");
+        let mut board = board_at(root.path());
+        board.config.system_control.guard_logoff = true;
+        board
+            .default_display_text
+            .update_record_number(IceText::ContinueLogoff as usize, "[logoff-confirm]")
+            .unwrap();
+        board.default_display_text.update_record_number(192, format!("!{}", hook.display())).unwrap();
+        board.commands.push(Command {
+            keyword: "QUIT".into(),
+            actions: vec![CommandAction {
+                command_type: CommandType::RunPPE,
+                parameter: ppe.to_string_lossy().into_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let mut session = Session::login(board).await;
+        session.send("QUIT\r").await;
+        session.expect("[logoff-confirm]").await;
+        session.send(if accepted { "Y\r" } else { "N\r" }).await;
+        if !accepted {
+            session.expect(COMMAND).await;
+            session.send("BYE\r").await;
+        }
+        let (result, output) = session.finish().await;
+        assert!(result.is_ok(), "{result:?}; {output:?}");
+        assert_eq!(output.matches("[goodbye-cancelled]").count(), usize::from(!accepted), "{output:?}");
+        assert_eq!(output.matches("[logoff-hook]").count(), 1, "{output:?}");
+    }
+}
+
+#[tokio::test]
+async fn logoff_group_chat_goodbye_runs_guard_and_hooks() {
+    for command in ["G", "GOODBYE"] {
+        for accepted in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let mut board = board_at(root.path());
+            board.config.system_control.guard_logoff = true;
+            std::fs::write(root.path().join("logoff.survey"), "[chat-logoff-survey]\r\n*****\r\n").unwrap();
+            board.config.paths.logoff_survey = root.path().join("logoff.survey");
+            board.config.paths.logoff_answer = root.path().join("logoff.answers");
+            for (id, text) in [
+                (IceText::NodeChatEntered, "[chat-entered]"),
+                (IceText::ChatPromptNovice, "[chat-command]"),
+                (IceText::ChatPromptExpertmode, "[chat-command]"),
+                (IceText::ContinueLogoff, "[logoff-confirm]"),
+            ] {
+                board.default_display_text.update_record_number(id as usize, text).unwrap();
+            }
+            let hook = crate::tests::compile_test_ppe("PRINTLN \"[chat-logoff-hook]\"\nEXIT");
+            board.default_display_text.update_record_number(192, format!("!{}", hook.display())).unwrap();
+            let mut session = Session::login(board).await;
+            session.send("CHAT G 1\r").await;
+            session.expect("[chat-entered]").await;
+            session.send("\x1b").await;
+            session.expect("[chat-command]").await;
+            session.send(&format!("{command}\r")).await;
+            session.expect("[logoff-confirm]").await;
+            session.send(if accepted { "Y\r" } else { "N\r" }).await;
+            if !accepted {
+                session.expect(COMMAND).await;
+                assert!(!String::from_utf8_lossy(&session.output).contains("[chat-logoff-hook]"));
+                session.send("BYE\r").await;
+            }
+            let (result, output) = session.finish().await;
+            assert!(result.is_ok(), "{command}, {accepted}: {result:?}; {output:?}");
+            for marker in ["[chat-logoff-survey]", "[chat-logoff-hook]", "Thanks for calling"] {
+                assert_eq!(output.matches(marker).count(), 1, "{command}, {accepted}: {output:?}");
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn logoff_forced_exits_log_once_without_running_closing_ppe() {
+    use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
+
+    for scenario in ["eof", "timeout", "shutdown_error"] {
+        for hook in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let mut board = board_at(root.path());
+            board.config.options.call_log = true;
+            board.config.paths.caller_log = root.path().join("caller.log");
+            let ppe = crate::tests::compile_test_ppe("PRINTLN \"[must-not-run]\"\nEXIT");
+            let record = if hook {
+                format!("!{} /LOGOFF", ppe.display())
+            } else {
+                "[final-minutes] @OPTEXT@".into()
+            };
+            board.default_display_text.update_record_number(192, &record).unwrap();
+            board.default_display_text.update_record_number(166, format!("!{}", ppe.display())).unwrap();
+            let timeout = crate::tests::compile_test_ppe("STRING KEY\nADJTIME -2000\nKEY = INKEY()\nPRINTLN \"[must-not-run]\"\nEXIT");
+            board.commands.push(Command {
+                keyword: "EXPIRE".into(),
+                actions: vec![CommandAction {
+                    command_type: CommandType::RunPPE,
+                    parameter: timeout.to_string_lossy().into_owned(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            });
+            let mut session = Session::login(board).await;
+            if scenario == "timeout" {
+                session.send("EXPIRE\r").await;
+            } else {
+                session.fail_shutdown.store(scenario == "shutdown_error", Ordering::SeqCst);
+                session.peer.shutdown().await.unwrap();
+            }
+            let (result, output) = session.finish().await;
+            if scenario == "shutdown_error" {
+                assert_eq!(result.unwrap_err(), SOCKET_ERROR);
+            } else {
+                assert!(result.is_ok(), "{scenario}: {result:?}; {output:?}");
+            }
+            assert!(!output.contains("[must-not-run]"), "{scenario}: {output:?}");
+            let log = std::fs::read_to_string(root.path().join("caller.log")).unwrap();
+            let expected = if hook { record } else { "[final-minutes]".into() };
+            assert_eq!(log.matches(&expected).count(), 1, "{scenario}: {log}");
+            assert!(!log.contains("@OPTEXT@"), "{scenario}: {log}");
+            assert_eq!(account(root.path(), 0).debit_call, 3.0);
+        }
+    }
+}
+
+#[tokio::test]
 async fn logoff_statements_follow_pcboard_kinds() {
     use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
 

@@ -164,12 +164,12 @@ impl IcyBoardState {
                 .check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password))
                 .await?
         {
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(None);
             }
             return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message password denied").into());
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(None);
         }
         let Some((header, body)) = read_authorized_reply(&mut base, &header, &self.session.user_name, &self.session.alias_name, read_all)? else {
@@ -346,12 +346,12 @@ impl IcyBoardState {
                 .check_password(IceText::PasswordToReadMessage, 0, |password| header.is_password_valid(password))
                 .await?
         {
-            if expected.is_some() && !self.session.request_logoff {
+            if expected.is_some() && !self.session.is_logoff_requested() {
                 return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Message password denied").into());
             }
             return Ok(EditResult::Abort);
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         let Some((header, body)) = read_authorized_reply(&mut base, &header, &self.session.user_name, &self.session.alias_name, may_read_all)? else {
@@ -370,7 +370,7 @@ impl IcyBoardState {
         } else {
             self.session.get_username_or_alias()
         };
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         let (mut to, mut subject, inherited_attributes, mut fields) = reply_details(&header);

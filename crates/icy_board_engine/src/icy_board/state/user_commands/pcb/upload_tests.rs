@@ -452,7 +452,9 @@ async fn unannounced_archive_diz_supplies_metadata_without_prompt_and_honors_pri
 async fn failed_or_logged_off_unannounced_uploads_skip_input_and_clean_all_temporaries() {
     for logoff in [false, true] {
         let (root, mut state, _peer) = fixture("must not be consumed\r").await;
-        state.session.request_logoff = logoff;
+        if logoff {
+            state.session.request_logoff();
+        }
         let remaining_input = state.char_buffer.len();
         let files = vec![completed("NEW1.BIN", b"one"), completed("NEW2.BIN", b"two")];
         let paths: Vec<_> = files.iter().map(|file| file.source.to_path_buf()).collect();

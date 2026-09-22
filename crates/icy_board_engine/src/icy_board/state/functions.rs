@@ -362,20 +362,31 @@ impl IcyBoardState {
         restore_result
     }
 
+    #[async_recursion(?Send)]
     async fn display_file_content(&mut self, converted_content: &str) -> Res<()> {
-        for (i, line) in converted_content.lines().enumerate() {
-            if i > 0 {
+        let mut automatic_logoff = false;
+        let mut first_line = true;
+        for line in converted_content.lines() {
+            if line.starts_with("@HANGUP@") {
+                automatic_logoff = true;
+                continue;
+            }
+            if !first_line {
                 self.new_line().await?;
                 if self.session.disp_options.abort_printout {
                     break;
                 }
             }
+            first_line = false;
             self.display_line(line).await?;
         }
 
         // .lines() not recognizes last empty line.
         if converted_content.ends_with('\n') && !self.session.disp_options.abort_printout {
             self.new_line().await?;
+        }
+        if automatic_logoff {
+            self.logoff_user(super::Logoff::Automatic).await?;
         }
         Ok(())
     }

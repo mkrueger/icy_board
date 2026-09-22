@@ -11,7 +11,7 @@ use crate::icy_board::{
     doors::{Door, DoorList, DoorType},
     pcb::user_inf::AccountUserInf,
     sec_levels::SecurityLevel,
-    state::{KeyChar, KeySource, Logoff},
+    state::{KeyChar, KeySource, Logoff, SessionLifecycle},
     user_base::User,
 };
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
@@ -294,6 +294,76 @@ async fn dos_preparation_failure_is_visible_and_not_billed() {
 }
 
 #[tokio::test]
+async fn logoff_forced_finalization_logs_once_after_keyboard_timeout_or_disconnect() {
+    for keyboard_timeout in [false, true] {
+        let (root, mut state, mut peer) = fixture(true).await;
+        let log = root.path().join("caller.log");
+        {
+            let mut board = state.get_board().await;
+            board.config.options.call_log = true;
+            board.config.paths.caller_log = log.clone();
+            board.config.limits.keyboard_timeout = 1;
+        }
+        state.display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+        state.display_text.update_record_number(192, "[final-minutes] @OPTEXT@").unwrap();
+        if keyboard_timeout {
+            state.session.keyboard_timer_started -= Duration::from_secs(120);
+            assert!(state.get_char(TerminalTarget::Both).await.unwrap().is_none());
+        } else {
+            state.session.force_logoff();
+        }
+        assert!(state.session.is_logoff_forced());
+        assert_eq!(state.session.lifecycle(), SessionLifecycle::AwaitingLogoffSettlement(Logoff::Abnormal));
+        state.finish_session().await.unwrap();
+        assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
+        let first = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(first.matches("[final-minutes]").count(), 1, "{first}");
+        assert!(!first.contains("@OPTEXT@"), "{first}");
+        state.finish_session().await.unwrap();
+        assert_eq!(std::fs::read_to_string(&log).unwrap(), first);
+        assert!(!output(&mut peer).await.contains("[final-minutes]"));
+    }
+}
+
+#[tokio::test]
+async fn logoff_display_file_finishes_before_automatic_logoff() {
+    for enabled in [false, true] {
+        for wrapped in [false, true] {
+            let (root, mut state, mut peer) = fixture(enabled).await;
+            let file = root.path().join("automatic");
+            std::fs::write(&file, "[before]\r\n@HANGUP@\r\n[after]\r\n@HANGUP@\r\n[last]\r\n").unwrap();
+            let survey = root.path().join("survey");
+            std::fs::write(&survey, "[must-not-ask]\r\n*****\r\n").unwrap();
+            state.get_board().await.config.paths.logoff_survey = survey;
+            let account_file = root.path().join("account-file");
+            std::fs::write(&account_file, "[must-not-ask]\r\n").unwrap();
+            state.session.accounting.options.logoff_file = account_file;
+            let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "DISPLAY", 3.0, 0.0);
+            if wrapped {
+                usage.start(&mut state).unwrap();
+            }
+            state.display_file(&file).await.unwrap();
+            if wrapped {
+                assert_eq!(state.session.lifecycle(), SessionLifecycle::AwaitingLogoffSettlement(Logoff::Automatic));
+                usage.finish(&mut state, Ok(())).await.unwrap();
+            }
+            assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
+            let text = output(&mut peer).await;
+            let mut previous = 0;
+            for marker in ["[before]", "[after]", "[last]", "Minutes Used", "Thanks for calling"] {
+                assert_eq!(text.matches(marker).count(), 1, "{enabled}, {wrapped}: {text}");
+                let position = text.find(marker).unwrap();
+                assert!(position >= previous, "{enabled}, {wrapped}: {text}");
+                previous = position;
+            }
+            assert!(!text.contains("[must-not-ask]"), "{text}");
+            state.finish_session().await.unwrap();
+            assert!(output(&mut peer).await.is_empty());
+        }
+    }
+}
+
+#[tokio::test]
 async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() {
     let (root, mut state, mut peer) = fixture(true).await;
     let file = root.path().join("final-balance");
@@ -308,13 +378,17 @@ async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() 
     let result = state.run_action(&cmd, &cmd.actions[0], false, Some(&mut usage)).await;
     assert!(result.is_ok());
     assert!(state.accounting_active());
-    assert!(state.session.request_logoff);
+    assert!(state.session.is_logoff_requested());
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::AwaitingLogoffSettlement(Logoff::Normal));
+    assert!(!state.session.is_logoff_forced());
     assert!(output(&mut peer).await.is_empty());
     // hangup has not closed the socket while the command is still unwinding.
     state.connection.send(b"STILL-OPEN\r\n").await.unwrap();
     usage.finish(&mut state, result).await.unwrap();
     assert!(!state.accounting_active());
     assert!(!state.accounting_invocation_active());
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
+    assert!(state.session.is_logoff_forced());
     assert_eq!(account(&state).debit_tpu, 7.0);
     assert_eq!(state.get_board().await.users[0].account.as_ref().unwrap().debit_tpu, 7.0);
     let text = output(&mut peer).await;
@@ -324,10 +398,43 @@ async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() 
         assert_eq!(text.matches(marker).count(), 1, "{marker}: {text}");
     }
     let audit = std::fs::read(root.path().join("usage.dbf")).unwrap();
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     state.accounting_finish().await.unwrap();
     assert!(output(&mut peer).await.is_empty());
     assert_eq!(std::fs::read(root.path().join("usage.dbf")).unwrap(), audit);
+}
+
+#[tokio::test]
+async fn forced_logoff_preserves_deferred_settlement_without_running_hooks() {
+    let (root, mut state, mut peer) = fixture(true).await;
+    let file = root.path().join("final-balance");
+    std::fs::write(&file, "MUST-NOT-PRINT\r\n").unwrap();
+    state.session.accounting.options.logoff_file = file;
+    let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "BYE", 3.0, 2.0);
+    usage.start(&mut state).unwrap();
+    usage.started = Some(Instant::now() - Duration::from_secs(95));
+    state.logoff_user(Logoff::Normal).await.unwrap();
+    state.session.force_logoff();
+    state.session.request_logoff();
+    state.logoff_user(Logoff::Abnormal).await.unwrap();
+    assert!(state.session.is_logoff_forced());
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::AwaitingLogoffSettlement(Logoff::Normal));
+    state.connection.send(b"STILL-OPEN").await.unwrap();
+    assert_eq!(output(&mut peer).await, "STILL-OPEN");
+
+    usage.finish(&mut state, Ok(())).await.unwrap();
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
+    assert!(state.session.is_logoff_forced());
+    assert!(!state.accounting_active());
+    assert!(!state.accounting_invocation_active());
+    assert_eq!(state.get_board().await.users[0].account.as_ref().unwrap().debit_tpu, 7.0);
+    assert!(output(&mut peer).await.is_empty());
+    let audit = std::fs::read(root.path().join("usage.dbf")).unwrap();
+    state.accounting_complete_logoff().await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
+    state.accounting_finish().await.unwrap();
+    assert_eq!(std::fs::read(root.path().join("usage.dbf")).unwrap(), audit);
+    assert!(output(&mut peer).await.is_empty());
 }
 
 #[tokio::test]
@@ -342,7 +449,7 @@ async fn nested_command_and_door_finish_requests_settle_once_even_on_handler_err
     inner.start(&mut state).unwrap();
     outer.started = Some(Instant::now() - Duration::from_secs(95));
     inner.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     state.accounting_finish().await.unwrap();
     let error = inner.finish(&mut state, Err("door handler failed".into())).await.unwrap_err();
     assert!(state.accounting_active());
@@ -374,7 +481,7 @@ async fn explicit_finish_inside_nested_usage_keeps_outer_posting_enabled() {
     inner.started = Some(Instant::now() - Duration::from_secs(95));
     balance(&mut state, 10.0);
     state.accounting_finish().await.unwrap();
-    assert!(!state.session.request_logoff, "explicit finish does not require a display/hangup");
+    assert!(!state.session.is_logoff_requested(), "explicit finish does not require a display/hangup");
     inner.finish(&mut state, Ok(())).await.unwrap();
     assert!(state.accounting_active(), "a security drop during unwind would discard the outer charge");
     outer.finish(&mut state, Ok(())).await.unwrap();
@@ -392,13 +499,14 @@ async fn failed_nested_minute_post_suppresses_incomplete_final_summary() {
     inner.start(&mut state).unwrap();
     outer.started = Some(Instant::now() - Duration::from_secs(95));
     inner.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     let error = inner.finish(&mut state, Ok(())).await.unwrap_err();
     assert!(state.accounting_active());
     assert!(outer.finish(&mut state, Err(error)).await.is_err());
     assert!(!state.accounting_invocation_active());
     assert!(!state.accounting_active());
-    assert!(state.session.logoff_pending.is_none());
+    assert!(!state.session.has_pending_logoff());
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
     assert_eq!(state.get_board().await.users[0].account.as_ref().unwrap().debit_tpu, 7.0);
     assert!(output(&mut peer).await.is_empty(), "failed charges must not be presented as a final total");
 }
@@ -409,12 +517,13 @@ async fn deferred_finish_save_failure_unwinds_and_retry_does_not_rebill_or_show_
     let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "BYE", 3.0, 2.0);
     usage.start(&mut state).unwrap();
     usage.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(Logoff::NORMAL).await.unwrap();
+    state.logoff_user(Logoff::Normal).await.unwrap();
     state.get_board().await.config.paths.user_file = root.path().to_path_buf();
     assert!(usage.finish(&mut state, Ok(())).await.is_err());
     assert!(!state.accounting_invocation_active());
     assert!(!state.accounting_active());
-    assert!(state.session.logoff_pending.is_none());
+    assert!(!state.session.has_pending_logoff());
+    assert_eq!(state.session.lifecycle(), SessionLifecycle::Ended);
     assert_eq!(account(&state).debit_tpu, 7.0);
     assert_eq!(state.get_board().await.users[0].account.as_ref().unwrap().debit_tpu, 0.0);
     assert!(output(&mut peer).await.is_empty());
@@ -431,7 +540,7 @@ async fn free_command_still_unwinds_logoff_and_disconnected_summary_cannot_lose_
         let (_root, mut state, peer) = fixture(true).await;
         let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "BYE", per_use, 0.0);
         usage.start(&mut state).unwrap();
-        state.logoff_user(Logoff::NORMAL).await.unwrap();
+        state.logoff_user(Logoff::Normal).await.unwrap();
         assert!(state.accounting_active());
         drop(peer);
         let error = usage.finish(&mut state, Err("original I/O failure".into())).await.unwrap_err();
@@ -538,7 +647,7 @@ async fn minute_rounding_and_error_disconnect_settlement_use_tpu_and_exact_activ
             usage.start(&mut state).unwrap();
             usage.start(&mut state).unwrap(); // idempotent across multiple actions
             usage.started = Some(Instant::now() - Duration::from_secs(seconds));
-            state.session.request_logoff = true;
+            state.session.request_logoff();
             let error = usage.finish(&mut state, Err("handler failed".into())).await.unwrap_err();
             assert_eq!(error.to_string(), "handler failed");
             assert_eq!(account(&state).debit_tpu, 3.0 + 2.0 * minutes as f64);
@@ -680,7 +789,7 @@ async fn native_door32_socket_transport_and_expanded_arguments() {
         assert_eq!(transport.matches("\r\n").count(), 11);
         assert_eq!(std::fs::read_to_string(work.join("cwd")).unwrap(), work.to_string_lossy());
         assert!(!work.join("door32.sys").exists() && !root.path().join("door32.sys").exists());
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -792,7 +901,7 @@ async fn native_door32_disconnect_and_cancellation_reap_child() {
             tokio::time::timeout(Duration::from_secs(3), &mut running).await.unwrap().unwrap();
         }
         drop(running);
-        assert_eq!(state.session.request_logoff, !cancel);
+        assert_eq!(state.session.is_logoff_requested(), !cancel);
         tokio::time::timeout(Duration::from_secs(3), async {
             while rustix::process::test_kill_process(pid).is_ok() {
                 tokio::task::yield_now().await;
@@ -822,7 +931,7 @@ async fn native_door32_drains_output_and_observes_socket_eof() {
             b"CLOSED".to_vec()
         };
         assert_eq!(door_payload_before_reset(output(&mut peer).await.as_bytes()), expected);
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -1021,7 +1130,7 @@ async fn native_stdio_door_raw_input_size_and_disconnect() {
             .await
             .unwrap();
             result.unwrap();
-            assert!(state.session.request_logoff);
+            assert!(state.session.is_logoff_requested());
             assert_eq!(rustix::process::test_kill_process(pid), Err(rustix::io::Errno::SRCH));
         }
     }
@@ -1072,7 +1181,7 @@ async fn native_stdio_door_drains_output_after_process_exit() {
         .unwrap()
         .unwrap();
     assert_eq!(door_payload_before_reset(output(&mut peer).await.as_bytes()), expected);
-    assert!(!state.session.request_logoff);
+    assert!(!state.session.is_logoff_requested());
 }
 
 #[cfg(unix)]
@@ -1148,7 +1257,7 @@ async fn native_door_umrc_original_menu_roundtrip() {
         .await
         .unwrap();
         result.unwrap();
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -1197,7 +1306,7 @@ async fn started_local_door_settles_on_caller_eof() {
     let (_root, mut state, peer) = fixture(true).await;
     drop(peer);
     state.run_door(&DoorList::default(), &door("/bin/cat"), 0).await.unwrap();
-    assert!(state.session.request_logoff);
+    assert!(state.session.is_logoff_requested());
     assert_eq!(account(&state).debit_tpu, 7.0);
 }
 

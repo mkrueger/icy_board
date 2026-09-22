@@ -72,7 +72,7 @@ impl EditState {
     }
 
     pub(crate) async fn edit_message(&mut self, state: &mut IcyBoardState) -> Res<EditResult> {
-        if state.session.request_logoff {
+        if state.session.is_logoff_requested() {
             return Ok(EditResult::Abort);
         }
         if self.max_lines == 0 || self.max_line_length == 0 {
@@ -102,7 +102,7 @@ impl EditState {
             loop {
                 // EOF/time-limit expiry must abandon the draft, not repeatedly
                 // ask a disconnected caller for an editor command.
-                if state.session.request_logoff {
+                if state.session.is_logoff_requested() {
                     return Ok(EditResult::Abort);
                 }
                 let cmd = if let Some(command) = state.session.tokens.pop_front() {
@@ -136,7 +136,7 @@ impl EditState {
                         .await?
                 };
 
-                if state.session.request_logoff {
+                if state.session.is_logoff_requested() {
                     return Ok(EditResult::Abort);
                 }
                 // Only split command arguments on whitespace: ';' belongs to
@@ -306,7 +306,7 @@ impl EditState {
         self.redraw_fse(state).await?;
 
         loop {
-            if state.session.request_logoff {
+            if state.session.is_logoff_requested() {
                 return Ok(());
             }
             let Some(ch) = state.get_char_edit().await? else {
@@ -539,7 +539,7 @@ impl EditState {
                 return Ok(());
             }
             let (new_line, next_line) = self.get_line(state, edit_line).await?;
-            if state.session.request_logoff {
+            if state.session.is_logoff_requested() {
                 return Ok(());
             }
             if new_line.is_empty() && next_line.is_empty() {
@@ -564,7 +564,7 @@ impl EditState {
             } else {
                 self.read_editor_line(state, String::new(), 127, false).await?.0
             };
-            if state.session.request_logoff || replacement.is_empty() {
+            if state.session.is_logoff_requested() || replacement.is_empty() {
                 return Ok(());
             }
             if !self.substitute(y, &replacement) {
@@ -582,7 +582,7 @@ impl EditState {
         state.print(TerminalTarget::Both, &edit_line).await?;
 
         loop {
-            if state.session.request_logoff {
+            if state.session.is_logoff_requested() {
                 return Ok((String::new(), String::new()));
             }
             let Some(ch) = state.get_char_edit().await? else {

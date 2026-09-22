@@ -329,7 +329,7 @@ impl IcyBoardState {
         {
             return Ok(None);
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(None);
         }
         // No JAM lock survives a terminal/board await. Recheck what was
@@ -431,7 +431,7 @@ impl IcyBoardState {
             let result = self.edit_message_context(&mut draft, quote.clone()).await;
             attachments.track(&draft)?;
             let result = result?;
-            if result == EditResult::Abort || self.session.request_logoff {
+            if result == EditResult::Abort || self.session.is_logoff_requested() {
                 return Ok(AfterAction::Redisplay);
             }
             if result != EditResult::AttachFile {
@@ -440,7 +440,7 @@ impl IcyBoardState {
             let attached = self.attach_message_file(&mut draft).await;
             attachments.track(&draft)?;
             let attached = attached?;
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(AfterAction::Redisplay);
             }
             if attached {
@@ -491,7 +491,7 @@ impl IcyBoardState {
             let mut edited = defaults.clone();
             if self.session.user_command_level.cmd_e.session_can_access(&self.session) {
                 edited.from = self.get_message_sender(&edited.from).await?;
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     return Ok(());
                 }
                 let Some(to) = self.get_message_recipient(IceText::MessageTo, edited.to, false).await? else {
@@ -508,7 +508,7 @@ impl IcyBoardState {
                         display_flags::FIELDLEN | display_flags::HIGHASCII | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
                     .await?;
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     return Ok(());
                 }
                 // Password protected messages keep their security; only E HEADER manages it.
@@ -534,7 +534,7 @@ impl IcyBoardState {
                     edited.is_private = privacy == "R";
                 }
             }
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(());
             }
             if edited.from.to_ascii_uppercase().contains("@USER@")
@@ -560,7 +560,7 @@ impl IcyBoardState {
             .edit_message_context(&mut draft, original.text().to_string().lines().map(str::to_string).collect())
             .await;
         attachments.track(&draft)?;
-        if result? == EditResult::Abort || self.session.request_logoff {
+        if result? == EditResult::Abort || self.session.is_logoff_requested() {
             return Ok(());
         }
         let mut base = JamMessageBase::open(&source.path)?;
@@ -621,7 +621,7 @@ impl IcyBoardState {
         let saved = self.session.current_conference.clone();
         let target_conf = self.get_board().await.conferences[conference as usize].clone();
         self.accounting_settle_conference().await?;
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(AfterAction::Redisplay);
         }
         self.session.current_conference = target_conf;
@@ -632,7 +632,7 @@ impl IcyBoardState {
         self.session.current_conference_number = source_conf;
         settled?;
         let Some(recipient) = recipient? else { return Ok(AfterAction::Redisplay) };
-        if recipient.eq_ignore_ascii_case("@LIST@") || self.session.request_logoff {
+        if recipient.eq_ignore_ascii_case("@LIST@") || self.session.is_logoff_requested() {
             return Ok(AfterAction::Redisplay);
         }
         let draft = transfer_draft(original, same_message_base(base.path(), &target));
@@ -1197,7 +1197,7 @@ impl IcyBoardState {
                                 display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
                             )
                             .await?;
-                        if password.is_empty() || self.session.request_logoff {
+                        if password.is_empty() || self.session.is_logoff_requested() {
                             return Ok(());
                         }
                         header.attributes &= !attributes::MSG_PRIVATE;

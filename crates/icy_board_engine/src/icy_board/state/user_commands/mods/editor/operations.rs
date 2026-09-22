@@ -256,7 +256,7 @@ impl EditState {
             .input_field(IceText::QuoteStart, 20, "0123456789Qq ", "", Some("1".into()), display_flags::NEWLINE)
             .await?;
         let (first, rest) = Self::parse_command(&answer);
-        if first == "Q" || state.session.request_logoff {
+        if first == "Q" || state.session.is_logoff_requested() {
             return Ok(());
         }
         let start = if first.is_empty() { 1 } else { first.parse().unwrap_or(0) };
@@ -278,7 +278,7 @@ impl EditState {
                 )
                 .await?
         };
-        if answer.eq_ignore_ascii_case("Q") || state.session.request_logoff {
+        if answer.eq_ignore_ascii_case("Q") || state.session.is_logoff_requested() {
             return Ok(());
         }
         let end = if answer.is_empty() {

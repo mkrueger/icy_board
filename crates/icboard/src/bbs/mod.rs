@@ -253,11 +253,11 @@ pub async fn handle_client(
 pub async fn internal_handle_client(state: IcyBoardState, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
     let mut cmd = PcbBoardCommand::new(state);
     let result = run_client_session(&mut cmd, login_options, stuffed_chars).await;
-    // This is deliberately independent of socket shutdown/display. It is a
+    // Cleanup is independent of socket shutdown. Accounting remains a
     // no-op until accounting_start authenticated the caller, even when login
     // loaded a user record before a failed password. Finish is retry-safe when
     // normal logoff/save already settled the account.
-    let finalized = cmd.state.accounting_finish().await;
+    let finalized = cmd.state.finish_session().await;
     match (result, finalized) {
         (Err(error), cleanup) => {
             if let Err(cleanup) = cleanup {
@@ -352,7 +352,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
         cmd.state.new_line().await?;
         if local {
             cmd.state.println(TerminalTarget::Both, &icy_board_tui::get_text("run_ppe_completed")).await?;
-            while !cmd.state.session.request_logoff && cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
+            while !cmd.state.session.is_logoff_requested() && cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
         }
         return Ok(());
     }
@@ -387,7 +387,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
                     display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE | display_flags::LOGIT,
                 )
                 .await?;
-            cmd.state.logoff_user(icy_board_engine::icy_board::state::Logoff::ABNORMAL).await?;
+            cmd.state.logoff_user(icy_board_engine::icy_board::state::Logoff::Abnormal).await?;
             return Ok(());
         }
 
@@ -430,7 +430,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
             )
             .await?;
 
-        if cmd.state.session.request_logoff {
+        if cmd.state.session.is_logoff_requested() {
             cmd.state.connection.shutdown().await?;
             save_at_logoff(cmd).await;
             return Ok(());
@@ -475,7 +475,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
             }
         }
 
-        if cmd.state.session.request_logoff {
+        if cmd.state.session.is_logoff_requested() {
             cmd.state.connection.shutdown().await?;
             save_at_logoff(cmd).await;
             return Ok(());

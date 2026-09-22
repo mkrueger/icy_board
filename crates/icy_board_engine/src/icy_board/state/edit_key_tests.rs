@@ -28,7 +28,7 @@ async fn next_key(state: &mut IcyBoardState) -> KeyChar {
             if let Some(key) = state.get_char_edit().await.unwrap() {
                 return key;
             }
-            assert!(!state.session.request_logoff, "unexpected input EOF");
+            assert!(!state.session.is_logoff_requested(), "unexpected input EOF");
             tokio::task::yield_now().await;
         }
     })
@@ -123,7 +123,7 @@ async fn remote_sequences_decode_across_delayed_channel_fragments() {
             assert_eq!(next_key(&mut state).await.ch, '!');
         };
         tokio::join!(send, read);
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -183,7 +183,7 @@ async fn incomplete_sequences_time_out_without_losing_suffixes_or_node_channels(
         for expected in input.chars().skip(1) {
             assert_eq!(next_key(&mut state).await.ch, expected);
         }
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
         assert!(state.node_state.lock().await[state.node].as_ref().unwrap().bbs_channel.is_some());
         peer.send(b"z").await.unwrap();
         assert_eq!(next_key(&mut state).await.ch, 'z');
@@ -240,7 +240,7 @@ async fn channel_close_during_escape_input_sets_logoff_without_spinning() {
         peer.send(input.as_bytes()).await.unwrap();
         peer.shutdown().await.unwrap();
         tokio::time::timeout(Duration::from_secs(1), async {
-            while !state.session.request_logoff {
+            while !state.session.is_logoff_requested() {
                 assert!(state.get_char_edit().await.unwrap().is_none(), "{input:?}");
             }
             assert!(state.get_char_edit().await.unwrap().is_none());
@@ -258,5 +258,5 @@ async fn a_complete_key_is_delivered_before_channel_close_is_reported() {
     peer.shutdown().await.unwrap();
     assert_eq!(next_key(&mut state).await.ch, control_codes::DEL);
     assert!(state.get_char_edit().await.unwrap().is_none());
-    assert!(state.session.request_logoff);
+    assert!(state.session.is_logoff_requested());
 }

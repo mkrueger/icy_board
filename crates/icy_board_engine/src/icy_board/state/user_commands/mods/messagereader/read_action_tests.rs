@@ -959,7 +959,7 @@ async fn appended_attachment_survives_cancellation_during_post_save_bookkeeping(
         // Dropping this suspended future simulates a disconnect/cancellation.
     }
     assert!(copies.files.is_empty(), "append must commit before the first bookkeeping await");
-    assert!(state.session.request_logoff, "cancelled completion must not offer a save retry");
+    assert!(state.session.is_logoff_requested(), "cancelled completion must not offer a save retry");
     assert_eq!(
         state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_write_private,
         5.0

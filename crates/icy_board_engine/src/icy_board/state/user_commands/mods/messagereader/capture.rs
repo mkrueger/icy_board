@@ -496,7 +496,7 @@ impl IcyBoardState {
                 if capture.full(number) {
                     return Ok(());
                 }
-                if self.session.request_logoff || self.session.disp_options.abort_printout {
+                if self.session.is_logoff_requested() || self.session.disp_options.abort_printout {
                     return Err(failure("Capture interrupted").into());
                 }
                 capture.scanned += 1;
@@ -606,7 +606,7 @@ impl IcyBoardState {
                 return Ok(());
             }
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(());
         }
         let packet = capture.packet()?;
@@ -725,13 +725,13 @@ impl IcyBoardState {
                     return Ok(false);
                 }
             };
-            if self.session.request_logoff || !delivered(&state, path) {
+            if self.session.is_logoff_requested() || !delivered(&state, path) {
                 return Ok(false);
             }
             return self.record_reader_capture_download(path, size, &state, "Local", started).await;
         }
         let answer = self.ask_transfer_protocol(&default).await?;
-        if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.request_logoff {
+        if answer.is_empty() || answer.eq_ignore_ascii_case("N") || self.session.is_logoff_requested() {
             return Ok(false);
         }
         let protocol = self
@@ -756,9 +756,9 @@ impl IcyBoardState {
         };
         let started = std::time::Instant::now();
         let mut failed = false;
-        while !state.is_finished && !state.request_cancel && !self.session.request_logoff {
+        while !state.is_finished && !state.request_cancel && !self.session.is_logoff_requested() {
             self.check_time_left().await;
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 break;
             }
             if !matches!(
@@ -769,7 +769,7 @@ impl IcyBoardState {
                 break;
             }
         }
-        let success = !failed && !self.session.request_logoff && delivered(&state, path);
+        let success = !failed && !self.session.is_logoff_requested() && delivered(&state, path);
         if !success {
             let _ = timeout(Duration::from_secs(2), protocol.cancel_transfer(&mut *self.connection)).await;
             return Ok(false);
@@ -1140,7 +1140,7 @@ mod tests {
                     }
                     panic!(
                         "local capture finish stalled ({outcome}, status={status}, pointer={pointer}): {text}; logoff={}, balance={}, time={:?}",
-                        state.session.request_logoff,
+                        state.session.is_logoff_requested(),
                         state.session.calculate_balance(),
                         state.minutes_left()
                     );
@@ -1170,7 +1170,7 @@ mod tests {
                     if success && pointer { (1, 1) } else { (0, 0) }
                 );
                 assert_eq!(state.session.flagged_files, flags);
-                assert!(!state.session.request_logoff);
+                assert!(!state.session.is_logoff_requested());
                 if success {
                     assert_eq!(std::fs::read(destination.path().join("messages.txt")).unwrap(), expected);
                 }

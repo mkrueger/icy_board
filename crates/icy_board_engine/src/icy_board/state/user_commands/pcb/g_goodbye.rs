@@ -4,7 +4,7 @@ use crate::{
     icy_board::{
         icb_text::IceText,
         security_expr::SecurityExpression,
-        state::{Logoff, LogoffKind, NodeStatus, functions::display_flags},
+        state::{Logoff, NodeStatus, functions::display_flags},
         surveys::Survey,
     },
     vm::TerminalTarget,
@@ -21,7 +21,7 @@ impl IcyBoardState {
             if let Some(token) = self.session.tokens.pop_front()
                 && token.eq_ignore_ascii_case(&self.session.yes_char.to_string())
             {
-                self.logoff_user(Logoff::NORMAL).await?;
+                self.logoff_user(Logoff::Normal).await?;
                 return Ok(());
             }
             if is_flagged {
@@ -44,26 +44,23 @@ impl IcyBoardState {
             }
         }
 
-        self.logoff_user(Logoff::NORMAL).await?;
+        self.logoff_user(Logoff::Normal).await?;
         Ok(())
     }
 
     pub async fn bye_cmd(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::LogoffPending).await;
         self.displaycmdfile("bye").await?;
-        self.logoff_user(Logoff::NORMAL).await?;
+        self.logoff_user(Logoff::Normal).await?;
         Ok(())
     }
 
     pub async fn logoff_user(&mut self, logoff: Logoff) -> Res<()> {
-        if self.session.logoff_started {
+        if !self.session.begin_logoff(logoff) {
             return Ok(());
         }
-        self.session.logoff_started = true;
-        self.session.keyboard_timer_check = false;
         let result = self.logoff_survey(logoff).await;
-        self.session.logoff_pending = Some(logoff);
-        self.session.request_logoff = true;
+        self.session.finish_logoff_survey();
         // hangup shuts down the socket. Keep it open until all enclosing
         // command/door minutes are posted and the final summary is displayed.
         let completed = if self.accounting_invocation_active() {
@@ -94,11 +91,24 @@ impl IcyBoardState {
         Ok(())
     }
 
+    pub async fn finish_session(&mut self) -> Res<()> {
+        self.session.force_logoff();
+        if self.session.accounting.begun && self.session.has_pending_logoff() {
+            self.accounting_complete_logoff().await
+        } else {
+            let finalized = self.accounting_finish().await;
+            let closed = self.hangup().await;
+            self.session.begin_logoff_finalization();
+            self.session.complete_logoff();
+            finalized.and(closed)
+        }
+    }
+
     /// Called directly for unwrapped logoff, otherwise by the outer invocation.
     /// Take the request before display so recursive @HANGUP@ cannot replay it.
     #[async_recursion::async_recursion(?Send)]
     pub(crate) async fn accounting_complete_logoff(&mut self) -> Res<()> {
-        let Some(logoff) = self.session.logoff_pending.take() else {
+        let Some(logoff) = self.session.begin_logoff_finalization() else {
             return Ok(());
         };
         let finalized = self.accounting_finish().await;
@@ -109,14 +119,14 @@ impl IcyBoardState {
             Ok(())
         };
         let closed = self.hangup().await;
+        self.session.complete_logoff();
         finalized.and(displayed).and(closed)
     }
 
     async fn accounting_display_logoff(&mut self, logoff: Logoff) -> Res<()> {
-        // The line is already gone, so the closing lines can only reach the caller log.
-        let offline = self.session.is_logoff_forced();
+        let forced = self.session.is_logoff_forced();
         // accounting_active is false now: these are settled, not previews.
-        if !offline && self.session.accounting.begun && self.session.accounting.mode != crate::icy_board::accounting::AccountingMode::Disabled {
+        if !forced && self.session.accounting.begun && self.session.accounting.mode != crate::icy_board::accounting::AccountingMode::Disabled {
             if logoff.asks_the_caller() {
                 let path = self.session.accounting.options.logoff_file.clone();
                 if !path.as_os_str().is_empty() {
@@ -130,14 +140,15 @@ impl IcyBoardState {
             }
         }
         self.session.op_text = (Utc::now() - self.session.login_date).num_minutes().to_string();
-        if offline {
-            let text = self.get_display_text(IceText::MinutesUsed)?.replace("@OPTEXT@", &self.session.op_text);
+        let text = self.get_display_text(IceText::MinutesUsed)?.replace("@OPTEXT@", &self.session.op_text);
+        self.write_caller_log(&text).await;
+        if forced {
             log::info!("{text}");
             return Ok(());
         }
         self.display_text(IceText::MinutesUsed, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT)
             .await?;
-        if logoff.kind == LogoffKind::Normal {
+        if logoff.is_orderly() {
             self.display_text(IceText::ThanksForCalling, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             self.reset_color(TerminalTarget::Both).await?;

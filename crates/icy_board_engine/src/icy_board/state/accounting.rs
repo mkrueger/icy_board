@@ -419,7 +419,7 @@ impl IcyBoardState {
         if self.accounting_invocation_active() || !self.session.accounting.finish_requested {
             return Ok(());
         }
-        if self.session.logoff_pending.is_some() {
+        if self.session.has_pending_logoff() {
             self.accounting_complete_logoff().await
         } else {
             self.accounting_finish().await
@@ -1058,7 +1058,7 @@ mod tests {
         assert!(state.session.calculate_balance() < 0.0);
         assert!(state.accounting_check_balance().await.is_err());
         assert!(!state.session.accounting.checking);
-        assert!(state.session.request_logoff);
+        assert!(state.session.is_logoff_requested());
     }
 
     #[tokio::test]

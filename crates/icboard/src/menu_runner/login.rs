@@ -80,7 +80,7 @@ impl PcbBoardCommand {
         }
 
         loop {
-            if self.state.session.request_logoff || self.deny_login_for_event().await? {
+            if self.state.session.is_logoff_requested() || self.deny_login_for_event().await? {
                 return Ok(false);
             }
             tries += 1;
@@ -209,7 +209,7 @@ impl PcbBoardCommand {
                     .await?;
                 if register == "Y" || register.trim().is_empty() {
                     if !self.new_user().await? {
-                        if !self.state.session.request_logoff {
+                        if !self.state.session.is_logoff_requested() {
                             self.state.display_text(IceText::RefusedToRegister, display_flags::NEWLINE).await?;
                             self.state.hangup().await?;
                             log::info!("'{}' refused to register.", self.state.session.user_name);
@@ -230,7 +230,7 @@ impl PcbBoardCommand {
     }
 
     async fn new_user(&mut self) -> Res<bool> {
-        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+        if self.state.session.is_logoff_requested() || self.deny_login_for_event().await? {
             return Ok(false);
         }
         let mut tries = 0;
@@ -576,7 +576,7 @@ impl PcbBoardCommand {
         }
 
         // A shutdown during registration/surveys must not publish a partial account.
-        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+        if self.state.session.is_logoff_requested() || self.deny_login_for_event().await? {
             return Ok(false);
         }
         if self.state.get_board().await.config.new_user_settings.auto_register_conferences {
@@ -614,12 +614,12 @@ impl PcbBoardCommand {
         self.state.log_logon_to_caller_log().await;
 
         self.announce_event_time_adjustment().await?;
-        if self.state.session.request_logoff {
+        if self.state.session.is_logoff_requested() {
             return Ok(false);
         }
         self.state.display_news(false).await?;
         self.logon_questions().await?;
-        if self.state.session.request_logoff {
+        if self.state.session.is_logoff_requested() {
             return Ok(false);
         }
         self.start_login_accounting().await?;
@@ -750,7 +750,7 @@ impl PcbBoardCommand {
         };
 
         if !check_password {
-            let offer_recovery = recovery_enabled && !self.state.session.request_logoff && {
+            let offer_recovery = recovery_enabled && !self.state.session.is_logoff_requested() && {
                 let board = self.state.get_board().await;
                 board
                     .users
@@ -794,7 +794,7 @@ impl PcbBoardCommand {
             self.state.hangup().await?;
             return Ok(false);
         }
-        if self.state.session.request_logoff || self.deny_login_for_event().await? {
+        if self.state.session.is_logoff_requested() || self.deny_login_for_event().await? {
             return Ok(false);
         }
 
@@ -846,11 +846,11 @@ impl PcbBoardCommand {
         log::warn!("Login from {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
         self.state.log_logon_to_caller_log().await;
         self.announce_event_time_adjustment().await?;
-        if self.state.session.request_logoff {
+        if self.state.session.is_logoff_requested() {
             return Ok(false);
         }
         self.logon_questions().await?;
-        if self.state.session.request_logoff {
+        if self.state.session.is_logoff_requested() {
             return Ok(false);
         }
         self.start_login_accounting().await?;
@@ -894,7 +894,7 @@ impl PcbBoardCommand {
                     display_flags::FIELDLEN | display_flags::ECHODOTS | display_flags::NEWLINE,
                 )
                 .await?;
-            if self.state.session.request_logoff {
+            if self.state.session.is_logoff_requested() {
                 return Ok(LoginPassword::Invalid);
             }
             let result = service.verify(&self.state.board, index, pwd.clone(), Utc::now()).await?;
@@ -939,7 +939,7 @@ impl PcbBoardCommand {
                     display_flags::ECHODOTS | display_flags::FIELDLEN | display_flags::NEWLINE,
                 )
                 .await?;
-            if first.is_empty() || self.state.session.request_logoff {
+            if first.is_empty() || self.state.session.is_logoff_requested() {
                 break;
             }
             let min_len = self.state.get_board().await.config.limits.min_pwd_length;
@@ -969,7 +969,7 @@ impl PcbBoardCommand {
                     display_flags::ECHODOTS | display_flags::FIELDLEN | display_flags::NEWLINE,
                 )
                 .await?;
-            if second.is_empty() || self.state.session.request_logoff {
+            if second.is_empty() || self.state.session.is_logoff_requested() {
                 break;
             }
             if !first.eq_ignore_ascii_case(&second) {
@@ -1059,7 +1059,7 @@ impl PcbBoardCommand {
     async fn input_required(&mut self, txt: IceText, mask: &str, len: i32, flags: i32) -> Res<Option<String>> {
         let mut tries = 0;
         loop {
-            if self.state.session.request_logoff {
+            if self.state.session.is_logoff_requested() {
                 return Ok(None);
             }
             tries += 1;
@@ -1224,7 +1224,7 @@ mod option_tests {
             state.stuff_keyboard_buffer("wrong\rwrong\rwrong\rZ", false).unwrap();
             // Stop successful login before surveys; failed login still exercises all three reads.
             if accepted {
-                state.session.request_logoff = true;
+                state.session.request_logoff();
             }
             let mut command = PcbBoardCommand::new(state);
             assert!(!command.login_user().await.unwrap());

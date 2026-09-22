@@ -198,7 +198,7 @@ impl IcyBoardState {
         let rate = self.accounting_rates().charge_per_group_chat_time;
         // Settle on quit, disconnect and terminal errors alike. Rejected room
         // joins never start the timer, and room changes do not restart it.
-        let result: Res<()> = async {
+        let result: Res<ChatCommandResult> = async {
             self.dispatch_group_chat_events(events)?;
             self.display_text(IceText::NodeChatEntered, display_flags::LFBEFORE | display_flags::NEWLINE)
                 .await?;
@@ -207,9 +207,9 @@ impl IcyBoardState {
             }
             let mut mode = ChatLoopMode::Chat;
             let mut buffer = String::new();
-            loop {
-                if self.session.request_logoff {
-                    break;
+            let exit = loop {
+                if self.session.is_logoff_requested() {
+                    break ChatCommandResult::ExitChat;
                 }
                 match mode {
                     ChatLoopMode::Chat => {
@@ -257,12 +257,12 @@ impl IcyBoardState {
                         }
                         match self.handle_chat_command(&manager, command.trim()).await? {
                             ChatCommandResult::Continue => mode = ChatLoopMode::Chat,
-                            ChatCommandResult::ExitChat | ChatCommandResult::Logoff => break,
+                            exit => break exit,
                         }
                     }
                 }
-            }
-            Ok(())
+            };
+            Ok(exit)
         }
         .await;
         let minutes = crate::icy_board::accounting::minutes_used(chrono::Utc::now() - started);
@@ -277,11 +277,14 @@ impl IcyBoardState {
         self.session.group_chat.monitor_rooms.clear();
         self.set_activity(NodeStatus::Available).await;
         charged?;
-        result?;
+        let exit = result?;
         cleanup?;
         self.accounting_check_balance().await?;
         self.display_text(IceText::NodeChatEnded, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;
+        if matches!(exit, ChatCommandResult::Logoff) {
+            self.goodbye_cmd().await?;
+        }
         Ok(())
     }
 
@@ -513,7 +516,6 @@ impl IcyBoardState {
             "WHO" => self.who_display_nodes().await?,
             "QUIT" | "Q" => return Ok(ChatCommandResult::ExitChat),
             "GOODBYE" | "G" => {
-                self.session.request_logoff = true;
                 return Ok(ChatCommandResult::Logoff);
             }
             other => {

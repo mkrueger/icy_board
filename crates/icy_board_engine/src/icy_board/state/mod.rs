@@ -240,41 +240,229 @@ impl TransferStatistics {
     }
 }
 
-/// `PCBoard` keeps `Status.Logoff` and `Status.AutoLogoff` apart because they gate
-/// different things: the kind decides the closing courtesies, the flag decides whether
-/// the caller is asked anything on the way out. See RECYCLE.C loguseroff().
+/// `PCBoard` gates the closing courtesies on `Status.Logoff` and the parting questions
+/// on `Status.AutoLogoff`; only these three combinations of the two occur.
+/// See RECYCLE.C loguseroff().
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Logoff {
-    pub kind: LogoffKind,
-    pub automatic: bool,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum LogoffKind {
+pub enum Logoff {
     /// The caller said goodbye.
     Normal,
+    /// `@HANGUP@`: still an orderly logoff, but not one the caller typed.
+    Automatic,
     /// The board dropped the caller.
     Abnormal,
 }
 
 impl Logoff {
-    pub const NORMAL: Self = Self {
-        kind: LogoffKind::Normal,
-        automatic: false,
-    };
-    /// `@HANGUP@`: still an orderly logoff, but not one the caller typed.
-    pub const AUTOMATIC: Self = Self {
-        kind: LogoffKind::Normal,
-        automatic: true,
-    };
-    pub const ABNORMAL: Self = Self {
-        kind: LogoffKind::Abnormal,
-        automatic: true,
-    };
-
     /// The survey and the accounting logoff file are only for a caller who asked to leave.
     pub(crate) fn asks_the_caller(self) -> bool {
-        self.kind == LogoffKind::Normal && !self.automatic
+        matches!(self, Self::Normal)
+    }
+
+    /// Only a caller the board did not drop is thanked for calling (RECYCLE.C:314).
+    pub(crate) fn is_orderly(self) -> bool {
+        !matches!(self, Self::Abnormal)
+    }
+}
+
+/// How far the caller's exit has escalated. It only ever moves forward.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum Termination {
+    #[default]
+    Running,
+    /// Ordinary command processing stops; PPEs and the closing hooks still run.
+    Requested,
+    /// PPE statements and low-level input are cancelled. Says nothing about the transport.
+    Forced,
+}
+
+/// The logoff procedure, which owns the survey, the settlement and the closing display.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SessionLifecycle {
+    #[default]
+    Running,
+    /// The survey still reads input, so it does not by itself ask to leave.
+    LogoffSurvey(Logoff),
+    AwaitingLogoffSettlement(Logoff),
+    FinalizingLogoff,
+    /// Nothing further runs for this caller; failed persistence can still be retried.
+    Ended,
+}
+
+impl SessionLifecycle {
+    fn logoff_started(self) -> bool {
+        !matches!(self, Self::Running)
+    }
+
+    fn begin_logoff(&mut self, logoff: Logoff) -> bool {
+        if self.logoff_started() {
+            return false;
+        }
+        *self = Self::LogoffSurvey(logoff);
+        true
+    }
+
+    fn finish_logoff_survey(&mut self) {
+        if let Self::LogoffSurvey(logoff) = *self {
+            *self = Self::AwaitingLogoffSettlement(logoff);
+        }
+    }
+
+    fn has_pending_logoff(self) -> bool {
+        matches!(self, Self::AwaitingLogoffSettlement(_))
+    }
+
+    fn begin_logoff_finalization(&mut self) -> Option<Logoff> {
+        let Self::AwaitingLogoffSettlement(logoff) = *self else {
+            return None;
+        };
+        *self = Self::FinalizingLogoff;
+        Some(logoff)
+    }
+
+    fn complete_logoff(&mut self) {
+        if *self == Self::FinalizingLogoff {
+            *self = Self::Ended;
+        }
+    }
+
+    /// A logoff already under way still owes its settlement and closing lines.
+    fn force_logoff(&mut self) {
+        if *self == Self::Running {
+            *self = Self::AwaitingLogoffSettlement(Logoff::Abnormal);
+        }
+    }
+}
+
+#[cfg(test)]
+mod session_lifecycle_tests {
+    use super::{Logoff, Session, SessionLifecycle};
+
+    #[test]
+    fn survey_keeps_command_processing_until_it_finishes() {
+        for logoff in [Logoff::Normal, Logoff::Automatic, Logoff::Abnormal] {
+            for requested in [false, true] {
+                let mut session = Session::new();
+                if requested {
+                    session.request_logoff();
+                }
+                assert_eq!(session.is_logoff_requested(), requested);
+                assert!(session.begin_logoff(logoff));
+                assert_eq!(session.lifecycle(), SessionLifecycle::LogoffSurvey(logoff));
+                assert_eq!(session.is_logoff_requested(), requested);
+                assert!(!session.has_pending_logoff());
+                assert_eq!(session.begin_logoff_finalization(), None);
+
+                session.finish_logoff_survey();
+                assert!(session.is_logoff_requested());
+                assert!(session.has_pending_logoff());
+                assert_eq!(session.begin_logoff_finalization(), Some(logoff));
+                assert!(!session.has_pending_logoff());
+                assert_eq!(session.lifecycle(), SessionLifecycle::FinalizingLogoff);
+                session.complete_logoff();
+                assert_eq!(session.lifecycle(), SessionLifecycle::Ended);
+            }
+        }
+    }
+
+    #[test]
+    fn request_during_survey_preserves_the_logoff() {
+        let mut session = Session::new();
+        assert!(session.begin_logoff(Logoff::Normal));
+        session.request_logoff();
+        assert!(session.is_logoff_requested());
+        session.finish_logoff_survey();
+        assert_eq!(session.begin_logoff_finalization(), Some(Logoff::Normal));
+    }
+
+    #[test]
+    fn repeated_transitions_cannot_restart_or_replay_logoff() {
+        let phases = [
+            SessionLifecycle::LogoffSurvey(Logoff::Normal),
+            SessionLifecycle::AwaitingLogoffSettlement(Logoff::Normal),
+            SessionLifecycle::FinalizingLogoff,
+            SessionLifecycle::Ended,
+        ];
+        for phase in phases {
+            let mut session = Session::new();
+            session.lifecycle = phase;
+            assert!(!session.begin_logoff(Logoff::Abnormal));
+            assert_eq!(session.lifecycle(), phase);
+        }
+        for phase in [SessionLifecycle::FinalizingLogoff, SessionLifecycle::Ended] {
+            let mut session = Session::new();
+            session.lifecycle = phase;
+            session.finish_logoff_survey();
+            assert_eq!(session.begin_logoff_finalization(), None);
+            assert_eq!(session.lifecycle(), phase);
+        }
+    }
+
+    #[test]
+    fn forced_termination_queues_abnormal_cleanup_and_keeps_pending_cleanup() {
+        for phase in [
+            SessionLifecycle::Running,
+            SessionLifecycle::LogoffSurvey(Logoff::Normal),
+            SessionLifecycle::AwaitingLogoffSettlement(Logoff::Normal),
+            SessionLifecycle::FinalizingLogoff,
+            SessionLifecycle::Ended,
+        ] {
+            let mut session = Session::new();
+            session.lifecycle = phase;
+            session.force_logoff();
+            assert!(session.is_logoff_requested());
+            assert!(session.is_logoff_forced());
+            if phase == SessionLifecycle::Running {
+                assert_eq!(session.lifecycle(), SessionLifecycle::AwaitingLogoffSettlement(Logoff::Abnormal));
+                assert_eq!(session.begin_logoff_finalization(), Some(Logoff::Abnormal));
+                session.complete_logoff();
+                session.force_logoff();
+                assert_eq!(session.lifecycle(), SessionLifecycle::Ended);
+                continue;
+            }
+            assert_eq!(session.lifecycle(), phase);
+            session.request_logoff();
+            session.force_logoff();
+            assert_eq!(session.lifecycle(), phase);
+            assert!(session.is_logoff_forced());
+            if phase == SessionLifecycle::LogoffSurvey(Logoff::Normal) {
+                session.finish_logoff_survey();
+            }
+            if session.has_pending_logoff() {
+                assert_eq!(session.begin_logoff_finalization(), Some(Logoff::Normal));
+                session.complete_logoff();
+                assert_eq!(session.lifecycle(), SessionLifecycle::Ended);
+                assert!(session.is_logoff_forced());
+            }
+        }
+    }
+
+    #[test]
+    fn normal_logoff_keeps_execution_enabled_until_forced() {
+        let mut session = Session::new();
+        assert_eq!(session.lifecycle(), SessionLifecycle::Running);
+        assert!(session.begin_logoff(Logoff::Normal));
+        assert!(!session.keyboard_timer_check);
+        assert!(!session.is_logoff_requested());
+        assert!(!session.is_logoff_forced());
+        assert!(!session.begin_logoff(Logoff::Abnormal));
+        session.finish_logoff_survey();
+        assert!(session.is_logoff_requested());
+        assert!(!session.is_logoff_forced());
+        assert_eq!(session.begin_logoff_finalization(), Some(Logoff::Normal));
+        assert!(!session.is_logoff_forced());
+        session.complete_logoff();
+        assert_eq!(session.lifecycle(), SessionLifecycle::Ended);
+        assert!(!session.is_logoff_forced());
+        assert!(!session.begin_logoff(Logoff::Normal));
+    }
+
+    #[test]
+    fn termination_only_escalates() {
+        let mut session = Session::new();
+        session.force_logoff();
+        session.request_logoff();
+        assert!(session.is_logoff_forced());
     }
 }
 
@@ -321,13 +509,8 @@ pub struct Session {
 
     pub last_new_line_y: i32,
 
-    /// Leaves normal command processing without preventing logoff PPE execution.
-    pub request_logoff: bool,
-    forced_logoff: bool,
-    /// Guards logoff displays/survey, including recursive @HANGUP@ in files.
-    pub(crate) logoff_started: bool,
-    /// Deferred summary, displayed before socket close.
-    pub(crate) logoff_pending: Option<Logoff>,
+    lifecycle: SessionLifecycle,
+    termination: Termination,
 
     pub time_limit: i32,
     /// Sub-minute upload credit carried between transfers; never a caller/PPL environment value.
@@ -439,10 +622,8 @@ impl Session {
             time_adjusted_for_event: false,
             keyboard_timer_check: true,
             keyboard_timer_started: Instant::now(),
-            request_logoff: false,
-            forced_logoff: false,
-            logoff_started: false,
-            logoff_pending: None,
+            lifecycle: SessionLifecycle::Running,
+            termination: Termination::Running,
             tokens: VecDeque::new(),
             last_password: String::new(),
             more_requested: false,
@@ -482,13 +663,51 @@ impl Session {
         }
     }
 
+    pub fn lifecycle(&self) -> SessionLifecycle {
+        self.lifecycle
+    }
+
+    pub fn request_logoff(&mut self) {
+        self.termination = self.termination.max(Termination::Requested);
+    }
+
+    pub fn is_logoff_requested(&self) -> bool {
+        self.termination != Termination::Running
+    }
+
     pub fn force_logoff(&mut self) {
-        self.request_logoff = true;
-        self.forced_logoff = true;
+        self.termination = Termination::Forced;
+        self.keyboard_timer_check = false;
+        self.lifecycle.force_logoff();
     }
 
     pub fn is_logoff_forced(&self) -> bool {
-        self.forced_logoff
+        self.termination == Termination::Forced
+    }
+
+    pub(crate) fn begin_logoff(&mut self, logoff: Logoff) -> bool {
+        if !self.lifecycle.begin_logoff(logoff) {
+            return false;
+        }
+        self.keyboard_timer_check = false;
+        true
+    }
+
+    pub(crate) fn finish_logoff_survey(&mut self) {
+        self.lifecycle.finish_logoff_survey();
+        self.request_logoff();
+    }
+
+    pub(crate) fn has_pending_logoff(&self) -> bool {
+        self.lifecycle.has_pending_logoff()
+    }
+
+    pub(crate) fn begin_logoff_finalization(&mut self) -> Option<Logoff> {
+        self.lifecycle.begin_logoff_finalization()
+    }
+
+    pub(crate) fn complete_logoff(&mut self) {
+        self.lifecycle.complete_logoff();
     }
 
     pub fn expert_mode(&self) -> bool {
@@ -1040,7 +1259,7 @@ impl IcyBoardState {
         if !self.credentials_still_current().await {
             self.session.force_logoff();
         }
-        if self.session.request_logoff || self.session.logoff_started || self.session.accounting.checking {
+        if self.session.is_logoff_requested() || self.session.lifecycle().logoff_started() || self.session.accounting.checking {
             return;
         }
         if let Err(error) = self.accounting_check_balance().await {
@@ -1326,7 +1545,7 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn next_line(&mut self) -> Res<()> {
-        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.count_lines {
+        if self.session.is_logoff_requested() || self.session.disp_options.abort_printout || !self.session.disp_options.count_lines {
             return Ok(());
         }
         self.session.disp_options.num_lines_printed += 1;
@@ -1971,7 +2190,7 @@ impl IcyBoardState {
         }
 
         if self.session.current_user.is_some() {
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return self.persist_final_user().await;
             }
             return self.persist_current_user().await;
@@ -3581,7 +3800,7 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::Hangup => {
-                let _ = self.logoff_user(Logoff::AUTOMATIC).await;
+                let _ = self.logoff_user(Logoff::Automatic).await;
                 return None;
             }
             MacroCommand::SwitchColor(color) => {
@@ -4462,7 +4681,7 @@ impl IcyBoardState {
     /// The `G` a caller may answer at nearly any prompt.
     /// # Errors
     pub async fn goodbye(&mut self) -> Res<()> {
-        self.logoff_user(Logoff::NORMAL).await
+        self.logoff_user(Logoff::Normal).await
     }
 
     pub async fn hangup(&mut self) -> Res<()> {

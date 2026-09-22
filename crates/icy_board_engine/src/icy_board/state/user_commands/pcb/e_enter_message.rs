@@ -126,7 +126,7 @@ impl IcyBoardState {
         } else {
             self.session.get_username_or_alias()
         };
-        if self.session.request_logoff {
+        if self.session.is_logoff_requested() {
             return Ok(());
         }
 
@@ -184,7 +184,7 @@ impl IcyBoardState {
             )
             .await?;
 
-        if self.session.request_logoff || (subject.is_empty() && !self.session.current_conference.long_to_names) {
+        if self.session.is_logoff_requested() || (subject.is_empty() && !self.session.current_conference.long_to_names) {
             return Ok(());
         }
 
@@ -281,7 +281,7 @@ impl IcyBoardState {
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
                 )
                 .await?;
-            if self.session.request_logoff || (empty_ends && answer.is_empty()) {
+            if self.session.is_logoff_requested() || (empty_ends && answer.is_empty()) {
                 return Ok(None);
             }
             let mut to = if answer.is_empty() { default_to.clone() } else { answer.trim().to_string() };
@@ -351,7 +351,7 @@ impl IcyBoardState {
             if retry.eq_ignore_ascii_case("C") {
                 return Ok(Some(to));
             }
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(None);
             }
             if !found && (retry.is_empty() || retry.eq_ignore_ascii_case("S")) {
@@ -391,7 +391,7 @@ impl IcyBoardState {
                             display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
                         )
                         .await?;
-                    if self.session.request_logoff {
+                    if self.session.is_logoff_requested() {
                         return Ok(None);
                     }
                     match choice.as_str() {
@@ -563,7 +563,7 @@ impl IcyBoardState {
                 )
                 .await?;
 
-            if self.session.request_logoff {
+            if self.session.is_logoff_requested() {
                 return Ok(false);
             }
 

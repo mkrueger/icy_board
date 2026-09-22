@@ -256,7 +256,7 @@ async fn allfiles_ppe_exports_all_pages_and_accessible_conferences() {
         assert!(!output.contains("HIDDEN"));
         assert!(!output.contains("private-path"));
         assert!(!output.contains("previous list"));
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
         assert!(state.session.tokens.is_empty());
         assert!(!root.path().join(format!("{output_name}.1.tmp")).exists());
     }
@@ -578,7 +578,7 @@ async fn e1_file_browser_download_command_returns_to_browser() {
             );
             assert_eq!(state.session.security_violations, i32::from(scenario == "denied"));
             assert_eq!(state.session.current_conference_number, 0);
-            assert!(!state.session.request_logoff);
+            assert!(!state.session.is_logoff_requested());
         }
     }
 }
@@ -651,7 +651,7 @@ async fn e1_file_browser_marks_without_downloading() {
                 state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
                 [language, "caller argument"]
             );
-            assert!(!state.session.request_logoff);
+            assert!(!state.session.is_logoff_requested());
             assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_downloads, 0);
         }
     }
@@ -789,7 +789,7 @@ async fn e1_directory_browser_call_ignores_language_token() {
         .unwrap();
         assert!(result);
         assert!(rendered, "CALL did not open the {language} browser");
-        assert!(!state.session.request_logoff);
+        assert!(!state.session.is_logoff_requested());
     }
 }
 
@@ -890,7 +890,7 @@ async fn e1_file_browser_pages_search_and_descriptions() {
             .expect("file browser timed out")
             .unwrap();
             assert!(result && completed, "{language}/{scenario}");
-            assert!(!state.session.request_logoff);
+            assert!(!state.session.is_logoff_requested());
             assert_eq!(state.session.current_conference_number, 0);
             assert_eq!(
                 state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -1022,7 +1022,7 @@ async fn e1_directory_browser_rendering_and_navigation() {
             .unwrap();
             assert!(result, "{language}/{scenario}: browser stopped unexpectedly");
             assert_eq!(visited, if scenario == "browse" { 22 } else { 1 }, "{language}/{scenario}");
-            assert!(!state.session.request_logoff, "{language}/{scenario}");
+            assert!(!state.session.is_logoff_requested(), "{language}/{scenario}");
             assert_eq!(state.session.current_conference_number, 0);
             assert_eq!(
                 state.session.tokens.iter().map(String::as_str).collect::<Vec<_>>(),

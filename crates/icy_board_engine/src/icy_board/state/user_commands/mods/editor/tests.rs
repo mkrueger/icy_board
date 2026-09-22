@@ -723,7 +723,7 @@ async fn cancelling_quote_at_either_prompt_preserves_the_draft() {
 async fn disconnect_guards_still_abort_both_editors_without_consuming_input() {
     for fse in [false, true] {
         let (mut board, _peer) = input_state("S\r").await;
-        board.session.request_logoff = true;
+        board.session.request_logoff();
         let mut editor = create_state("draft");
         editor.use_fse = fse;
         assert_eq!(super::EditResult::Abort, editor.edit_message(&mut board).await.unwrap());

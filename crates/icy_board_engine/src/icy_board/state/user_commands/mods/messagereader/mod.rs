@@ -501,7 +501,7 @@ impl IcyBoardState {
         let viewer = MessageViewer::load(&self.display_text)?;
         let mut options = ReaderOptions::default();
         let mut pending = None;
-        while !self.session.disp_options.abort_printout && !self.session.request_logoff {
+        while !self.session.disp_options.abort_printout && !self.session.is_logoff_requested() {
             message_base.read_jhr_header()?;
             let low_number = message_base.lowest_message_number();
             let high_number = message_base.highest_message_number();
@@ -986,13 +986,13 @@ impl IcyBoardState {
         let result = async {
             for (index, conf) in conferences.iter().enumerate().skip(start) {
                 self.session.start_conf = index as u16;
-                if self.session.request_logoff || self.session.disp_options.abort_printout {
+                if self.session.is_logoff_requested() || self.session.disp_options.abort_printout {
                     return Ok(ReaderExit::Stop);
                 }
                 // Authorization must use the original context, not a security
                 // bonus acquired while visiting the previous conference.
                 self.accounting_settle_conference().await?;
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     return Ok(ReaderExit::Stop);
                 }
                 self.session.current_conference_number = original;
@@ -1025,7 +1025,7 @@ impl IcyBoardState {
                     continue;
                 }
                 self.accounting_settle_conference().await?;
-                if self.session.request_logoff {
+                if self.session.is_logoff_requested() {
                     return Ok(ReaderExit::Stop);
                 }
                 self.set_current_conference(number).await?;
@@ -1138,7 +1138,7 @@ impl IcyBoardState {
         let mut display_msg = true;
         let mut shown = 0;
         loop {
-            if self.session.request_logoff || self.session.disp_options.abort_printout {
+            if self.session.is_logoff_requested() || self.session.disp_options.abort_printout {
                 return Ok(ReaderExit::Stop);
             }
             if number == 0 {
@@ -1218,7 +1218,7 @@ impl IcyBoardState {
                 }
                 viewer.display_body(self, &text).await?;
                 self.new_line().await?;
-                if self.session.request_logoff || self.session.disp_options.abort_printout {
+                if self.session.is_logoff_requested() || self.session.disp_options.abort_printout {
                     return Ok(ReaderExit::Stop);
                 }
                 shown += 1;

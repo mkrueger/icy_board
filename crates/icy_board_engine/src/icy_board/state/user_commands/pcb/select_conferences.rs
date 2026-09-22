@@ -38,7 +38,7 @@ impl IcyBoardState {
         let skip_print = !self.session.tokens.is_empty();
         let mut begin = 0;
         let mut done = false;
-        while !done && !self.session.request_logoff {
+        while !done && !self.session.is_logoff_requested() {
             let mut end = begin;
             if !skip_print {
                 let page: Vec<_> = (begin..num_conf)
