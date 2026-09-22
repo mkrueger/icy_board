@@ -50,3 +50,14 @@ jobs:
         fi
     - name: Run the embedded help tests
       run: cargo test -p icy_board_help --locked
+
+  # macOS is a release target as well, and its default filesystem is case
+  # insensitive, which no other runner would show.
+  macos_checks:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run tests
+      env:
+        CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      run: cargo test --all-features --locked
