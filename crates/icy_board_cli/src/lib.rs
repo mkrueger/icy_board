@@ -33,7 +33,7 @@ static FORMATTER: OnceLock<()> = OnceLock::new();
 /// Translate application-owned help using the same desktop locale as the formatter.
 pub fn text(domain: &str, key: &str) -> String {
     let loaders = LOADERS.get_or_init(|| {
-        let languages = DesktopLanguageRequester::requested_languages();
+        let languages = requested_languages();
         DOMAINS
             .iter()
             .map(|&domain| {
@@ -45,6 +45,29 @@ pub fn text(domain: &str, key: &str) -> String {
             .collect()
     });
     loaders.get(domain).expect("unknown CLI translation domain").get(key)
+}
+
+/// Only the Unix locale lookup reads the POSIX variables; macOS asks CoreFoundation
+/// alone, so an explicitly requested language would be ignored there.
+fn requested_languages() -> Vec<i18n_embed::unic_langid::LanguageIdentifier> {
+    let mut tags: Vec<String> = Vec::new();
+    for variable in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
+        let Ok(value) = std::env::var(variable) else {
+            continue;
+        };
+        for part in value.split(':').filter(|part| !part.is_empty()) {
+            // POSIX names carry an encoding and a modifier that BCP 47 does not know.
+            let tag = part.split(['.', '@']).next().unwrap_or(part).replace('_', "-");
+            if !tags.contains(&tag) {
+                tags.push(tag);
+            }
+        }
+    }
+    let languages: Vec<_> = tags.iter().filter_map(|tag| tag.parse().ok()).collect();
+    if languages.is_empty() {
+        return DesktopLanguageRequester::requested_languages();
+    }
+    languages
 }
 
 /// Build a command with localized help at every subcommand level.

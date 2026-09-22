@@ -250,7 +250,10 @@ fn parser_errors_are_localized_on_stderr_with_exit_one() {
             assert!(output.stdout.is_empty());
             let stderr = decoded(&output.stderr);
             assert!(stderr.contains("--help"), "{stderr}");
-            let prefix = if locale == "de_DE" { "fehler" } else { "error" };
+            // The error heading belongs to clap-i18n-richformatter, which reads the system
+            // language instead of the locale set here, and macOS offers it no way to see one.
+            let translated = locale == "de_DE" && !cfg!(target_os = "macos");
+            let prefix = if translated { "fehler" } else { "error" };
             assert!(stderr.to_lowercase().contains(prefix), "{stderr}");
         }
         let output = run(locale, &["import", "files", "--format", "bogus"]);
