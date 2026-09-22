@@ -1,14 +1,8 @@
 use crate::icy_board::state::user_commands::mods::filebrowser::FileFilter;
+use crate::icy_board::state::user_commands::pcb::z_zippy_directory_scan::NewScanKind;
 use crate::{
     Res,
-    datetime::IcbDate,
-    icy_board::{
-        commands::CommandType,
-        state::{
-            IcyBoardState,
-            functions::{MASK_COMMAND, MASK_NUM},
-        },
-    },
+    icy_board::state::{IcyBoardState, functions::MASK_COMMAND},
 };
 use crate::{
     icy_board::{icb_config::IcbColor, icb_text::IceText, state::functions::display_flags},
@@ -22,28 +16,7 @@ impl IcyBoardState {
                 .await?;
             return Ok(());
         }
-        let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
-            token
-        } else {
-            let date = self.session.current_user.as_ref().map(|user| user.stats.last_on.format("%m%d%y").to_string());
-
-            self.input_field(
-                IceText::DateToSearch,
-                6,
-                &MASK_NUM,
-                CommandType::LocateFile.get_help(),
-                date,
-                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE,
-            )
-            .await?
-        };
-        if search_pattern.is_empty() {
-            return Ok(());
-        }
-        let month = search_pattern[0..2].parse::<u8>().unwrap_or(0);
-        let day = search_pattern[2..4].parse::<u8>().unwrap_or(0);
-        let year = search_pattern[4..6].parse::<u16>().unwrap_or(0);
-        let search_date = IcbDate::new(month, day, year).to_local_date_time();
+        let search_date = self.ask_scan_date(NewScanKind::AskDate).await?;
 
         loop {
             let search_area = if let Some(token) = self.session.tokens.pop_front() {
@@ -85,8 +58,11 @@ impl IcyBoardState {
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
-                    self.display_file_area(&path, &metadata, FileFilter::new_files_since(search_date.into()))
-                        .await?;
+                    let filter = match search_date {
+                        Some(date) => FileFilter::new_files_since(date.into()),
+                        None => FileFilter::all(),
+                    };
+                    self.display_file_area(&path, &metadata, filter).await?;
                     if self.session.disp_options.abort_printout {
                         break;
                     }

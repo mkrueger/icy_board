@@ -202,21 +202,20 @@ impl IcyBoardState {
             if answer == "000000" {
                 return Ok(None);
             }
-            if answer.len() != 6 || !answer.chars().all(|c| c.is_ascii_digit()) {
+            let Some(date) = Self::parse_scan_date(&answer) else {
                 continue;
-            }
-            return Ok(Self::parse_scan_date(&answer));
+            };
+            return Ok(Some(date));
         }
     }
 
-    fn parse_scan_date(answer: &str) -> Option<chrono::prelude::DateTime<chrono::prelude::Local>> {
+    /// The scan prompts take a bare `MMDDYY`, so anything else is not a date at all and
+    /// a two digit year is read through `PCBoard`'s 1979..2078 window.
+    pub(crate) fn parse_scan_date(answer: &str) -> Option<chrono::prelude::DateTime<chrono::prelude::Local>> {
         if answer.len() != 6 || !answer.chars().all(|c| c.is_ascii_digit()) {
             return None;
         }
-        let month = answer[0..2].parse::<u8>().unwrap_or(0);
-        let day = answer[2..4].parse::<u8>().unwrap_or(0);
-        let year = answer[4..6].parse::<u16>().unwrap_or(0);
-        Some(IcbDate::new(month, day, year).to_local_date_time())
+        Some(IcbDate::try_parse(answer)?.to_local_date_time())
     }
 
     pub async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {
@@ -228,11 +227,12 @@ impl IcyBoardState {
         let max_dirs = self.session.current_conference.directories.as_ref().unwrap().len();
         while let Some(token) = self.session.tokens.pop_front() {
             if read_date {
-                let month = token[0..2].parse::<u8>().unwrap_or(0);
-                let day = token[2..4].parse::<u8>().unwrap_or(0);
-                let year = token[4..6].parse::<u16>().unwrap_or(0);
-                res.date_time = Some(IcbDate::new(month, day, year).to_local_date_time());
-                continue;
+                read_date = false;
+                // Only a real date belongs to the N; anything else is still an argument.
+                if let Some(date) = Self::parse_scan_date(&token) {
+                    res.date_time = Some(date);
+                    continue;
+                }
             }
             match token.as_str() {
                 "A" => {

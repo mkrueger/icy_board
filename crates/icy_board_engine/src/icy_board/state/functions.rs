@@ -506,6 +506,7 @@ impl IcyBoardState {
         }
 
         let mut default_answer = default_answer;
+        let mut shown_default = 0;
         if show_field_len {
             self.print(TerminalTarget::Both, " (").await?;
             let x = self.session.cursor_pos.x;
@@ -529,6 +530,7 @@ impl IcyBoardState {
             if let Some(default) = &default_answer {
                 self.print(TerminalTarget::Both, default).await?;
                 self.backward(default.chars().count() as i32).await?;
+                shown_default = default.chars().count() as i32;
             }
         } else if display_question {
             self.print(TerminalTarget::Both, " ").await?;
@@ -586,6 +588,13 @@ impl IcyBoardState {
                     || high_ascii && key_char.ch >= '\u{80}'
                     || (display_flags & display_flags::STACKED) != 0 && " ;".contains(key_char.ch))
             {
+                // Typing replaces the default, so the field must stop showing the part
+                // of it that is about to be dropped.
+                if output.is_empty() && shown_default > 0 {
+                    self.print(TerminalTarget::Both, &" ".repeat(shown_default as usize)).await?;
+                    self.backward(shown_default).await?;
+                    shown_default = 0;
+                }
                 output.push(key_char.ch);
                 if !key_char.source.is_hidden() {
                     if display_flags & display_flags::ECHODOTS != 0 {
