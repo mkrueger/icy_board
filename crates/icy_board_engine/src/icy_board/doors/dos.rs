@@ -464,7 +464,11 @@ pub fn expand_run_batch(door: &Door, node: usize, drop_file: &str) -> Res<String
             return Err("DOS arguments cannot contain line breaks, double quotes or percent signs; use the command field for batch syntax".into());
         }
         command.push(' ');
-        if argument.is_empty() || argument.chars().any(|character| character.is_whitespace() || matches!(character, '&' | '|' | '<' | '>')) {
+        if argument.is_empty()
+            || argument
+                .chars()
+                .any(|character| character.is_whitespace() || matches!(character, '&' | '|' | '<' | '>'))
+        {
             command.push('"');
             command.push_str(&argument);
             command.push('"');
