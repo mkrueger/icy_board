@@ -63,7 +63,7 @@ struct MessageCommitGuard<'a> {
 impl Drop for MessageCommitGuard<'_> {
     fn drop(&mut self) {
         if !self.completed {
-            self.state.session.request_logoff = true;
+            self.state.session.force_logoff();
         }
     }
 }

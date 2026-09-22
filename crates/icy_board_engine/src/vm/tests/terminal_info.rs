@@ -1,6 +1,77 @@
 use super::{compile_errors_with_runtime, run_ppl};
 
 #[tokio::test]
+async fn logoff_request_allows_ppe_but_forced_logoff_aborts() {
+    use crate::{
+        icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
+        vm::{DiskIO, run},
+    };
+    use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
+    use std::sync::Arc;
+
+    for scenario in ["normal", "forced", "session_timeout", "keyboard_timeout", "disconnect", "hangup"] {
+        let root = tempfile::tempdir().unwrap();
+        let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (peer, connection) = ChannelConnection::create_pair();
+        let mut peer = Some(peer);
+        let mut board = IcyBoard::new();
+        board.default_display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+        board.config.limits.keyboard_timeout = 1;
+        let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+        state.session.page_len = 0;
+        match scenario {
+            "normal" => state.session.request_logoff = true,
+            "forced" => {
+                state.session.request_logoff = true;
+                state.session.force_logoff();
+            }
+            "session_timeout" => {
+                state.session.time_limit = 1;
+                state.session.login_date = chrono::Utc::now() - chrono::Duration::minutes(2);
+            }
+            "keyboard_timeout" => state.session.keyboard_timer_started -= std::time::Duration::from_secs(120),
+            "disconnect" => drop(peer.take()),
+            "hangup" => {}
+            _ => unreachable!(),
+        }
+        let entry = if scenario == "hangup" { "HANGUP" } else { "STRING KEY\nKEY = INKEY()" };
+        let executable = super::compile(&format!(
+            "{entry}\nFCREATE 1, PPEPATH() + \"ran.txt\", O_WR, S_DN\nFCLOSE 1\nPRINT \"[logoff-ppe]\"\nEXIT"
+        ));
+        let mut io = DiskIO::new(root.path().to_str().unwrap(), None);
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            run(&root.path().join("logoff.ppe"), &executable, &mut io, &mut state),
+        )
+        .await
+        .expect(scenario);
+        let mut output = Vec::new();
+        while let Some(peer) = &mut peer {
+            let mut buffer = [0; 4096];
+            let count = peer.try_read(&mut buffer).await.unwrap();
+            if count == 0 {
+                break;
+            }
+            output.extend_from_slice(&buffer[..count]);
+        }
+        let forced = scenario != "normal";
+        if forced {
+            assert!(result.is_err(), "{scenario}: {result:?}");
+            assert!(!root.path().join("ran.txt").exists(), "{scenario}");
+            assert!(!String::from_utf8_lossy(&output).contains("[logoff-ppe]"), "{scenario}");
+        } else {
+            assert!(result.unwrap());
+            assert!(root.path().join("ran.txt").exists());
+            assert_eq!(output, b"[logoff-ppe]");
+        }
+        assert!(state.session.request_logoff, "{scenario}");
+        assert_eq!(state.session.is_logoff_forced(), forced, "{scenario}");
+    }
+}
+
+#[tokio::test]
 async fn a5_unicode_cells_through_serialized_ppe_and_wire() {
     use crate::{
         icy_board::{

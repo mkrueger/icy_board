@@ -123,7 +123,7 @@ impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn run_single_command(&mut self, via_cmd_list: bool) -> Res<bool> {
         if !self.credentials_still_current().await {
-            self.session.request_logoff = true;
+            self.session.force_logoff();
             return Ok(false);
         }
         if let Some(command) = self.session.tokens.pop_front() {
@@ -980,7 +980,7 @@ impl IcyBoardState {
             .await?;
             self.display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
-            self.goodbye().await?;
+            self.logoff_user(super::Logoff::ABNORMAL).await?;
         }
 
         Ok(false)

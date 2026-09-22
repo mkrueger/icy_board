@@ -17,7 +17,7 @@ use crate::{
         ftn::queue,
         icb_config::IcbColor,
         state::{
-            GraphicsMode, KeySource, NodeState, NodeStatus,
+            GraphicsMode, KeySource, Logoff, NodeState, NodeStatus,
             functions::{MASK_ASCII, PPECall, display_flags},
         },
         user_base::ConferenceFlags,
@@ -284,7 +284,7 @@ fn fputpad_internal(vm: &mut VirtualMachine<'_>, channel: i32, text: String, wid
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn hangup(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye().await?;
+    vm.icy_board_state.logoff_user(Logoff::ABNORMAL).await?;
     vm.is_running = false;
     Ok(())
 }
@@ -584,7 +584,7 @@ pub async fn dtron(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn dtroff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye().await?;
+    vm.icy_board_state.hangup().await?;
     Ok(())
 }
 
@@ -799,13 +799,13 @@ pub async fn kbdfile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn bye(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye().await?;
+    vm.icy_board_state.logoff_user(Logoff::NORMAL).await?;
     vm.is_running = false;
     Ok(())
 }
 
 pub async fn goodbye(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.goodbye().await?;
+    vm.icy_board_state.goodbye_cmd().await?;
     vm.is_running = false;
     Ok(())
 }

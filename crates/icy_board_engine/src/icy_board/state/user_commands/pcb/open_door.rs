@@ -539,7 +539,7 @@ impl IcyBoardState {
                     match read_data {
                         Ok(size) => {
                             if size == 0 {
-                                self.session.request_logoff = true;
+                                self.session.force_logoff();
                                 break;
                             }
                             if stdin.write_all(&write_buf[0..size]).await.is_err() {
@@ -648,7 +648,7 @@ impl IcyBoardState {
                 read = self.connection.read(&mut input) => {
                     let size = read?;
                     if size == 0 {
-                        self.session.request_logoff = true;
+                        self.session.force_logoff();
                         break;
                     }
                     let dos_input = input_encoder.encode(&input[..size], self.session.term_caps.is_utf8);
@@ -781,7 +781,7 @@ impl IcyBoardState {
                     },
                     read = self.connection.read(&mut input) => {
                         let count = read?;
-                        if count == 0 { self.session.request_logoff = true; return Ok(false); }
+                        if count == 0 { self.session.force_logoff(); return Ok(false); }
                         let bytes = encoder.encode(&input[..count], self.session.term_caps.is_utf8);
                         if !bytes.is_empty() { session.input.send(bytes).map_err(|_| "DOS editor input closed")?; }
                     },
@@ -820,7 +820,7 @@ impl IcyBoardState {
             }
             "1" => Ok(false),
             "2" => {
-                self.session.request_logoff = true;
+                self.session.force_logoff();
                 Ok(false)
             }
             status => Err(format!("DOS editor failed or did not return a status: {status}").into()),
@@ -959,7 +959,7 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut crate::i
                                 }
                             }
                         } else {
-                            state.session.request_logoff = true;
+                            state.session.force_logoff();
                             return Ok(());
                         }
                     }

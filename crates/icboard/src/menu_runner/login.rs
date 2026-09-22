@@ -1232,7 +1232,8 @@ mod option_tests {
                 command.state.session.current_user.as_ref().unwrap().stats.num_password_failures,
                 if accepted { 0 } else { 1 }
             );
-            command.state.session.request_logoff = false;
+            assert_eq!(command.state.session.is_logoff_forced(), !accepted);
+            command.state.session = Default::default();
             let next = command.state.get_char(icy_board_engine::vm::TerminalTarget::Both).await.unwrap().unwrap();
             assert_eq!(next.ch, if accepted { 'w' } else { 'Z' });
         }

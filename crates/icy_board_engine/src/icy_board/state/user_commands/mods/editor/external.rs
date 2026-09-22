@@ -188,7 +188,7 @@ impl IcyBoardState {
                         Some(0) => Ok(true),
                         Some(1) => Ok(false),
                         Some(2) => {
-                            self.session.request_logoff = true;
+                            self.session.force_logoff();
                             Ok(false)
                         }
                         code => Err(format!("external editor failed with status {code:?}").into()),
@@ -205,7 +205,7 @@ impl IcyBoardState {
                     },
                     read = self.connection.read(&mut input_buffer), if exit_status.is_none() => {
                         let count = read?;
-                        if count == 0 { self.session.request_logoff = true; return Ok(false); }
+                        if count == 0 { self.session.force_logoff(); return Ok(false); }
                         let bytes = encoder.encode(&input_buffer[..count], self.session.term_caps.is_utf8);
                         input.write_all(&bytes).await?;
                     },

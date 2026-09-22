@@ -324,6 +324,197 @@ fn options(login_sysop: bool) -> LoginOptions {
     }
 }
 
+#[tokio::test]
+async fn logoff_text_hooks_run_ppe_before_disconnect() {
+    let compiled = crate::tests::compile_test_ppe(
+        r#"
+STRING ARG, RECORD
+ARG = TOKENSTR()
+TOKENIZE ARG
+GETTOKEN ARG
+GETTOKEN RECORD
+FAPPEND 1, PPEPATH() + "hooks.txt", O_WR, S_DN
+FPUTLN 1, ARG + ":" + RECORD
+FCLOSE 1
+PRINTLN "[logoff-hook-" + RECORD + "]"
+PRINT "@HANGUP@"
+EXIT
+"#,
+    );
+    for enabled in [false, true] {
+        for command in ["G", "BYE"] {
+            let root = tempfile::tempdir().unwrap();
+            let ppe = root.path().join("hook.ppe");
+            std::fs::copy(&compiled, &ppe).unwrap();
+            let mut board = board_at(root.path());
+            board.config.accounting.enabled = enabled;
+            for record in [192, 166] {
+                board
+                    .default_display_text
+                    .update_record_number(record, format!("!{} /LOGOFF {record}", ppe.display()))
+                    .unwrap();
+            }
+            let mut session = Session::login(board).await;
+            session.send(&format!("{command}\r")).await;
+            let (result, output) = session.finish().await;
+            assert!(result.is_ok(), "{command}, accounting={enabled}: {result:?}; {output:?}");
+            let hooks = std::fs::read_to_string(root.path().join("hooks.txt"));
+            assert!(hooks.is_ok(), "{command}, accounting={enabled}: {hooks:?}; {output:?}");
+            assert_eq!(hooks.unwrap().trim_start_matches('\u{feff}'), "/LOGOFF:192\n/LOGOFF:166\n", "{output:?}");
+            assert_eq!(output.matches("[logoff-hook-192]").count(), 1, "{output:?}");
+            assert_eq!(output.matches("[logoff-hook-166]").count(), 1, "{output:?}");
+            assert!(
+                output.find("[logoff-hook-192]").unwrap() < output.find("[logoff-hook-166]").unwrap(),
+                "{output:?}"
+            );
+            assert!(!output.contains("Error occurred executing PPE"), "{output:?}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn logoff_hook_accepts_input_after_time_limit_without_restarting_logoff() {
+    let root = tempfile::tempdir().unwrap();
+    let compiled = crate::tests::compile_test_ppe(
+        r#"
+STRING KEY, ANSWER
+PRINT "@HANGUP@"
+ADJTIME -2000
+PRINTLN "[logoff-hook-input]"
+KEY = ""
+WHILE (KEY = "") DO
+    KEY = INKEY()
+ENDWHILE
+PRINTLN "[logoff-hook-key-" + KEY + "]"
+INPUTSTR "", ANSWER, 7, 20, "abcdefghijklmnopqrstuvwxyz", 0
+PRINTLN "[logoff-hook-answer-" + ANSWER + "]"
+EXIT
+"#,
+    );
+    let mut board = board_at(root.path());
+    board
+        .default_display_text
+        .update_record_number(192, format!("!{}", compiled.display()))
+        .unwrap();
+    let mut session = Session::login(board).await;
+    session.send("BYE\r").await;
+    session.expect("[logoff-hook-input]").await;
+    session.send("xanswer\r").await;
+    let (result, output) = session.finish().await;
+    assert!(result.is_ok(), "{result:?}; {output:?}");
+    assert_eq!(output.matches("[logoff-hook-input]").count(), 1, "{output:?}");
+    assert_eq!(output.matches("[logoff-hook-key-x]").count(), 1, "{output:?}");
+    assert_eq!(output.matches("[logoff-hook-answer-answer]").count(), 1, "{output:?}");
+    assert_eq!(output.matches("Thanks for calling").count(), 1, "{output:?}");
+    assert!(!output.contains("Error occurred executing PPE"), "{output:?}");
+}
+
+#[tokio::test]
+async fn normal_logoff_allows_parent_ppe_to_finish_before_hooks() {
+    use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
+
+    let root = tempfile::tempdir().unwrap();
+    let parent = crate::tests::compile_test_ppe("COMMAND FALSE, \"BYE\"\nPRINTLN \"[parent-resumed-after-logoff]\"\nEXIT");
+    let hook = crate::tests::compile_test_ppe("PRINTLN \"[logoff-final-ppe]\"\nEXIT");
+    let mut board = board_at(root.path());
+    board.commands.push(Command {
+        keyword: "PPEEXIT".into(),
+        actions: vec![CommandAction {
+            command_type: CommandType::RunPPE,
+            parameter: parent.to_string_lossy().into_owned(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    });
+    board.default_display_text.update_record_number(192, format!("!{}", hook.display())).unwrap();
+    let mut session = Session::login(board).await;
+    session.send("PPEEXIT\r").await;
+    let (result, output) = session.finish().await;
+    assert!(result.is_ok(), "{result:?}; {output:?}");
+    assert_eq!(output.matches("[parent-resumed-after-logoff]").count(), 1, "{output:?}");
+    assert_eq!(output.matches("[logoff-final-ppe]").count(), 1, "{output:?}");
+    assert!(
+        output.find("[parent-resumed-after-logoff]").unwrap() < output.find("[logoff-final-ppe]").unwrap(),
+        "{output:?}"
+    );
+    assert_eq!(output.matches("Thanks for calling").count(), 1, "{output:?}");
+    assert!(!output.contains("Error occurred executing PPE"), "{output:?}");
+}
+
+#[tokio::test]
+async fn logoff_statements_follow_pcboard_kinds() {
+    use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
+
+    // BYE/GOODBYE are what the caller asked for, HANGUP and @HANGUP@ are not.
+    for (statement, asks_caller, courtesies) in [
+        ("BYE", true, true),
+        ("GOODBYE", true, true),
+        ("HANGUP", false, false),
+        ("PRINT \"@HANGUP@\"", false, true),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("logoff.survey"), "[logoff-survey]\r\n*****\r\n").unwrap();
+        let ppe = crate::tests::compile_test_ppe(&format!("{statement}\nEXIT"));
+        let hook = crate::tests::compile_test_ppe("PRINTLN \"[logoff-hook]\"\nEXIT");
+        let mut board = board_at(root.path());
+        board.config.paths.logoff_survey = root.path().join("logoff.survey");
+        board.config.paths.logoff_answer = root.path().join("logoff.answers");
+        board.commands.push(Command {
+            keyword: "QUIT".into(),
+            actions: vec![CommandAction {
+                command_type: CommandType::RunPPE,
+                parameter: ppe.to_string_lossy().into_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        board.default_display_text.update_record_number(192, format!("!{}", hook.display())).unwrap();
+        let mut session = Session::login(board).await;
+        session.send("QUIT\r").await;
+        let (result, output) = session.finish().await;
+        assert!(result.is_ok(), "{statement}: {result:?}; {output:?}");
+        assert_eq!(output.matches("[logoff-survey]").count(), usize::from(asks_caller), "{statement}: {output:?}");
+        assert_eq!(output.matches("[logoff-hook]").count(), 1, "{statement}: {output:?}");
+        assert_eq!(output.matches("Thanks for calling").count(), usize::from(courtesies), "{statement}: {output:?}");
+        assert!(!output.contains("Error occurred executing PPE"), "{statement}: {output:?}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires the original LastCaller package in ICB_LASTCALLER_DIR"]
+async fn logoff_original_lastcaller_updates_data_from_icbtext_192() {
+    let package = std::path::PathBuf::from(std::env::var_os("ICB_LASTCALLER_DIR").expect("ICB_LASTCALLER_DIR"));
+    for enabled in [false, true] {
+        for command in ["G", "BYE"] {
+            let root = tempfile::tempdir().unwrap();
+            for file in ["LC.PPE", "4EVER83.DAT", "GATE.PCB"] {
+                std::fs::copy(package.join(file), root.path().join(file)).unwrap();
+            }
+            let data = root.path().join("4EVER83.DAT");
+            let before = std::fs::read(&data).unwrap();
+            let mut board = board_at(root.path());
+            board.config.accounting.enabled = enabled;
+            board
+                .default_display_text
+                .update_record_number(192, format!("!{} /LOGOFF", root.path().join("LC.PPE").display()))
+                .unwrap();
+            let mut session = Session::login(board).await;
+            session.send(&format!("{command}\r")).await;
+            let (result, output) = session.finish().await;
+            assert!(result.is_ok(), "{command}, accounting={enabled}: {result:?}; {output:?}");
+            let after = std::fs::read(&data).unwrap();
+            assert_ne!(before, after, "{command}, accounting={enabled}: {output:?}");
+            let lines: Vec<_> = after
+                .split(|byte| *byte == b'\n')
+                .map(|line| line.strip_suffix(b"\r").unwrap_or(line))
+                .collect();
+            assert_eq!(lines.get(65).copied(), Some(b"ACCOUNT USER".as_slice()), "{output:?}");
+            assert_eq!(output.matches("Thanks for calling").count(), 1, "{output:?}");
+            assert!(!output.contains("Error occurred executing PPE"), "{output:?}");
+        }
+    }
+}
+
 fn account(root: &Path, user: usize) -> AccountUserInf {
     UserBase::load(&root.join("users.toml")).unwrap()[user].account.clone().unwrap()
 }

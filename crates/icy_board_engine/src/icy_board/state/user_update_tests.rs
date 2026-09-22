@@ -668,6 +668,7 @@ async fn final_save_preserves_changed_credentials_without_reauthorizing_the_stal
     assert_eq!(disk[CALLER].account.as_ref().unwrap().debit_msg_read, 3.0);
     assert_eq!(f.second.session.authenticated_security, authorization);
     assert!(f.second.session.request_logoff);
+    assert!(f.second.session.is_logoff_forced());
 }
 
 #[tokio::test]

@@ -387,7 +387,7 @@ async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<Log
                     display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE | display_flags::LOGIT,
                 )
                 .await?;
-            cmd.state.logoff_user(true).await?;
+            cmd.state.logoff_user(icy_board_engine::icy_board::state::Logoff::ABNORMAL).await?;
             return Ok(());
         }
 

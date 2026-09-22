@@ -323,7 +323,7 @@ impl IcyBoardState {
 
         self.write_terminal_bytes(TerminalTarget::Both, b"\x1b[?25l", b"\x1b[?25l").await?;
         let result: Res<()> = async {
-            while animator.lock().is_playing() && !self.session.disp_options.abort_printout && !self.session.request_logoff {
+            while animator.lock().is_playing() && !self.session.disp_options.abort_printout && !self.session.is_logoff_forced() {
                 let frame = {
                     let mut animator = animator.lock();
                     animator.get_cur_frame_buffer_mut().map(|(screen, _, delay)| {
@@ -406,7 +406,7 @@ impl IcyBoardState {
         default_answer: Option<String>,
         mut display_flags: i32,
     ) -> Res<String> {
-        if self.session.request_logoff {
+        if self.session.is_logoff_forced() {
             return Ok(String::new());
         }
         self.session.default_answer.clone_from(&default_answer);
@@ -545,7 +545,7 @@ impl IcyBoardState {
 
         let mut output = String::new();
         loop {
-            if self.session.request_logoff {
+            if self.session.is_logoff_forced() {
                 return Ok(String::new());
             }
 

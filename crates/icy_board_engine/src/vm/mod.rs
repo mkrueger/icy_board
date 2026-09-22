@@ -866,14 +866,14 @@ impl VirtualMachine<'_> {
         let commands = Arc::clone(&self.commands);
         let max_ptr = commands.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {
-            if self.icy_board_state.session.request_logoff {
+            if self.icy_board_state.session.is_logoff_forced() {
                 return Err(icy_net::NetError::ConnectionClosed.into());
             }
             let p = self.cur_ptr;
             self.cur_ptr += 1;
             // log::info!("{p}: {c}");
             self.execute_statement(&commands[p]).await?;
-            if self.icy_board_state.session.request_logoff {
+            if self.icy_board_state.session.is_logoff_forced() {
                 return Err(icy_net::NetError::ConnectionClosed.into());
             }
             if trap_errors {

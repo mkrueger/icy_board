@@ -503,7 +503,7 @@ impl IcyBoardState {
         let result = self.accounting_check_balance_inner().await;
         self.session.accounting.checking = false;
         if result.is_err() {
-            self.session.request_logoff = true;
+            self.session.force_logoff();
         }
         result
     }

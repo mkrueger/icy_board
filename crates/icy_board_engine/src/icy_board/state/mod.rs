@@ -240,6 +240,44 @@ impl TransferStatistics {
     }
 }
 
+/// `PCBoard` keeps `Status.Logoff` and `Status.AutoLogoff` apart because they gate
+/// different things: the kind decides the closing courtesies, the flag decides whether
+/// the caller is asked anything on the way out. See RECYCLE.C loguseroff().
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Logoff {
+    pub kind: LogoffKind,
+    pub automatic: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LogoffKind {
+    /// The caller said goodbye.
+    Normal,
+    /// The board dropped the caller.
+    Abnormal,
+}
+
+impl Logoff {
+    pub const NORMAL: Self = Self {
+        kind: LogoffKind::Normal,
+        automatic: false,
+    };
+    /// `@HANGUP@`: still an orderly logoff, but not one the caller typed.
+    pub const AUTOMATIC: Self = Self {
+        kind: LogoffKind::Normal,
+        automatic: true,
+    };
+    pub const ABNORMAL: Self = Self {
+        kind: LogoffKind::Abnormal,
+        automatic: true,
+    };
+
+    /// The survey and the accounting logoff file are only for a caller who asked to leave.
+    pub(crate) fn asks_the_caller(self) -> bool {
+        self.kind == LogoffKind::Normal && !self.automatic
+    }
+}
+
 #[derive(Clone)]
 pub struct Session {
     pub accounting: AccountingSession,
@@ -283,11 +321,13 @@ pub struct Session {
 
     pub last_new_line_y: i32,
 
+    /// Leaves normal command processing without preventing logoff PPE execution.
     pub request_logoff: bool,
+    forced_logoff: bool,
     /// Guards logoff displays/survey, including recursive @HANGUP@ in files.
     pub(crate) logoff_started: bool,
-    /// Deferred summary (automatic or regular), displayed before socket close.
-    pub(crate) logoff_pending: Option<bool>,
+    /// Deferred summary, displayed before socket close.
+    pub(crate) logoff_pending: Option<Logoff>,
 
     pub time_limit: i32,
     /// Sub-minute upload credit carried between transfers; never a caller/PPL environment value.
@@ -400,6 +440,7 @@ impl Session {
             keyboard_timer_check: true,
             keyboard_timer_started: Instant::now(),
             request_logoff: false,
+            forced_logoff: false,
             logoff_started: false,
             logoff_pending: None,
             tokens: VecDeque::new(),
@@ -439,6 +480,15 @@ impl Session {
             group_chat: GroupChatPreferences::default(),
             joined_conferences: HashSet::new(),
         }
+    }
+
+    pub fn force_logoff(&mut self) {
+        self.request_logoff = true;
+        self.forced_logoff = true;
+    }
+
+    pub fn is_logoff_forced(&self) -> bool {
+        self.forced_logoff
     }
 
     pub fn expert_mode(&self) -> bool {
@@ -988,9 +1038,9 @@ impl IcyBoardState {
     /// everyone, sysop included - an unlimited sysop holds a level that says so.
     async fn check_time_left(&mut self) {
         if !self.credentials_still_current().await {
-            self.session.request_logoff = true;
+            self.session.force_logoff();
         }
-        if self.session.request_logoff || self.session.accounting.checking {
+        if self.session.request_logoff || self.session.logoff_started || self.session.accounting.checking {
             return;
         }
         if let Err(error) = self.accounting_check_balance().await {
@@ -1073,7 +1123,7 @@ impl IcyBoardState {
         self.limit_time_for_event().await;
         if let Err(error) = self.accounting_refresh().await {
             log::error!("Accounting security refresh failed: {error}");
-            self.session.request_logoff = true;
+            self.session.force_logoff();
         }
     }
 
@@ -1187,7 +1237,7 @@ impl IcyBoardState {
         }
         if let Err(error) = self.accounting_refresh().await {
             log::error!("Accounting conference security refresh failed: {error}");
-            self.session.request_logoff = true;
+            self.session.force_logoff();
         }
     }
 
@@ -1276,7 +1326,7 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn next_line(&mut self) -> Res<()> {
-        if self.session.disp_options.abort_printout || !self.session.disp_options.count_lines {
+        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.count_lines {
             return Ok(());
         }
         self.session.disp_options.num_lines_printed += 1;
@@ -1740,7 +1790,7 @@ impl IcyBoardState {
     }
 
     async fn shutdown_connections(&mut self) {
-        self.session.request_logoff = true;
+        self.session.force_logoff();
         let _ = self.connection.shutdown().await;
 
         if let Some(state) = self.node_state.lock().await[self.node].as_mut()
@@ -1943,7 +1993,7 @@ impl IcyBoardState {
     async fn persist_user(&mut self, closing: bool) -> Res<()> {
         self.reconcile_pending_user_save(closing).await?;
         if !self.credentials_still_current().await {
-            self.session.request_logoff = true;
+            self.session.force_logoff();
             if !closing && let (Some(local), Some(baseline)) = (&self.session.current_user, &self.session.security_baseline) {
                 if super::password_recovery::security_fingerprint(local) != super::password_recovery::security_fingerprint(baseline) {
                     return Err("Credentials changed on another node; relogin required".into());
@@ -3531,7 +3581,7 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::Hangup => {
-                let _ = self.logoff_user(false).await;
+                let _ = self.logoff_user(Logoff::AUTOMATIC).await;
                 return None;
             }
             MacroCommand::SwitchColor(color) => {
@@ -3552,13 +3602,13 @@ impl IcyBoardState {
     #[async_recursion(?Send)]
     async fn get_char_with_timeout(&mut self, target: TerminalTarget, wait: Duration) -> Res<Option<KeyChar>> {
         if !self.credentials_still_current().await {
-            self.session.request_logoff = true;
+            self.session.force_logoff();
             return Ok(None);
         }
         // Check even with a continuously stuffed/typeahead buffer, not only when
         // the terminal is idle. Accounting display recursion is guarded inside.
         self.check_time_left().await;
-        if self.session.request_logoff {
+        if self.session.is_logoff_forced() {
             return Ok(None);
         }
         self.drain_raw_input();
@@ -3596,7 +3646,7 @@ impl IcyBoardState {
         if self.keyboard_timed_out().await? {
             return Ok(None);
         }
-        if self.session.request_logoff {
+        if self.session.is_logoff_forced() {
             return Ok(None);
         }
 
@@ -3699,7 +3749,7 @@ impl IcyBoardState {
                         self.char_buffer.extend(keys);
                         return Ok(key);
                     }
-                    self.session.request_logoff = true;
+                    self.session.force_logoff();
                     return Ok(None);
                 }
                 () = sleep(wait) => {
@@ -3770,7 +3820,7 @@ impl IcyBoardState {
                         self.char_buffer.extend(keys);
                         return Ok(key);
                     }
-                    self.session.request_logoff = true;
+                    self.session.force_logoff();
                     return Ok(None);
                 }
                 () = sleep(wait) => {
@@ -4099,7 +4149,7 @@ impl IcyBoardState {
 
         let deadline = timeout.map(|timeout| Instant::now() + timeout);
         loop {
-            if self.session.request_logoff {
+            if self.session.is_logoff_forced() {
                 return Err(icy_net::NetError::ConnectionClosed.into());
             }
             let result = if let Some(deadline) = deadline {
@@ -4133,7 +4183,7 @@ impl IcyBoardState {
                 // One deadline for the whole sequence, not a fresh wait per byte.
                 let deadline = Instant::now() + Duration::from_millis(250);
                 let Some(introducer) = self.get_edit_sequence_char(ch.source, deadline).await? else {
-                    return Ok((!self.session.request_logoff).then_some(ch));
+                    return Ok((!self.session.is_logoff_forced()).then_some(ch));
                 };
                 if !matches!(introducer.ch, '[' | 'O') {
                     self.char_buffer.push_front(introducer);
@@ -4179,7 +4229,7 @@ impl IcyBoardState {
                         break;
                     }
                 }
-                if self.session.request_logoff {
+                if self.session.is_logoff_forced() {
                     return Ok(None);
                 }
                 // Incomplete/malformed escape: keep the literal suffix in order.
@@ -4195,7 +4245,7 @@ impl IcyBoardState {
 
     async fn get_edit_sequence_char(&mut self, source: KeySource, deadline: Instant) -> Res<Option<KeyChar>> {
         loop {
-            if self.session.request_logoff || Instant::now() >= deadline {
+            if self.session.is_logoff_forced() || Instant::now() >= deadline {
                 return Ok(None);
             }
             let key = if let Some(key) = self.char_buffer.pop_front() {
@@ -4409,34 +4459,13 @@ impl IcyBoardState {
         (self.session.cursor_pos.x, self.session.cursor_pos.y)
     }
 
+    /// The `G` a caller may answer at nearly any prompt.
     /// # Errors
     pub async fn goodbye(&mut self) -> Res<()> {
-        /*     if HangupType::Hangup != hangup_type {
-
-                    if HangupType::Goodbye == hangup_type {
-                        let logoff_script = self
-                            .board
-                            .lock()
-                            .as_ref()
-                            .unwrap()
-                            .data
-                            .paths
-                            .logoff_script
-                            .clone();
-                        self.display_file(&logoff_script)?;
-                    }
-
-
-                }
-                self.display_text(IceText::ThanksForCalling, display_flags::LFBEFORE | display_flags::NEWLINE)
-                    .await?;
-                self.reset_color(TerminalTarget::Both).await?;
-        */
-        self.hangup().await
+        self.logoff_user(Logoff::NORMAL).await
     }
 
     pub async fn hangup(&mut self) -> Res<()> {
-        self.session.request_logoff = true;
         self.shutdown_connections().await;
         Ok(())
     }
@@ -4471,7 +4500,7 @@ impl IcyBoardState {
     }
 
     pub async fn more_promt(&mut self) -> Res<()> {
-        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
+        if self.session.is_logoff_forced() || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
             return Ok(());
         }
         if !self.session.disp_options.allow_break {
@@ -4532,7 +4561,7 @@ impl IcyBoardState {
 
     pub async fn press_enter(&mut self) -> Res<()> {
         self.session.more_requested = false;
-        if self.session.request_logoff || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
+        if self.session.is_logoff_forced() || self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
             return Ok(());
         }
         let user_color = self.user_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);

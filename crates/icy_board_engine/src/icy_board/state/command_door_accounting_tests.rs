@@ -11,7 +11,7 @@ use crate::icy_board::{
     doors::{Door, DoorList, DoorType},
     pcb::user_inf::AccountUserInf,
     sec_levels::SecurityLevel,
-    state::{KeyChar, KeySource},
+    state::{KeyChar, KeySource, Logoff},
     user_base::User,
 };
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
@@ -324,7 +324,7 @@ async fn custom_bye_command_settles_minutes_before_final_summary_and_shutdown() 
         assert_eq!(text.matches(marker).count(), 1, "{marker}: {text}");
     }
     let audit = std::fs::read(root.path().join("usage.dbf")).unwrap();
-    state.logoff_user(false).await.unwrap();
+    state.logoff_user(Logoff::NORMAL).await.unwrap();
     state.accounting_finish().await.unwrap();
     assert!(output(&mut peer).await.is_empty());
     assert_eq!(std::fs::read(root.path().join("usage.dbf")).unwrap(), audit);
@@ -342,7 +342,7 @@ async fn nested_command_and_door_finish_requests_settle_once_even_on_handler_err
     inner.start(&mut state).unwrap();
     outer.started = Some(Instant::now() - Duration::from_secs(95));
     inner.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(false).await.unwrap();
+    state.logoff_user(Logoff::NORMAL).await.unwrap();
     state.accounting_finish().await.unwrap();
     let error = inner.finish(&mut state, Err("door handler failed".into())).await.unwrap_err();
     assert!(state.accounting_active());
@@ -392,7 +392,7 @@ async fn failed_nested_minute_post_suppresses_incomplete_final_summary() {
     inner.start(&mut state).unwrap();
     outer.started = Some(Instant::now() - Duration::from_secs(95));
     inner.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(false).await.unwrap();
+    state.logoff_user(Logoff::NORMAL).await.unwrap();
     let error = inner.finish(&mut state, Ok(())).await.unwrap_err();
     assert!(state.accounting_active());
     assert!(outer.finish(&mut state, Err(error)).await.is_err());
@@ -409,7 +409,7 @@ async fn deferred_finish_save_failure_unwinds_and_retry_does_not_rebill_or_show_
     let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "BYE", 3.0, 2.0);
     usage.start(&mut state).unwrap();
     usage.started = Some(Instant::now() - Duration::from_secs(95));
-    state.logoff_user(false).await.unwrap();
+    state.logoff_user(Logoff::NORMAL).await.unwrap();
     state.get_board().await.config.paths.user_file = root.path().to_path_buf();
     assert!(usage.finish(&mut state, Ok(())).await.is_err());
     assert!(!state.accounting_invocation_active());
@@ -431,7 +431,7 @@ async fn free_command_still_unwinds_logoff_and_disconnected_summary_cannot_lose_
         let (_root, mut state, peer) = fixture(true).await;
         let mut usage = ActivityUsage::new("CMD USAGE", "CMD USAGE MIN", "BYE", per_use, 0.0);
         usage.start(&mut state).unwrap();
-        state.logoff_user(false).await.unwrap();
+        state.logoff_user(Logoff::NORMAL).await.unwrap();
         assert!(state.accounting_active());
         drop(peer);
         let error = usage.finish(&mut state, Err("original I/O failure".into())).await.unwrap_err();

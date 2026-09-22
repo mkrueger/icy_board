@@ -669,7 +669,7 @@ async fn hidden_and_disconnected_prompts_do_not_wait_for_input() {
             state.session.more_requested = true;
             state.session.disp_options.num_lines_printed = 7;
             if disconnected {
-                state.session.request_logoff = true;
+                state.session.force_logoff();
             } else {
                 state.session.disp_options.show_on_screen = false;
                 state.new_line().await.unwrap();
