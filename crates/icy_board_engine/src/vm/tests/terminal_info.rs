@@ -19,6 +19,7 @@ async fn logoff_request_allows_ppe_but_forced_logoff_aborts() {
         let mut board = IcyBoard::new();
         board.default_display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
         board.config.limits.keyboard_timeout = 1;
+        board.config.paths.caller_log = root.path().join("caller.log");
         let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
         state.session.page_len = 0;
         match scenario {

@@ -52,6 +52,7 @@ async fn fixture(input: &str) -> (TempDir, IcyBoardState, ChannelConnection) {
     board.config.file_transfer.promote_to_batch_transfers = false;
     board.config.paths.statistics_file = root.path().join("statistics.toml");
     board.config.paths.transfer_log = root.path().join("transfer.log");
+    board.config.paths.caller_log = root.path().join("caller.log");
     board.users.new_user(User {
         name: "DOWNLOAD TEST".into(),
         security_level: 255,
