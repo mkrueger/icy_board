@@ -1,0 +1,3 @@
+# Embedded data is fingerprinted and fixtures are compared byte for byte, so a
+# checkout must never rewrite line endings - not even on Windows.
+* -text

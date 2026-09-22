@@ -244,9 +244,6 @@ pub fn sources(overrides: Option<&Path>) -> Result<Vec<Source>> {
     for topic in &catalog.topics {
         let name = format!("{}.md", topic.id);
         let markdown = embedded_text(&name)?;
-        if sha256(markdown.as_bytes()) != topic.source_hash {
-            return Err(invalid(format!("Embedded English fingerprint mismatch: {name}")));
-        }
         markdowns.insert(name, markdown);
     }
     for name in Embedded::iter() {
@@ -340,6 +337,19 @@ mod tests {
         for source in &sources {
             assert_eq!(source.source_hash, sha256(source.markdown.as_bytes()));
             crate::render(&source.markdown, &crate::RenderOptions::default()).unwrap();
+        }
+    }
+
+    /// Catalog and sources are embedded in the same binary, so a stale fingerprint is a
+    /// build mistake rather than something a running board could ever recover from.
+    #[test]
+    fn embedded_sources_match_their_catalog_fingerprints() {
+        let catalog = parse_catalog(&embedded_text("catalog.toml").unwrap()).unwrap();
+        assert_eq!(catalog.topics.len(), 68);
+        for topic in catalog.topics {
+            let name = format!("{}.md", topic.id);
+            let markdown = embedded_text(&name).unwrap();
+            assert_eq!(sha256(markdown.as_bytes()), topic.source_hash, "{name}");
         }
     }
 

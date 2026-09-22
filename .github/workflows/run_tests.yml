@@ -32,3 +32,21 @@ jobs:
     - name: Run tests
       run: |
         cargo test --all-features --locked
+
+  # The board embeds its English help and refuses to start from sources whose
+  # fingerprint changed, which a line ending rewrite is enough to do.
+  windows_checks:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check that the checkout kept the committed bytes
+      shell: bash
+      run: |
+        rewritten=$(git ls-files --eol | awk '$1 == "i/lf" && $2 == "w/crlf" { print $4 }')
+        if [ -n "$rewritten" ]; then
+          echo "These files arrived with CRLF and no longer match what was committed:"
+          echo "$rewritten"
+          exit 1
+        fi
+    - name: Run the embedded help tests
+      run: cargo test -p icy_board_help --locked
