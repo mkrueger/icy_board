@@ -537,17 +537,20 @@ impl IcyBoardState {
     }
 
     pub async fn ask_date_format(&mut self, cur_format: &str) -> Res<String> {
-        self.new_line().await?;
         let date_formats = self.get_board().await.languages.date_formats.clone();
-
-        self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         let mut preview = String::new();
+        let show_list = !self.has_hidden_typeahead();
+        if show_list {
+            self.new_line().await?;
+            self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
+        }
         for (i, (disp_fmt, fmt)) in date_formats.iter().enumerate() {
             if fmt == cur_format {
                 preview = (i + 1).to_string();
-                self.println(TerminalTarget::Both, &format!("=> ({}) {}", i + 1, disp_fmt)).await?;
-            } else {
-                self.println(TerminalTarget::Both, &format!("   ({}) {}", i + 1, disp_fmt)).await?;
+            }
+            if show_list {
+                let marker = if fmt == cur_format { "=>" } else { "  " };
+                self.println(TerminalTarget::Both, &format!("{marker} ({}) {}", i + 1, disp_fmt)).await?;
             }
         }
         let date_format = self

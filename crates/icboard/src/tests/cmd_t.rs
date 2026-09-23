@@ -39,3 +39,35 @@ fn test_t_token() {
         "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mT X\n\n\u{1b}[1;32mDefault Protocol set to \u{1b}[36mXmodem/Checksum\n\n\u{1b}[32mPress (Enter) to continue? \u{1b}[0m"
     );
 }
+
+/// SETTINGS.C setprotocol drops an invalid stacked letter and asks with the menu instead.
+#[test]
+fn test_t_invalid_token_shows_the_menu() {
+    let output = test_output("T 123\nX\n".to_string(), |_| {});
+    let lines = crate::tests::cmd_file_lists::rendered_lines(&output);
+    assert!(lines.iter().any(|line| line.contains("(X) Xmodem/Checksum")), "{lines:#?}");
+    assert!(lines.iter().any(|line| line.contains("Default Protocol Desired")), "{lines:#?}");
+    assert!(
+        lines.iter().any(|line| line.trim_end() == "Default Protocol set to Xmodem/Checksum"),
+        "{lines:#?}"
+    );
+}
+
+#[test]
+fn test_t_invalid_token_then_enter_keeps_the_protocol() {
+    let output = test_output("T 1\n\n".to_string(), |_| {});
+    let lines = crate::tests::cmd_file_lists::rendered_lines(&output);
+    assert!(lines.iter().any(|line| line.contains("Default Protocol Desired")), "{lines:#?}");
+    assert!(!lines.iter().any(|line| line.contains("Default Protocol set to")), "{lines:#?}");
+}
+
+/// The prompt only takes letters of installed protocols, like the Valid mask in SETTINGS.C.
+#[test]
+fn test_t_prompt_ignores_letters_without_a_protocol() {
+    let output = test_output("T\n1X\n".to_string(), |_| {});
+    let lines = crate::tests::cmd_file_lists::rendered_lines(&output);
+    assert!(
+        lines.iter().any(|line| line.trim_end() == "Default Protocol set to Xmodem/Checksum"),
+        "{lines:#?}"
+    );
+}

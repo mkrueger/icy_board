@@ -426,9 +426,7 @@ impl IcyBoardState {
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
-        if let Some(front) = self.char_buffer.front()
-            && front.source.is_hidden()
-        {
+        if self.has_hidden_typeahead() {
             let mut result = String::new();
             while let Some(key) = self.char_buffer.pop_front() {
                 if key.ch == '\n' || key.ch == '\r' {
@@ -480,9 +478,7 @@ impl IcyBoardState {
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
-        if let Some(front) = self.char_buffer.front()
-            && front.source.is_hidden()
-        {
+        if self.has_hidden_typeahead() {
             let mut result = String::new();
             while let Some(key) = self.char_buffer.pop_front() {
                 if key.ch == '\n' || key.ch == '\r' {

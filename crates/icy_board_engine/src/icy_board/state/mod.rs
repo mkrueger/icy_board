@@ -1834,6 +1834,11 @@ impl IcyBoardState {
         self.char_buffer.front().is_some_and(|c| c.source.is_stuffed())
     }
 
+    /// True when the next prompt is answered silently from KBDSTUFF or KBDFILE input.
+    pub fn has_hidden_typeahead(&self) -> bool {
+        self.char_buffer.front().is_some_and(|c| c.source.is_hidden())
+    }
+
     pub async fn get_pcbdat(&self) -> Res<String> {
         let board = self.get_board().await;
         let path = board.resolve_file(&board.config.paths.tmp_work_path);
