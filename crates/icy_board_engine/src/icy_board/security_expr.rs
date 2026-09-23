@@ -368,6 +368,11 @@ impl SecurityExpression {
         matches!(self, SecurityExpression::Constant(Value::Bool(true)))
     }
 
+    /// Anyone passes it: `true` or `PCBoard`'s `ReqSecLevel <= 0` (also what an empty expression parses to).
+    pub fn is_unrestricted(&self) -> bool {
+        matches!(self, SecurityExpression::Constant(Value::Bool(true))) || matches!(self, SecurityExpression::Constant(Value::Integer(level)) if *level <= 0)
+    }
+
     pub(crate) fn level(&self) -> u8 {
         // TODO
         0

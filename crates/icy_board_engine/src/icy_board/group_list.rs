@@ -137,6 +137,13 @@ impl GroupList {
         });
     }
 
+    /// Adds a new user to the groups listed in the new user settings, separated by ',' or ';'.
+    pub fn add_new_user(&mut self, configured: &str, user_name: &str) {
+        for group in configured.split([',', ';']).map(str::trim).filter(|name| !name.is_empty()) {
+            self.add_member(group, user_name);
+        }
+    }
+
     pub fn add_member(&mut self, group_name: &str, member_name: &str) {
         if let Some(group) = self.group.iter_mut().find(|g| g.name == group_name) {
             group.members.push(member_name.to_string());

@@ -440,3 +440,63 @@ async fn compiled_selection_changes_and_invalid_getaltuser_preserve_the_right_ba
     assert_eq!(vm.icy_board_state.session.current_user.as_ref().unwrap().user_comment, "caller draft");
     assert!(users[0].user_comment.is_empty());
 }
+
+#[tokio::test]
+async fn adduser_applies_the_new_user_defaults() {
+    use crate::icy_board::{conferences::Conference, group_list::GroupList, security_expr::SecurityExpression, user_base::ConferenceFlags};
+
+    let directory = tempfile::tempdir().unwrap();
+    let mut state = state(directory.path()).await;
+    {
+        let mut board = state.get_board().await;
+        board.config.new_user_settings.sec_level = 20;
+        board.config.new_user_settings.auto_register_conferences = true;
+        board.config.new_user_settings.new_user_groups = "new_users; trial".into();
+        board.config.subscription_info.is_enabled = true;
+        board.config.subscription_info.subscription_length = 30;
+        board.config.subscription_info.default_expired_level = 5;
+        board.config.paths.group_file = directory.path().join("groups.toml");
+        board.groups = GroupList::new();
+        board.groups.add_group("new_users", "New users");
+        board.groups.add_group("trial", "Trial users");
+        board.conferences.clear();
+        for (is_public, required_security) in [
+            (true, SecurityExpression::default()),
+            (false, SecurityExpression::default()),
+            (true, SecurityExpression::from_req_security(50)),
+        ] {
+            board.conferences.push(Conference {
+                is_public,
+                required_security,
+                ..Default::default()
+            });
+        }
+    }
+    let registry = crate::parser::icy_board_registry();
+    let mut io = DiskIO::new(".", None);
+    let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
+    let before = chrono::Utc::now();
+    for command in load(&mut vm, "ADDUSER \"NEW USER\", FALSE\n") {
+        vm.execute_statement(&command).await.unwrap();
+    }
+
+    let users = UserBase::load(&directory.path().join("users.toml")).unwrap();
+    let user = &users[2];
+    assert_eq!(user.name, "NEW USER");
+    assert_eq!(user.security_level, 20);
+    assert_eq!(user.exp_security_level, 5);
+    assert_eq!(user.protocol, "N");
+    assert_eq!(user.page_len, 23);
+    let days = (user.expiration_date - before).num_days();
+    assert!((29..=30).contains(&days), "expiration {} days after creation", days);
+    assert_eq!(
+        user.conference_flags.get(&0).copied(),
+        Some(ConferenceFlags::Registered | ConferenceFlags::Expired | ConferenceFlags::Selected)
+    );
+    assert!(!user.conference_flags.contains_key(&1));
+    assert!(!user.conference_flags.contains_key(&2));
+
+    assert_eq!(vm.icy_board_state.get_board().await.groups.get_groups("NEW USER"), vec!["new_users", "trial"]);
+    let saved = GroupList::load(&directory.path().join("groups.toml")).unwrap();
+    assert_eq!(saved.get_groups("NEW USER"), vec!["new_users", "trial"]);
+}

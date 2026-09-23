@@ -16,16 +16,10 @@ use icy_board_engine::{
             functions::{MASK_ASCII, MASK_DATE, MASK_MESSAGE, MASK_NAME, MASK_PHONE, MASK_WEB, display_flags, pwd_flags},
         },
         surveys::Survey,
-        user_base::{ConferenceFlags, User},
     },
     vm::TerminalTarget,
 };
 
-fn assign_new_user_groups(groups: &mut icy_board_engine::icy_board::group_list::GroupList, configured: &str, user_name: &str) {
-    for group in configured.split([',', ';']).map(str::trim).filter(|name| !name.is_empty()) {
-        groups.add_member(group, user_name);
-    }
-}
 use icy_net::iemsi::try_iemsi;
 use tokio::fs;
 impl PcbBoardCommand {
@@ -260,18 +254,14 @@ impl PcbBoardCommand {
             }
         }
 
-        let mut new_user = User::default();
         let settings = self.state.get_board().await.config.new_user_settings.clone();
-        let subscription = self.state.get_board().await.config.subscription_info.clone();
-        new_user.security_level = settings.sec_level;
-        new_user.exp_security_level = subscription.default_expired_level;
-        new_user.expiration_date = icy_board_engine::icy_board::subscription::new_user_expiration(
-            subscription.is_enabled,
-            subscription.subscription_length,
-            self.state.session.login_date,
-        );
+        // The subscription runs from the logon, as PCBoard's Status.JulianLogonDate.
+        let mut new_user = self
+            .state
+            .get_board()
+            .await
+            .new_user_record(&self.state.session.user_name, self.state.session.login_date);
         new_user.stats.first_date_on = Utc::now();
-        new_user.set_name(self.state.session.user_name.clone());
         loop {
             tries += 1;
             if tries > 4 {
@@ -579,10 +569,6 @@ impl PcbBoardCommand {
         if self.state.session.is_logoff_requested() || self.deny_login_for_event().await? {
             return Ok(false);
         }
-        if self.state.get_board().await.config.new_user_settings.auto_register_conferences {
-            self.register_public_conferences(&mut new_user).await;
-        }
-
         let user_name = new_user.get_name().clone();
         let live_board = self.state.board.clone();
         let id = IcyBoard::write_users(&self.state.board, move |board| {
@@ -599,7 +585,7 @@ impl PcbBoardCommand {
             }
             // Groups are not part of the writer's user snapshot.
             let mut groups = live_board.blocking_lock().groups.clone();
-            assign_new_user_groups(&mut groups, &board.config.new_user_settings.new_user_groups, &user_name);
+            groups.add_new_user(&board.config.new_user_settings.new_user_groups, &user_name);
             groups.save(&board.config.paths.group_file)?;
             live_board.blocking_lock().groups = groups;
             board.edit_users(|users| Ok(Some(users.new_user(new_user))))
@@ -626,19 +612,6 @@ impl PcbBoardCommand {
         self.state.join_conference(0, false, false).await?;
 
         Ok(true)
-    }
-
-    /// PCBoard's AutoRegConf - a new caller starts out registered in every public
-    /// conference that carries no security requirement of its own.
-    async fn register_public_conferences(&self, user: &mut User) {
-        let board = self.state.get_board().await;
-        for (number, conference) in board.conferences.iter().enumerate() {
-            if !conference.is_public || !conference.required_security.is_empty() {
-                continue;
-            }
-            let flags = user.conference_flags.entry(number).or_insert(ConferenceFlags::None);
-            *flags |= ConferenceFlags::Registered;
-        }
     }
 
     /// PCBoard's ConfirmCaller - show the record the name matched so a caller who
@@ -1118,7 +1091,6 @@ impl PcbBoardCommand {
 
 #[cfg(test)]
 mod option_tests {
-    use super::assign_new_user_groups;
     use icy_board_engine::icy_board::group_list::GroupList;
 
     #[test]
@@ -1126,7 +1098,7 @@ mod option_tests {
         let mut groups = GroupList::new();
         groups.add_group("new_users", "New users");
         groups.add_group("trial", "Trial users");
-        assign_new_user_groups(&mut groups, "new_users, trial; missing", "NEW USER");
+        groups.add_new_user("new_users, trial; missing", "NEW USER");
         assert_eq!(groups.get_groups("NEW USER"), vec!["new_users", "trial"]);
     }
 

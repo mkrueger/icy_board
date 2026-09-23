@@ -80,7 +80,13 @@ ADDUSER (3.20)
     None
 
   **Description**
-    Creates a new user record with system defaults for all fields except the supplied name.
+    Creates a new user record with the new user defaults, as a login registration would:
+    the new user security level, the default expired level, a subscription expiration date
+    (when subscriptions are enabled), transfer protocol ``N``, page length 23, registration in
+    every public conference without a security requirement (when auto registration is enabled),
+    the new user starting balance (accounting) and membership in the configured new user groups.
+    No questions are asked; set password, city etc. afterwards through the ``U_`` variables
+    and :PPL:`PUTALTUSER`. Nothing is created when the name or alias already exists.
 
   **Example**
 
@@ -90,7 +96,8 @@ ADDUSER (3.20)
        PRINTLN "Created & switched context to: New Caller"
 
   **Notes**
-    Validate for duplicates before creation if possible.
+    Validate for duplicates before creation if possible. Newask questions and surveys are
+    not run.
 
   **See Also**
     * :PPL:`GETALTUSER`

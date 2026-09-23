@@ -164,6 +164,30 @@ pub(super) fn resolve_file_from_root(root_path: &Path, file: &Path) -> PathBuf {
 }
 
 impl IcyBoard {
+    /// The record a new caller starts with, shared by login registration and PPL `ADDUSER`.
+    pub fn new_user_record(&self, name: &str, now: chrono::DateTime<chrono::Utc>) -> user_base::User {
+        let settings = &self.config.new_user_settings;
+        let subscription = &self.config.subscription_info;
+        let mut user = user_base::User::default();
+        user.set_name(name.to_string());
+        user.security_level = settings.sec_level;
+        user.exp_security_level = subscription.default_expired_level;
+        user.expiration_date = subscription::new_user_expiration(subscription.is_enabled, subscription.subscription_length, now);
+        user.stats.first_date_on = now;
+        if settings.auto_register_conferences {
+            // PCBoard's AutoRegConf: every public conference without its own security requirement,
+            // registered (also while expired) and selected for scans.
+            let auto_flags = user_base::ConferenceFlags::Registered | user_base::ConferenceFlags::Expired | user_base::ConferenceFlags::Selected;
+            for (number, conference) in self.conferences.iter().enumerate() {
+                if conference.is_public && conference.required_security.is_unrestricted() {
+                    let flags = user.conference_flags.entry(number).or_insert(user_base::ConferenceFlags::None);
+                    *flags |= auto_flags;
+                }
+            }
+        }
+        user
+    }
+
     pub fn new() -> Self {
         let default_display_text = IcbTextFile::default();
 
