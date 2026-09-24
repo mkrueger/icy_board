@@ -102,6 +102,7 @@ ADDUSER (3.20)
   **See Also**
     * :PPL:`GETALTUSER`
     * :PPL:`PUTALTUSER`
+    * :PPL:`Board.AddUser()` – Creates a user and returns a writable ``USER`` record (4.00)
 
 
 ADJTIME (1.00)

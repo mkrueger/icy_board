@@ -303,11 +303,11 @@ value is copied like an ordinary PPL value.
    :header: "Type", "Lifetime", "Mutability"
    :widths: 18, 42, 40
 
-   "``BOARD``", "First-access snapshot for the PPE run", "Read-only"
+   "``BOARD``", "First-access snapshot; the user list is re-read after the PPE changes a user", "Read-only; ``AddUser()`` creates a user"
    "``CONFERENCE``, ``DIRECTORY``, ``DOOR``", "Configured-entry snapshot", "Read-only"
    "``AREA``", "Configured-entry snapshot; message methods perform live I/O", "Read-only"
    "``SESSION``", "Live active-call view", "Read-only"
-   "``USER``", "Live caller view from ``Session``; snapshot from ``Board``", "Caller view selectively writable; board snapshot read-only"
+   "``USER``", "Live caller view from ``Session``; stored record from ``Board.AddUser()``/``Board.FindUser()``; snapshot from ``Board.Users``", "Caller view and stored records selectively writable; ``Board.Users`` entries read-only"
    "``CONTACT``", "Value record in a snapshot array", "Local record fields writable"
    "``MSG``", "Header snapshot; ``Text()`` loads the body", "Read-only"
    "``TERMINAL``", "Live caller-terminal root", "Methods change terminal state"

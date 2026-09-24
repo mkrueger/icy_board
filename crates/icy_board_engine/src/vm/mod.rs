@@ -164,8 +164,12 @@ pub struct VirtualMachine<'a> {
     pub handler_depth: Option<usize>,
 
     /// `Board` is a snapshot of what the board is configured to be, so it is taken once
-    /// rather than on every access - building it copies every conference.
-    pub board_value: Option<VariableValue>,
+    /// rather than on every access - building it copies every conference. Only its user
+    /// list is taken again, after this PPE changes a user.
+    pub board_value: Option<(crate::icy_board::state::ppl_board::PplBoard, VariableValue)>,
+
+    /// The records behind writable `USER` values other than the caller, by primary name.
+    pub user_records: crate::icy_board::state::ppl_user::UserRecords,
 
     /// The message base the `AREA`/`MSG` calls read through. Opening one is what such a
     /// call costs, so a walk keeps it rather than paying for it once per message.
@@ -211,6 +215,7 @@ impl<'a> VirtualMachine<'a> {
             cached_msg_header: None,
             abort_on_stack_error: true,
             board_value: None,
+            user_records: Default::default(),
             message_base: None,
             last_error: PplError::default(),
             error_pending: false,
@@ -223,6 +228,17 @@ impl<'a> VirtualMachine<'a> {
 }
 
 impl VirtualMachine<'_> {
+    /// Called after this PPE created or saved a user, so `Board.Users` and writable
+    /// `USER` values read what was stored rather than what the program started with.
+    pub async fn users_changed(&mut self) {
+        let board = self.icy_board_state.get_board().await;
+        if let Some((snapshot, value)) = &mut self.board_value {
+            snapshot.replace_users(board.users.snapshot());
+            *value = snapshot.clone().value();
+        }
+        self.user_records.refresh(&board.users);
+    }
+
     fn select_user(&mut self, user: User) {
         self.user_baseline = user.clone();
         self.user = user;

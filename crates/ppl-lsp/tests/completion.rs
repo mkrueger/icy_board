@@ -419,7 +419,10 @@ fn runtime_400_objects_offer_their_registered_members() {
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "SetPacing"][..]),
-        ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences", "Users"][..]),
+        (
+            "BOARD value\nvalue.",
+            &["Name", "SysopName", "NodeCount", "Conferences", "Users", "AddUser", "FindUser"][..],
+        ),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
         (
             "USER value\nvalue.",

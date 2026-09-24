@@ -1007,7 +1007,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 
 | Type | Lifetime | Mutability |
 | :--- | :--- | :--- |
-| `BOARD` | Snapshot created on first access; stable for the PPE run | Read-only |
+| `BOARD` | Snapshot created on first access; its user list is re-read after the PPE changes a user | Read-only; `AddUser()` creates a user |
 | `CONFERENCE` | Configured-entry snapshot | Read-only |
 | `AREA` | Configured-entry snapshot; message methods perform live I/O | Read-only |
 | `DIRECTORY` | Configured-entry snapshot; search/mark operations recheck live permissions | Read-only |
@@ -1015,7 +1015,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `FILEPAGE` | Result of one bounded index read; no snapshot across pages | Read-only |
 | `DOOR` | Configured-entry snapshot | Read-only |
 | `SESSION` | Live view of the active call | Read-only; mutate caller data through `Session.User` |
-| `USER` | Live write-through view from `Session.User`; snapshot from `Board.Users` | Session user is writable where documented; board snapshots are read-only |
+| `USER` | Live write-through view from `Session.User`; stored record from `Board.AddUser()`/`Board.FindUser()`; snapshot from `Board.Users` | Session user and stored records are writable where documented; `Board.Users` entries are read-only |
 | `CONTACT` | Value record copied in contact-array snapshots | Record fields are writable on the local copy |
 | `MSG` | Header snapshot; `Text()` loads the current stored body on demand | Read-only |
 | `MSGHEADER` | Local header value; `MSG.Header` returns an independent copy | Writable fields; no write-through |
@@ -2016,7 +2016,9 @@ one call *is doing*.
 
 `Board` is a snapshot of the configuration, conferences and users. It is taken the
 first time a PPE reads `Board` and stands for the rest of the run, so touching it
-inside a loop is not paid for again:
+inside a loop is not paid for again. The one exception is the user list: after
+the PPE creates or saves a user, the next `Board` read sees the current users.
+A `BOARD` value kept in a variable keeps the list it was read with:
 
 | Member | Type | Description |
 | :--- | :--- | :--- |
@@ -2027,6 +2029,8 @@ inside a loop is not paid for again:
 | `NodeCount` | `INTEGER` | Number of configured nodes |
 | `Conferences` | `CONFERENCE[]` | The conferences of the board |
 | `Users` | `USER[]` | The registered users of the board |
+| `AddUser(name)` | `USER` | Creates a user and returns its writable record |
+| `FindUser(name)` | `USER` | The writable record of the user with that name |
 
 `Conferences` is what lets a PPE walk the board without `HIGHCONFNUM()`. An index
 no conference has answers with an object whose `Valid` property is false.
@@ -2059,6 +2063,32 @@ Board metadata reads do not materialize the full user array. `Users` and
 `Conferences` build and cache their PPL arrays on first access from the state
 captured for this `Board` snapshot. `Board.Users` is not a paginated or searchable
 userbase API; retaining it can retain the captured user data for the PPE run.
+
+`AddUser(name)` creates a user with the defaults `ADDUSER` uses and returns its
+record. An empty name, or one another user already has as a name or alias,
+fails with `ERR_INVALID` and returns an invalid `USER`; a failed save reports
+`ERR_IO`. `FindUser(name)` looks a user up by name and returns an invalid
+`USER` without an error when nobody has that name. For the caller it returns
+`Session.User`.
+
+A record is written through: each assignment or `SetPassword()` is saved at
+once and merged with changes other nodes made to fields the PPE did not touch.
+Records of the same user share one state, so every handle in a PPE sees the
+same values. If the user is removed or replaced, for example by a sysop pack,
+the record becomes invalid and a write fails with `ERR_IO` instead of
+recreating the user:
+
+```PPL
+USER user
+
+user = Board.AddUser("New Caller")
+IF (user.Valid) THEN
+	user.City = "Berlin"
+	user.SecurityLevel = 20
+ELSE
+	PRINTLN Error.Last().Message
+ENDIF
+```
 
 `Session` is the call in progress. Unlike `Board` it is read live, so a value
 kept in a variable still answers with what the session became:

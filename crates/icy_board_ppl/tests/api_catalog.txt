@@ -219,6 +219,8 @@ TYPE Board (46) [instance]
     4 getter NodeCount: Integer
     5 getter Conferences: Conference[1]
     6 getter Users: User[1]
+    7 func   AddUser(name: UnboundedString) -> User
+    8 func   FindUser(name: UnboundedString) -> User
 
 TYPE Session (47) [instance]
     0 getter Conference: Conference

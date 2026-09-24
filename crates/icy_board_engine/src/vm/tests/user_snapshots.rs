@@ -500,3 +500,147 @@ async fn adduser_applies_the_new_user_defaults() {
     let saved = GroupList::load(&directory.path().join("groups.toml")).unwrap();
     assert_eq!(saved.get_groups("NEW USER"), vec!["new_users", "trial"]);
 }
+
+/// The output, and the user file if the snippet saved one.
+fn run_with_user_file(source: &str) -> (String, Option<UserBase>) {
+    let directory = tempfile::tempdir().unwrap();
+    let user_file = directory.path().join("users.toml");
+    let output = tests::run_ppl_on(source, |board| board.config.paths.user_file = user_file.clone());
+    (output, user_file.exists().then(|| UserBase::load(&user_file).unwrap()))
+}
+
+#[test]
+fn board_add_user_returns_a_writable_record_that_board_users_sees() {
+    let (output, users) = run_with_user_file(
+        r#"
+PRINTLN Board.Users.Len()
+USER created = Board.AddUser("  New Caller ")
+PRINTLN Error.Last().OK, "|", created.Valid, "|", created.Name, "|", created.RecordNumber, "|", created.Protocol, "|", created.PageLength
+PRINTLN Board.Users.Len(), "|", Board.Users[created.RecordNumber - 1].Name
+created.City = "Berlin"
+created.SecurityLevel = 20
+PRINTLN Error.Last().OK, "|", created.City, "|", created.SecurityLevel, "|", Board.Users[created.RecordNumber - 1].City
+PRINTLN Session.User.Name, "|", Session.User.City
+"#,
+    );
+    assert_eq!(output, "1\n1|1|New Caller|2|N|23\n2|New Caller\n1|Berlin|20|Berlin\nSYSOP|\n");
+    let users = users.unwrap();
+    assert_eq!(users.len(), 2);
+    assert_eq!(users[1].name, "New Caller");
+    assert_eq!(users[1].city_or_state, "Berlin");
+    assert_eq!(users[1].security_level, 20);
+    assert!(users[0].city_or_state.is_empty());
+}
+
+#[test]
+fn board_add_user_refuses_empty_and_taken_names() {
+    let (output, users) = run_with_user_file(
+        r#"
+USER user = Board.AddUser("   ")
+PRINTLN user.Valid, "|", Error.Last().OK, "|", Error.Last().Message
+Error.Clear()
+user = Board.AddUser("sysop")
+PRINTLN user.Valid, "|", Error.Last().OK, "|", Error.Last().Message
+Error.Clear()
+user.City = "nowhere"
+PRINTLN Error.Last().OK, "|", Board.Users.Len()
+"#,
+    );
+    assert_eq!(
+        output,
+        "0|0|the user name cannot be empty\n0|0|a user with that name or alias already exists\n0|1\n"
+    );
+    assert!(users.is_none(), "nothing was created or saved");
+}
+
+#[test]
+fn board_find_user_shares_one_record_and_hands_out_the_caller_as_session_user() {
+    let (output, users) = run_with_user_file(
+        r#"
+ADDUSER "Other Caller", FALSE
+USER first = Board.FindUser(" other caller ")
+USER second = Board.FindUser("OTHER CALLER")
+first.Comment = "shared"
+PRINTLN second.Comment, "|", second.RecordNumber, "|", Board.Users[1].Comment
+USER me = Board.FindUser("sysop")
+me.City = "Home"
+PRINTLN Session.User.City, "|", me.RecordNumber
+USER nobody = Board.FindUser("nobody")
+PRINTLN nobody.Valid, "|", Error.Last().OK
+"#,
+    );
+    assert_eq!(output, "shared|2|shared\nHome|1\n0|1\n");
+    let users = users.unwrap();
+    assert_eq!(users[0].city_or_state, "Home");
+    assert_eq!(users[1].user_comment, "shared");
+}
+
+#[test]
+fn board_users_and_records_follow_legacy_adduser_and_putuser() {
+    let (output, users) = run_with_user_file(
+        r#"
+PRINTLN Board.Users.Len()
+ADDUSER "Legacy", FALSE
+PRINTLN Board.Users.Len(), "|", Board.Users[1].Name
+USER record = Board.FindUser("Legacy")
+record.City = "FromObject"
+GETALTUSER record.RecordNumber
+U_CMNT1 = "FromLegacy"
+PUTUSER
+PRINTLN record.City, "|", record.Comment, "|", Board.Users[1].Comment, "|", U_CITY
+PRINTLN Board.Users[1].SetNote(0, "refused"), "|", Error.Last().OK
+"#,
+    );
+    assert_eq!(output, "1\n2|Legacy\nFromObject|FromLegacy|FromLegacy|FromObject\n0|0\n");
+    let users = users.unwrap();
+    assert_eq!(users[1].city_or_state, "FromObject");
+    assert_eq!(users[1].user_comment, "FromLegacy");
+}
+
+async fn edit_stored_users(vm: &mut VirtualMachine<'_>, edit: impl FnOnce(&mut UserBase) + Send + 'static) {
+    IcyBoard::write_users(&vm.icy_board_state.board, move |board| {
+        board.edit_users(|users| {
+            edit(users);
+            Ok(())
+        })
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn a_record_merges_with_another_writer_and_notices_when_it_is_packed_away() {
+    use crate::icy_board::state::ppl_error::ERR_IO;
+
+    let directory = tempfile::tempdir().unwrap();
+    let mut state = state(directory.path()).await;
+    let registry = crate::parser::icy_board_registry();
+    let mut io = DiskIO::new(".", None);
+    let mut vm = VirtualMachine::new("test.ppe".into(), &registry, &mut io, &mut state);
+    let commands = load(
+        &mut vm,
+        "USER record = Board.FindUser(\"OTHER\")\nrecord.City = \"Hamburg\"\nrecord.Comment = \"gone\"\nU_CMNT1 = record.Name\n",
+    );
+    assert_eq!(commands.len(), 5, "four statements and END");
+    vm.execute_statement(&commands[0]).await.unwrap();
+
+    edit_stored_users(&mut vm, |users| users[1].user_comment = "other node".into()).await;
+    vm.execute_statement(&commands[1]).await.unwrap();
+    assert!(vm.last_error.is_ok(), "{:?}", vm.last_error);
+    let stored = vm.icy_board_state.get_board().await.users[1].clone();
+    assert_eq!((stored.city_or_state.as_str(), stored.user_comment.as_str()), ("Hamburg", "other node"));
+
+    edit_stored_users(&mut vm, |users| {
+        users.remove(1);
+    })
+    .await;
+    vm.execute_statement(&commands[2]).await.unwrap();
+    assert_eq!(vm.last_error.code, ERR_IO);
+    vm.clear_error();
+    vm.variable_table.set_value(U_CMNT1, VariableValue::new_string("unset".into())).unwrap();
+    vm.execute_statement(&commands[3]).await.unwrap();
+    assert_eq!(vm.variable_table.get_value(U_CMNT1).as_string(), "", "the packed-away record reads invalid");
+    let users = vm.icy_board_state.get_board().await.users.clone();
+    assert_eq!(users.len(), 1);
+    assert!(users.iter().all(|user| user.name != "OTHER"));
+}

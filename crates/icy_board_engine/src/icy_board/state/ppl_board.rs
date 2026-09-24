@@ -22,6 +22,8 @@ member_name!(SYSOP_NAME, "SysopName");
 member_name!(NODES, "NodeCount");
 member_name!(CONFERENCES, "Conferences");
 member_name!(USERS, "Users");
+member_name!(ADD_USER, "AddUser");
+member_name!(FIND_USER, "FindUser");
 
 /// What the board is configured to be, apart from any one call.
 #[derive(Clone, Default)]
@@ -58,6 +60,12 @@ impl PplBoard {
 
     pub fn value(self) -> VariableValue {
         user_data_value(self, BOARD_ID)
+    }
+
+    /// Takes the user list again; `Board` values handed out earlier keep theirs.
+    pub fn replace_users(&mut self, users: Snapshot<Vec<User>>) {
+        self.users = users;
+        self.user_value = Arc::default();
     }
 }
 
@@ -104,10 +112,16 @@ impl UserDataValue for PplBoard {
 
     async fn call_function(
         &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
+        vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        _arguments: &[VariableValue],
+        arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *ADD_USER {
+            return Ok(crate::icy_board::state::ppl_user::add_user(vm, &arguments[0].as_string()).await);
+        }
+        if *name == *FIND_USER {
+            return Ok(crate::icy_board::state::ppl_user::find_user(vm, &arguments[0].as_string()).await);
+        }
         Err(format!("Unknown BOARD function {name}").into())
     }
 

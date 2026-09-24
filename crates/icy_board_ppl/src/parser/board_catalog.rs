@@ -389,6 +389,8 @@ fn register_remaining_members<F: UserDataMemberRegistry>(id: usize, registry: &m
             registry.add_property(n("NodeCount"), V::Integer, false);
             registry.add_array_property(n("Conferences"), V::UserData(CONFERENCE_ID as u32), 1);
             registry.add_array_property(n("Users"), V::UserData(USER_ID as u32), 1);
+            registry.add_named_function(n("AddUser"), vec![("name", V::UnboundedString)], V::UserData(USER_ID as u32));
+            registry.add_named_function(n("FindUser"), vec![("name", V::UnboundedString)], V::UserData(USER_ID as u32));
         }
         SESSION_ID => {
             for (name, id) in [

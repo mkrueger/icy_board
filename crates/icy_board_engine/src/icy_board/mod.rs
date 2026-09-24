@@ -188,6 +188,60 @@ impl IcyBoard {
         user
     }
 
+    /// Creates a user the way PPL `ADDUSER` does, with PCBoard's USRMAINT.C addrecsub
+    /// defaults on top of the new user record. Returns `None` when the name is empty
+    /// or already taken as a name or alias.
+    pub async fn add_user(board: &std::sync::Arc<tokio::sync::Mutex<IcyBoard>>, name: &str) -> Res<Option<(usize, user_base::User)>> {
+        use pcb::user_inf::AccountUserInf;
+
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            return Ok(None);
+        }
+        let now = chrono::Utc::now();
+        let mut new_user = board.lock().await.new_user_record(&name, now);
+        // Login registration asks for these instead.
+        new_user.protocol = "N".to_string();
+        new_user.page_len = 23;
+        new_user.stats.last_on = now;
+        let live_board = board.clone();
+        IcyBoard::write_users(board, move |board| {
+            let duplicate = board
+                .users
+                .iter()
+                .any(|u| u.get_name().eq_ignore_ascii_case(&name) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(&name)));
+            if duplicate {
+                return Ok(None);
+            }
+
+            if board.config.accounting.enabled
+                && let Some(acc_cfg) = &board.config.accounting.accounting_config
+            {
+                new_user.account = Some(AccountUserInf {
+                    starting_balance: acc_cfg.new_user_balance,
+                    start_this_session: acc_cfg.new_user_balance,
+                    ..Default::default()
+                });
+            }
+
+            let new_user_groups = &board.config.new_user_settings.new_user_groups;
+            if !new_user_groups.trim().is_empty() {
+                // Groups are not part of the writer's user snapshot.
+                let mut groups = live_board.blocking_lock().groups.clone();
+                groups.add_new_user(new_user_groups, &name);
+                // Groups are an IcyBoard extension; failing to store them must not fail user creation.
+                match groups.save(&board.config.paths.group_file) {
+                    Ok(()) => live_board.blocking_lock().groups = groups,
+                    Err(err) => log::error!("Can't save groups to {}: {err}", board.config.paths.group_file.display()),
+                }
+            }
+
+            let record_index = board.edit_users(|users| Ok(users.new_user(new_user)))?;
+            Ok(Some((record_index, board.users[record_index].clone())))
+        })
+        .await
+    }
+
     pub fn new() -> Self {
         let default_display_text = IcbTextFile::default();
 

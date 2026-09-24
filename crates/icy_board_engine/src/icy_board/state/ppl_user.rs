@@ -78,7 +78,8 @@ member_name!(ADD_CONTACT, "AddContact");
 member_name!(REMOVE_CONTACT, "RemoveContact");
 member_name!(SET_NOTE, "SetNote");
 
-/// A user record. `Session.User` is live; entries from `Board.Users` are snapshots.
+/// A user record. `Session.User` is live; entries from `Board.Users` are snapshots;
+/// `Board.AddUser` and `Board.FindUser` hand out writable views of stored records.
 #[derive(Clone, Default)]
 pub enum PplUser {
     #[default]
@@ -88,6 +89,43 @@ pub enum PplUser {
         valid: bool,
         index: usize,
     },
+    /// The same identity `PUTUSER` merges by, so a pack or a replaced record is noticed.
+    Record {
+        name: String,
+        first_date_on: chrono::DateTime<chrono::Utc>,
+    },
+}
+
+/// What this PPE last read or saved of the records behind `PplUser::Record`, keyed by
+/// primary name, so every value for one record agrees on its state.
+#[derive(Default)]
+pub struct UserRecords {
+    records: std::collections::HashMap<String, (usize, User)>,
+}
+
+impl UserRecords {
+    fn get(&self, name: &str, first_date_on: &chrono::DateTime<chrono::Utc>) -> Option<&(usize, User)> {
+        self.records.get(name).filter(|(_, user)| user.stats.first_date_on == *first_date_on)
+    }
+
+    fn insert(&mut self, index: usize, user: User) {
+        self.records.insert(user.name.clone(), (index, user));
+    }
+
+    /// Re-reads every known record; one that was packed away or replaced is dropped.
+    pub fn refresh(&mut self, users: &[User]) {
+        self.records.retain(|name, (index, user)| {
+            let Some(position) = users.iter().position(|stored| stored.name == *name) else {
+                return false;
+            };
+            if users[position].stats.first_date_on != user.stats.first_date_on {
+                return false;
+            }
+            *index = position;
+            user.clone_from(&users[position]);
+            true
+        });
+    }
 }
 
 impl PplUser {
@@ -99,10 +137,32 @@ impl PplUser {
         Self::Snapshot { user, valid, index }
     }
 
+    fn invalid() -> VariableValue {
+        user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false, 0), USER_ID)
+    }
+
+    /// A writable view of stored record `index`. The caller's own record is always
+    /// `Session.User`, so there is only one copy of it to keep up to date.
+    fn record_value(vm: &mut crate::vm::VirtualMachine<'_>, index: usize, user: User) -> VariableValue {
+        if let Some(current) = &vm.icy_board_state.session.current_user
+            && current.name == user.name
+            && current.stats.first_date_on == user.stats.first_date_on
+        {
+            return Self::value();
+        }
+        let record = Self::Record {
+            name: user.name.clone(),
+            first_date_on: user.stats.first_date_on,
+        };
+        vm.user_records.insert(index, user);
+        user_data_value(record, USER_ID)
+    }
+
     fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
         match self {
             Self::Current => vm.icy_board_state.session.current_user.as_ref(),
             Self::Snapshot { user, .. } => Some(user),
+            Self::Record { name, first_date_on } => vm.user_records.get(name, first_date_on).map(|(_, user)| user),
         }
     }
 
@@ -110,28 +170,45 @@ impl PplUser {
         match self {
             Self::Current => vm.icy_board_state.session.current_user.is_some(),
             Self::Snapshot { valid, .. } => *valid,
+            Self::Record { .. } => self.user(vm).is_some(),
         }
     }
 
-    /// Stage mutations on a copy so rejected arguments cannot alter the live user.
+    /// Stage mutations on a copy so rejected arguments cannot alter the stored user.
     fn writable_user(&self, vm: &mut crate::vm::VirtualMachine<'_>) -> Option<User> {
-        if matches!(self, Self::Snapshot { .. }) {
-            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
-            return None;
-        }
-        let user = vm.icy_board_state.session.current_user.clone();
+        let user = match self {
+            Self::Snapshot { .. } => {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+                return None;
+            }
+            Self::Current => vm.icy_board_state.session.current_user.clone(),
+            Self::Record { .. } => self.user(vm).cloned(),
+        };
         if user.is_none() {
-            vm.set_error(PplError::new(ERR_KIND_USER, ERR_UNAVAILABLE, "no current user"));
+            let message = if matches!(self, Self::Current) {
+                "no current user"
+            } else {
+                "the user record no longer exists"
+            };
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_UNAVAILABLE, message));
         }
         user
     }
 
-    async fn save_user(vm: &mut crate::vm::VirtualMachine<'_>, mut user: User) -> bool {
+    async fn save_user(&self, vm: &mut crate::vm::VirtualMachine<'_>, user: User) -> bool {
+        match self {
+            Self::Record { name, first_date_on } => Self::save_record(vm, name, first_date_on, user).await,
+            _ => Self::save_current(vm, user).await,
+        }
+    }
+
+    async fn save_current(vm: &mut crate::vm::VirtualMachine<'_>, mut user: User) -> bool {
         user.flags.is_dirty = true;
         let previous = vm.icy_board_state.session.current_user.replace(user);
         match vm.icy_board_state.persist_current_user().await {
             Ok(()) => {
                 vm.operation_succeeded();
+                vm.users_changed().await;
                 true
             }
             Err(error) => {
@@ -141,6 +218,73 @@ impl PplUser {
                 false
             }
         }
+    }
+
+    /// Merges into the stored record like a sysop edit, so changes made elsewhere since
+    /// this PPE read it are kept unless they touch the same field.
+    async fn save_record(vm: &mut crate::vm::VirtualMachine<'_>, name: &str, first_date_on: &chrono::DateTime<chrono::Utc>, edited: User) -> bool {
+        use crate::icy_board::{IcyBoard, user_store::UserUpdateMode};
+
+        let Some((_, baseline)) = vm.user_records.get(name, first_date_on).cloned() else {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_UNAVAILABLE, "the user record no longer exists"));
+            return false;
+        };
+        let result = IcyBoard::write_users(&vm.icy_board_state.board, move |board| {
+            let saved = board.update_user(&baseline, &edited, UserUpdateMode::Edit)?;
+            let index = board.users.iter().position(|user| user.name == saved.name).unwrap_or_default();
+            Ok((index, saved))
+        })
+        .await;
+        match result {
+            Ok((index, saved)) => {
+                vm.user_records.insert(index, saved);
+                vm.operation_succeeded();
+                vm.users_changed().await;
+                true
+            }
+            Err(error) => {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_IO, format!("failed to save user: {error}")));
+                // A record that was packed away or replaced reads as invalid from now on.
+                vm.users_changed().await;
+                false
+            }
+        }
+    }
+}
+
+/// `Board.AddUser`: creates a user like `ADDUSER` and hands out a writable view of it.
+pub async fn add_user(vm: &mut crate::vm::VirtualMachine<'_>, name: &str) -> VariableValue {
+    if name.trim().is_empty() {
+        vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "the user name cannot be empty"));
+        return PplUser::invalid();
+    }
+    match crate::icy_board::IcyBoard::add_user(&vm.icy_board_state.board, name).await {
+        Ok(Some((index, user))) => {
+            vm.operation_succeeded();
+            vm.users_changed().await;
+            PplUser::record_value(vm, index, user)
+        }
+        Ok(None) => {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "a user with that name or alias already exists"));
+            PplUser::invalid()
+        }
+        Err(error) => {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_IO, format!("failed to add user: {error}")));
+            PplUser::invalid()
+        }
+    }
+}
+
+/// `Board.FindUser`: the user with that name or alias, writable, or an invalid user.
+pub async fn find_user(vm: &mut crate::vm::VirtualMachine<'_>, name: &str) -> VariableValue {
+    let found = {
+        let board = vm.icy_board_state.get_board().await;
+        board.users.find_by_name(name).map(|index| (index, board.users[index].clone()))
+    };
+    vm.operation_succeeded();
+    match found {
+        Some((index, user)) => PplUser::record_value(vm, index, user),
+        None => PplUser::invalid(),
     }
 }
 
@@ -193,7 +337,7 @@ fn editor_mode_from_int(value: i32) -> FSEMode {
 
 impl UserData for PplUser {
     const TYPE_NAME: &'static str = "User";
-    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false, 0), USER_ID));
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(PplUser::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         crate::parser::board_catalog::register_members(USER_ID, registry);
@@ -234,6 +378,7 @@ impl UserDataValue for PplUser {
             let number = match self {
                 Self::Current => vm.icy_board_state.session.cur_user_id + 1,
                 Self::Snapshot { index, .. } => *index as i32 + 1,
+                Self::Record { name, first_date_on } => vm.user_records.get(name, first_date_on).map_or(0, |(index, _)| *index as i32 + 1),
             };
             VariableValue::new_int(number.max(0))
         } else if *name == *NAME {
@@ -380,7 +525,7 @@ impl UserDataValue for PplUser {
                 "expiresat" | "expirationdate" => user.expiration_date = value,
                 _ => user.password.expire_date = value,
             }
-            Self::save_user(vm, user).await;
+            self.save_user(vm, user).await;
             return Ok(());
         }
         let number = val.as_int();
@@ -454,7 +599,7 @@ impl UserDataValue for PplUser {
         } else {
             return Err(format!("USER property {name} is read-only").into());
         }
-        Self::save_user(vm, user).await;
+        self.save_user(vm, user).await;
         Ok(())
     }
 
@@ -521,7 +666,7 @@ impl UserDataValue for PplUser {
             };
             *note = text;
         }
-        Ok(VariableValue::new_bool(Self::save_user(vm, user).await))
+        Ok(VariableValue::new_bool(self.save_user(vm, user).await))
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {

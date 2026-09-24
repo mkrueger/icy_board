@@ -330,6 +330,7 @@ pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
     vm.select_user(saved);
     // Leave the visible U_* values alone, but acknowledge only successfully merged edits.
     vm.snapshot_user_variables();
+    vm.users_changed().await;
     Ok(())
 }
 
@@ -2953,9 +2954,6 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    use crate::icy_board::pcb::user_inf::AccountUserInf;
-    use chrono::Utc;
-
     // ADDUSER(STRING username, BOOLEAN keepAltVars)
     let username = vm.eval_expr(&args[0]).await?.as_string();
     let keep_alt_vars = vm.eval_expr(&args[1]).await?.as_bool();
@@ -2966,54 +2964,12 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         return Ok(());
     }
 
-    let name = trimmed.to_string();
-    let now = Utc::now();
-    let mut new_user = vm.icy_board_state.get_board().await.new_user_record(&name, now);
-    // USRMAINT.C addrecsub defaults; login registration asks for these instead.
-    new_user.protocol = "N".to_string();
-    new_user.page_len = 23;
-    new_user.stats.last_on = now;
-    let live_board = vm.icy_board_state.board.clone();
-    let created = IcyBoard::write_users(&vm.icy_board_state.board, move |board| {
-        let duplicate = board
-            .users
-            .iter()
-            .any(|u| u.get_name().eq_ignore_ascii_case(&name) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(&name)));
-        if duplicate {
-            return Ok(None);
-        }
-
-        if board.config.accounting.enabled
-            && let Some(acc_cfg) = &board.config.accounting.accounting_config
-        {
-            new_user.account = Some(AccountUserInf {
-                starting_balance: acc_cfg.new_user_balance,
-                start_this_session: acc_cfg.new_user_balance,
-                ..Default::default()
-            });
-        }
-
-        let new_user_groups = &board.config.new_user_settings.new_user_groups;
-        if !new_user_groups.trim().is_empty() {
-            // Groups are not part of the writer's user snapshot.
-            let mut groups = live_board.blocking_lock().groups.clone();
-            groups.add_new_user(new_user_groups, &name);
-            // Groups are an IcyBoard extension; failing to store them must not fail a PCBoard statement.
-            match groups.save(&board.config.paths.group_file) {
-                Ok(()) => live_board.blocking_lock().groups = groups,
-                Err(err) => log::error!("ADDUSER: can't save groups to {}: {err}", board.config.paths.group_file.display()),
-            }
-        }
-
-        let record_index = board.edit_users(|users| Ok(users.new_user(new_user)))?;
-        Ok(Some((record_index, board.users[record_index].clone())))
-    })
-    .await?;
-    let Some((record_index, new_user)) = created else {
+    let Some((record_index, new_user)) = IcyBoard::add_user(&vm.icy_board_state.board, trimmed).await? else {
         log::warn!("ADDUSER: duplicate username '{trimmed}', no user created");
         return Ok(());
     };
     log::info!("ADDUSER: created user '{}' as record #{}", trimmed, record_index + 1);
+    vm.users_changed().await;
 
     // Handle variable context switching
     if keep_alt_vars {
