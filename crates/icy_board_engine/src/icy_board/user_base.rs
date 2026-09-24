@@ -692,7 +692,7 @@ impl User {
     }
 
     pub fn set_tpa(&mut self, keyword: &str, data: &str) {
-        self.tpa_record_mut(keyword).data = data.to_string();
+        data.clone_into(&mut self.tpa_record_mut(keyword).data);
     }
 
     pub fn get_conference_tpa(&self, keyword: &str, conference: usize) -> &str {
@@ -708,7 +708,7 @@ impl User {
     pub fn set_conference_tpa(&mut self, keyword: &str, conference: usize, data: &str) {
         let record = self.tpa_record_mut(keyword);
         match record.conferences.iter_mut().find(|c| c.conference == conference) {
-            Some(entry) => entry.data = data.to_string(),
+            Some(entry) => data.clone_into(&mut entry.data),
             None => record.conferences.push(TpaConferenceRecord {
                 conference,
                 data: data.to_string(),
@@ -731,20 +731,12 @@ impl User {
         self.tpa_records.last_mut().unwrap()
     }
 
-    pub fn get_first_name(&self) -> String {
-        if let Some(idx) = self.name.find(' ') {
-            self.name[..idx].to_string()
-        } else {
-            self.name.clone()
-        }
+    pub fn first_name(&self) -> &str {
+        self.name.split_once(' ').map_or(self.name.as_str(), |(first, _)| first)
     }
 
-    pub fn get_last_name(&self) -> String {
-        if let Some(idx) = self.name.find(' ') {
-            self.name[idx + 1..].to_string()
-        } else {
-            String::new()
-        }
+    pub fn last_name(&self) -> &str {
+        self.name.split_once(' ').map_or("", |(_, last)| last)
     }
 
     fn import_pcb(u: &PcbUser) -> Self {
@@ -1313,6 +1305,73 @@ impl Deref for UserBase {
 impl DerefMut for UserBase {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.users
+    }
+}
+
+#[cfg(test)]
+mod user_tests {
+    use super::*;
+
+    #[test]
+    fn name_accessors_borrow_and_preserve_existing_splitting() {
+        for (name, first, last) in [
+            ("", "", ""),
+            ("Single", "Single", ""),
+            ("First Last", "First", "Last"),
+            ("First Middle Last", "First", "Middle Last"),
+            (" First", "", "First"),
+            ("First ", "First", ""),
+            ("First  Last", "First", " Last"),
+            ("First\tLast", "First\tLast", ""),
+            ("J\u{00f6}rg M\u{00fc}ller", "J\u{00f6}rg", "M\u{00fc}ller"),
+        ] {
+            let user = User {
+                name: name.into(),
+                ..Default::default()
+            };
+            assert_eq!(user.first_name(), first);
+            assert_eq!(user.last_name(), last);
+            assert_eq!(user.first_name().as_ptr(), user.name.as_ptr());
+            if !last.is_empty() {
+                assert_eq!(user.last_name().as_ptr(), user.name[user.name.len() - last.len()..].as_ptr());
+            }
+        }
+    }
+
+    #[test]
+    fn tpa_updates_reuse_existing_buffers() {
+        let mut user = User::default();
+        user.set_tpa("APP", &"x".repeat(128));
+        user.set_conference_tpa("app", 7, &"y".repeat(128));
+        let data_capacity = user.tpa_records[0].data.capacity();
+        let conference_capacity = user.tpa_records[0].conferences[0].data.capacity();
+
+        for data in ["updated", "", "another update"] {
+            user.set_tpa("App", data);
+            user.set_conference_tpa("aPP", 7, data);
+            assert_eq!(user.get_tpa("app"), data);
+            assert_eq!(user.get_conference_tpa("APP", 7), data);
+            assert_eq!(user.tpa_records.len(), 1);
+            assert_eq!(user.tpa_records[0].keyword, "APP");
+            assert_eq!(user.tpa_records[0].conferences.len(), 1);
+            assert_eq!(user.tpa_records[0].data.capacity(), data_capacity);
+            assert_eq!(user.tpa_records[0].conferences[0].data.capacity(), conference_capacity);
+        }
+
+        let larger_data = "z".repeat(256);
+        user.set_tpa("APP", &larger_data);
+        user.set_conference_tpa("app", 7, &larger_data);
+        user.set_conference_tpa("app", 9, "other conference");
+        user.set_tpa("OTHER", "other application");
+        assert_eq!(user.get_tpa("app"), larger_data);
+        assert_eq!(user.get_conference_tpa("APP", 7), larger_data);
+        assert_eq!(user.get_conference_tpa("app", 9), "other conference");
+        assert_eq!(user.get_tpa("other"), "other application");
+        assert_eq!(user.get_tpa("missing"), "");
+        assert_eq!(user.get_conference_tpa("app", 8), "");
+        let encoded = toml::to_string(&user).unwrap();
+        let decoded: User = toml::from_str(&encoded).unwrap();
+        assert!(decoded == user);
     }
 }
 

@@ -14,8 +14,8 @@ pub async fn create_dorinfo(state: &IcyBoardState, path: &std::path::Path) -> Re
     let mut contents = String::new();
     let board = state.get_board().await;
     let _ = write!(contents, "{}\r\n", board.config.board.name); // System name
-    let _ = write!(contents, "{}\r\n", board.users[0].get_first_name()); // Sysop first name
-    let _ = write!(contents, "{}\r\n", board.users[0].get_last_name()); // Sysop last name
+    let _ = write!(contents, "{}\r\n", board.users[0].first_name()); // Sysop first name
+    let _ = write!(contents, "{}\r\n", board.users[0].last_name()); // Sysop last name
     let _ = write!(contents, "COM{DOOR_COM_PORT}\r\n"); // Communications port in use (COM0 if local)
     let _ = write!(contents, "{DOOR_BPS_RATE} BAUD-R,N,8,1\r\n"); // Communications port settings
     contents.push_str("0\r\n"); // Reserved (always zero)
