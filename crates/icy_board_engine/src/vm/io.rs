@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::{Res, executable::PPEExpr, icy_board::read_data_with_encoding_detection, vm::VirtualMachine};
+use icy_board_ppl::io::read_data_with_utf8_detection;
 
 use crate::vm::VMError;
 
@@ -74,7 +75,8 @@ pub trait PCBoardIO: Send {
     ///   FGET 1, s
     /// ENDWHILE
     /// FCLOSE 1
-    fn fget(&mut self, channel: i32) -> Res<String>;
+    /// `detect_utf8` also reads files without a BOM as UTF-8 when they are valid UTF-8 (runtime 400).
+    fn fget(&mut self, channel: i32, detect_utf8: bool) -> Res<String>;
 
     fn fread(&mut self, channel: i32, size: usize) -> Res<Vec<u8>>;
     fn fwrite(&mut self, channel: i32, data: &[u8]) -> Res<()>;
@@ -440,7 +442,7 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn fget(&mut self, channel: i32) -> Res<String> {
+    fn fget(&mut self, channel: i32, detect_utf8: bool) -> Res<String> {
         let Some(chan) = self.open_channel(channel) else {
             return Ok(String::new());
         };
@@ -452,7 +454,12 @@ impl PCBoardIO for DiskIO {
                 chan.file = Some(f);
                 return Ok(String::new());
             }
-            match read_data_with_encoding_detection(&buf) {
+            let decoded = if detect_utf8 {
+                read_data_with_utf8_detection(&buf)
+            } else {
+                read_data_with_encoding_detection(&buf)
+            };
+            match decoded {
                 Ok(str) => {
                     chan.reader = Some(Cursor::new(str));
                 }
@@ -700,9 +707,9 @@ mod tests {
         second.fopen(1, path, 0, 2).unwrap();
         assert!(!first.ferr(1));
         assert!(!second.ferr(1));
-        assert_eq!(first.fget(1).unwrap(), "one");
-        assert_eq!(first.fget(1).unwrap(), "two");
-        assert_eq!(first.fget(1).unwrap(), "");
+        assert_eq!(first.fget(1, false).unwrap(), "one");
+        assert_eq!(first.fget(1, false).unwrap(), "two");
+        assert_eq!(first.fget(1, false).unwrap(), "");
         assert!(first.ferr(1));
         writer.fcreate(1, path, 1, 0);
         assert!(writer.ferr(1));
@@ -713,14 +720,14 @@ mod tests {
         writer.fcreate(1, path, 1, 3);
         assert!(!writer.ferr(1));
         writer.fwrite(1, b"unchanged").unwrap();
-        writer.fget(1).unwrap();
+        writer.fget(1, false).unwrap();
         assert!(writer.ferr(1));
         first.fopen(1, path, 0, 0).unwrap();
         assert!(first.ferr(1));
         writer.fclose(1).unwrap();
         first.fopen(1, path, 0, 0).unwrap();
         assert!(!first.ferr(1));
-        assert_eq!(first.fget(1).unwrap(), "unchanged");
+        assert_eq!(first.fget(1, false).unwrap(), "unchanged");
     }
 
     #[test]
@@ -864,7 +871,7 @@ mod tests {
 
         io.frewind(6).unwrap();
         assert!(io.ferr(6));
-        assert_eq!(io.fget(6).unwrap(), "");
+        assert_eq!(io.fget(6, false).unwrap(), "");
         assert_eq!(io.fread(6, 4).unwrap(), Vec::<u8>::new());
         io.fput(6, "x".to_string()).unwrap();
         io.fwrite(6, b"x").unwrap();

@@ -255,3 +255,101 @@ fn a_short_bytes_read_returns_empty_and_sets_the_error_flag() {
     );
     assert_eq!(output, "0 1\n");
 }
+
+const UTF8_TEXT: &str = "Grüße ░▒▓\r\nzweite Zeile\r\n";
+const CP437_TEXT: &[u8] = b"Gr\x81\xe1e \xb0\xb1\xb2\r\nzweite Zeile\r\n";
+
+fn encoding_samples() -> Vec<(&'static str, Vec<u8>)> {
+    let mut bom = vec![0xEF, 0xBB, 0xBF];
+    bom.extend_from_slice(UTF8_TEXT.as_bytes());
+    // A SAUCE record is CP437 with binary fields; 0x95 on its own is not valid UTF-8.
+    let mut utf8_sauce = UTF8_TEXT.as_bytes().to_vec();
+    utf8_sauce.extend_from_slice(b"\x1aSAUCE00\x95\x3e");
+    vec![
+        ("utf8.txt", UTF8_TEXT.as_bytes().to_vec()),
+        ("bom.txt", bom),
+        ("cp437.txt", CP437_TEXT.to_vec()),
+        ("sauce.txt", utf8_sauce),
+    ]
+}
+
+/// Runtime 400 reads UTF-8 whether or not the file has a BOM and keeps reading CP437 files.
+#[test]
+fn fread_into_a_string_detects_utf8_in_runtime_400() {
+    let samples = encoding_samples();
+    let files: Vec<(&str, &[u8])> = samples.iter().map(|(name, data)| (*name, data.as_slice())).collect();
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 400
+        DECLARE PROCEDURE Show(STRING name)
+        Show("utf8.txt")
+        Show("bom.txt")
+        Show("cp437.txt")
+        Show("sauce.txt")
+        PROCEDURE Show(STRING name)
+            STRING s
+            INTEGER eof
+            FOPEN 1, name, O_RD, S_DN
+            FREAD 1, s, FILEINF(name, 4)
+            FCLOSE 1
+            eof = s.Find(CHR(26))
+            IF (eof >= 0) s = s.Left(eof)
+            PRINTLN "[", s.Left(9), "] ", s.Len()
+        ENDPROC
+        "#,
+        &files,
+    );
+
+    assert_eq!(output, "[Grüße ░▒▓] 25\n[Grüße ░▒▓] 25\n[Grüße ░▒▓] 25\n[Grüße ░▒▓] 25\n");
+}
+
+#[test]
+fn fget_detects_utf8_in_runtime_400() {
+    let samples = encoding_samples();
+    let files: Vec<(&str, &[u8])> = samples.iter().map(|(name, data)| (*name, data.as_slice())).collect();
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 400
+        DECLARE PROCEDURE Show(STRING name)
+        Show("utf8.txt")
+        Show("bom.txt")
+        Show("cp437.txt")
+        Show("sauce.txt")
+        PROCEDURE Show(STRING name)
+            STRING s
+            FOPEN 1, name, O_RD, S_DN
+            FGET 1, s
+            WHILE (!FERR(1)) DO
+                PRINT "[", s, "]"
+                FGET 1, s
+            ENDWHILE
+            FCLOSE 1
+            PRINTLN
+        ENDPROC
+        "#,
+        &files,
+    );
+
+    let expected = "[Grüße ░▒▓][zweite Zeile]\n";
+    assert_eq!(output, expected.repeat(4));
+}
+
+/// Old PPEs read fixed CP437 fields with FREAD, so they keep reading every file without a BOM as CP437.
+#[test]
+fn legacy_reads_keep_cp437_without_a_bom() {
+    let output = super::run_ppl_with_files_on_runtime(
+        r#"
+        STRING s
+        FOPEN 1, "utf8.txt", O_RD, S_DN
+        FREAD 1, s, 7
+        FCLOSE 1
+        PRINTLN "fread=", s
+        FOPEN 1, "utf8.txt", O_RD, S_DN
+        FGET 1, s
+        FCLOSE 1
+        PRINTLN "fget=", LEFT(s, 7)
+        "#,
+        340,
+        &[("utf8.txt", UTF8_TEXT.as_bytes())],
+    );
+
+    assert_eq!(output, "fread=Gr├╝├ƒe\nfget=Gr├╝├ƒe\n");
+}

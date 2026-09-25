@@ -202,7 +202,8 @@ pub async fn fclose(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn fget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
-    let value = VariableValue::new_string(vm.io.fget(channel)?);
+    let utf8 = vm.variable_table.get_version() >= 400;
+    let value = VariableValue::new_string(vm.io.fget(channel, utf8)?);
     vm.set_variable(&args[1], value).await?;
     Ok(())
 }
@@ -1753,13 +1754,12 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
             vm.set_variable(arg, VariableValue::new_bytes(result)).await?;
         }
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
-            let mut vs = String::new();
-            for c in result {
-                if c == 0 {
-                    break;
-                }
-                vs.push(CP437_TO_UNICODE[c as usize]);
-            }
+            let text = &result[..result.iter().position(|&c| c == 0).unwrap_or(result.len())];
+            let vs = if vm.variable_table.get_version() >= 400 {
+                icy_board_ppl::io::decode_utf8_or_cp437(text)
+            } else {
+                text.iter().map(|&c| CP437_TO_UNICODE[c as usize]).collect()
+            };
             vm.set_variable(arg, VariableValue::new_string(vs)).await?;
         }
         VariableType::Boolean => {
@@ -1821,7 +1821,7 @@ pub async fn fgetrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     };
     let mut lines = Vec::with_capacity(count);
     for _ in 0..count {
-        let line = vm.io.fget(channel)?;
+        let line = vm.io.fget(channel, vm.variable_table.get_version() >= 400)?;
         if vm.io.ferr(channel) {
             record_io_error(vm, channel, ERR_FORMAT, "text record is truncated".to_string());
             return Ok(());
@@ -1937,7 +1937,8 @@ pub async fn fdefout(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 pub async fn fdget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let value = VariableValue::new_string(vm.io.fget(vm.fd_default_in)?);
+    let utf8 = vm.variable_table.get_version() >= 400;
+    let value = VariableValue::new_string(vm.io.fget(vm.fd_default_in, utf8)?);
     vm.set_variable(&args[0], value).await?;
     Ok(())
 }

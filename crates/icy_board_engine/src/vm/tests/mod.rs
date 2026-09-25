@@ -116,7 +116,11 @@ pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
 
 /// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
 pub(crate) fn compile(source: &str) -> crate::executable::Executable {
-    let executable = compile_source(source);
+    compile_for_runtime(source, None)
+}
+
+fn compile_for_runtime(source: &str, runtime: Option<u16>) -> crate::executable::Executable {
+    let executable = compile_source(source, runtime);
     // Keep the real PPE storage boundary for all existing callers.
     let mut bytes = executable.to_buffer().expect("the snippet does not serialize");
     crate::executable::Executable::from_buffer(&mut bytes, false).expect("the snippet does not load")
@@ -126,7 +130,7 @@ pub(crate) fn compile(source: &str) -> crate::executable::Executable {
 pub(super) fn compile_in_memory(source: &str) -> crate::executable::Executable {
     use crate::executable::VariableType;
 
-    let mut executable = compile_source(source);
+    let mut executable = compile_source(source, None);
     for id in 1..=executable.variable_table.get_entries().len() {
         let entry = executable.variable_table.get_var_entry_mut(id);
         // Ordinary declaration arrays normally get their storage from the PPE loader.
@@ -138,11 +142,12 @@ pub(super) fn compile_in_memory(source: &str) -> crate::executable::Executable {
     executable
 }
 
-fn compile_source(source: &str) -> crate::executable::Executable {
+fn compile_source(source: &str, runtime: Option<u16>) -> crate::executable::Executable {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let reg = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
+    workspace.package.runtime = runtime;
 
     let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
 
@@ -248,6 +253,11 @@ pub fn run_ppl_with_input_after_output(source: &str, marker: &[u8], input: &[u8]
     });
     let _ = std::fs::remove_dir_all(&work_dir);
     String::from_utf8(output).unwrap().replace("\r\n", "\n")
+}
+
+/// The same, with the snippet compiled for an older PPE runtime.
+pub fn run_ppl_with_files_on_runtime(source: &str, runtime: u16, files: &[(&str, &[u8])]) -> String {
+    run_executable_collecting(compile_for_runtime(source, Some(runtime)), |_| {}, files, None, &[], false, false).1
 }
 
 pub fn run_ppl_with_files_and_input(source: &str, files: &[(&str, &[u8])], input: &[u8]) -> String {

@@ -148,6 +148,20 @@ PRINTLN "[", text, "] ", Error.Last().Kind = ErrKind.String, " ", Error.Last().C
 }
 
 #[test]
+fn to_string_drops_a_leading_bom() {
+    // "77u/SGk=" is EF BB BF followed by "Hi".
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+BYTES raw = Base64Dec("77u/SGk=")
+STRING text = raw.ToString()
+PRINTLN "[", text, "] ", text.Len(), " ", Error.Last().OK
+"#,
+    );
+
+    assert_eq!(output, "[Hi] 2 1\n");
+}
+
+#[test]
 fn malformed_base64_reports_a_format_error() {
     let output = run_ppl(
         r#";$LANGVERSION 400

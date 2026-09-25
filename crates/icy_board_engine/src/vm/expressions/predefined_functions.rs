@@ -993,8 +993,9 @@ pub async fn bytes_to_string(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> R
     let Some(bytes) = bytes_from_value(vm, &value, "Bytes.ToString") else {
         return Ok(VariableType::UnboundedString.create_empty_value());
     };
-    match String::from_utf8(bytes) {
+    match std::str::from_utf8(icy_board_ppl::io::strip_utf8_bom(&bytes)) {
         Ok(text) => {
+            let text = text.to_string();
             vm.operation_succeeded();
             Ok(VariableValue::new_unbounded_string(text))
         }

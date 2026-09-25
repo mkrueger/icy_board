@@ -617,8 +617,19 @@ layout measurement.
 
 `BYTES` holds raw bytes. `TOBYTES(text)` encodes UTF-8; `bytes.ToString()` decodes
 strict UTF-8, returning an empty string and `ErrKind.String` / `ErrCode.Format`
-on invalid input. It does not guess CP437 or substitute replacement characters.
+on invalid input. A leading UTF-8 BOM is dropped. It does not guess CP437 or
+substitute replacement characters.
 Numeric `TOBYTES` conversions retain their fixed-width little-endian format.
+
+**Text read from files in runtime 400.** `FGET`, `FDGET`, `FGETREC`, `FREAD` and `FDREAD`
+into a string variable decode a file as UTF-8 when it starts with a BOM or when
+the text before the first NUL or Ctrl-Z is valid UTF-8; anything else is CP437.
+The BOM is not part of the result. `FREAD` keeps the bytes from a Ctrl-Z on
+(for example a SAUCE record) as CP437, so `text.Find(CHR(26))` still finds the
+end of the text. `FREAD` decides for each call: a multi-byte character split
+between two reads makes both parts read as CP437, so read text files in one
+piece or with `FGET`. Below runtime 400 `FGET` recognizes UTF-8 only by its BOM
+and `FREAD` always reads CP437, as PCBoard-era PPEs that read CP437 fields expect.
 
 **Stored literal encoding follows the PPE target runtime, not the source
 language version.** Below runtime 400 the existing CP437 format is unchanged.
@@ -2480,8 +2491,8 @@ uppercase, separator-free hexadecimal, and `LEN(value)` returns its byte count.
 `TOBYTES(value)` returns the binary representation of a supported scalar. Strings
 use UTF-8; numeric values use their fixed-width little-endian representation.
 Arrays, records, objects, tables, passwords and routine references are rejected
-with `ErrCode.Invalid`. `value.ToString()` decodes UTF-8; invalid bytes report
-`ErrCode.Format`.
+with `ErrCode.Invalid`. `value.ToString()` decodes UTF-8 and drops a leading BOM;
+invalid bytes report `ErrCode.Format`.
 
 ```PPL
 BYTES raw = TOBYTES("Grüße")
