@@ -23,7 +23,7 @@ const MEMBER_LIMIT: usize = 16 * 1024 * 1024;
 const TOTAL_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 
 fn digest(data: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(data))
+    hex::encode(Sha256::digest(data))
 }
 
 fn corpus_archive_format(data: &[u8]) -> Option<ArchiveFormat> {

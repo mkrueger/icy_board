@@ -297,6 +297,7 @@ fn parse_screen(parser: &mut AnsiParser, screen: &Arc<Mutex<TextScreen>>, data: 
         return;
     }
     let mut screen = screen.lock().unwrap();
+    parser.utf8 = screen.buffer.buffer_type == icy_engine::BufferType::Unicode;
     icy_board_engine::icy_board::state::virtual_screen::parse_into_screen(parser, &mut screen, data);
 }
 
@@ -476,6 +477,44 @@ mod tests {
         drop(tx);
         drop(board_connection);
         handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn local_terminal_rep_repeats_whole_characters() {
+        for (buffer_type, packet, expected) in [
+            (icy_engine::BufferType::Unicode, "░\x1b[2b▒\x1b[2b▓\x1b[2b".as_bytes(), "░░░▒▒▒▓▓▓"),
+            (icy_engine::BufferType::CP437, b"\xDB\xB1\x1b[2b".as_slice(), "█▒▒▒"),
+        ] {
+            let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+            let mut screen = TextScreen::new((80, 25));
+            screen.buffer.buffer_type = buffer_type;
+            screen.set_unicode_width(buffer_type == icy_engine::BufferType::Unicode);
+            let screen = Arc::new(Mutex::new(screen));
+            let generation = Arc::new(AtomicU64::new(0));
+            let (handle, tx) = start_update_thread(Box::new(ui_connection), screen.clone(), generation.clone());
+
+            for byte in packet {
+                let previous_generation = generation.load(Ordering::Acquire);
+                board_connection.send(&[*byte]).await.unwrap();
+                tokio::time::timeout(Duration::from_secs(1), async {
+                    while generation.load(Ordering::Acquire) == previous_generation {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .unwrap();
+            }
+
+            let screen = screen.lock().unwrap();
+            let row = (0..expected.chars().count() as i32)
+                .map(|x| buffer_type.convert_to_unicode(screen.char_at(Position::new(x, 0)).ch))
+                .collect::<String>();
+            assert_eq!(row, expected, "{buffer_type:?}");
+            drop(screen);
+            drop(tx);
+            drop(board_connection);
+            handle.join().unwrap();
+        }
     }
 
     #[tokio::test]

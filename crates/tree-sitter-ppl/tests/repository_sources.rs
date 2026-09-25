@@ -119,7 +119,7 @@ fn file_host_types_parse_and_highlight_as_builtins() {
     let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
     let mut highlighted_types = Vec::new();
     while let Some(query_match) = matches.next() {
-        for capture in query_match.captures {
+        for capture in query_match.captures() {
             if query.capture_names()[capture.index as usize] == "type.builtin" {
                 highlighted_types.push(capture.node.utf8_text(source.as_bytes()).unwrap());
             }

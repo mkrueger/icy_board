@@ -1142,9 +1142,12 @@ impl IcyBoardState {
         session.date_format = board.lock().await.config.board.date_format.clone();
         let display_text: IcbTextFile = board.lock().await.default_display_text.clone();
         let root_path = board.lock().await.root_path.clone();
-        let p1 = icy_parser_core::AnsiParser::default();
+        // Both screens receive UTF-8 through print_char.
+        let mut p1 = icy_parser_core::AnsiParser::default();
+        p1.utf8 = true;
         //p1.bs_is_ctrl_char = true;
-        let p2 = icy_parser_core::AnsiParser::default();
+        let mut p2 = icy_parser_core::AnsiParser::default();
+        p2.utf8 = true;
         //p2.bs_is_ctrl_char = true;
         Self {
             root_path,

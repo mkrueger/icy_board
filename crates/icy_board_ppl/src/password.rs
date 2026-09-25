@@ -1,7 +1,7 @@
 use crate::Res;
 use argon2::{
     Argon2,
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+    password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -87,8 +87,7 @@ impl Password {
 
     pub fn new_argon2(str: impl Into<String>) -> Password {
         let argon2 = Argon2::default();
-        let salt = SaltString::generate(&mut OsRng);
-        let password_hash = argon2.hash_password(str.into().to_lowercase().as_bytes(), &salt).unwrap().to_string();
+        let password_hash = argon2.hash_password(str.into().to_lowercase().as_bytes()).unwrap().to_string();
         Password::Argon2(password_hash)
     }
 

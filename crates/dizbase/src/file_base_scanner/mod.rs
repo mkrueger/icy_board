@@ -46,8 +46,10 @@ fn is_short_desc(name: &std::ffi::OsStr) -> Option<i32> {
 }
 
 fn scan_sauce(mut info: Vec<MetadataHeader>, path: &Path) -> crate::Result<Vec<MetadataHeader>> {
-    if let Ok(Some(sauce)) = SauceRecord::from_path(path) {
-        info.push(MetadataHeader::new(MetadataType::Sauce, sauce.to_bytes_without_eof()));
+    if let Ok(Some(sauce)) = SauceRecord::from_path(path)
+        && let Ok(data) = sauce.to_bytes_without_eof()
+    {
+        info.push(MetadataHeader::new(MetadataType::Sauce, data));
     }
     Ok(info)
 }

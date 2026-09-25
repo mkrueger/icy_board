@@ -165,7 +165,7 @@ fn review_text_rules(audit: &Path, catalog: &Path, output: &Path) -> Result<()> 
     for row in statement.query_map([], |r| r.get::<_, String>(0))? {
         let hash = row?;
         let raw = fs::read(audit.join("raw").join(&hash))?;
-        if format!("{:x}", Sha256::digest(&raw)) != hash {
+        if hex::encode(Sha256::digest(&raw)) != hash {
             return Err(format!("modified raw blob {hash}").into());
         }
         raw_count += 1;
@@ -231,7 +231,7 @@ fn review_text_rules(audit: &Path, catalog: &Path, output: &Path) -> Result<()> 
     for (id, count) in counts {
         report.push_str(&format!("| {id} | {} | {} | {} |\n", count[0], count[1], count[2]));
     }
-    report.push_str(&format!("\nCatalog SHA-256: `{:x}`\n", Sha256::digest(fs::read(catalog)?)));
+    report.push_str(&format!("\nCatalog SHA-256: `{}`\n", hex::encode(Sha256::digest(fs::read(catalog)?))));
     fs::create_dir(output)?;
     fs::write(output.join("README.md"), &report)?;
     fs::write(output.join("findings.tsv"), findings)?;

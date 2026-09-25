@@ -66,6 +66,10 @@ impl HelpViewState {
             quote_note: get_tui_theme().help_text.fg.unwrap(),
             quote_caution: get_tui_theme().help_text.fg.unwrap(),
             quote_default: get_tui_theme().help_text.fg.unwrap(),
+
+            help_bg_color: get_tui_theme().help_text.bg.unwrap(),
+            help_fg_color: get_tui_theme().help_text.fg.unwrap(),
+            help_title_color: get_tui_theme().help_header.fg.unwrap(),
         };
 
         md_tui::util::colors::set_color_config(cfg);

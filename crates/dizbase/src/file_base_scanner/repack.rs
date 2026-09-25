@@ -490,8 +490,8 @@ mod tests {
         let exact = b"known advertisement";
         let comment = b"known advertising comment";
         let fingerprints = rules(&format!(
-            "[[fingerprint]]\nname = 'known'\nsha256 = '{:x}'\nfile_size = {}\n\n[[fingerprint]]\npattern = '^VARIANT[.]AD$'\nkeywords = ['visit our board']\n\n[[description_rule]]\nid = 'footer'\nlines = ['^visit our board$']\naction = 'auto_clean'\n",
-            Sha256::digest(exact),
+            "[[fingerprint]]\nname = 'known'\nsha256 = '{}'\nfile_size = {}\n\n[[fingerprint]]\npattern = '^VARIANT[.]AD$'\nkeywords = ['visit our board']\n\n[[description_rule]]\nid = 'footer'\nlines = ['^visit our board$']\naction = 'auto_clean'\n",
+            hex::encode(Sha256::digest(exact)),
             exact.len()
         ));
         for enabled in [false, true] {

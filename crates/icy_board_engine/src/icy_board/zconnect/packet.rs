@@ -112,7 +112,7 @@ fn read_limited(path: &Path, limit: usize) -> Res<Vec<u8>> {
 }
 
 fn digest(data: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(data))
+    hex::encode(Sha256::digest(data))
 }
 
 fn sync_directory(dir: &Path) -> Res<()> {

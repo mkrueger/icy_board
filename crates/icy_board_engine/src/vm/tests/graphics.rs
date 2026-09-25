@@ -484,7 +484,7 @@ fn gfx_cache_name(png: &[u8]) -> String {
     JxlSimpleEncoder::new(&rgb, EncoderOptions::new(width, height, ColorSpace::RGB, BitDepth::Eight))
         .encode(&mut encoded)
         .unwrap();
-    format!("gfx/{}.jxl", &format!("{:x}", Sha256::digest(&encoded))[..32])
+    format!("gfx/{}.jxl", &hex::encode(Sha256::digest(&encoded))[..32])
 }
 
 /// Shrunk to one zoom frame at a coarse resolution: the point is that the demo

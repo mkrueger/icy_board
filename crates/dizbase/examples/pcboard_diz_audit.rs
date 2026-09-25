@@ -30,7 +30,7 @@ struct Audit {
 }
 
 fn sha(data: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(data))
+    hex::encode(Sha256::digest(data))
 }
 
 fn inspect(data: &[u8], origin: &str, output: &Path, depth: usize, audit: &mut Audit) -> Result<()> {

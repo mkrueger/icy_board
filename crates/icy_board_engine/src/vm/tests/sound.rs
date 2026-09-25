@@ -325,7 +325,7 @@ fn a_looping_sound_is_not_watched_for_its_end() {
 fn snd_cache_name(data: &[u8], extension: &str) -> String {
     use sha2::{Digest, Sha256};
 
-    format!("snd/{}.{extension}", &format!("{:x}", Sha256::digest(data))[..32])
+    format!("snd/{}.{extension}", &hex::encode(Sha256::digest(data))[..32])
 }
 
 #[test]

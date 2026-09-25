@@ -58,7 +58,7 @@ impl Fingerprint {
             keywords: Vec::new(),
             crc: get_crc32(content),
             file_size: content.len() as u64,
-            sha256: format!("{:x}", Sha256::digest(content)),
+            sha256: hex::encode(Sha256::digest(content)),
         }
     }
 }
@@ -244,7 +244,7 @@ impl FingerprintData {
             return true;
         }
         if !self.sha256s.is_empty() {
-            let sha256 = format!("{:x}", Sha256::digest(content));
+            let sha256 = hex::encode(Sha256::digest(content));
             if self.sha256s.contains(&(sha256, content.len() as u64)) {
                 return true;
             }
@@ -313,8 +313,8 @@ mod tests {
     fn test_a_sha256_fingerprint_matches_exact_content() {
         let content = b"the same bytes as ever";
         let fingerprints = data(&format!(
-            "[[fingerprint]]\nname = \"intro\"\nsha256 = \"{:x}\"\nfile_size = {}\n",
-            Sha256::digest(content),
+            "[[fingerprint]]\nname = \"intro\"\nsha256 = \"{}\"\nfile_size = {}\n",
+            hex::encode(Sha256::digest(content)),
             content.len()
         ));
         assert!(fingerprints.is_match("whatever.ans", content));

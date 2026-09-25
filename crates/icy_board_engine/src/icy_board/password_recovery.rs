@@ -11,7 +11,6 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor, message::Mailbox, transport::smtp::authentication::Credentials};
-use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::{io::AsyncReadExt, sync::Semaphore};
@@ -229,7 +228,7 @@ impl std::fmt::Debug for RecoveryChallenge {
 /// Compare records, not Password::PartialEq (which verifies plaintext against hashes).
 pub fn security_fingerprint(user: &User) -> String {
     let record = security_record(user);
-    format!("{:x}", Sha256::digest(record.as_bytes()))
+    hex::encode(Sha256::digest(record.as_bytes()))
 }
 
 fn security_record(user: &User) -> String {
@@ -338,13 +337,13 @@ fn random_secret() -> Res<String> {
     // 32 symbols, so masking is unbiased: 12 characters carry 60 random bits.
     const ALPHABET: &[u8; 32] = b"ABCDEFGHJKMNPQRSTVWXYZ23456789!?";
     let mut bytes = [0u8; 12];
-    OsRng.try_fill_bytes(&mut bytes).map_err(|_| "Recovery randomness unavailable")?;
+    getrandom::fill(&mut bytes).map_err(|_| "Recovery randomness unavailable")?;
     Ok(bytes.iter().map(|b| ALPHABET[(b & 31) as usize] as char).collect())
 }
 
 fn challenge_id() -> Res<String> {
     let mut bytes = [0u8; 16];
-    OsRng.try_fill_bytes(&mut bytes).map_err(|_| "Recovery randomness unavailable")?;
+    getrandom::fill(&mut bytes).map_err(|_| "Recovery randomness unavailable")?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 

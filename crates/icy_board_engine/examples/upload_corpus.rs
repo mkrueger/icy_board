@@ -82,7 +82,7 @@ fn hash(path: &Path) -> Res<String> {
         }
         digest.update(&buffer[..n]);
     }
-    Ok(format!("{:x}", digest.finalize()))
+    Ok(hex::encode(digest.finalize()))
 }
 
 fn write_new(path: &Path, text: &str) -> Res<()> {

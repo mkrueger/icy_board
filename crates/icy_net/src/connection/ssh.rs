@@ -464,7 +464,9 @@ struct Client {
 impl russh::client::Handler for Client {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, key: &russh::keys::PublicKeyOrCertificate) -> Result<bool, Self::Error> {
+        // Host certificates are verified by their embedded key; CA trust is not evaluated.
+        let key = &key.public_key();
         match &self.host_key_policy {
             HostKeyPolicy::InsecureAcceptAny => Ok(true),
             HostKeyPolicy::Fingerprint(expected) => {
@@ -1201,7 +1203,7 @@ mod tests {
             },
         };
         assert!(matches!(
-            russh::client::Handler::check_server_key(&mut unknown, first.public_key()).await,
+            russh::client::Handler::check_server_key(&mut unknown, &first.public_key().clone().into()).await,
             Err(russh::Error::UnknownKey)
         ));
 
@@ -1213,9 +1215,13 @@ mod tests {
                 accept_new: true,
             },
         };
-        assert!(russh::client::Handler::check_server_key(&mut accept_new, first.public_key()).await.unwrap());
+        assert!(
+            russh::client::Handler::check_server_key(&mut accept_new, &first.public_key().clone().into())
+                .await
+                .unwrap()
+        );
         assert!(matches!(
-            russh::client::Handler::check_server_key(&mut accept_new, second.public_key()).await,
+            russh::client::Handler::check_server_key(&mut accept_new, &second.public_key().clone().into()).await,
             Err(russh::Error::KeyChanged { .. })
         ));
     }

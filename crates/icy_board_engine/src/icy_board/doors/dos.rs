@@ -223,7 +223,7 @@ pub fn prepare_dos_assets(assets: &Path) -> Res<()> {
 
 fn verify_dos_asset(bytes: &[u8], expected: &str) -> Res<()> {
     use sha2::{Digest, Sha256};
-    let actual = format!("{:x}", Sha256::digest(bytes));
+    let actual = hex::encode(Sha256::digest(bytes));
     if actual != expected {
         return Err(format!("DOS asset checksum mismatch: expected {expected}, got {actual}").into());
     }

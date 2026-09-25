@@ -29,7 +29,7 @@ const TOTAL: usize = 2 * 1024 * 1024 * 1024;
 const STORED: usize = 1024 * 1024 * 1024;
 
 fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 fn hash_file(path: &Path) -> Result<String> {
     if !fs::symlink_metadata(path)?.is_file() {
@@ -45,7 +45,7 @@ fn hash_file(path: &Path) -> Result<String> {
         }
         sha.update(&buf[..n]);
     }
-    Ok(format!("{:x}", sha.finalize()))
+    Ok(hex::encode(sha.finalize()))
 }
 fn esc(s: &str) -> String {
     s.chars()

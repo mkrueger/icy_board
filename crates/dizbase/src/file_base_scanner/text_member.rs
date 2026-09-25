@@ -134,7 +134,7 @@ impl TextMemberMatcher {
         if matching.is_empty() {
             return Vec::new();
         }
-        let sha256 = format!("{:x}", Sha256::digest(raw));
+        let sha256 = hex::encode(Sha256::digest(raw));
         matching
             .into_iter()
             .map(|rule| TextMemberMatch {
@@ -215,7 +215,7 @@ mod tests {
             let matches = matcher.matches("renamed/weird.nfo", &raw);
             assert_eq!(matches.len(), 1);
             assert_eq!(matches[0].action, RuleAction::ReportOnly);
-            assert_eq!(matches[0].sha256, format!("{:x}", Sha256::digest(&raw)));
+            assert_eq!(matches[0].sha256, hex::encode(Sha256::digest(&raw)));
         }
     }
     #[test]

@@ -160,7 +160,7 @@ struct Planned<'a> {
 }
 
 fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex::encode(Sha256::digest(bytes))
 }
 
 fn validate_hash(value: &str) -> Res<()> {

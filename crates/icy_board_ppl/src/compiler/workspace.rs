@@ -333,7 +333,7 @@ impl Dependency {
             .chars()
             .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
             .collect();
-        let digest = format!("{digest:x}");
+        let digest = hex::encode(digest);
         let destination = cache.join(format!("{safe_name}-{}", &digest[..16]));
         if destination.join("ppl.toml").is_file() {
             if self.rev.is_none() && self.tag.is_none() {

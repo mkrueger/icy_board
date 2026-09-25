@@ -18,10 +18,10 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 unicase = { workspace = true }
 
-env_logger = "0.11.6"
+env_logger = "0.11.11"
 ropey = "1.6.1"
 serde_json = { workspace = true }
 tower-lsp = { version = "0.20.0", features = ["proposed"]}
-dashmap = "6.1.0"
+dashmap = "6.2.1"
 
 

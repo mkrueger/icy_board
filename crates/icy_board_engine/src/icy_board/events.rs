@@ -5,7 +5,7 @@
 //!   bounded by the inclusive `end_time` second or the end of that calendar day.
 //! * Overnight windows are rejected, not inferred. DST gaps are skipped; ambiguous
 //!   slots use the first fold. `end_time` limits starting, never running duration.
-//! * New records get UUID-v4 strings using existing rand_core OS randomness.
+//! * New records get UUID-v4 strings using OS randomness (getrandom).
 //!   Missing IDs use SHA-256 of the canonical fully defaulted serialized record
 //!   with an empty ID. Load does not write the schedule; the next editor save
 //!   persists this fallback. Before that save, changing any record field changes
@@ -164,7 +164,7 @@ impl TryFrom<EventFields> for BoardEvent {
             // Hash the canonical, fully defaulted record (empty ID), never file order
             // or randomness on load. Identical legacy records deliberately share an ID.
             let canonical = toml::to_string(&event).map_err(|e| e.to_string())?;
-            event.id = format!("legacy-{:x}", Sha256::digest(canonical.as_bytes()));
+            event.id = format!("legacy-{}", hex::encode(Sha256::digest(canonical.as_bytes())));
         }
         event.validate()?;
         Ok(event)
@@ -174,9 +174,8 @@ impl TryFrom<EventFields> for BoardEvent {
 impl BoardEvent {
     /// UUID v4 using the existing OS-random dependency; no UUID crate is required.
     pub fn new_id() -> String {
-        use rand_core::RngCore;
         let mut bytes = [0u8; 16];
-        rand_core::OsRng.fill_bytes(&mut bytes);
+        getrandom::fill(&mut bytes).expect("no secure random source available");
         bytes[6] = (bytes[6] & 0x0f) | 0x40;
         bytes[8] = (bytes[8] & 0x3f) | 0x80;
         let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();

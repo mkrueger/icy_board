@@ -3327,7 +3327,7 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Res
         }
     };
 
-    let hash = format!("{:x}", Sha256::digest(&data));
+    let hash = hex::encode(Sha256::digest(&data));
     let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("bin");
     let cache_name = format!("{}{}.{extension}", crate::icy_board::state::ppl_graphics::SOUND_CACHE_PREFIX, &hash[..32]);
 
@@ -4256,7 +4256,7 @@ async fn gfx_present_surface(
     }
 
     let name = if cacheable {
-        format!("{CACHE_PREFIX}{}.jxl", &format!("{:x}", Sha256::digest(&encoded))[..32])
+        format!("{CACHE_PREFIX}{}.jxl", &hex::encode(Sha256::digest(&encoded))[..32])
     } else {
         // A frame that keeps changing reuses one name per node and surface instead of
         // leaving a new file behind for every frame drawn.
