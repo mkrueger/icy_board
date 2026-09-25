@@ -1,11 +1,19 @@
 use crate::Res;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::IcyBoardState;
-use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND, pwd_flags};
+use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND, MASK_PASSWORD};
 use crate::icy_board::user_base::ConferenceFlags;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::vm::TerminalTarget;
 use std::fmt::Write as _;
+
+enum JoinSelection {
+    Join { number: u16, show_news: bool },
+    Stay { show_news: bool },
+    Retry,
+    Relist,
+    Stop,
+}
 
 impl IcyBoardState {
     pub async fn join_conference_cmd(&mut self) -> Res<()> {
@@ -18,10 +26,7 @@ impl IcyBoardState {
             return Ok(());
         }
         let mut display_menu = self.session.tokens.is_empty();
-        let mut quick_join = false;
         loop {
-            let mut search = false;
-            let mut conf_num = -1;
             if self.session.tokens.is_empty() {
                 if display_menu {
                     display_menu = false;
@@ -35,7 +40,7 @@ impl IcyBoardState {
                 let str = self
                     .input_field(
                         IceText::JoinConferenceNumber,
-                        40,
+                        60,
                         MASK_COMMAND,
                         CommandType::JoinConference.get_help(),
                         None,
@@ -43,146 +48,228 @@ impl IcyBoardState {
                     )
                     .await?;
                 if str.is_empty() {
-                    break;
+                    return Ok(());
                 }
                 self.session.push_tokens(&str);
             }
 
-            let mut search_text = String::new();
-            let mut last_token = String::new();
-            let mut name = String::new();
-            for token in &self.session.tokens {
-                last_token = token.clone();
-                match token.as_str() {
-                    "Q" => {
-                        quick_join = true;
+            match self.select_conference().await? {
+                JoinSelection::Join { number, show_news } => return self.join_selected_conference(number, show_news).await,
+                JoinSelection::Stay { show_news } => return self.process_join(show_news, !show_news).await,
+                JoinSelection::Retry => {}
+                JoinSelection::Relist => display_menu = true,
+                JoinSelection::Stop => return Ok(()),
+            }
+        }
+    }
+
+    async fn select_conference(&mut self) -> Res<JoinSelection> {
+        let tokens: Vec<String> = std::mem::take(&mut self.session.tokens).into();
+        let mut show_news = true;
+        let mut search = false;
+        let mut number = None;
+        let mut name = String::new();
+        let mut last_token = String::new();
+        // A digit after Q, S or a one-letter name is part of the name.
+        let mut non_digit = false;
+
+        for token in tokens {
+            last_token.clone_from(&token);
+            if token.is_empty() {
+                continue;
+            }
+            if !non_digit && token.bytes().all(|b| b.is_ascii_digit()) {
+                number = Some(token.parse::<u16>().unwrap_or(u16::MAX));
+                continue;
+            }
+            let mut chars = token.chars();
+            if let (Some(ch), None) = (chars.next(), chars.next()) {
+                match ch.to_ascii_uppercase() {
+                    'Q' => {
+                        show_news = false;
+                        non_digit = true;
+                        continue;
                     }
-                    "S" => {
+                    'S' => {
                         search = true;
+                        non_digit = true;
+                        continue;
                     }
-                    token => {
-                        if search {
-                            search_text.push_str(token);
-                            search_text.push(' ');
-                        } else if let Ok(num) = token.parse::<i32>() {
-                            conf_num = num;
-                        } else {
-                            if !name.is_empty() {
-                                name.push(' ');
-                            }
-                            let token = token.to_ascii_uppercase();
-                            name.push_str(&token);
-                        }
-                    }
+                    'J' => continue,
+                    'R' => return Ok(JoinSelection::Relist),
+                    _ => non_digit = true,
                 }
             }
             if !name.is_empty() {
-                if name == "MAIN" || name == "MAIN BOARD" {
-                    conf_num = 0;
-                } else {
-                    for (i, conf) in self.get_board().await.conferences.iter().enumerate() {
-                        if conf.name.to_ascii_uppercase() == name {
-                            conf_num = i as i32;
-                            break;
-                        }
-                    }
-                }
+                name.push(' ');
             }
+            name.push_str(&token);
+        }
 
-            self.session.tokens.clear();
-            if conf_num < 0 && name.is_empty() && quick_join && !search {
-                continue;
-            }
-            if conf_num < 0 && search {
-                let text = if search_text.is_empty() {
-                    self.input_field(
-                        IceText::TextToScanFor,
-                        40,
-                        &MASK_ASCII,
-                        CommandType::JoinConference.get_help(),
-                        None,
-                        display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
-                    )
-                    .await?
-                } else {
-                    search_text.pop();
-                    search_text
-                };
-                if text.is_empty() {
-                    break;
-                }
-                self.search_init(text, false);
-                let c = self.get_board().await.conferences.iter().map(|c| c.name.clone()).collect::<Vec<String>>();
-                if let Some(regex) = &self.session.search_pattern.clone() {
-                    for (i, c) in c.iter().enumerate() {
-                        if regex.find(c).is_some() {
-                            self.print(crate::vm::TerminalTarget::Both, &format!("{i}) ")).await?;
-                            self.print_found_text(crate::vm::TerminalTarget::Both, c).await?;
-                            self.new_line().await?;
-
-                            if self.session.disp_options.abort_printout {
-                                break;
-                            }
-                        }
-                    }
-                }
-                self.stop_search();
-                continue;
-            }
-
-            if conf_num == self.session.current_conference_number as i32 {
-                return Ok(());
-            }
-
-            let Some(conference) = self.get_board().await.conferences.get(conf_num as usize).cloned() else {
-                self.session.op_text = last_token;
-                self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-                continue;
+        let conferences = self.get_board().await.conferences.clone();
+        if number.is_none() && !search && !name.is_empty() {
+            let upper = name.to_ascii_uppercase();
+            number = if upper == "MAIN" || upper == "MAIN BOARD" {
+                Some(0)
+            } else {
+                conferences
+                    .iter()
+                    .position(|conference| !conference.name.is_empty() && conference.name.eq_ignore_ascii_case(&name))
+                    .map(|number| number as u16)
             };
+        }
 
-            if !self.subscription_can_access_conference(conf_num as u16) {
-                self.session.op_text.clone_from(&conference.name);
-                self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-                continue;
+        if number.is_none() && search {
+            let text = if name.is_empty() {
+                self.input_field(
+                    IceText::TextToScanFor,
+                    60,
+                    &MASK_ASCII,
+                    CommandType::JoinConference.get_help(),
+                    None,
+                    display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::HIGHASCII,
+                )
+                .await?
+            } else {
+                name
+            };
+            if text.is_empty() {
+                return Ok(JoinSelection::Stay { show_news });
             }
+            self.list_matching_conferences(&conferences, &text.to_ascii_uppercase()).await?;
+            return Ok(JoinSelection::Retry);
+        }
 
-            if !conference.required_security.session_can_access(&self.session) {
-                self.session.op_text.clone_from(&conference.name);
-                self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-                continue;
+        let Some(number) = number else {
+            self.session.op_text = if name.is_empty() { last_token } else { name };
+            self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(JoinSelection::Retry);
+        };
+        if number == self.session.current_conference_number {
+            return Ok(JoinSelection::Stay { show_news });
+        }
+        let Some(conference) = conferences.get(number as usize) else {
+            self.session.op_text = if name.is_empty() { last_token } else { name };
+            self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(JoinSelection::Retry);
+        };
+        if conference.name.is_empty() {
+            self.session.op_text = number.to_string();
+            self.display_text(IceText::InvalidConferenceNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(JoinSelection::Retry);
+        }
+
+        if self.registered_in_conference(number, conference) {
+            return Ok(JoinSelection::Join { number, show_news });
+        }
+        if !conference.password.is_empty() && !self.is_lockedout(number) && self.subscription_can_access_conference(number) {
+            if self.conference_password_ok(conference).await? {
+                if let Some(user) = &mut self.session.current_user {
+                    *user.conference_flags.entry(number as usize).or_insert(ConferenceFlags::None) |= ConferenceFlags::Registered;
+                }
+                return Ok(JoinSelection::Join { number, show_news });
             }
-
-            if !conference.password.is_empty()
-                && !self
-                    .check_password(IceText::PasswordToJoin, pwd_flags::PLAIN, |pwd| conference.password.is_valid(pwd))
-                    .await?
-            {
+            self.session.password_failure_count = self.session.password_failure_count.saturating_add(1);
+            if self.session.password_failure_count >= 4 {
                 self.display_text(IceText::DeniedWrongPassword, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
-                return Ok(());
+                self.logoff_user(crate::icy_board::state::Logoff::Abnormal).await?;
+                return Ok(JoinSelection::Stop);
             }
+            return Ok(JoinSelection::Retry);
+        }
 
-            self.accounting_settle_conference().await?;
-            if self.session.is_logoff_requested() {
-                return Ok(());
+        self.session.op_text = number.to_string();
+        self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
+            .await?;
+        if let Some(user) = &mut self.session.current_user {
+            user.stats.num_not_reg += 1;
+        }
+        Ok(JoinSelection::Retry)
+    }
+
+    fn registered_in_conference(&self, number: u16, conference: &crate::icy_board::conferences::Conference) -> bool {
+        if number == 0 {
+            return true;
+        }
+        let registered = self
+            .session
+            .current_user
+            .as_ref()
+            .and_then(|user| user.conference_flags.get(&(number as usize)))
+            .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
+        self.subscription_can_access_conference(number)
+            && !self.is_lockedout(number)
+            && conference.required_security.session_can_access(&self.session)
+            && (self.session.is_sysop || conference.is_public || registered)
+    }
+
+    /// Two tries; the password already given during this call is accepted without asking.
+    async fn conference_password_ok(&mut self, conference: &crate::icy_board::conferences::Conference) -> Res<bool> {
+        if !self.session.last_password.is_empty() && conference.password.is_valid(&self.session.last_password) {
+            return Ok(true);
+        }
+        for _ in 0..2 {
+            let password = self
+                .input_field(
+                    IceText::PasswordToJoin,
+                    12,
+                    MASK_PASSWORD,
+                    "",
+                    None,
+                    display_flags::ECHODOTS | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::HIGHASCII,
+                )
+                .await?;
+            if conference.password.is_valid(&password) {
+                self.session.last_password = password;
+                return Ok(true);
             }
-            if conf_num == 0 {
-                self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.join_conference(conf_num as u16, quick_join, true).await?;
-                self.display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-            } else {
-                self.join_conference(conf_num as u16, quick_join, true).await?;
-                self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
-                self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
+            self.display_text(IceText::WrongPasswordEntered, display_flags::NEWLINE).await?;
+        }
+        Ok(false)
+    }
+
+    async fn list_matching_conferences(&mut self, conferences: &[crate::icy_board::conferences::Conference], text: &str) -> Res<()> {
+        let mut matches = conferences
+            .iter()
+            .enumerate()
+            .filter(|(_, conference)| !conference.name.is_empty() && conference.name.to_ascii_uppercase().contains(text))
+            .filter(|(number, conference)| self.registered_in_conference(*number as u16, conference))
+            .map(|(number, conference)| (number, conference.name.clone()))
+            .collect::<Vec<_>>();
+        matches.sort_by_key(|(_, name)| name.to_ascii_uppercase());
+        for (number, name) in matches {
+            self.println(TerminalTarget::Both, &format!("{number:5}) {name}")).await?;
+            if self.session.disp_options.abort_printout {
+                break;
             }
-            break;
         }
         Ok(())
+    }
+
+    async fn join_selected_conference(&mut self, number: u16, show_news: bool) -> Res<()> {
+        self.accounting_settle_conference().await?;
+        if self.session.is_logoff_requested() {
+            return Ok(());
+        }
+        let abandoned = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
+        if !self.set_current_conference(number).await? {
+            return Ok(());
+        }
+        if number == 0 {
+            self.session.op_text = abandoned;
+            self.display_text(IceText::ConferenceAbandoned, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+        } else {
+            self.session.op_text = format!("{} ({})", self.session.current_conference.name, number);
+            self.display_text(IceText::ConferenceJoined, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+        }
+        self.display_conference_intro(show_news).await?;
+        self.process_join(show_news, !show_news).await
     }
 
     /// The first of the two questions `PCBoard` asks the first time a

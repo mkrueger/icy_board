@@ -580,6 +580,8 @@ pub struct Session {
     pub memorized_msg: Option<(usize, u32)>,
     pub group_chat: GroupChatPreferences,
     pub joined_conferences: HashSet<u16>,
+    /// Wrong conference passwords during this call; the fourth one ends it.
+    pub password_failure_count: u8,
 }
 
 #[cfg(test)]
@@ -659,6 +661,7 @@ impl Session {
             memorized_msg: None,
             group_chat: GroupChatPreferences::default(),
             joined_conferences: HashSet::new(),
+            password_failure_count: 0,
         }
     }
 
@@ -1486,50 +1489,92 @@ impl IcyBoardState {
     }
 
     pub async fn join_conference(&mut self, conference: u16, quick_join: bool, show_intro: bool) -> Res<()> {
-        let news_behavior = self.board.lock().await.config.switches.display_news_behavior;
-        let scan_new_blt = self.board.lock().await.config.switches.scan_new_blt;
-        let display_userinfo_at_login = self.board.lock().await.config.switches.display_userinfo_at_login;
-
-        let (show_news, only_new) = match news_behavior {
-            super::icb_config::DisplayNewsBehavior::OnlyNewer | super::icb_config::DisplayNewsBehavior::OncePerDay => (true, true),
-
-            super::icb_config::DisplayNewsBehavior::Always => (true, false),
-            super::icb_config::DisplayNewsBehavior::Never => (false, false),
-        };
-
-        // Everything below the intro only happens the first time round.
-        let first_join = !self.session.joined_conferences.contains(&conference);
-
         if !self.set_current_conference(conference).await? {
             return Ok(());
         }
+        self.display_conference_intro(show_intro).await?;
+        self.process_join(!quick_join, quick_join).await
+    }
 
-        if show_news && !quick_join {
-            self.display_news(only_new).await?;
+    /// The board can force the intro even when the caller asked to skip it.
+    pub(crate) async fn display_conference_intro(&mut self, show_intro: bool) -> Res<()> {
+        if !show_intro && !self.get_board().await.config.switches.force_intro_on_join {
+            return Ok(());
         }
+        let intro = self.session.current_conference.intro_file.clone();
+        if !intro.as_os_str().is_empty() && self.get_board().await.resolve_file(&intro).is_file() {
+            self.display_file(&intro).await?;
+        }
+        Ok(())
+    }
 
-        if !quick_join && (self.get_board().await.config.switches.force_intro_on_join || show_intro) && self.session.current_conference.intro_file.is_file() {
-            let f = self.session.current_conference.intro_file.clone();
-            self.display_file(&f).await?;
+    /// News, first-join questions and settings after the current conference was selected.
+    pub(crate) async fn process_join(&mut self, show_news: bool, quick_logon: bool) -> Res<()> {
+        let conference = self.session.current_conference_number;
+        let first_join = !self.session.joined_conferences.contains(&conference);
+        let switches = self.get_board().await.config.switches.clone();
+
+        if let Some(news) = self.conference_news_to_show(show_news, first_join, switches.display_news_behavior).await {
+            self.new_line().await?;
+            self.display_file(&news).await?;
         }
 
         if first_join {
-            self.ask_to_view_conference_members(quick_join).await?;
-            if scan_new_blt {
+            self.ask_to_view_conference_members(quick_logon).await?;
+            if switches.scan_new_blt {
                 self.scan_new_bulletins().await?;
             }
             self.ask_to_scan_message_base().await?;
-        }
-        self.session.joined_conferences.insert(conference);
 
-        if display_userinfo_at_login {
             let sec: SecurityExpression = self.session.user_command_level.cmd_v.clone();
-            if !sec.session_can_access(&self.session) {
+            if switches.display_userinfo_at_login && sec.session_can_access(&self.session) {
                 self.view_settings().await?;
             }
         }
-
+        self.session.joined_conferences.insert(conference);
         Ok(())
+    }
+
+    async fn conference_news_to_show(&self, requested: bool, first_join: bool, behavior: super::icb_config::DisplayNewsBehavior) -> Option<PathBuf> {
+        use super::icb_config::DisplayNewsBehavior;
+
+        let always = behavior == DisplayNewsBehavior::Always;
+        if behavior == DisplayNewsBehavior::Never || (!always && (!requested || self.joined_conference_shares_news().await)) {
+            return None;
+        }
+        let news = self.session.current_conference.news_file.clone();
+        if news.as_os_str().is_empty() {
+            return None;
+        }
+        let resolved = self.get_board().await.resolve_file(&news);
+        let resolved = self.find_more_specific_file(resolved.to_string_lossy().to_string());
+        let modified: DateTime<Utc> = std::fs::metadata(&resolved).and_then(|metadata| metadata.modified()).ok()?.into();
+        if always {
+            return Some(resolved);
+        }
+        if (self.session.is_sysop && self.session.expert_mode()) || !first_join {
+            return None;
+        }
+        let last_on = self.session.current_user.as_ref().map(|user| user.stats.last_on)?;
+        let already_seen = match behavior {
+            DisplayNewsBehavior::OnlyNewer => modified <= last_on,
+            DisplayNewsBehavior::OncePerDay => last_on.date_naive() == self.session.login_date.to_utc().date_naive(),
+            DisplayNewsBehavior::Always | DisplayNewsBehavior::Never => false,
+        };
+        (!already_seen).then_some(resolved)
+    }
+
+    /// A news file shared with an already joined conference has been seen in this call.
+    async fn joined_conference_shares_news(&self) -> bool {
+        let current = self.session.current_conference_number;
+        let board = self.get_board().await;
+        let news = board.resolve_file(&self.session.current_conference.news_file);
+        self.session
+            .joined_conferences
+            .iter()
+            .filter(|number| **number != current)
+            .filter_map(|number| board.conferences.get(*number as usize))
+            .any(|conference| !conference.news_file.as_os_str().is_empty() && board.resolve_file(&conference.news_file) == news)
     }
 
     pub(crate) fn page_line_limit(&self) -> Option<usize> {

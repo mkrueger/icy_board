@@ -7,8 +7,9 @@ teilen diese in Kategorien, um die Suche zu vereinfachen.
 
 - `[conf. name]` Konferenzname. Spezifiziert den Konferenznamen
 - `[conf. num.]` Konferenznummer. Spezifiziert die Konferenznummer
-- `Q` Schnellbeitrit. Überspringt news & intro file beim
-  Betreten.
+- `Q` Schnellbeitritt. Wird nach der Konferenznummer oder dem Namen
+  angegeben, zB. `J 13 Q` oder `J;13;Q`. News- und Intro-Dateien werden
+  übersprungen, außer das System zeigt News immer an oder erzwingt das Intro.
 - `S` Suche nach Namen. Filtert den Konferenznamen nach Muster
   es werden nur passende Konferenzen angezeigt.
 
@@ -43,9 +44,9 @@ J S GAMES
 IcyBoard sucht nach passenden Konferenzen und zeigt zb. das hier an:
 
 ```text
-1) PC Games
-12) Amiga Games
-42) C64 Games
+   12) Amiga Games
+   42) C64 Games
+    1) PC Games
 ```
 
 Mit der Nummer kann die Konferenz betreten werden.

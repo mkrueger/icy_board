@@ -4,14 +4,25 @@ use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType}
 use icy_board_engine::icy_board::conferences::Conference;
 use icy_board_engine::icy_board::icb_config::DisplayNewsBehavior;
 
+/// Conference 7 with its own news and intro. The news file is newer than the caller's last call.
 fn setup_join_files(board: &mut IcyBoard) {
     setup_conference(board);
     board.conferences.resize_with(8, Conference::default);
     board.conferences[7].name = "SEVENTH".to_string();
+    board.conferences[7].is_public = true;
     board.conferences[7].news_file = fixture("main/blt1");
     board.conferences[7].intro_file = fixture("main/blt2");
+    board.config.switches.display_news_behavior = DisplayNewsBehavior::OnlyNewer;
+}
+
+fn setup_forced_join_files(board: &mut IcyBoard) {
+    setup_join_files(board);
     board.config.switches.display_news_behavior = DisplayNewsBehavior::Always;
     board.config.switches.force_intro_on_join = true;
+}
+
+fn position(output: &str, text: &str) -> usize {
+    output.find(text).unwrap_or_else(|| panic!("{text:?} missing from {output}"))
 }
 
 #[test]
@@ -93,50 +104,112 @@ fn test_cmd_j_join() {
 }
 
 #[test]
-fn test_cmd_j_quick_join_by_number_skips_news_and_intro() {
-    for command in ["J;Q;7\n", "J;7;Q\n"] {
-        let output = test_output(command.to_string(), setup_join_files);
-        assert!(output.contains("SEVENTH (7) Joined"), "{command}: {output}");
-        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
-        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
-        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
-    }
-}
-
-#[test]
-fn a_ppe_command_can_quick_join_without_displaying_conference_files() {
-    let output = test_ppe_output("COMMAND TRUE, \"J;Q;7\"", setup_join_files);
+fn test_cmd_j_quick_join_after_the_number_skips_news_and_intro() {
+    let output = test_output("J;7;Q\n".to_string(), setup_join_files);
     assert!(output.contains("SEVENTH (7) Joined"), "{output}");
     assert!(!output.contains("BULLETIN1"), "{output}");
     assert!(!output.contains("BULLETIN2"), "{output}");
 }
 
+/// After Q the digits are part of a conference name, as on `PCBoard` 15.4.
 #[test]
-fn test_cmd_j_normal_join_still_displays_news_and_intro() {
-    let output = test_output("J;7\n".to_string(), setup_join_files);
+fn test_cmd_j_a_number_after_quick_join_is_a_name() {
+    let output = test_output("J;Q;7\n\n".to_string(), setup_join_files);
+    assert!(output.contains("(7) is an invalid Conference selection!"), "{output}");
+    assert!(output.contains("Conference # to join (Enter)=none"), "{output}");
+    assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_quick_join_alone_is_invalid_and_does_not_carry_over() {
+    let output = test_output("J Q\n7\n".to_string(), setup_join_files);
+    assert!(output.contains("(Q) is an invalid Conference selection!"), "{output}");
     assert!(output.contains("SEVENTH (7) Joined"), "{output}");
     assert!(output.contains("BULLETIN1"), "{output}");
     assert!(output.contains("BULLETIN2"), "{output}");
 }
 
 #[test]
-fn test_cmd_j_quick_join_by_name_or_prompt_skips_news_and_intro() {
-    for command in ["J Q TESTCONF\n", "J Q\n7\n"] {
-        let output = test_output(command.to_string(), |board| {
-            setup_join_files(board);
-            board.conferences[1].news_file = fixture("main/blt1");
-            board.conferences[1].intro_file = fixture("main/blt2");
-        });
-        let joined = if command.contains("TESTCONF") {
-            "TESTCONF (1) Joined"
-        } else {
-            "SEVENTH (7) Joined"
-        };
-        assert!(output.contains(joined), "{command}: {output}");
-        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
-        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
-        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
-    }
+fn test_cmd_j_quick_join_by_name_skips_news_and_intro() {
+    let output = test_output("J Q SEVENTH\n".to_string(), setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(!output.contains("BULLETIN1"), "{output}");
+    assert!(!output.contains("BULLETIN2"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_joined_is_shown_before_intro_and_news() {
+    let output = test_output("J;7\n".to_string(), setup_join_files);
+    let joined = position(&output, "SEVENTH (7) Joined");
+    let intro = position(&output, "BULLETIN2");
+    let news = position(&output, "BULLETIN1");
+    assert!(joined < intro && intro < news, "{output}");
+}
+
+#[test]
+fn test_cmd_j_news_is_not_repeated_on_a_second_join() {
+    let output = test_output("J;7\n\nJ;0\n\nJ;7\n".to_string(), setup_join_files);
+    assert_eq!(output.matches("BULLETIN1").count(), 1, "{output}");
+    assert_eq!(output.matches("BULLETIN2").count(), 2, "{output}");
+}
+
+/// Always showing news and forcing the intro both win over Q.
+#[test]
+fn test_cmd_j_forced_news_and_intro_ignore_quick_join() {
+    let output = test_output("J;7;Q\n\nJ;0\n\nJ;7;Q\n".to_string(), setup_forced_join_files);
+    assert_eq!(output.matches("BULLETIN1").count(), 2, "{output}");
+    assert_eq!(output.matches("BULLETIN2").count(), 2, "{output}");
+}
+
+#[test]
+fn a_ppe_command_can_quick_join() {
+    let output = test_ppe_output("COMMAND TRUE, \"J;7;Q\"", setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(!output.contains("BULLETIN1"), "{output}");
+    assert!(!output.contains("BULLETIN2"), "{output}");
+}
+
+#[test]
+fn a_caller_cannot_join_an_unregistered_private_conference() {
+    let output = test_ppe_output("COMMAND TRUE, \"J;7\"", |board| {
+        setup_join_files(board);
+        board.conferences[7].is_public = false;
+    });
+    assert!(output.contains("you are not registered in Conference 7"), "{output}");
+    assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_search_lists_numbered_matches_by_name() {
+    let output = test_output("J;S;E\n\n".to_string(), |board| {
+        setup_join_files(board);
+        board.conferences[2].name = "ANOTHER".to_string();
+    });
+    let another = position(&output, "    2) ANOTHER");
+    let seventh = position(&output, "    7) SEVENTH");
+    let testconf = position(&output, "    1) TESTCONF");
+    assert!(another < seventh && seventh < testconf, "{output}");
+    assert!(output.contains("Conference # to join (Enter)=none"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_search_asks_for_text() {
+    let output = test_output("J S\nSEVEN\n\n".to_string(), setup_join_files);
+    assert!(output.contains("    7) SEVENTH"), "{output}");
+    assert!(!output.contains("TESTCONF"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_r_relists_the_conferences() {
+    let output = test_output("J\nR\n\n".to_string(), setup_join_files);
+    assert_eq!(output.matches("Conference # to join (Enter)=none").count(), 2, "{output}");
+    assert!(!output.contains("invalid Conference selection"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_an_unnamed_conference_is_invalid() {
+    let output = test_output("J 5\n\n".to_string(), setup_join_files);
+    assert!(output.contains("(5) is an invalid Conference selection!"), "{output}");
 }
 
 #[test]

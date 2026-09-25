@@ -9,9 +9,9 @@ dividing that up in categories you can find things faster.
   name you wish to join.
 - `[conf. num.]` Conference number to join. Specifies the conference
   number you wish to join.
-- `Q` Quick-join the conference. News and introduction files are skipped,
-  even when the introduction is normally forced on join. For example,
-  `J Q 13` or `J;Q;13`.
+- `Q` Quick-join the conference. Put it after the conference number or
+  name, for example `J 13 Q` or `J;13;Q`. News and introduction files are
+  skipped unless the board always shows news or forces the introduction.
 - `S` Search conference names for text. Filter conferences
   to join for a text.
 
@@ -50,9 +50,9 @@ IcyBoard will search the conference names to see if it could find a
 match. For example you may see a prompt like that:
 
 ```text
-1) PC Games
-12) Amiga Games
-42) C64 Games
+   12) Amiga Games
+   42) C64 Games
+    1) PC Games
 ```
 
 Pick the conference with the number.
