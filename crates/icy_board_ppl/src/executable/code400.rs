@@ -196,7 +196,11 @@ fn read_expr(input: &mut Reader<'_>, depth: usize) -> Result<PPEExpr> {
             Box::new(read_expr(input, depth + 1)?),
             Box::new(read_expr(input, depth + 1)?),
         ),
-        8 => PPEExpr::Dim(id, read_args(input, depth)?),
+        8 => {
+            // Earlier compilers wrote `NAME()` on a scalar with no indices; that is the variable itself.
+            let args = read_args(input, depth)?;
+            if args.is_empty() { PPEExpr::Value(id) } else { PPEExpr::Dim(id, args) }
+        }
         9 => {
             let definition = FUNCTION_DEFINITIONS
                 .iter()

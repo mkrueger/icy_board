@@ -62,6 +62,7 @@ mod s1_record_fields;
 mod s2_logical_operators;
 mod s3_var_binding;
 mod s4_open_enums;
+mod scalar_parentheses;
 mod scalars;
 mod sound;
 mod static_members;

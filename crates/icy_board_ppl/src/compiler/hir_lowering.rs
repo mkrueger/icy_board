@@ -18,6 +18,8 @@ pub fn lower_expression(expression: &HirExpr) -> PPEExpr {
         }
         HirExpr::Unary(op, expression) => PPEExpr::UnaryExpression(*op, Box::new(lower_expression(expression))),
         HirExpr::Binary(op, left, right) => PPEExpr::BinaryExpression(*op, Box::new(lower_expression(left)), Box::new(lower_expression(right))),
+        // `NAME()` on a scalar is the plain variable, as the legacy encoding stores it.
+        HirExpr::Dim(variable, dimensions) if dimensions.is_empty() => PPEExpr::Value(variable.0),
         HirExpr::Dim(variable, dimensions) => PPEExpr::Dim(variable.0, dimensions.iter().map(lower_expression).collect()),
         HirExpr::PredefinedCall(opcode, arguments) => {
             PPEExpr::PredefinedFunctionCall(opcode.get_definition(), arguments.iter().map(lower_expression).collect())

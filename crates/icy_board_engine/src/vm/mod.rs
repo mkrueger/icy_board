@@ -572,6 +572,10 @@ impl VirtualMachine<'_> {
                 if self.variable_table.get_version() >= 400 && matches!(self.variable_table.get_value(*id).vtype, VariableType::UserData(_)) {
                     return None;
                 }
+                // The async path reports a malformed index list as an error.
+                if !(1..=3).contains(&dims.len()) {
+                    return None;
+                }
                 let dim_1 = self.eval_expr_sync(&dims[0])?.try_as_int()? as usize;
                 let dim_2 = if dims.len() >= 2 {
                     self.eval_expr_sync(&dims[1])?.try_as_int()? as usize
