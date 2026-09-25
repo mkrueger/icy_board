@@ -29,8 +29,9 @@ impl VirtualMachine<'_> {
         }
         // A brand-new absolute path whose parent directory is real - such as one built from
         // `TempPath()` - is a modern path that simply doesn't have its target file yet, not a
-        // stale DOS import to go hunting for below the PPE.
-        if resolved.is_absolute() && resolved.parent().is_some_and(Path::exists) {
+        // stale DOS import to go hunting for below the PPE. A relative name only became
+        // absolute by being joined to the board, so it still gets looked for below the PPE.
+        if Path::new(&file).is_absolute() && resolved.parent().is_some_and(Path::exists) {
             return resolved;
         }
         // A bare name is the board's, the way PCBoard read it from its own directory - only a

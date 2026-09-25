@@ -92,3 +92,17 @@ fn a_relative_directory_that_is_not_there_finds_nothing() {
     );
     assert_eq!(output, "exist=0\n");
 }
+
+/// TETRIS loads `./ui.png` and its sounds from its own directory; the board directory
+/// existing must not stop the lookup there.
+#[test]
+fn a_dot_relative_asset_is_found_next_to_the_ppe() {
+    let output = run_ppl_in_ppe_dir(
+        r#"
+        PRINTLN "exist=", EXIST("./tetris_music.ogg")
+    "#,
+        "ppe/tetris",
+        &[("ppe/tetris/tetris_music.ogg", CONTENT)],
+    );
+    assert_eq!(output, "exist=1\n");
+}
