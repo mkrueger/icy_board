@@ -196,8 +196,7 @@ fn test_cmd_r_lower_case_options_stay_options() {
 }
 
 /// PCBoard asked whether to resume an (A)ll scan only when an earlier one had stopped
-/// part way - getallresumestatus() looks at Status.StartConf. Without one there is
-/// nothing to resume, so the question does not come up.
+/// part way. Without one there is nothing to resume, so the question does not come up.
 #[test]
 fn test_cmd_r_all_does_not_ask_to_resume_a_scan_that_never_stopped() {
     let output = test_output("R A\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);

@@ -423,7 +423,7 @@ fn main() -> Result<()> {
             {
                 return Err(eyre!(err.to_string()));
             }
-            // PCBSetup left its editor for a plain screen to report on the paths. See writefile() in DATAWRIT.C.
+            // PCBSetup left its editor for a plain screen to report on the paths.
             if app.save == SaveChoice::Save {
                 println!("Checking directories while saving files...");
                 if report_paths(&icy_board.lock().unwrap(), true) > 0 {
@@ -443,8 +443,8 @@ fn main() -> Result<()> {
 }
 
 /// Reports on the paths and, when asked, offers to make the missing
-/// directories, the way PCBSetup did after a full save. See checkexistence()
-/// in CHKEXIST.C. Answers how many paths need attention.
+/// directories, the way PCBSetup did after a full save. Answers how many paths
+/// need attention.
 fn report_paths(board: &IcyBoard, offer_to_create: bool) -> usize {
     let reports = board.check_paths();
     if reports.is_empty() {

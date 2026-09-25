@@ -169,7 +169,7 @@ impl DosInputEncoder {
 impl IcyBoardState {
     /// `PCBoard`'s command dispatcher falls through to the door list when a caller
     /// with OPEN access types a word that is not a command; the door name is
-    /// matched as a prefix, the way `searchdoorlist` does (DOORS.C). Returns true
+    /// matched as a prefix, the way `PCBoard` searched its door list. Returns true
     /// when a door was found and run.
     pub async fn try_open_matching_door(&mut self, name: &str) -> Res<bool> {
         let open_access = self.session.user_command_level.cmd_open_door.clone();

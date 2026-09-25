@@ -203,7 +203,7 @@ impl IcyBoardState {
                     _ => file.exists(),
                 };
                 // A line naming something that is not there is a line, the way PCBoard
-                // printed it when runscriptwithparams() came back empty. See FILES.C.
+                // printed it when the script it names could not be run.
                 if !found {
                     self.print(TerminalTarget::Both, txt).await?;
                     return Ok(());
@@ -251,7 +251,7 @@ impl IcyBoardState {
         let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
 
         // PCBoard left a file alone that it was already displaying, so a file including itself
-        // or a PPE started from it displaying it again ends here. See displayfile() in FILES.C.
+        // or a PPE started from it displaying it again ends here.
         if self.displayed_files.iter().any(|open| open == &resolved_name) {
             return Ok(true);
         }
@@ -421,7 +421,7 @@ impl IcyBoardState {
             return Ok(String::new());
         }
         self.session.default_answer.clone_from(&default_answer);
-        // INPUT.C resets the counter without changing a menu's POFF/nonstop mode.
+        // PCBoard reset the counter without changing a menu's POFF/nonstop mode.
         self.session.disp_options.num_lines_printed = 0;
 
         // we've data from a PPE here, so take that input and return it.

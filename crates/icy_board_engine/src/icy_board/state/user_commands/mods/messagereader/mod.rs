@@ -698,7 +698,7 @@ impl IcyBoardState {
         }
 
         // PCBoard only asked where an (A)ll scan had stopped before; without one there is
-        // nothing to resume. See getallresumestatus() in MSGREAD.C.
+        // nothing to resume.
         if cmd.ask_resume_all && self.session.start_conf != 0 {
             let answer = self
                 .input_field(
@@ -1224,7 +1224,7 @@ impl IcyBoardState {
                 shown += 1;
                 // Body output, not header scans, password failures or actions.
                 // Captures bypass this loop and are billed on delivery instead.
-                // MSGREAD.C counts a read for accounting only beyond the caller's
+                // PCBoard counted a read for accounting only beyond the caller's
                 // last-read pointer, and never for a message they wrote.
                 let own = snapshot.header.from().is_some_and(|from| {
                     let from = from.to_string();
@@ -1581,7 +1581,7 @@ mod persistence_tests {
         }
     }
 
-    /// MSGREAD.C counts a read for accounting only beyond the caller's last-read
+    /// PCBoard counted a read for accounting only beyond the caller's last-read
     /// pointer and never for a message they wrote themselves.
     #[tokio::test]
     async fn accounting_bills_new_messages_but_not_own_ones_or_re_reads() {

@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn catalog_covers_original_pcboard_help_and_icy_board_additions() {
-        // Golden suffixes from pcboard/pcb-main/SOURCE/DISPLAY/HELP.C, displayhelpfile().
+        // The help file suffixes PCBoard shipped with.
         let suffixes = [
             "brd", "open", "chat", "cmenu", "endr", "flag", "fscrn", "lang", "r", "news", "qwk", "reg", "rep", "rm", "sec", "sel", "srch", "test", "ts",
             "users", "who", "!", "alias",

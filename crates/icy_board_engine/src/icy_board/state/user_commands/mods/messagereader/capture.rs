@@ -1,6 +1,6 @@
 //! Reader-scoped capture, not the standalone QWK area's independent selection.
 //!
-//! MSGREAD.C readmessage() skips group-password mail during capture (even when
+//! PCBoard skipped group-password mail during capture (even when
 //! the caller previously entered its password). C asks before download, D sends
 //! text, Z compresses text, and QWK produces an indexed packet. Unlike the DOS
 //! implementation, read effects are deferred until the protocol confirms delivery.

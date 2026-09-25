@@ -334,7 +334,7 @@ impl IcyBoardState {
         Ok(true)
     }
 
-    /// MSGENTER.C selects a single global category, then adds the destination
+    /// PCBoard selected a single global category, then adds the destination
     /// conference rate. Resolve before append, not during post-save output.
     async fn message_charge(&mut self, conf: i32, message: &JamMessage) -> Res<MessageCharge> {
         let surcharge = if conf < 0 {
@@ -446,7 +446,7 @@ impl IcyBoardState {
     ) -> Res<()> {
         // No await between append and debit/attachment adoption. A failed audit
         // can follow a committed debit; never invoke the charge a second time.
-        // MSGENTER.C leaves no audit trail for a message that costs nothing.
+        // PCBoard left no audit trail for a message that costs nothing.
         let charged = if charge.rate == 0.0 {
             Ok(0.0)
         } else {

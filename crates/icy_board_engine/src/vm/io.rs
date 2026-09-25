@@ -48,7 +48,7 @@ pub trait PCBoardIO: Send {
     /// Determine if a file error has occured on a channel since last check.
     /// channel - integer expression with the channel to use for the file
     ///
-    /// `PCBoard` cleared `errStat` when FERR was read (EVALP.CPP `TOK_OP_FERR`).
+    /// `PCBoard` cleared the error when FERR was read.
     /// Returns true if an error occured on the specified channel since the last check.
     fn ferr(&mut self, channel: i32) -> bool;
 
@@ -368,8 +368,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, sm: i32) -> Res<()> {
-        // PCBoard's openChan set an error flag and carried on - a channel already in use or a
-        // file that would not open never stopped a PPE. See SCREXEC.CPP.
+        // PCBoard set an error flag and carried on - a channel already in use or a
+        // file that would not open never stopped a PPE.
         if self.is_open(channel) {
             self.set_channel_error(channel, format!("channel {channel} is already in use"));
             return Ok(());
@@ -401,7 +401,6 @@ impl PCBoardIO for DiskIO {
     }
 
     fn ferr(&mut self, channel: i32) -> bool {
-        // PCBoard (EVALP.CPP): result = fileArr[c].errStat; fileArr[c].errStat = FALSE;
         // Reading FERR clears the sticky error. A channel that was never opened has no
         // sticky error yet — PCBoard's array starts false — but any prior failed op set it.
         if let Some(chan) = self.channels.get_mut(&channel) {
@@ -848,7 +847,7 @@ mod tests {
         let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
         io.fopen(1, path.to_str().unwrap(), 0, 0).unwrap();
         assert!(io.ferr(1));
-        // FERR clears the sticky flag on read (EVALP.CPP).
+        // FERR clears the sticky flag on read.
         assert!(!io.ferr(1));
         assert!(!io.is_open(1));
     }

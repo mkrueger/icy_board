@@ -915,7 +915,6 @@ pub fn find_exact<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Comm
 ///
 /// `PCBoard` took an abbreviation from two characters on - one character is never enough,
 /// no matter what a command list holds, so `G` stays Goodbye next to a `GREED` entry.
-/// See `runcmds()` in `PCBoard`'s CMDS.C.
 pub fn find_prefix<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Command> {
     if keyword.len() < 2 {
         return None;
@@ -966,7 +965,7 @@ impl PCBoardRecordImporter<Command> for CommandList {
                 trigger: ActionTrigger::Activation,
             }],
             security: SecurityExpression::from_req_security(security),
-            // PCB.H's packed cmdtype: Name[15], SecLevel, File[40], then
+            // PCBoard's packed command record: Name[15], SecLevel, File[40], then
             // two little-endian IEEE single precision rates (use, minute).
             charge_per_use: f32::from_le_bytes(data[56..60].try_into().unwrap()) as f64,
             charge_per_minute: f32::from_le_bytes(data[60..64].try_into().unwrap()) as f64,

@@ -8,6 +8,7 @@ handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 
 | Start here | Use it for |
 | :--- | :--- |
+| [AI agent setup](agent-setup.md) | Safely create, configure, validate and locally test a new board with an agent. |
 | [Getting started](gettingstarted.md) | Create a board, configure it, make a local call and find the important files. |
 | [TOML configuration reference](configuration/README.md) | Complete file formats, exact keys, required fields, defaults, enum values and examples. |
 | [Installation](../INSTALL.md) | Prebuilt packages, source builds and editor setup. |

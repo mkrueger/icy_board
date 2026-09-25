@@ -47,7 +47,7 @@ pub(crate) const STATUS_ROWS: u16 = 2;
 
 /// What a local session gets to write on: the console is twenty-five rows and the status
 /// bar keeps the last of them, so the board scrolls in what is left. PCBoard sizes a normal
-/// install the same way - two status lines over twenty-three rows (INIT.C setscreen).
+/// install the same way - two status lines over twenty-three rows.
 pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - STATUS_ROWS);
 
 #[derive(Debug, PartialEq)]

@@ -473,7 +473,7 @@ pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
         )
         .await?;
-    // PCBoard assigns the text and lets the variable's type convert it (SCREXEC.CPP).
+    // PCBoard assigns the text and lets the variable's type convert it.
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
@@ -960,9 +960,9 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let operation = vm.eval_expr(&args[4]).await?.as_string();
     let _broadcast = vm.eval_expr(&args[5]).await?.as_string();
 
-    // PCBoard's WRUNET (SCREXEC.CPP) only calls updateusernetrecord - it never sends
-    // anything itself. A node message is delivered when the *target* node's own
-    // polling loop later finds Status == NODEMESSAGE in its record (USERNET.C); we
+    // PCBoard's WRUNET only updates the USERNET record - it never sends anything
+    // itself. A node message is delivered when the *target* node's own polling loop
+    // later finds the node message status in its record; we
     // do not run that poll, so the message text has nowhere to go.
     if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get_mut(node as usize) {
         // PCBoard writes the status byte unconditionally; an empty string clears it.
@@ -2731,7 +2731,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let time = IcbTime::from_naive(date_time.naive_local());
 
     // PCBoard keeps at most 25 characters in the fixed To/From/Subject fields and
-    // spills anything longer into extended headers (MSGENTER.C).
+    // spills anything longer into extended headers.
     let mut ext_headers: Vec<(&str, String)> = Vec::new();
     let to = split_fixed_field(header.to().map(ToString::to_string).unwrap_or_default(), "TO", "TO2", true, &mut ext_headers);
     let from = split_fixed_field(
@@ -2788,7 +2788,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let _ = writeln!(msg, "            Time: {:02}:{:02}", time.get_hour(), time.get_minute());
     let _ = writeln!(msg, "              To: {to}");
     // PCBoard builds a "Reply" line here but overwrites it before writing, so
-    // only "Time of reply" ever reaches the file (SCREXEC.CPP).
+    // only "Time of reply" ever reaches the file.
     msg.push_str("   Time of reply: \n");
     let _ = writeln!(msg, "            From: {from}");
     let _ = writeln!(msg, "         Subject: {subject}");

@@ -19,7 +19,7 @@ use crate::{
 impl IcyBoardState {
     /// Both the directory exemption and the file header's FREE flag apply.
     /// There is no persisted NOTIME or FSEC multiplier in the current schema.
-    /// TRANSFER.C's FILETIME CREDIT additionally needs successful per-file CPS:
+    /// PCBoard's FILETIME CREDIT additionally needs successful per-file CPS:
     /// finished_files only retains names/paths and resets its timing at finish.
     /// Batch CPS includes partial files, so it cannot safely fund that rebate.
     pub(crate) async fn accounting_download_free(&mut self, path: &Path) -> Res<bool> {
@@ -54,7 +54,7 @@ impl IcyBoardState {
         Ok(files.iter().any(|file| file.name().eq_ignore_ascii_case(&name) && file.is_free()))
     }
 
-    /// TRANSFER.C estimates fractional KiB and normal-rate time, including
+    /// PCBoard estimates fractional KiB and normal-rate time, including
     /// earlier queued files. A free file still consumes online time.
     pub(crate) async fn accounting_download_estimate(&mut self, path: &Path, bytes: u64) -> Res<f64> {
         if !self.accounting_active() {
@@ -79,7 +79,7 @@ impl IcyBoardState {
         Ok(reserved)
     }
 
-    /// TRANSFER.C's generated MSGCAP/QWKCAP packets are NOCOST/FreeFile.
+    /// PCBoard's generated MSGCAP/QWKCAP packets are NOCOST/FreeFile.
     /// They still cost online time; StopClockOnCap is not in the live schema.
     pub(crate) fn accounting_capture_transfer_estimate(&self, bytes: u64) -> f64 {
         if !self.accounting_active() {
@@ -110,7 +110,7 @@ impl IcyBoardState {
         let mut protocol_str = self.session.current_user.as_ref().map(|user| user.protocol.clone()).unwrap_or_default();
         let mut goodbye_after_dl = false;
         if ask_flagged_files {
-            // TRANSFER.C scans command-line names separately from prompt answers.
+            // PCBoard scans command-line names separately from prompt answers.
             // In particular, DownloadTagged must not consume the first filename.
             let stacked = std::mem::take(&mut self.session.tokens);
             let mut batch = (explicit_batch && self.session.user_command_level.batch_file_transfer.session_can_access(&self.session))
@@ -335,7 +335,7 @@ impl IcyBoardState {
     }
 
     /// Prompt input may contain several names, but unlike command-line input a
-    /// single letter is a filename, not a protocol (TRANSFER.C scanfornames).
+    /// single letter is a filename, not a protocol.
     async fn download_names(&mut self, goodbye: &mut bool, batch: bool) -> Res<bool> {
         let input = self
             .input_field(

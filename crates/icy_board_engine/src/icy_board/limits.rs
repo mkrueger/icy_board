@@ -1,7 +1,6 @@
 //! The transfer limits `PCBoard` applied to a download.
 //!
-//! Faithful to `checkdlfiles`, `checkratio` and `checklimit` in the original source: each
-//! file is judged on its own against everything already accepted into the batch, and a
+//! Each file is judged on its own against everything already accepted into the batch, and a
 //! file that fails is skipped while the rest of the batch still goes out.
 
 use crate::icy_board::sec_levels::SecurityLevel;

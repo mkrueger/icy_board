@@ -31,9 +31,11 @@ From the board directory, run:
 icbsetup
 ```
 
-Set the board and sysop names, choose a permanent sysop password, inspect the
-network listeners and confirm the node count. Options that the runtime does not
-use yet are greyed out and explain why.
+Set the board and sysop names, inspect the network listeners and confirm the
+node count. The `icbsetup` local sysop password is separate from the sysop user
+account password printed at creation; use `icbsm` to set a permanent password
+for that user before allowing callers in. Options that the runtime does not use
+yet are greyed out and explain why.
 
 On an editable filename or directory field, **F4** opens the file browser:
 

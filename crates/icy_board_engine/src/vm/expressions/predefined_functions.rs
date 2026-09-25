@@ -1833,9 +1833,8 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let item = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
 
     let path = vm.resolve_file(&file).await;
-    // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst without FA_DIREC, and if nothing
-    // is found memset the find block to 0 - directories and missing files both read as
-    // zeroes, never as an error.
+    // PCBoard looked for files only and zeroed the result when nothing was found -
+    // directories and missing files both read as zeroes, never as an error.
     let meta = path.metadata().ok().filter(std::fs::Metadata::is_file);
     let exists = meta.is_some();
 
@@ -2799,7 +2798,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             30 | 42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc
             31 => Ok(VariableValue::new_bool(conference.force_echomail)),
             32 => Ok(VariableValue::new_bool(conference.is_read_only)),
-            // PCBoard field 33 is NoPrivateMsgs (SCRMISC.CPP), not PrivMsgs (field 6).
+            // PCBoard field 33 is NoPrivateMsgs, not PrivMsgs (field 6).
             33 => Ok(VariableValue::new_bool(conference.disallow_private_msgs)),
             34 => Ok(VariableValue::new_int(conference.sec_request_rr.level() as i32)),
             35 => Ok(VariableValue::new_bool(conference.record_origin)),
@@ -3134,7 +3133,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 }
 
 /// The one character `PCBoard` kept in the header to say what kind of message this
-/// is and whether it has been read (MESSAGES.H).
+/// is and whether it has been read.
 pub(crate) fn message_status(header: &JamMessageHeader) -> char {
     let read = header.is_read();
     if header.needs_password() {

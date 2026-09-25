@@ -1,6 +1,3 @@
-//! Source evidence: TRANSFER.C scanfornames/getnames (3568-3720), editlist
-//! (3773-3844), successful (968-980), checkdlfiles (3370-3493), and download
-//! cleanup (4274-4275); FILELIST.C removefinishedfilesfromlist (311-331).
 use std::{sync::Arc, time::Duration};
 
 use dizbase::file_base::FileBase;
@@ -596,8 +593,8 @@ async fn local_d_and_bd_picker_cancel_preserves_queue_and_does_not_credit_or_com
 
 #[tokio::test]
 async fn local_explicit_bd_numbers_filename_prompts_but_unpromoted_d_does_not() {
-    // TRANSFER.C getnames selects TXT_FILENAMETODNLDBTCH only for
-    // Status.Batch; a normal D stops asking after its first accepted file.
+    // PCBoard numbered the filename prompt only for a batch download;
+    // a normal D stops asking after its first accepted file.
     for verb in ["D", "BD", "DB"] {
         let batch = verb != "D";
         let (root, mut state, mut peer) = fixture(if batch { "A.ZIP\r\r" } else { "A.ZIP\r" }).await;
@@ -616,8 +613,8 @@ async fn local_explicit_bd_numbers_filename_prompts_but_unpromoted_d_does_not() 
 
 #[tokio::test]
 async fn local_bd_batch_permission_denied_falls_back_to_unnumbered_d_and_picker() {
-    // COMMAND.C O_BD/O_DB sets Status.Batch from SEC_BATCH, then dispatches
-    // send using SEC_D. Batch denial alone must not deny the download command.
+    // BD/DB decide batch mode from the batch security level, then run the
+    // download with the D security level. Batch denial alone must not deny the download command.
     for verb in ["BD", "DB"] {
         let (root, mut state, mut peer) = fixture("A.ZIP\r").await;
         let mut picker = local_picker(&mut state).await;

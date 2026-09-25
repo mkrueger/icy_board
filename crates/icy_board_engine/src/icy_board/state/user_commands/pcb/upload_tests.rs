@@ -1,4 +1,4 @@
-//! TRANSFER.C successful/getnames/receive and the attempt08 prompt oracle.
+//! Upload receiving, naming and crediting, checked against the attempt08 prompt oracle.
 use super::*;
 use crate::icy_board::{
     IcyBoard,
@@ -356,7 +356,7 @@ async fn independent_descriptions_private_routing_requested_xmodem_name_and_clea
 
 #[tokio::test]
 async fn described_and_unannounced_batch_files_have_independent_descriptions_and_privacy() {
-    // A blank FIRST line after receiving is not cancellation (TRANSFER.C 754+).
+    // A blank FIRST line after receiving is not cancellation.
     let (root, mut state, mut peer) = fixture("\rfirst unannounced description\r\r\\second unannounced description\r\r").await;
     let files = vec![
         completed("KNOWN1.BIN", b"known one"),

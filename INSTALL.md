@@ -207,6 +207,8 @@ files is all it needs.
   PPL/tooling documentation
 - [Getting started](docs/gettingstarted.md) - the board, its directories and the
   first steps
+- [AI agent setup](docs/agent-setup.md) - a local-only creation, validation and
+  handoff checklist for agents
 - [Migrating from PCBoard](docs/migration.md) - dry-run import, drive maps, PPE
   review and validation
 - [Known limitations](docs/known_limitations.md) - what is missing and what

@@ -371,7 +371,7 @@ impl DoorList {
             let path = split[5];
             // let _login= split[6] != "0";
             let use_shell = split[7] != "N";
-            // DOORS.C reads optional comma-separated use/minute rates after
+            // PCBoard reads optional comma-separated use/minute rates after
             // the shell parameter. Older eight-column lists remain free.
             let charge_per_use = split.get(8).and_then(|value| value.trim().parse::<f64>().ok()).unwrap_or_default();
             let charge_per_minute = split.get(9).and_then(|value| value.trim().parse::<f64>().ok()).unwrap_or_default();

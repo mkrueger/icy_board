@@ -5,7 +5,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    /// SETTINGS.C setprotocol: an invalid stacked letter falls through to the menu and
+    /// An invalid stacked letter falls through to the menu and
     /// the prompt, which keeps asking until it gets a valid letter or no change.
     pub async fn set_transfer_protocol(&mut self) -> Res<()> {
         let cur_protocol = if let Some(user) = &self.session.current_user {
@@ -83,7 +83,7 @@ impl IcyBoardState {
         Ok(protocol)
     }
 
-    /// SETTINGS.C protfile: PREPROT comes first, and a PROT file replaces the built-in list.
+    /// PREPROT comes first, and a PROT file replaces the built-in list.
     async fn print_protocol_list(&mut self, cur_protocol: &str) -> Res<()> {
         self.new_line().await?;
         self.displaycmdfile("preprot").await?;

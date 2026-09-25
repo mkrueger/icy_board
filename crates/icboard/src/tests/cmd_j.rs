@@ -1,5 +1,18 @@
-use crate::tests::{compile_test_ppe, setup_conference, test_output, test_user_output};
+use crate::tests::{compile_test_ppe, fixture, setup_conference, test_output, test_ppe_output, test_user_output};
+use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
+use icy_board_engine::icy_board::conferences::Conference;
+use icy_board_engine::icy_board::icb_config::DisplayNewsBehavior;
+
+fn setup_join_files(board: &mut IcyBoard) {
+    setup_conference(board);
+    board.conferences.resize_with(8, Conference::default);
+    board.conferences[7].name = "SEVENTH".to_string();
+    board.conferences[7].news_file = fixture("main/blt1");
+    board.conferences[7].intro_file = fixture("main/blt2");
+    board.config.switches.display_news_behavior = DisplayNewsBehavior::Always;
+    board.config.switches.force_intro_on_join = true;
+}
 
 #[test]
 fn a_mapped_ppe_can_stuff_a_complete_builtin_join_command() {
@@ -77,6 +90,53 @@ fn test_cmd_j_join() {
         output,
         "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n\u{1b}[1;32mTESTCONF (1) Joined\n\nPress (Enter) to continue? \u{1b}[0m"
     );
+}
+
+#[test]
+fn test_cmd_j_quick_join_by_number_skips_news_and_intro() {
+    for command in ["J;Q;7\n", "J;7;Q\n"] {
+        let output = test_output(command.to_string(), setup_join_files);
+        assert!(output.contains("SEVENTH (7) Joined"), "{command}: {output}");
+        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
+    }
+}
+
+#[test]
+fn a_ppe_command_can_quick_join_without_displaying_conference_files() {
+    let output = test_ppe_output("COMMAND TRUE, \"J;Q;7\"", setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(!output.contains("BULLETIN1"), "{output}");
+    assert!(!output.contains("BULLETIN2"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_normal_join_still_displays_news_and_intro() {
+    let output = test_output("J;7\n".to_string(), setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(output.contains("BULLETIN1"), "{output}");
+    assert!(output.contains("BULLETIN2"), "{output}");
+}
+
+#[test]
+fn test_cmd_j_quick_join_by_name_or_prompt_skips_news_and_intro() {
+    for command in ["J Q TESTCONF\n", "J Q\n7\n"] {
+        let output = test_output(command.to_string(), |board| {
+            setup_join_files(board);
+            board.conferences[1].news_file = fixture("main/blt1");
+            board.conferences[1].intro_file = fixture("main/blt2");
+        });
+        let joined = if command.contains("TESTCONF") {
+            "TESTCONF (1) Joined"
+        } else {
+            "SEVENTH (7) Joined"
+        };
+        assert!(output.contains(joined), "{command}: {output}");
+        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
+    }
 }
 
 #[test]

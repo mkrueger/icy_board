@@ -137,7 +137,7 @@ fn fileinf_of_a_file_that_is_not_there_answers_zero() {
 }
 
 /// FILEINF hands out the name without its extension and the extension without its dot.
-/// `PCBoard` uppercased the path string before splitting (EVALP.CPP `TOK_OP_FILEINF`).
+/// `PCBoard` uppercased the path string before splitting.
 #[test]
 fn fileinf_splits_a_name_the_way_pcboard_did() {
     let output = run_ppl_with_files(

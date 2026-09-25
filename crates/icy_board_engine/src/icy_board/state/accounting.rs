@@ -274,7 +274,7 @@ impl IcyBoardState {
         .await;
         // Record has no fallible work after its monetary commit. Thus every
         // error here is safe to roll back and retry; no audit/debit is duplicated.
-        // LOGIN.C logs how the caller reached the board: "LOCAL" or the speed.
+        // PCBoard logged how the caller reached the board: "LOCAL" or the speed.
         let connection = if self.session.is_local {
             "LOCAL".to_string()
         } else {

@@ -1,5 +1,5 @@
 //! Walking the paths a board is configured with, the way `PCBSetup` did on a full
-//! save. See `writefile` in DATAWRIT.C and `checkexistence` in CHKEXIST.C.
+//! save.
 
 use std::{
     collections::HashSet,

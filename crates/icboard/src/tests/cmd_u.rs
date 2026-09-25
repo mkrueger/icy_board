@@ -17,7 +17,7 @@ fn setup_upload_directory(board: &mut IcyBoard) {
 
 fn assert_returned_to_main_command(output: &str) {
     // Scripts must acknowledge the non-expert menu's PressEnter after U/BU
-    // returns (PCBoard COMMAND.C), in addition to cancelling the upload itself.
+    // returns, in addition to cancelling the upload itself.
     assert_eq!(output.matches("Main Board Command?").count(), 2, "upload did not finish cleanly:\n{output}");
     assert!(!output.contains("Invalid Entry"), "upload input leaked into the command loop:\n{output}");
     assert!(!output.contains("Transfer Successful"), "cancel claimed a transfer:\n{output}");

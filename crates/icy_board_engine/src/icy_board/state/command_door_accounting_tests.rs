@@ -1,6 +1,5 @@
 //! Configured command/door surcharges: independent from global online time.
-//! Source references: PCB.H cmdtype; CMDS.C runcmds; DOORS.C searchdoorlist;
-//! INIT.C backfromdos. Unlike PCBoard, failed door launches are free and door
+//! Unlike PCBoard, failed door launches are free and door
 //! minutes use elapsed nearest-minute rounding rather than log timestamps.
 use super::*;
 use crate::icy_board::{

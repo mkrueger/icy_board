@@ -27,7 +27,7 @@ pub struct MessageFilter {
     text: Option<Regex>,
     /// The reader's own name and alias, upper cased.
     own_names: Vec<String>,
-    /// `PCBoard`'s `SEC_READALLMAIL`, which opens receiver-only mail to the sysop.
+    /// The read-all-mail security, which opens receiver-only mail to the sysop.
     may_read_all_mail: bool,
 }
 

@@ -18,8 +18,8 @@ impl IcyBoardState {
             return Ok(());
         }
         let mut display_menu = self.session.tokens.is_empty();
+        let mut quick_join = false;
         loop {
-            let mut quick_join = false;
             let mut search = false;
             let mut conf_num = -1;
             if self.session.tokens.is_empty() {
@@ -61,7 +61,7 @@ impl IcyBoardState {
                         search = true;
                     }
                     token => {
-                        if search || quick_join {
+                        if search {
                             search_text.push_str(token);
                             search_text.push(' ');
                         } else if let Ok(num) = token.parse::<i32>() {
@@ -90,6 +90,9 @@ impl IcyBoardState {
             }
 
             self.session.tokens.clear();
+            if conf_num < 0 && name.is_empty() && quick_join && !search {
+                continue;
+            }
             if conf_num < 0 && search {
                 let text = if search_text.is_empty() {
                     self.input_field(

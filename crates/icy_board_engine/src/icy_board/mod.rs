@@ -188,9 +188,9 @@ impl IcyBoard {
         user
     }
 
-    /// Creates a user the way PPL `ADDUSER` does, with PCBoard's USRMAINT.C addrecsub
-    /// defaults on top of the new user record. Returns `None` when the name is empty
-    /// or already taken as a name or alias.
+    /// Creates a user the way PPL `ADDUSER` does, with PCBoard's defaults
+    /// on top of the new user record. Returns `None` when the name is empty or already
+    /// taken as a name or alias.
     pub async fn add_user(board: &std::sync::Arc<tokio::sync::Mutex<IcyBoard>>, name: &str) -> Res<Option<(usize, user_base::User)>> {
         use pcb::user_inf::AccountUserInf;
 

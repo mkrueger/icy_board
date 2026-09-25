@@ -255,7 +255,7 @@ impl PcbBoardCommand {
         }
 
         let settings = self.state.get_board().await.config.new_user_settings.clone();
-        // The subscription runs from the logon, as PCBoard's Status.JulianLogonDate.
+        // The subscription runs from the logon date, as in PCBoard.
         let mut new_user = self
             .state
             .get_board()
@@ -986,7 +986,7 @@ impl PcbBoardCommand {
         Ok(())
     }
 
-    /// NODE/LOGIN.C: after LOGON preprocessing, before ordinary conference
+    /// Runs after LOGON preprocessing, before ordinary conference
     /// screens. Direct /PPE mode intentionally does not use this entry point.
     pub(crate) async fn start_login_accounting(&mut self) -> Res<()> {
         self.state.accounting_start().await?;
@@ -1020,7 +1020,7 @@ impl PcbBoardCommand {
     async fn announce_event_time_adjustment(&mut self) -> Res<()> {
         self.state.limit_time_for_event().await;
         if self.state.session.time_adjusted_for_event {
-            // PCBoard LOGIN.C protects this warning from INTRO with an acknowledgement.
+            // PCBoard protected this warning from INTRO with an acknowledgement.
             self.state
                 .display_text(IceText::TimeAdjusted, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;

@@ -230,8 +230,8 @@ impl IcyBoardState {
         }
 
         // Only offered to users who may join conferences, and suppressed when
-        // the prompt was blanked out in ICBTEXT: PCBoard gates this on SEC_J
-        // plus a non-empty TXT_SELECTCONFS.
+        // the prompt was blanked out in ICBTEXT: PCBoard gates this on the J
+        // command's security plus a non-empty prompt text.
         let select_confs_text = self.get_display_text(IceText::SelectConferences)?;
         let may_join = self.session.user_command_level.cmd_j.session_can_access(&self.session);
         if may_join && !select_confs_text.trim().is_empty() && self.ask_yes_no(IceText::SelectConferences, false).await? {

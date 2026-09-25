@@ -1,7 +1,5 @@
 //! F9/F10/F11 follow-up: serialized PPE, private harness (no shared helper edits).
-//! Classic evidence: PCBoard PPL/VAR.CPP cVARVAL::stripatx and MAIN/SCRIPT.C
-//! removecodes delete only complete uppercase @X plus two hex digits. This is
-//! source evidence, NOT a fresh DOS runtime oracle capture. Both the classic
+//! PCBoard deletes only complete uppercase @X plus two hex digits. Both the classic
 //! STRIPATX and runtime-400 StringStripAtx opcodes must follow that contract.
 //! Error policy: pure/default/explicit Ordinal comparisons preserve old errors;
 //! fallible IgnoreCase comparisons clear old errors on success, never same-statement

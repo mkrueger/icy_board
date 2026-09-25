@@ -78,7 +78,7 @@ fn normalize_upload_name(name: &str) -> Option<String> {
 }
 
 fn upload_credits(bytes: u64, cps: u64, byte_rate: u32, time_rate: u32) -> (u64, u64) {
-    // TRANSFER.C successful(): division by CPS precedes multiplication.
+    // Division by CPS precedes multiplication, as in PCBoard.
     (
         bytes.saturating_mul(u64::from(byte_rate)) / 10,
         if cps == 0 {
@@ -309,7 +309,7 @@ impl IcyBoardState {
                 return Ok(None);
             }
             if lines.is_empty() {
-                // TRANSFER.C getdescription: a blank first line only abandons
+                // A blank first line only abandons
                 // a size-zero (not yet received) file. Otherwise ask for more.
                 if line.is_empty() && !transferred {
                     return Ok(None);
@@ -697,7 +697,7 @@ impl IcyBoardState {
         let mut pending = Vec::new();
         let mut seen: Vec<String> = Vec::new();
         let mut can_describe = !receipt.failed && self.upload_description_input_available().await;
-        // TRANSFER.C scanforuploads: describe unannounced files FIRST, before
+        // Describe unannounced files FIRST, before
         // processing/publication of any completed file. Never borrow another
         // file's description or privacy flag.
         for (index, completed) in receipt.files.into_iter().enumerate() {

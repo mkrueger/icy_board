@@ -40,7 +40,7 @@ fn test_t_token() {
     );
 }
 
-/// SETTINGS.C setprotocol drops an invalid stacked letter and asks with the menu instead.
+/// PCBoard dropped an invalid stacked letter and asks with the menu instead.
 #[test]
 fn test_t_invalid_token_shows_the_menu() {
     let output = test_output("T 123\nX\n".to_string(), |_| {});
@@ -61,7 +61,7 @@ fn test_t_invalid_token_then_enter_keeps_the_protocol() {
     assert!(!lines.iter().any(|line| line.contains("Default Protocol set to")), "{lines:#?}");
 }
 
-/// The prompt only takes letters of installed protocols, like the Valid mask in SETTINGS.C.
+/// The prompt only takes letters of installed protocols, like PCBoard's did.
 #[test]
 fn test_t_prompt_ignores_letters_without_a_protocol() {
     let output = test_output("T\n1X\n".to_string(), |_| {});

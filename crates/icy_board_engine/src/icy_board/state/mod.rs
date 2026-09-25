@@ -240,9 +240,8 @@ impl TransferStatistics {
     }
 }
 
-/// `PCBoard` gates the closing courtesies on `Status.Logoff` and the parting questions
-/// on `Status.AutoLogoff`; only these three combinations of the two occur.
-/// See RECYCLE.C loguseroff().
+/// `PCBoard` gates the closing courtesies on its logoff flag and the parting questions
+/// on its automatic logoff flag; only these three combinations of the two occur.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Logoff {
     /// The caller said goodbye.
@@ -259,7 +258,7 @@ impl Logoff {
         matches!(self, Self::Normal)
     }
 
-    /// Only a caller the board did not drop is thanked for calling (RECYCLE.C:314).
+    /// Only a caller the board did not drop is thanked for calling.
     pub(crate) fn is_orderly(self) -> bool {
         !matches!(self, Self::Abnormal)
     }
@@ -1294,7 +1293,7 @@ impl IcyBoardState {
 
     pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
         // Clearing the screen starts the page over, it does not turn a pause back on that
-        // an @POFF@ before it turned off. See printcls() in DISPLAY.C.
+        // an @POFF@ before it turned off.
         self.session.disp_options.num_lines_printed = 0;
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
@@ -1505,11 +1504,11 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        if show_news {
+        if show_news && !quick_join {
             self.display_news(only_new).await?;
         }
 
-        if (self.get_board().await.config.switches.force_intro_on_join || show_intro) && self.session.current_conference.intro_file.is_file() {
+        if !quick_join && (self.get_board().await.config.switches.force_intro_on_join || show_intro) && self.session.current_conference.intro_file.is_file() {
             let f = self.session.current_conference.intro_file.clone();
             self.display_file(&f).await?;
         }
@@ -1602,8 +1601,7 @@ impl IcyBoardState {
         executable: Executable,
         restore_color: bool,
     ) -> Res<bool> {
-        // PCBoard stacked no more than 16 PPEs, doScript() refused the next one.
-        // See MAX_SCR_STK in SCRMISC.CPP.
+        // PCBoard stacked no more than 16 PPEs and refused the next one.
         const MAX_PPE_NESTING: usize = 16;
         if self.ppe_nesting >= MAX_PPE_NESTING {
             log::warn!("PPE nesting limit reached, not running {}", file_name.as_ref().display());
@@ -4802,7 +4800,7 @@ impl IcyBoardState {
     }
 
     /// `PCBoard` counted a line here and nowhere else, so a PPE drawing its own screen with
-    /// PRINT and cursor positioning never ran into a MORE prompt. See `newline()` in DISPLAY.C.
+    /// PRINT and cursor positioning never ran into a MORE prompt.
     pub async fn new_line(&mut self) -> Res<()> {
         if self.session.disp_options.abort_printout || !self.session.disp_options.show_on_screen {
             return Ok(());
