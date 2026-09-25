@@ -1536,6 +1536,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     0
                 };
                 res = r.variable_type;
+                if arg_count == 0 && call.get_arguments().is_empty() {
+                    self.errors.lock().unwrap().report_warning(
+                        call.get_expression().get_span(),
+                        CompilationWarningType::ParenthesesOnScalar(call.get_expression().to_string()),
+                    );
+                }
                 self.check_expr_arg_count(arg_count, call.get_arguments().len(), call.get_expression());
             }
             Some(SemanticInfo::PredefFunctionGroup(funcs)) => {

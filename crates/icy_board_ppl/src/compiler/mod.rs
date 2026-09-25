@@ -271,6 +271,9 @@ pub enum CompilationWarningType {
     #[error("PPL 4.00 array indexing should use '[' and ']' instead of '(' and ')'")]
     ArrayBracketsRequired,
 
+    #[error("{0} is not an array or function; remove the parentheses")]
+    ParenthesesOnScalar(String),
+
     #[error("Unused label {0}")]
     UnusedLabel(String),
 

@@ -2,10 +2,56 @@
 //!
 //! GW-ONELINER does `SavedWho = U_ALIAS()`. The legacy PPE encoding stores that as the
 //! plain variable, but PPE 4.00 files kept an empty index list, and reading one took the
-//! whole board down.
+//! whole board down. The compiler warns about it in every language version.
+
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use super::{compile, run_ppl};
+use crate::compiler::{CompilationWarningType, PPECompiler, workspace::Workspace};
 use crate::executable::{Executable, PPECommand, PPEExpr, PPEScript};
+use crate::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast};
+
+/// The names reported for `NAME()` on a scalar, after checking the snippet has no errors.
+fn parentheses_warnings(source: &str, language: u16) -> Vec<String> {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let registry = UserTypeRegistry::icy_board_registry();
+    let mut workspace = Workspace::default();
+    workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
+    workspace.package.runtime = Some(400);
+    workspace.set_default_language_version(Some(language));
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+    compiler.compile(&[&ast]);
+    let reporter = errors.lock().unwrap();
+    assert!(
+        !reporter.has_errors(),
+        "{language}: {:?}",
+        reporter.errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>()
+    );
+    reporter
+        .warnings
+        .iter()
+        .filter_map(|warning| match warning.error.downcast_ref::<CompilationWarningType>() {
+            Some(CompilationWarningType::ParenthesesOnScalar(name)) => Some(name.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn empty_parentheses_on_a_scalar_are_a_warning_in_every_language_version() {
+    for language in [100, 340, 400] {
+        let warnings = parentheses_warnings("STRING s\nGETUSER\ns = U_ALIAS()\nPRINTLN s()", language);
+        assert_eq!(warnings, ["U_ALIAS", "s"], "language {language}");
+    }
+}
+
+#[test]
+fn arrays_and_function_calls_do_not_warn_about_parentheses() {
+    let source = "STRING a(3)\nDECLARE FUNCTION f() STRING\nPRINTLN a(1), f(), U_ALIAS\nFUNCTION f() STRING\n  f = \"x\"\nENDFUNC";
+    assert!(parentheses_warnings(source, 340).is_empty());
+}
 
 #[test]
 fn empty_parentheses_on_a_scalar_read_the_variable() {
