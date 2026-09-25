@@ -170,6 +170,57 @@ fn a_ppe_command_can_quick_join() {
 }
 
 #[test]
+fn a_ppe_join_can_quick_join_by_number_or_name() {
+    for selection in ["\"7;Q\"", "\"SEVENTH;Q\""] {
+        let output = test_ppe_output(&format!("JOIN {selection}"), setup_join_files);
+        assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+        assert!(!output.contains("BULLETIN1"), "{output}");
+        assert!(!output.contains("BULLETIN2"), "{output}");
+    }
+}
+
+#[test]
+fn a_ppe_join_without_q_displays_intro_and_news() {
+    let output = test_ppe_output("JOIN \"7\"", setup_join_files);
+    let joined = position(&output, "SEVENTH (7) Joined");
+    let intro = position(&output, "BULLETIN2");
+    let news = position(&output, "BULLETIN1");
+    assert!(joined < intro && intro < news, "{output}");
+}
+
+#[test]
+fn a_ppe_join_still_accepts_numeric_arguments() {
+    let output = test_ppe_output("JOIN 7", setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(output.contains("BULLETIN1"), "{output}");
+    assert!(output.contains("BULLETIN2"), "{output}");
+}
+
+#[test]
+fn a_ppe_join_can_return_to_main_by_name() {
+    let output = test_ppe_output("JOIN \"7;Q\"\nJOIN \"MAIN\"", setup_join_files);
+    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
+    assert!(output.contains("SEVENTH (7) Abandoned"), "{output}");
+}
+
+#[test]
+fn a_ppe_join_uses_j_selection_rules() {
+    let output = test_ppe_output("JOIN \"Q;7\"", setup_join_files);
+    assert!(output.contains("(7) is an invalid Conference selection!"), "{output}");
+    assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
+}
+
+#[test]
+fn a_ppe_join_respects_private_conference_access() {
+    let output = test_ppe_output("JOIN \"7;Q\"", |board| {
+        setup_join_files(board);
+        board.conferences[7].is_public = false;
+    });
+    assert!(output.contains("you are not registered in Conference 7"), "{output}");
+    assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
+}
+
+#[test]
 fn a_caller_cannot_join_an_unregistered_private_conference() {
     let output = test_ppe_output("COMMAND TRUE, \"J;7\"", |board| {
         setup_join_files(board);

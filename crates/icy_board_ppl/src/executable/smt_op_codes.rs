@@ -1216,7 +1216,7 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]
             name: "Join",
             version: 100,
             opcode: OpCode::JOIN,
-            args: Some(vec![ArgumentDefinition::new("conf", VariableType::Integer)]),
+            args: Some(vec![ArgumentDefinition::new("conf", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {

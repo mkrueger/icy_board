@@ -747,11 +747,9 @@ pub async fn call(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let conf = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
-    if conf >= 0 {
-        vm.icy_board_state.join_conference(conf as u16, true, true).await?;
-    }
-    Ok(())
+    let selection = vm.eval_expr(&args[0]).await?.as_string();
+    vm.icy_board_state.session.push_tokens(&selection);
+    vm.icy_board_state.join_conference_cmd().await
 }
 pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
