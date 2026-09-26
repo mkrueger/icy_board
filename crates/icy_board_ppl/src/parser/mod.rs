@@ -595,16 +595,16 @@ impl<'a> Parser<'a> {
             if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
+                    if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                        return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
                     }
                     continue;
                 }
 
                 if let Some(Token::Procedure) = self.get_cur_token() {
                     parameters.push(self.parse_procedure_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
+                    if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                        return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
                     }
                     continue;
                 }
@@ -627,8 +627,8 @@ impl<'a> Parser<'a> {
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
             }
 
-            if self.get_cur_token() == Some(Token::Comma) {
-                self.next_token();
+            if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
             }
         }
         let rightpar_token = self.save_spanned_token();
@@ -678,16 +678,16 @@ impl<'a> Parser<'a> {
             if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
+                    if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                        return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, proc_token, VariableType::Integer, None));
                     }
                     continue;
                 }
 
                 if let Some(Token::Procedure) = self.get_cur_token() {
                     parameters.push(self.parse_procedure_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
+                    if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                        return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, proc_token, VariableType::Integer, None));
                     }
                     continue;
                 }
@@ -710,8 +710,8 @@ impl<'a> Parser<'a> {
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, proc_token, VariableType::Integer, None));
             }
 
-            if self.get_cur_token() == Some(Token::Comma) {
-                self.next_token();
+            if self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected).is_none() {
+                return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, proc_token, VariableType::Integer, None));
             }
         }
         let rightpar_token = self.save_spanned_token();
@@ -979,16 +979,12 @@ impl Parser<'_> {
             if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
-                    }
+                    self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                     continue;
                 }
                 if let Some(Token::Procedure) = self.get_cur_token() {
                     parameters.push(self.parse_procedure_parameter_specifier());
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
-                    }
+                    self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                     continue;
                 }
             }
@@ -1013,9 +1009,7 @@ impl Parser<'_> {
                 return None;
             }
 
-            if self.get_cur_token() == Some(Token::Comma) {
-                self.next_token();
-            }
+            self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
         }
         let rightpar_token = self.save_spanned_token();
         self.next_token();
@@ -1069,6 +1063,36 @@ impl Parser<'_> {
         }
     }
 
+    /// Consumes the separator after an element of a list closed by `close`. A comma has to be
+    /// followed by another element, and anything but a comma or `close` means one is missing.
+    fn parse_list_separator(&mut self, close: &Token, missing_element: fn(Token) -> ParserErrorType) -> Option<()> {
+        match self.get_cur_token() {
+            Some(Token::Comma) => {
+                self.next_token();
+                if self.get_cur_token().as_ref() == Some(close) {
+                    self.report_error(self.save_token_span(), missing_element(self.save_token()));
+                    return None;
+                }
+                Some(())
+            }
+            Some(token) if token == *close => Some(()),
+            Some(Token::Eol | Token::Comment(_, _)) | None => {
+                let token = self.save_token();
+                let error = if *close == Token::RBracket {
+                    ParserErrorType::MissingCloseBracket(token)
+                } else {
+                    ParserErrorType::MissingCloseParens(token)
+                };
+                self.report_error(self.save_token_span(), error);
+                None
+            }
+            Some(token) => {
+                self.report_error(self.save_token_span(), ParserErrorType::CommaExpected(token));
+                None
+            }
+        }
+    }
+
     /// Returns the parse procedure of this [`Tokenizer`].
     ///
     /// # Panics
@@ -1105,16 +1129,12 @@ impl Parser<'_> {
                 if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                     if let Some(Token::Function) = self.get_cur_token() {
                         parameters.push(self.parse_function_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
+                        self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                         continue;
                     }
                     if let Some(Token::Procedure) = self.get_cur_token() {
                         parameters.push(self.parse_procedure_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
+                        self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                         continue;
                     }
                 }
@@ -1137,9 +1157,7 @@ impl Parser<'_> {
                     return None;
                 }
 
-                if self.get_cur_token() == Some(Token::Comma) {
-                    self.next_token();
-                }
+                self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
             }
             let rightpar_token = self.save_spanned_token();
             self.next_token();
@@ -1215,16 +1233,12 @@ impl Parser<'_> {
                 if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                     if let Some(Token::Function) = self.get_cur_token() {
                         parameters.push(self.parse_function_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
+                        self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                         continue;
                     }
                     if let Some(Token::Procedure) = self.get_cur_token() {
                         parameters.push(self.parse_procedure_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
+                        self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
                         continue;
                     }
                 }
@@ -1252,9 +1266,7 @@ impl Parser<'_> {
                     return None;
                 }
 
-                if self.get_cur_token() == Some(Token::Comma) {
-                    self.next_token();
-                }
+                self.parse_list_separator(&Token::RPar, ParserErrorType::TypeExpected)?;
             }
             let rightpar_token = self.save_spanned_token();
             self.next_token();

@@ -220,14 +220,7 @@ impl Parser<'_> {
                 return None;
             };
             arguments.push(value);
-            if self.get_cur_token() == Some(Token::Comma) {
-                self.next_token();
-                continue;
-            }
-
-            if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
-                break;
-            }
+            self.parse_list_separator(&Token::RPar, ParserErrorType::ExpressionExpected)?;
         }
 
         if self.get_cur_token() != Some(Token::RPar) {
@@ -300,9 +293,7 @@ impl Parser<'_> {
                         return None;
                     };
                     arguments.push(value);
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
-                    }
+                    self.parse_list_separator(&Token::RBracket, ParserErrorType::ExpressionExpected)?;
                 }
                 let close_token = self.save_spanned_token();
                 self.next_token();
@@ -394,14 +385,7 @@ impl Parser<'_> {
                             return None;
                         };
                         arguments.push(value);
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                            continue;
-                        }
-
-                        if self.get_cur_token() != Some(Token::RBracket) && self.get_cur_token() != Some(Token::Comma) {
-                            break;
-                        }
+                        self.parse_list_separator(&Token::RBracket, ParserErrorType::ExpressionExpected)?;
                     }
 
                     if self.get_cur_token() != Some(Token::RBracket) {

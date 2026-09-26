@@ -547,6 +547,9 @@ impl Parser<'_> {
             self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
             return None;
         };
+        if self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) && self.cur_token.is_some() {
+            self.report_error(self.save_token_span(), ParserErrorType::EolExpected(self.save_token()));
+        }
         self.next_token();
         self.skip_eol();
 
@@ -739,12 +742,8 @@ impl Parser<'_> {
                         if is_lpar && self.get_cur_token() == Some(Token::RPar) || !is_lpar && self.get_cur_token() == Some(Token::RBracket) {
                             break;
                         }
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        } else {
-                            self.report_error(self.lex.span(), ParserErrorType::CommaExpected(self.save_token()));
-                            return None;
-                        }
+                        let close = if is_lpar { Token::RPar } else { Token::RBracket };
+                        self.parse_list_separator(&close, ParserErrorType::ExpressionExpected)?;
                     }
                     rightpar_token = Some(self.save_spanned_token());
                     self.next_token();
@@ -1068,6 +1067,10 @@ impl Parser<'_> {
                 }
                 if self.get_cur_token() == Some(Token::Comma) {
                     self.next_token();
+                    if self.get_cur_token() == Some(Token::Eol) || matches!(self.get_cur_token(), Some(Token::Comment(_, _))) || self.cur_token.is_none() {
+                        self.report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                        return None;
+                    }
                 } else {
                     break;
                 }
@@ -1107,9 +1110,8 @@ impl Parser<'_> {
                     return None;
                 };
                 params.push(right);
-                if self.get_cur_token() == Some(Token::Comma) {
-                    self.next_token();
-                }
+                let close = if is_lpar { Token::RPar } else { Token::RBracket };
+                self.parse_list_separator(&close, ParserErrorType::ExpressionExpected)?;
             }
             if is_lpar && self.get_cur_token() != Some(Token::RPar) || !is_lpar && self.get_cur_token() != Some(Token::RBracket) {
                 self.report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));

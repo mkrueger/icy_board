@@ -114,6 +114,104 @@ fn routine_closers_outside_routines_cannot_be_emitted_as_returns() {
     }
 }
 
+fn compile_result(source: &str) -> (bool, bool) {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let ast = parse_ast(PathBuf::from("lists.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+    let parser_errors = errors.lock().unwrap().has_errors();
+    let mut compiler = crate::compiler::PPECompiler::new(&workspace, registry, errors.clone());
+    compiler.compile(&[&ast]);
+    (parser_errors, compiler.create_executable().is_ok())
+}
+
+#[test]
+fn list_elements_need_exactly_one_separating_comma() {
+    const ROUTINES: &str = "PROCEDURE P(INTEGER X, INTEGER Y)\nENDPROC\nFUNCTION F(INTEGER X, INTEGER Y) INTEGER\nF = X\nENDFUNC\n";
+    let with_routines = |body: &str| {
+        format!("DECLARE PROCEDURE P(INTEGER X, INTEGER Y)\nDECLARE FUNCTION F(INTEGER X, INTEGER Y) INTEGER\nINTEGER I, B[3, 3]\nSTRING S\n{body}\n{ROUTINES}")
+    };
+
+    for body in [
+        "P(1, 2)",
+        "I = F(1, 2)",
+        "B[1, 2] = 3",
+        "LET B(1, 2) = 3",
+        "I = B[1, 2]",
+        "S = MID(S, 1, 2)",
+        "PRINTLN 1, 2",
+    ] {
+        let source = with_routines(body);
+        assert_eq!(compile_result(&source), (false, true), "valid list rejected: {body:?}");
+    }
+
+    for body in [
+        "P(1 2)",
+        "P(1, 2,)",
+        "I = F(1 2)",
+        "I = F(1, 2,)",
+        "B(1 2) = 3",
+        "B[1, 2,] = 3",
+        "LET B(1 2) = 3",
+        "LET B(1, 2,) = 3",
+        "I = B[1 2]",
+        "I = B[1, 2,]",
+        "S = MID(S, 1 2)",
+        "PRINTLN 1,",
+        "PRINTLN 1, ; comment",
+    ] {
+        let source = with_routines(body);
+        let (parser_errors, emitted) = compile_result(&source);
+        assert!(parser_errors, "parser missed {body:?}");
+        assert!(!emitted, "emitted PPE for {body:?}");
+    }
+
+    for source in [
+        "DECLARE PROCEDURE P(INTEGER X INTEGER Y)\nP(1, 2)\nPROCEDURE P(INTEGER X, INTEGER Y)\nENDPROC",
+        "DECLARE PROCEDURE P(INTEGER X,)\nP(1)\nPROCEDURE P(INTEGER X)\nENDPROC",
+        "DECLARE PROCEDURE P(INTEGER X, INTEGER Y)\nP(1, 2)\nPROCEDURE P(INTEGER X INTEGER Y)\nENDPROC",
+        "DECLARE FUNCTION F(INTEGER X, INTEGER Y) INTEGER\nPRINTLN F(1, 2)\nFUNCTION F(INTEGER X INTEGER Y) INTEGER\nF = X\nENDFUNC",
+        "DECLARE FUNCTION F(INTEGER X) INTEGER\nPRINTLN F(1)\nFUNCTION F(INTEGER X,) INTEGER\nF = X\nENDFUNC",
+        "DECLARE PROCEDURE P(FUNCTION G(INTEGER X INTEGER Y) INTEGER)\nPROCEDURE P(FUNCTION G(INTEGER X, INTEGER Y) INTEGER)\nENDPROC",
+        "DECLARE PROCEDURE P(PROCEDURE Q(INTEGER X,))\nPROCEDURE P(PROCEDURE Q(INTEGER X))\nENDPROC",
+    ] {
+        let (parser_errors, emitted) = compile_result(source);
+        assert!(parser_errors, "parser missed {source:?}");
+        assert!(!emitted, "emitted PPE for {source:?}");
+    }
+}
+
+#[test]
+fn select_case_selector_must_end_its_line() {
+    let valid = "INTEGER I\nSELECT CASE I ; comment\nCASE 1\nPRINTLN 1\nENDSELECT";
+    assert_eq!(compile_result(valid), (false, true));
+
+    let (parser_errors, emitted) = compile_result("INTEGER I, J\nSELECT CASE I J\nCASE 1\nPRINTLN 1\nENDSELECT");
+    assert!(parser_errors, "trailing selector token was dropped silently");
+    assert!(!emitted);
+}
+
+#[test]
+fn oversized_decimal_literals_keep_their_value() {
+    for (input, expected) in [("I = 99999999999999999999", 1e20), ("I = 99999999999D", 99_999_999_999.0)] {
+        let Statement::Let(let_statement) = parse_statement(input, true) else {
+            panic!("{input:?} is not an assignment");
+        };
+        let crate::ast::Expression::Const(constant) = let_statement.get_value_expression() else {
+            panic!("{input:?} does not assign a constant");
+        };
+        assert!(
+            matches!(constant.get_constant_value(), Constant::Double(value) if *value == expected),
+            "{input:?} became {:?}",
+            constant.get_constant_value()
+        );
+    }
+
+    let (parser_errors, emitted) = compile_result("DOUBLE F\nF = 1.2.3");
+    assert!(parser_errors, "malformed real literal was replaced silently");
+    assert!(!emitted);
+}
+
 #[test]
 fn test_parse_comment_statement() {
     check_statement(";FOO", &CommentAstNode::create_empty_statement("FOO"));

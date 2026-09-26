@@ -1078,12 +1078,18 @@ impl Lexer {
                         match ch {
                             '.' => {  break; }
                             'D' | 'd' => {
-                                let r = self.text[start..self.token_end - 1].iter().collect::<String>().parse::<i32>();
-                                match r {
+                                let digits = self.text[start..self.token_end - 1].iter().collect::<String>();
+                                match digits.parse::<i32>() {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Dec)));
                                     }
                                     Err(r) => {
+                                        // Too large for an integer, so the value is kept as a double.
+                                        if digits.chars().all(|ch| ch.is_ascii_digit())
+                                            && let Ok(f) = digits.parse::<f64>()
+                                        {
+                                            return Some(Token::Const(Constant::Double(f)));
+                                        }
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
@@ -1192,7 +1198,7 @@ impl Lexer {
                                     return Some(Token::Const(Constant::Double(f)));
                                 }
                                 Err(r) => {
-                                    self.errors.lock().unwrap().report_warning(
+                                    self.errors.lock().unwrap().report_error(
                                         self.token_start..self.token_end,
                                         LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
                                     );
@@ -1212,15 +1218,15 @@ impl Lexer {
                                 return Some(Token::Const(Constant::Unsigned(i as u64, NumberFormat::Default)));
                             }
                         }
-                        Err(r) => {
-                            let r2 = self.text[start..end].iter().collect::<String>().parse::<u64>();
-                            if let Ok(i) = r2 {
+                        Err(_) => {
+                            let literal = self.text[start..end].iter().collect::<String>();
+                            if let Ok(i) = literal.parse::<u64>() {
                                 return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Default)));
                             }
-                            self.errors.lock().unwrap().report_warning(
-                                self.token_start..self.token_end,
-                                LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
-                            );
+                            // Too large for any integer type, so the value is kept as a double.
+                            if let Ok(f) = literal.parse::<f64>() {
+                                return Some(Token::Const(Constant::Double(f)));
+                            }
                             return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                         }
                     }
@@ -2018,12 +2024,18 @@ impl Lexer {
                                 break;
                             }
                             'D' | 'd' => {
-                                let r = self.text[start..self.byte_end - 1].parse::<i32>();
-                                match r {
+                                let digits = &self.text[start..self.byte_end - 1];
+                                match digits.parse::<i32>() {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Dec)));
                                     }
                                     Err(r) => {
+                                        // Too large for an integer, so the value is kept as a double.
+                                        if digits.chars().all(|ch| ch.is_ascii_digit())
+                                            && let Ok(f) = digits.parse::<f64>()
+                                        {
+                                            return Some(Token::Const(Constant::Double(f)));
+                                        }
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
@@ -2132,7 +2144,7 @@ impl Lexer {
                                     return Some(Token::Const(Constant::Double(f)));
                                 }
                                 Err(r) => {
-                                    self.errors.lock().unwrap().report_warning(
+                                    self.errors.lock().unwrap().report_error(
                                         self.token_start..self.token_end,
                                         LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                     );
@@ -2152,15 +2164,15 @@ impl Lexer {
                                 return Some(Token::Const(Constant::Unsigned(i as u64, NumberFormat::Default)));
                             }
                         }
-                        Err(r) => {
-                            let r2 = self.text[start..end].parse::<u64>();
-                            if let Ok(i) = r2 {
+                        Err(_) => {
+                            let literal = &self.text[start..end];
+                            if let Ok(i) = literal.parse::<u64>() {
                                 return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Default)));
                             }
-                            self.errors.lock().unwrap().report_warning(
-                                self.token_start..self.token_end,
-                                LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
-                            );
+                            // Too large for any integer type, so the value is kept as a double.
+                            if let Ok(f) = literal.parse::<f64>() {
+                                return Some(Token::Const(Constant::Double(f)));
+                            }
                             return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                         }
                     }
