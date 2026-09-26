@@ -47,6 +47,22 @@ fn empty_parentheses_on_a_scalar_are_a_warning_in_every_language_version() {
     }
 }
 
+/// The original PPLC accepts `FOO() = "HELLO"`, with or without LET.
+#[test]
+fn assigning_through_empty_parentheses_is_a_warning() {
+    for language in [100, 340, 400] {
+        let warnings = parentheses_warnings("STRING s, t\ns() = \"a\"\nLET t() = \"b\"\nPRINTLN s, t", language);
+        assert_eq!(warnings, ["s", "t"], "language {language}");
+    }
+    assert_eq!(run_ppl("STRING s\ns() = \"HELLO\"\nPRINTLN s()"), "HELLO\n");
+}
+
+#[test]
+fn more_than_three_indices_are_still_an_error() {
+    let errors = super::compile_errors("STRING a[2, 2, 2]\na[1, 1, 1, 1] = \"x\"");
+    assert_eq!(errors, ["Too many dimensions (4); the maximum is 3"]);
+}
+
 #[test]
 fn arrays_and_function_calls_do_not_warn_about_parentheses() {
     let source = "STRING a(3)\nDECLARE FUNCTION f() STRING\nPRINTLN a(1), f(), U_ALIAS\nFUNCTION f() STRING\n  f = \"x\"\nENDFUNC";

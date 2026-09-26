@@ -1892,6 +1892,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             field_name: None,
                         });
                     } else {
+                        if header.dim == 0 && let_stmt.get_lpar_token().is_some() && let_stmt.get_arguments().is_empty() {
+                            self.errors.lock().unwrap().report_warning(
+                                let_stmt.get_identifier_token().span.clone(),
+                                CompilationWarningType::ParenthesesOnScalar(let_stmt.get_identifier().to_string()),
+                            );
+                        }
                         self.check_arg_count(header.dim as usize, let_stmt.get_arguments().len(), let_stmt.get_identifier_token());
                     }
                 } else {

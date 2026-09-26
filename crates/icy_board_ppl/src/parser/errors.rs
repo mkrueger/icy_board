@@ -60,7 +60,7 @@ pub enum ParserErrorType {
     #[error("Expected statement")]
     StatementExpected,
 
-    #[error("Too many dimensions for variable '{0}' (max 3)")]
+    #[error("Too many dimensions ({0}); the maximum is 3")]
     TooManyDimensions(usize),
 
     #[error("Invalid token '{0}' - 'CASE' expected")]

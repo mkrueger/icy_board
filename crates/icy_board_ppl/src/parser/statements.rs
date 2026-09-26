@@ -1165,7 +1165,7 @@ impl Parser<'_> {
                     self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
                     return None;
                 };
-                if !params.is_empty() && params.len() <= 3 {
+                if params.len() <= 3 {
                     return Some(Statement::Let(LetStatement::new(
                         None,
                         id_token,
