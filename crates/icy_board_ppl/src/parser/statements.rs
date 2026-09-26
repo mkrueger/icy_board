@@ -246,9 +246,7 @@ impl Parser<'_> {
             return None;
         };
 
-        if let Some(Token::Identifier(id)) = self.get_cur_token()
-            && id != "TO"
-        {
+        if self.get_cur_token() != Some(Token::Identifier(unicase::Ascii::new("TO".to_string()))) {
             self.report_error(self.lex.span(), ParserErrorType::ToExpected(self.save_token()));
             return None;
         }
@@ -264,7 +262,11 @@ impl Parser<'_> {
         let (step_expr, step_token) = if self.get_cur_token() == Some(Token::Identifier(unicase::Ascii::new("STEP".to_string()))) {
             let to_token = self.save_spanned_token();
             self.next_token();
-            (self.parse_expression().map(Box::new), Some(to_token))
+            let Some(step) = self.parse_expression() else {
+                self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                return None;
+            };
+            (Some(Box::new(step)), Some(to_token))
         } else {
             (None, None)
         };
@@ -290,7 +292,6 @@ impl Parser<'_> {
                     .lock()
                     .unwrap()
                     .report_warning(self.lex.span(), ParserWarningType::NextIdentifierInvalid(start_id, self.save_token()));
-                return None;
             }
 
             let t = self.save_spanned_token();
@@ -803,9 +804,8 @@ impl Parser<'_> {
                 Some(Statement::Continue(ContinueStatement::new(tok)))
             }
             Some(Token::EndProc | Token::EndFunc) => {
-                let tok = self.save_spanned_token();
-                self.next_token();
-                Some(Statement::Return(ReturnStatement::new(tok, None)))
+                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                None
             }
 
             Some(Token::Return) => {

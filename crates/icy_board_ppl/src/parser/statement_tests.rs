@@ -59,6 +59,62 @@ fn check_statement_without_eol(input: &str, check: &Statement) {
 }
 
 #[test]
+fn malformed_for_headers_report_errors_before_emitting_ppe() {
+    use crate::compiler::PPECompiler;
+
+    for source in [
+        "INTEGER I\nFOR I = 1, 3\nNEXT",
+        "INTEGER I\nFOR I = 1\n3\nNEXT",
+        "INTEGER I\nFOR I = 1 TO 3 STEP\nNEXT",
+    ] {
+        let registry = UserTypeRegistry::default();
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let workspace = Workspace::default();
+        let ast = parse_ast(PathBuf::from("bad_for.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+        assert!(errors.lock().unwrap().has_errors(), "parser missed {source:?}");
+        let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+        compiler.compile(&[&ast]);
+        assert!(compiler.create_executable().is_err(), "emitted PPE for {source:?}");
+    }
+}
+
+#[test]
+fn mismatched_next_identifier_warns_without_dropping_loop() {
+    let source = "INTEGER I\nFOR I = 1 TO 3\nPRINTLN I\nNEXT J\nPRINTLN I";
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let ast = parse_ast(PathBuf::from("next.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+    assert!(!errors.lock().unwrap().has_errors());
+    assert!(errors.lock().unwrap().has_warnings());
+    assert!(
+        ast.nodes
+            .iter()
+            .any(|node| matches!(node, AstNode::Main(block) if block.get_statements().iter().any(|statement| matches!(statement, Statement::For(_))))),
+        "FOR was dropped despite only a warning"
+    );
+    let mut compiler = crate::compiler::PPECompiler::new(&workspace, registry, errors.clone());
+    compiler.compile(&[&ast]);
+    assert!(compiler.create_executable().is_ok(), "valid FOR with a warning could not compile");
+}
+
+#[test]
+fn routine_closers_outside_routines_cannot_be_emitted_as_returns() {
+    use crate::compiler::PPECompiler;
+
+    for source in ["ENDPROC", "ENDFUNC", "PRINTLN 1\nENDPROC"] {
+        let registry = UserTypeRegistry::default();
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let workspace = Workspace::default();
+        let ast = parse_ast(PathBuf::from("orphan_end.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+        assert!(errors.lock().unwrap().has_errors(), "parser missed {source:?}");
+        let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+        compiler.compile(&[&ast]);
+        assert!(compiler.create_executable().is_err(), "emitted PPE for {source:?}");
+    }
+}
+
+#[test]
 fn test_parse_comment_statement() {
     check_statement(";FOO", &CommentAstNode::create_empty_statement("FOO"));
 }
