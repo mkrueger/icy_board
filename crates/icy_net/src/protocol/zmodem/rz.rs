@@ -255,6 +255,14 @@ impl Rz {
                     self.state = RecvState::Idle;
                     return Ok(false);
                 }
+                // XON/XOFF are legal between frames: senders like lrzsz append XON to
+                // ZCRCW subpackets and hex headers, so this is not a header error.
+                if matches!(
+                    err.downcast_ref::<ZModemError>(),
+                    Some(ZModemError::ZPADExected(XON | XON_0X80 | XOFF | XOFF_0X80))
+                ) {
+                    return Ok(false);
+                }
                 transfer_state.recieve_state.errors += 1;
                 transfer_state
                     .recieve_state

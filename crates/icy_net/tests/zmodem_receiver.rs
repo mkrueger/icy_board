@@ -3,7 +3,7 @@ use std::{future::Future, time::Duration};
 use icy_net::{
     Connection,
     connection::channel::ChannelConnection,
-    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCW, ZFrameType, Zmodem},
+    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCE, ZCRCW, ZFrameType, Zmodem},
 };
 
 async fn bounded<T>(future: impl Future<Output = T>) -> T {
@@ -154,4 +154,29 @@ async fn disconnect_during_cleanup_finishes_but_header_eof_is_an_error() {
             assert!(result.is_err(), "EOF must propagate, not repeat header reads forever");
         }
     }
+}
+
+#[tokio::test]
+async fn flow_control_bytes_before_a_header_are_not_errors() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x005\x00", false));
+    // Senders like lrzsz follow a ZCRCW subpacket with XON; flow control may add XOFF with parity.
+    bytes.extend_from_slice(&[0x11, 0x93]);
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    let reply = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    assert_eq!(reply.frame_type, ZFrameType::RPos);
+
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.cur_bytes_transfered < 5 {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    assert_eq!(state.recieve_state.errors, 0, "{:?}", state.recieve_state.output_log);
+    assert_eq!(state.recieve_state.warnings, 0, "{:?}", state.recieve_state.output_log);
 }
