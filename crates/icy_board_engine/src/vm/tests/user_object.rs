@@ -421,3 +421,49 @@ PRINTLN MID(UserRecord, 88, 6), "|", MID(UserRecord, 94, 5)
     );
     assert_eq!(output, "1\n09-15-1983\n260915|21:07\n");
 }
+
+#[test]
+fn u_inconf_checks_conference_registration_of_a_record() {
+    use crate::icy_board::{
+        conferences::Conference,
+        message_area::{AreaList, MessageArea},
+        security_expr::SecurityExpression,
+        user_base::{ConferenceFlags, User},
+    };
+    let output = run_ppl_on(
+        r#"
+        ;$LANGVERSION 400
+        INTEGER rec = U_RECNUM("CALLER")
+        PRINTLN rec, U_INCONF(rec, 0), U_INCONF(rec, 1), U_INCONF(rec, 2), U_INCONF(rec, 3), U_INCONF(rec, 4)
+        PRINTLN U_INCONF(0, 0), U_INCONF(3, 0), U_INCONF(1, 3)
+        PRINTLN U_INCONF(rec, AreaId(2, 0)), U_INCONF(rec, AreaId(2, 1)), U_INCONF(rec, AreaId(2, 5)), U_INCONF(rec, AreaId(3, 0))
+    "#,
+        |board| {
+            board.users.new_user(User {
+                name: "CALLER".into(),
+                security_level: 10,
+                conference_flags: [(2, ConferenceFlags::Registered)].into_iter().collect(),
+                ..Default::default()
+            });
+            for (name, is_public) in [("Main", true), ("Public", true), ("Registered", false), ("Private", false)] {
+                board.conferences.push(Conference {
+                    name: name.into(),
+                    is_public,
+                    ..Default::default()
+                });
+            }
+            board.conferences[2].areas = Some(std::sync::Arc::new(AreaList::new(vec![
+                MessageArea {
+                    name: "Open".into(),
+                    ..Default::default()
+                },
+                MessageArea {
+                    name: "Closed".into(),
+                    req_level_to_enter: SecurityExpression::from_req_security(100),
+                    ..Default::default()
+                },
+            ])));
+        },
+    );
+    assert_eq!(output, "211100\n000\n1000\n");
+}

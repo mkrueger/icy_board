@@ -214,7 +214,7 @@ ANSION (1.00)
 
 AREAID (4.00)
 ~~~~~~~~~~~~~
-  :PPL:`FUNCTION MESSAGEAREAID AREAID(INTEGER conf, INTEGER area)`
+  :PPL:`FUNCTION MSGAREAID AREAID(INTEGER conf, INTEGER area)`
 
   Creates a combined conference/message area identifier for IcyBoard compatibility.
 
@@ -223,7 +223,7 @@ AREAID (4.00)
     * :PPL:`area` – Message area number within the conference
 
   **Returns**
-    Combined MessageAreaID value for use with message-related functions.
+    Combined MSGAREAID value for use with message-related functions.
 
   **Remarks**
     IcyBoard extends the traditional PCBoard conference model with multiple message areas 
@@ -232,42 +232,30 @@ AREAID (4.00)
     use message areas continue to work unmodified - they simply operate on the default area 
     (area 0) of each conference.
     
-    The returned MessageAreaID encodes both conference and area information in a single value 
-    that can be passed to functions like HIMSGNUM(), LOWMSGNUM(), ACTMSGNUM(), and others 
-    that previously only accepted conference numbers. This enables precise targeting of 
-    message operations across the expanded IcyBoard message structure.
+    The returned value can be passed wherever these functions and statements expect a
+    conference number: GETMSGHDR(), SETMSGHDR(), SCANMSGHDR(), U_LMR(), U_INCONF(),
+    MESSAGE, SETLMR, MSGTOFILE, KILLMSG and MOVEMSG. A plain integer still addresses
+    area 0 of that conference. Converting the value to a string yields
+    ``conf,area``; the read-only members ``.Conference`` and ``.Area`` return the
+    two parts.
 
   **Example**
 
     .. code-block:: PPL
 
-       MESSAGEAREAID mainBoard, techSupport
-       
-       ; Target main board's default area (backward compatible)
-       mainBoard = AREAID(0, 0)
-       PRINTLN "Messages in main: ", ACTMSGNUM(mainBoard)
-       
-       ; Target conference 5, area 3 (IcyBoard extended)
-       techSupport = AREAID(5, 3)
-       PRINTLN "Tech support messages: ", ACTMSGNUM(techSupport)
-       
-       ; Scan across multiple areas
-       INTEGER conf, area, msgCount
-       FOR conf = 0 TO HICONFNUM()
-           FOR area = 0 TO 9  ; Check first 10 areas
-               msgCount = ACTMSGNUM(AREAID(conf, area))
-               IF (msgCount > 0) THEN
-                   PRINTLN "Conf ", conf, " Area ", area, ": ", msgCount, " messages"
-               ENDIF
-           NEXT
-       NEXT
+       ;$LANGVERSION 400
+       MSGAREAID techSupport = AREAID(5, 3)
+
+       PRINTLN "Area ", techSupport, " is conference ", techSupport.Conference, ", area ", techSupport.Area
+       IF (U_INCONF(U_RECNUM(U_NAME()), techSupport)) THEN
+           PRINTLN "Last message read there: ", U_LMR(techSupport)
+           PRINTLN "First message about PPL: ", SCANMSGHDR(techSupport, 1, HDR_SUBJ, "PPL")
+       ENDIF
 
   **See Also**
-    * :PPL:`ACTMSGNUM()` – Count active messages
-    * :PPL:`HIMSGNUM()` – Get highest message number
-    * :PPL:`LOWMSGNUM()` – Get lowest message number
     * :PPL:`SCANMSGHDR()` – Search message headers
-    * :PPL:`JOIN` – Join conference
+    * :PPL:`U_INCONF()` – Check conference registration
+    * :PPL:`U_LMR()` – Get last message read
 
 ASC (1.00)
 ~~~~~~~~~~
@@ -4211,6 +4199,10 @@ U_INCONF (1.00)
     Sometimes necessary to know if a user is registered in a conference (for example, 
     when entering a message to a particular user). Before calling this function you need 
     to find the user's record number from the USERS file with the U_RECNUM() function.
+
+    The main board and public conferences count as registered for every user. In IcyBoard
+    :PPL:`conf` may also be an :PPL:`AREAID()`; the user must then also be allowed to enter
+    that message area.
 
   **Example**
 

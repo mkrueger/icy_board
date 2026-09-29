@@ -2034,24 +2034,40 @@ pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_int(-1))
 }
 
+/// Record numbers are 1-based, as returned by `U_RECNUM`. An `AreaId` also
+/// requires the area to exist and to be open to the user.
 pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
-    let (area, conf) = vm.eval_expr(&args[1]).await?.as_msg_id();
+    let id = vm.eval_expr(&args[1]).await?;
+    let (conf_num, area_num) = id.as_msg_id();
     let board = vm.icy_board_state.get_board().await;
-    if let Some(user) = board.users.get(record as usize)
-        && let Some(conf) = &board.conferences.get(conf as usize)
-    {
-        if conf.required_security.user_can_access(user) {
-            return Ok(VariableValue::new_bool(true));
-        }
-        if let Some(areas) = &conf.areas
-            && let Some(area) = areas.get(area as usize)
-            && area.req_level_to_enter.user_can_access(user)
-        {
-            return Ok(VariableValue::new_bool(true));
-        }
+    let Some(user) = record
+        .checked_sub(1)
+        .filter(|index| *index >= 0)
+        .and_then(|index| board.users.get(index as usize))
+    else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let Some(conference) = usize::try_from(conf_num).ok().and_then(|number| board.conferences.get(number)) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let registered = conf_num == 0
+        || conference.is_public
+        || user
+            .conference_flags
+            .get(&(conf_num as usize))
+            .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
+    if !registered {
+        return Ok(VariableValue::new_bool(false));
     }
-    Ok(VariableValue::new_bool(false))
+    if id.get_type() == VariableType::MessageAreaID {
+        let area_open = usize::try_from(area_num)
+            .ok()
+            .and_then(|number| conference.areas.as_ref().and_then(|areas| areas.get(number)))
+            .is_some_and(|area| area.req_level_to_enter.user_can_access(user));
+        return Ok(VariableValue::new_bool(area_open));
+    }
+    Ok(VariableValue::new_bool(true))
 }
 
 /// There is no memory to read, and a PPE polling a VGA register here spins until the
