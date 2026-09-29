@@ -220,7 +220,8 @@ AREAID (4.00)
 
   **Parameters**
     * :PPL:`conf` – Conference number (0 = main board)
-    * :PPL:`area` – Message area number within the conference
+    * :PPL:`area` – Message area number within the conference, starting at 1 like
+      ``Area.Number`` and the ``AREA`` command; 0 also means the first area
 
   **Returns**
     Combined MSGAREAID value for use with message-related functions.
@@ -229,15 +230,15 @@ AREAID (4.00)
     IcyBoard extends the traditional PCBoard conference model with multiple message areas 
     per conference. This function creates a combined identifier that allows message functions 
     to target specific areas while maintaining backward compatibility. Legacy PPEs that don't 
-    use message areas continue to work unmodified - they simply operate on the default area 
-    (area 0) of each conference.
+    use message areas continue to work unmodified - they simply operate on the first area
+    (area 1) of each conference.
     
     The returned value can be passed wherever these functions and statements expect a
     conference number: GETMSGHDR(), SETMSGHDR(), SCANMSGHDR(), U_LMR(), U_INCONF(),
     MESSAGE, SETLMR, MSGTOFILE, KILLMSG and MOVEMSG. A plain integer still addresses
-    area 0 of that conference. Converting the value to a string yields
+    the first area of that conference. Converting the value to a string yields
     ``conf,area``; the read-only members ``.Conference`` and ``.Area`` return the
-    two parts.
+    two parts. ``AREAID(5, 0)`` is stored as ``5,1``.
 
   **Example**
 

@@ -442,7 +442,7 @@ than failing, so its properties can still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Area name |
-| `Number` | `INTEGER` | The number it was fetched under |
+| `Number` | `INTEGER` | One-based number, as the `AREA` command and `AreaId` take it; 0 when the area does not exist |
 | `Valid` | `BOOLEAN` | Whether the requested area exists |
 | `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
 | `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |

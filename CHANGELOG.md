@@ -8,6 +8,18 @@ releases.
 
 ## [Unreleased]
 
+### Changed
+
+- PPL message areas are numbered from 1: `Area.Number`, the area in `AreaId()`
+  and the `AREA` command now use the same number. `AreaId(conf, 0)` and a plain
+  conference number still address the first area. PPEs that added one to
+  `Area.Number` or passed zero-based areas above 0 to `AreaId()` must be updated.
+
+### Fixed
+
+- The `AREA` command's search list and its confirmation showed zero-based
+  numbers, so choosing a listed number joined the wrong area.
+
 ## [0.2.2] - 2026-09-12
 
 Third public beta. This release expands the BBS administration, upload and FTN

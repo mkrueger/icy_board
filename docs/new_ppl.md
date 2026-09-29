@@ -1540,15 +1540,18 @@ message area just works in icy board. But with icy board it's possible to specif
 `conf`      An integer expression stating the conference number of the message base.
 
 `area`      An integer expression stating the message area of the message base.
+            Areas are numbered from 1, the same number `Area.Number` reports and
+            the `AREA` command takes. 0 also means the first area.
 
 ### Returns
 `MessageAreaID`   Combined Value of conference/message area
 
 This is a pair, not a message number or an existence check. Printing or
 converting `AreaId(7, 1)` to a string yields `7,1`, regardless of whether that
-area exists. Pass the value to message-related functions to address the area.
-The read-only integer properties `.Conference` and `.Area` access the two
-components, for example `AreaId(7, 1).Conference` is `7`.
+area exists. `AreaId(7, 0)` yields `7,1` as well. Pass the value to
+message-related functions to address the area; a plain conference number
+addresses its first area. The read-only integer properties `.Conference` and
+`.Area` access the two components, for example `AreaId(7, 1).Conference` is `7`.
 
 ## Board objects (4.00)
 
@@ -1581,7 +1584,8 @@ an empty conference object, so its properties can still be read.
 
 | Area member | Type | Description |
 | :--- | :--- | :--- |
-| `Name`, `Number`, `Valid` | | Name, the number it was fetched under, and whether it exists |
+| `Name`, `Valid` | | Name and whether it exists |
+| `Number` | `INTEGER` | One-based number, as the `AREA` command and `AreaId` take it; 0 when the area does not exist |
 | `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
 | `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |
 | `QwkName` | `STRING` | The name this area carries in a QWK packet |

@@ -1933,12 +1933,19 @@ impl VariableValue {
         unsafe { IcbTime::from_pcboard(self.data.time_value) }
     }
 
-    /// Returns (conference, area) for a message id
+    /// Returns (conference, message area) for a message id
     pub fn as_msg_id(&self) -> (i32, i32) {
         match self.vtype {
             VariableType::MessageAreaID => unsafe { (self.data.message_id_value.conference, self.data.message_id_value.area) },
             _ => (self.as_int(), 0),
         }
+    }
+
+    /// Returns (conference, zero-based area index) for a message id. Area numbers
+    /// start at 1; 0, and a plain conference number, address the first area.
+    pub fn as_msg_area_index(&self) -> (i32, i32) {
+        let (conference, area) = self.as_msg_id();
+        (conference, if area > 0 { area - 1 } else { area })
     }
 
     #[must_use]

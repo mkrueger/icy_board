@@ -89,6 +89,52 @@ fn area_id_prints_and_converts_to_string() {
 }
 
 #[test]
+fn area_id_zero_is_the_first_area() {
+    let output = run_ppl_on("PRINTLN AreaId(7, 0), \" \", AreaId(7, 0).Area\n", |_| {});
+    assert_eq!("7,1 1\n", output);
+}
+
+/// Area numbers start at 1 in `Area.Number`, `AreaId` and the `AREA` command alike;
+/// 0 and a plain conference number still address the first area.
+#[test]
+fn area_numbers_address_the_same_message_base() {
+    use jamjam::jam::{JamMessage, JamMessageBase};
+
+    let dir = super::scratch_dir("area-numbers");
+    let mut areas = Vec::new();
+    for name in ["First", "Second"] {
+        let path = dir.join(name.to_lowercase());
+        let mut base = JamMessageBase::create(&path).unwrap();
+        base.write_message(&JamMessage::default().with_subject(name.into()).with_text("body".into()))
+            .unwrap();
+        base.write_jhr_header().unwrap();
+        areas.push(MessageArea {
+            name: name.to_string(),
+            path,
+            ..Default::default()
+        });
+    }
+    let output = run_ppl_on(
+        r#"
+        AREA second = Board.Conferences[0].Areas[1]
+        PRINTLN Board.Conferences[0].Areas[0].Number, " ", second.Number
+        PRINTLN GETMSGHDR(0, 1, HDR_SUBJ), " ", GETMSGHDR(AreaId(0, 0), 1, HDR_SUBJ), " ", GETMSGHDR(AreaId(0, 1), 1, HDR_SUBJ)
+        PRINTLN GETMSGHDR(AreaId(0, 2), 1, HDR_SUBJ), " ", GETMSGHDR(AreaId(0, second.Number), 1, HDR_SUBJ)
+        PRINTLN Board.Conferences[0].Areas[2].Number
+        "#,
+        |board| {
+            board.conferences.clear();
+            board.conferences.push(Conference {
+                name: "Main Board".to_string(),
+                areas: Some(std::sync::Arc::new(AreaList::new(areas.clone()))),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!("1 2\nFirst First First\nSecond Second\n0\n", output);
+}
+
+#[test]
 fn area_id_components_are_read_only() {
     for write in ["MSGAREAID id = AreaId(7, 1)\nid.Conference = 3", "MSGAREAID id = AreaId(7, 1)\nLET id.Area = 2"] {
         let errors = compile_errors(write);

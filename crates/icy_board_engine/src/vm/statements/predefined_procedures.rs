@@ -1526,7 +1526,7 @@ pub async fn closecap(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let (conf, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conf, area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let to = vm.eval_expr(&args[1]).await?.as_string();
     let from = vm.eval_expr(&args[2]).await?.as_string();
     let subject = vm.eval_expr(&args[3]).await?.as_string();
@@ -2390,7 +2390,7 @@ pub async fn frealtuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 /// past the end clamps to the highest one there is, so a PPE can ask for
 /// "everything" without knowing the numbers.
 pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let requested = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int().max(0) as u32;
 
     let conference = {
@@ -2694,7 +2694,7 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
 }
 
 pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let msg_number: i32 = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
     let file_name = vm.eval_expr(&args[2]).await?.as_string();
 
@@ -2986,7 +2986,7 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 /// Deletes a message. A message nobody can delete is not an error the PPE gets
 /// to see; `PCBoard` simply carries on.
 pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let number = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
 
     let Some(msg_base) = vm.message_base_path(conference, area).await else {
@@ -3122,7 +3122,7 @@ pub async fn shortdesc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 /// Copies a message out of the conference the caller is in and into `conf`, and
 /// deletes the original when `movetype` asks for a move rather than a copy.
 pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let (to_conf, to_area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (to_conf, to_area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let number = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
     let moving = vm.eval_expr(&args[2]).await?.as_bool();
 

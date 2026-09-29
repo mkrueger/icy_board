@@ -103,7 +103,7 @@ impl IcyBoardState {
                     let c = areas.iter().map(|a| a.name.clone()).collect::<Vec<String>>();
                     for (i, c) in c.iter().enumerate() {
                         if regex.find(c).is_some() {
-                            self.print(crate::vm::TerminalTarget::Both, &format!("{i}) ")).await?;
+                            self.print(crate::vm::TerminalTarget::Both, &format!("{}) ", i + 1)).await?;
                             self.print_found_text(crate::vm::TerminalTarget::Both, c).await?;
                             self.new_line().await?;
                             if self.session.disp_options.abort_printout {
@@ -147,7 +147,7 @@ impl IcyBoardState {
             }*/
 
             self.session.current_message_area = area_num as usize;
-            self.session.op_text = format!("{} ({})", area.name, self.session.current_message_area);
+            self.session.op_text = format!("{} ({})", area.name, area_num + 1);
             self.display_text(IceText::AreaJoined, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
             break;
         }

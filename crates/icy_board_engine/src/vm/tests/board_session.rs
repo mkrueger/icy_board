@@ -258,7 +258,7 @@ fn board_objects_know_their_own_number() {
         },
     );
 
-    assert_eq!(output, "1 Second 1\n1 Second 1\n");
+    assert_eq!(output, "1 Second 1\n2 Second 1\n");
 }
 
 /// `Session` is read live rather than snapshotted, so a value kept in a

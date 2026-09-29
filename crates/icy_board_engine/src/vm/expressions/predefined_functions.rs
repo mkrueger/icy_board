@@ -1120,7 +1120,7 @@ pub async fn u_ldir(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 /// and does not depend on the interactive reader having run first.
 pub async fn u_lmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let cached = vm.icy_board_state.session.last_msg_read;
-    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let Some(msg_base) = vm.message_base_path(conference, area).await else {
         return Ok(VariableValue::new_int(cached as i32));
     };
@@ -2039,7 +2039,7 @@ pub async fn u_recnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let record = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let id = vm.eval_expr(&args[1]).await?;
-    let (conf_num, area_num) = id.as_msg_id();
+    let (conf_num, area_num) = id.as_msg_area_index();
     let board = vm.icy_board_state.get_board().await;
     let Some(user) = record
         .checked_sub(1)
@@ -3107,7 +3107,7 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let msg_num = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
     if let Some((cn, an, mn, header)) = &vm.cached_msg_header
@@ -3229,7 +3229,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
 
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     vm.invalidate_message_base();
-    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let msg_num = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as u32;
     let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let value = vm.eval_expr(&args[3]).await?.as_string();
@@ -3308,7 +3308,7 @@ fn set_field(field_num: i32, header: &mut JamMessageHeader, value: &str) -> bool
 /// Walks forward from `start_msg` and reports the first message whose header
 /// field contains `test`, or zero when the scan runs off the end.
 pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
+    let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_area_index();
     let start_msg = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int().max(0) as u32;
     let field_num = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int();
     let test = vm.eval_expr(&args[3]).await?.as_string().to_uppercase();
@@ -3334,7 +3334,8 @@ pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 pub async fn area_id(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conference = vm.eval_expr(&args[0]).await?.checked_numeric()?.as_int();
     let area = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int();
-    Ok(VariableValue::new_msg_id(conference, area))
+    // Area numbers start at 1; 0 stands for the first area.
+    Ok(VariableValue::new_msg_id(conference, if area == 0 { 1 } else { area }))
 }
 
 /// Should be the same logic than the one in pcboard.

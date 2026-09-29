@@ -32,7 +32,7 @@ use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 pub struct MessageArea {
     pub name: String,
 
-    /// Set when the area is handed to a PPE, so the object can report where it sits.
+    /// Zero-based position, set when the area is handed to a PPE. PPL sees it one-based.
     #[serde(skip)]
     pub number: usize,
 
@@ -256,7 +256,8 @@ impl UserDataValue for MessageArea {
             return Ok(VariableValue::new_unbounded_string(self.name.clone()));
         }
         if *name == *NUMBER {
-            return Ok(VariableValue::new_int(self.number as i32));
+            // The number the AREA command takes; an area that does not exist has none.
+            return Ok(VariableValue::new_int(if self.valid { self.number as i32 + 1 } else { 0 }));
         }
         if *name == *VALID {
             return Ok(VariableValue::new_bool(self.valid));

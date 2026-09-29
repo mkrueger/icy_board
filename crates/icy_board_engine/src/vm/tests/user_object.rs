@@ -436,7 +436,7 @@ fn u_inconf_checks_conference_registration_of_a_record() {
         INTEGER rec = U_RECNUM("CALLER")
         PRINTLN rec, U_INCONF(rec, 0), U_INCONF(rec, 1), U_INCONF(rec, 2), U_INCONF(rec, 3), U_INCONF(rec, 4)
         PRINTLN U_INCONF(0, 0), U_INCONF(3, 0), U_INCONF(1, 3)
-        PRINTLN U_INCONF(rec, AreaId(2, 0)), U_INCONF(rec, AreaId(2, 1)), U_INCONF(rec, AreaId(2, 5)), U_INCONF(rec, AreaId(3, 0))
+        PRINTLN U_INCONF(rec, AreaId(2, 1)), U_INCONF(rec, AreaId(2, 2)), U_INCONF(rec, AreaId(2, 5)), U_INCONF(rec, AreaId(3, 0))
     "#,
         |board| {
             board.users.new_user(User {

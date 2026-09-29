@@ -32,6 +32,7 @@ mod cmd_3;
 mod cmd_7;
 mod cmd_a;
 mod cmd_alias;
+mod cmd_area;
 mod cmd_b;
 mod cmd_bye;
 mod cmd_c;
