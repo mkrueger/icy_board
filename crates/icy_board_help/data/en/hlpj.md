@@ -9,8 +9,8 @@ dividing that up in categories you can find things faster.
   name you wish to join.
 - `[conf. num.]` Conference number to join. Specifies the conference
   number you wish to join.
-- `Q` Quick-join the conference. Put it after the conference number or
-  name, for example `J 13 Q` or `J;13;Q`. News and introduction files are
+- `Q` Quick-join the conference, for example `J 13 Q`, `J;13;Q` or
+  `J;Q;13`. News and introduction files are
   skipped unless the board always shows news or forces the introduction.
 - `S` Search conference names for text. Filter conferences
   to join for a text.

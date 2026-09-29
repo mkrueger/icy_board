@@ -111,13 +111,15 @@ fn test_cmd_j_quick_join_after_the_number_skips_news_and_intro() {
     assert!(!output.contains("BULLETIN2"), "{output}");
 }
 
-/// After Q the digits are part of a conference name, as on `PCBoard` 15.4.
 #[test]
-fn test_cmd_j_a_number_after_quick_join_is_a_name() {
-    let output = test_output("J;Q;7\n\n".to_string(), setup_join_files);
-    assert!(output.contains("(7) is an invalid Conference selection!"), "{output}");
-    assert!(output.contains("Conference # to join (Enter)=none"), "{output}");
-    assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
+fn test_cmd_j_quick_join_before_the_number_skips_news_and_intro() {
+    for command in ["J;Q;7\n", "J Q 7\n"] {
+        let output = test_output(command.to_string(), setup_join_files);
+        assert!(output.contains("SEVENTH (7) Joined"), "{command}: {output}");
+        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
+    }
 }
 
 #[test]
@@ -163,15 +165,18 @@ fn test_cmd_j_forced_news_and_intro_ignore_quick_join() {
 
 #[test]
 fn a_ppe_command_can_quick_join() {
-    let output = test_ppe_output("COMMAND TRUE, \"J;7;Q\"", setup_join_files);
-    assert!(output.contains("SEVENTH (7) Joined"), "{output}");
-    assert!(!output.contains("BULLETIN1"), "{output}");
-    assert!(!output.contains("BULLETIN2"), "{output}");
+    for command in ["\"J;7;Q\"", "\"J;Q;7\""] {
+        let output = test_ppe_output(&format!("COMMAND TRUE, {command}"), setup_join_files);
+        assert!(output.contains("SEVENTH (7) Joined"), "{command}: {output}");
+        assert!(!output.contains("invalid Conference selection"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN1"), "{command}: {output}");
+        assert!(!output.contains("BULLETIN2"), "{command}: {output}");
+    }
 }
 
 #[test]
 fn a_ppe_join_can_quick_join_by_number_or_name() {
-    for selection in ["\"7;Q\"", "\"SEVENTH;Q\""] {
+    for selection in ["\"7;Q\"", "\"Q;7\"", "\"SEVENTH;Q\""] {
         let output = test_ppe_output(&format!("JOIN {selection}"), setup_join_files);
         assert!(output.contains("SEVENTH (7) Joined"), "{output}");
         assert!(!output.contains("BULLETIN1"), "{output}");
@@ -205,8 +210,7 @@ fn a_ppe_join_can_return_to_main_by_name() {
 
 #[test]
 fn a_ppe_join_uses_j_selection_rules() {
-    let output = test_ppe_output("JOIN \"Q;7\"", setup_join_files);
-    assert!(output.contains("(7) is an invalid Conference selection!"), "{output}");
+    let output = test_ppe_output("JOIN \"S;7\"", setup_join_files);
     assert!(!output.contains("SEVENTH (7) Joined"), "{output}");
 }
 

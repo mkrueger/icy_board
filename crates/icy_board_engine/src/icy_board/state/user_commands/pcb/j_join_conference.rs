@@ -70,7 +70,7 @@ impl IcyBoardState {
         let mut number = None;
         let mut name = String::new();
         let mut last_token = String::new();
-        // A digit after Q, S or a one-letter name is part of the name.
+        // A digit after S or a one-letter name is part of the name.
         let mut non_digit = false;
 
         for token in tokens {
@@ -87,7 +87,6 @@ impl IcyBoardState {
                 match ch.to_ascii_uppercase() {
                     'Q' => {
                         show_news = false;
-                        non_digit = true;
                         continue;
                     }
                     'S' => {

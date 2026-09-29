@@ -7,8 +7,8 @@ teilen diese in Kategorien, um die Suche zu vereinfachen.
 
 - `[conf. name]` Konferenzname. Spezifiziert den Konferenznamen
 - `[conf. num.]` Konferenznummer. Spezifiziert die Konferenznummer
-- `Q` Schnellbeitritt. Wird nach der Konferenznummer oder dem Namen
-  angegeben, zB. `J 13 Q` oder `J;13;Q`. News- und Intro-Dateien werden
+- `Q` Schnellbeitritt, zB. `J 13 Q`, `J;13;Q` oder `J;Q;13`. News- und
+  Intro-Dateien werden
   übersprungen, außer das System zeigt News immer an oder erzwingt das Intro.
 - `S` Suche nach Namen. Filtert den Konferenznamen nach Muster
   es werden nur passende Konferenzen angezeigt.
