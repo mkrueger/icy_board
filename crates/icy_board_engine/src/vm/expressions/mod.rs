@@ -377,6 +377,19 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
                 .evaluate(&values[1], &values[2..])
                 .map_err(|error| crate::executable::VMError::InvalidTemporalValue(error).into())
         }
+        FuncOpCode::AreaIdPart => {
+            let id = arg.eval_expr(&arguments[0]).await?;
+            if id.get_type() != crate::executable::VariableType::MessageAreaID {
+                return Err(crate::vm::VMError::InternalVMError.into());
+            }
+            let part = arg.eval_expr(&arguments[1]).await?.checked_numeric()?.as_int();
+            let (conference, area) = id.as_msg_id();
+            match part {
+                0 => Ok(crate::executable::VariableValue::new_int(conference)),
+                1 => Ok(crate::executable::VariableValue::new_int(area)),
+                _ => Err(crate::vm::VMError::InternalVMError.into()),
+            }
+        }
         FuncOpCode::EnumCast => {
             let type_id = arg.eval_expr(&arguments[0]).await?.checked_numeric()?.as_int();
             let value = arg.eval_expr(&arguments[1]).await?;

@@ -610,6 +610,7 @@ impl Decompiler {
             PPEExpr::PredefinedFunctionCall(def, arguments) if def.opcode == FuncOpCode::TemporalCall => {
                 self.temporal_member(arguments).map(|(_, member)| member.result)
             }
+            PPEExpr::PredefinedFunctionCall(def, _) if def.opcode == FuncOpCode::AreaIdPart => Some(VariableType::Integer),
             PPEExpr::PredefinedFunctionCall(def, _) => Some(def.return_type),
             _ => None,
         }
@@ -805,6 +806,19 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => {
+                if f.opcode == FuncOpCode::AreaIdPart
+                    && let [receiver, PPEExpr::Value(index)] = args.as_slice()
+                    && let Some(entry) = self.executable.variable_table.try_get_entry(*index)
+                {
+                    let name = match entry.value.try_as_int() {
+                        Some(0) => Some("Conference"),
+                        Some(1) => Some("Area"),
+                        _ => None,
+                    };
+                    if let Some(name) = name {
+                        return MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new(name.to_string()));
+                    }
+                }
                 if f.opcode == FuncOpCode::TemporalCall && args.len() == 5 {
                     use crate::executable::temporal::TemporalOp;
                     if let Some((typ, member)) = self.temporal_member(args) {

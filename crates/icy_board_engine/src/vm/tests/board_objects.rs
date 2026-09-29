@@ -67,6 +67,36 @@ fn directory_list() -> DirectoryList {
 }
 
 #[test]
+fn area_id_prints_and_converts_to_string() {
+    let output = run_ppl_on(
+        r#"
+        MSGAREAID id = AreaId(7, 1)
+        STRING text = AreaId(7, 1)
+        PRINTLN "[", AreaId(7, 1), "]"
+        PRINTLN "[", id, "]"
+        PRINTLN "[", text, "]"
+        PRINTLN id.Conference, " ", id.Area
+        PRINTLN AreaId(7, 1).Conference, " ", AreaId(7, 1).Area
+        "#,
+        |board| {
+            seed_conference(board);
+            let conference = board.conferences[0].clone();
+            board.conferences.resize(8, conference);
+            board.conferences[7].areas = Some(std::sync::Arc::new(AreaList::new(vec![MessageArea::default(), MessageArea::default()])));
+        },
+    );
+    assert_eq!("[7,1]\n[7,1]\n[7,1]\n7 1\n7 1\n", output);
+}
+
+#[test]
+fn area_id_components_are_read_only() {
+    for write in ["MSGAREAID id = AreaId(7, 1)\nid.Conference = 3", "MSGAREAID id = AreaId(7, 1)\nLET id.Area = 2"] {
+        let errors = compile_errors(write);
+        assert!(errors.iter().any(|error| error.contains("can only be read")), "{write}: {errors:?}");
+    }
+}
+
+#[test]
 fn bulletin_and_news_metadata_are_readable() {
     let output = run_ppl_on(
         r#"

@@ -1914,6 +1914,10 @@ impl VariableValue {
                     VariableType::Word => self.data.word_value.to_string(),
                     VariableType::SByte => self.data.sbyte_value.to_string(),
                     VariableType::SWord => self.data.sword_value.to_string(),
+                    VariableType::MessageAreaID => {
+                        let id = self.data.message_id_value;
+                        format!("{},{}", id.conference, id.area)
+                    }
 
                     _ => String::new(),
                 },
@@ -2450,6 +2454,14 @@ mod tests {
     fn bytes_render_as_uppercase_hex() {
         assert_eq!("48656C6C6F", VariableValue::new_bytes(b"Hello".to_vec()).as_string());
         assert_eq!("", VariableValue::new_bytes(Vec::new()).as_string());
+    }
+
+    #[test]
+    fn message_area_id_renders_both_numbers() {
+        let id = VariableValue::new_msg_id(7, 1);
+        assert_eq!("7,1", id.as_string());
+        assert_eq!("7,1", id.convert_to(VariableType::String).unwrap().as_string());
+        assert_eq!("0,0", VariableValue::new_msg_id(0, 0).as_string());
     }
 
     #[test]

@@ -153,6 +153,12 @@ pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<Vari
 
 /// The type a field of `var_type` has.
 pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, member: &str) -> Option<VariableType> {
+    if var_type == VariableType::MessageAreaID {
+        return ["Conference", "Area"]
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(member))
+            .then_some(VariableType::Integer);
+    }
     if var_type.is_temporal() {
         return temporal_members(var_type)
             .iter()
@@ -523,6 +529,16 @@ pub fn callable_detail(registry: &UserTypeRegistry, method: &CallableMember) -> 
 
 /// Everything that may follow a `.` on a value of this type.
 pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if var_type == VariableType::MessageAreaID {
+        return ["Conference", "Area"]
+            .into_iter()
+            .map(|name| Member {
+                name: name.to_string(),
+                detail: "INTEGER".to_string(),
+                kind: MemberKind::Field,
+            })
+            .collect();
+    }
     if var_type.is_temporal() {
         return temporal_completion_members(registry, var_type, false);
     }
@@ -676,6 +692,26 @@ fn named_parameters(registry: &UserTypeRegistry, parameters: &[VariableType], na
         })
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod area_id_tests {
+    use super::*;
+
+    #[test]
+    fn message_area_id_exposes_both_integer_fields() {
+        let registry = UserTypeRegistry::icy_board_registry();
+        let members = members_of(&registry, VariableType::MessageAreaID);
+        assert_eq!(members.iter().map(|member| member.name.as_str()).collect::<Vec<_>>(), ["Conference", "Area"]);
+        for member in &members {
+            assert_eq!(member.detail, "INTEGER");
+            assert!(matches!(member.kind, MemberKind::Field));
+            assert_eq!(
+                type_of_member(&registry, VariableType::MessageAreaID, &member.name),
+                Some(VariableType::Integer)
+            );
+        }
+    }
 }
 
 /// The parameter list of a callable member, so a signature can read as a call.

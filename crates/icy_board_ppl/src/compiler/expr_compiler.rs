@@ -78,6 +78,21 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
 
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> HirExpr {
         let base = member_reference_expression.get_expression().visit(self);
+        if self
+            .compiler
+            .semantic_visitor
+            .member_receiver_type_lookup
+            .get(&member_reference_expression.get_identifier_token().span.start)
+            == Some(&VariableType::MessageAreaID)
+        {
+            let part = if *member_reference_expression.get_identifier() == "Conference" {
+                0
+            } else {
+                1
+            };
+            let part = self.compiler.lookup_table.lookup_constant(&Constant::Integer(part, NumberFormat::Default));
+            return HirExpr::predefined(FuncOpCode::AreaIdPart, vec![base, HirExpr::constant(part)]);
+        }
         if let Some(typ) = self
             .compiler
             .semantic_visitor

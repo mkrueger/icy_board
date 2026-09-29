@@ -245,6 +245,13 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
 }
 
 pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<String> {
+    if var_type == VariableType::MessageAreaID {
+        return match member.to_ascii_lowercase().as_str() {
+            "conference" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-id-conference")),
+            "area" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-id-area")),
+            _ => None,
+        };
+    }
     if var_type.is_temporal() {
         use icy_board_ppl::executable::temporal::{TemporalOp, temporal_members};
         let definition = temporal_members(var_type)

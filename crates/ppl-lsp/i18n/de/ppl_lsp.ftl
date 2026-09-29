@@ -63,6 +63,8 @@ hint-temporal-until=Vorzeichenbehafteter Abstand vom Empfänger zum Argument in 
 hint-temporal-change=Liefert einen geänderten Wert, ohne den Empfänger zu verändern. Ungültige Kalenderänderungen, Leerwerte und Überläufe lösen einen Fehler aus.
 hint-temporal-create=Erzeugt einen validierten Wert. FromUtc kombiniert DATE und TIME als UTC; FromUnix erwartet ganze Sekunden seit 1970-01-01T00:00:00Z mit Vorzeichen.
 hint-temporal-component=Liest eine Komponente, ohne den Wert zu ändern. TIMESTAMP-Komponenten sind UTC; DayOfWeek verwendet Sonntag=0. Leerwerte lösen einen Fehler aus.
+hint-member-area-id-conference=Konferenznummer dieser Nachrichtenbereichskennung (schreibgeschützt).
+hint-member-area-id-area=Bereichsnummer dieser Nachrichtenbereichskennung (schreibgeschützt).
 hint-member-user-birthday=Natives Kalendergeburtsdatum ohne Legacy-Jahresverkürzung. Bei Session.User schreibbar; Leerwerte werden abgewiesen.
 hint-member-user-calendar=Natives Kalenderdatum DATE aus dem UTC-Ablaufzeitstempel. Bei Session.User schreibbar; ein nicht leeres Datum wird als Mitternacht UTC gespeichert. Fehler lassen den Wert unverändert und aktualisieren Error.Last(). Ungültige Benutzer liefern leer.
 hint-member-native-date=Schreibgeschütztes natives Kalenderdatum DATE aus dem gespeicherten UTC-Zeitstempel. Ungültige Objekte liefern leer.

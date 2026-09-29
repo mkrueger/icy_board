@@ -1544,6 +1544,12 @@ message area just works in icy board. But with icy board it's possible to specif
 ### Returns
 `MessageAreaID`   Combined Value of conference/message area
 
+This is a pair, not a message number or an existence check. Printing or
+converting `AreaId(7, 1)` to a string yields `7,1`, regardless of whether that
+area exists. Pass the value to message-related functions to address the area.
+The read-only integer properties `.Conference` and `.Area` access the two
+components, for example `AreaId(7, 1).Conference` is `7`.
+
 ## Board objects (4.00)
 
 `Board.Conferences[index]` returns a read-only `CONFERENCE` snapshot, and

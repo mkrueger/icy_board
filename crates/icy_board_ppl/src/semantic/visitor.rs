@@ -673,6 +673,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::Rejected => return VariableType::None,
         };
         self.reject_bare_array_value(member_reference_expression.get_expression());
+        if t == VariableType::MessageAreaID
+            && matches!(
+                member_reference_expression.get_identifier().as_ref().to_ascii_lowercase().as_str(),
+                "conference" | "area"
+            )
+        {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, t);
+            return VariableType::Integer;
+        }
         if t.is_temporal() {
             if let Some(member) = crate::executable::temporal::temporal_members(t)
                 .into_iter()
@@ -1789,6 +1799,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             } else {
                 None
             };
+            let area_id_property = matches!(target, Expression::MemberReference(member)
+                if self.member_receiver_type_lookup.get(&member.get_identifier_token().span.start) == Some(&VariableType::MessageAreaID));
+            if area_id_property {
+                if let Expression::MemberReference(member) = target {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::MemberIsReadOnly(member.get_identifier().to_string()),
+                    );
+                }
+                return VariableType::None;
+            }
             if object_field_writable == Some(false) || (object_field_writable != Some(true) && !self.is_assignable_explicit_target(target)) {
                 if let Expression::MemberReference(member) = target
                     && let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()
@@ -1912,6 +1933,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 let mut variable_type = target_type;
                 for (position, member_token) in let_stmt.get_members().iter().enumerate() {
                     match variable_type {
+                        VariableType::MessageAreaID
+                            if position + 1 == let_stmt.get_members().len()
+                                && matches!(&member_token.token, Token::Identifier(name)
+                                    if matches!(name.as_ref().to_ascii_lowercase().as_str(), "conference" | "area")) =>
+                        {
+                            self.errors.lock().unwrap().report_error(
+                                member_token.span.clone(),
+                                CompilationErrorType::MemberIsReadOnly(member_token.token.to_string()),
+                            );
+                            break;
+                        }
                         VariableType::UserData(type_id) if self.type_registry.is_record_type(type_id) => {
                             let Token::Identifier(member) = &member_token.token else {
                                 break;

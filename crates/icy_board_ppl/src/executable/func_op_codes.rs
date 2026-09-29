@@ -375,9 +375,10 @@ pub enum FuncOpCode {
     ArrayValueAt2 = -357,
     ArrayValueAt3 = -358,
     TemporalCall = -359,
+    AreaIdPart = -360,
 }
 
-pub const LAST_FUNC: i16 = -359;
+pub const LAST_FUNC: i16 = -360;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -389,6 +390,7 @@ impl FuncOpCode {
         if matches!(
             self,
             FuncOpCode::TemporalCall
+                | FuncOpCode::AreaIdPart
                 | FuncOpCode::Rgb
                 | FuncOpCode::RgbAlpha
                 | FuncOpCode::Terminal
@@ -514,7 +516,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 371]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 372]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3574,6 +3576,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 371]> 
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::FixedParameters(5),
+        },
+        FunctionDefinition {
+            name: "<area id part>",
+            version: 400,
+            opcode: FuncOpCode::AreaIdPart,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

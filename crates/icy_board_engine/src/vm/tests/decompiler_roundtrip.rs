@@ -250,6 +250,14 @@ fn assert_roundtrip(source: &str, expected: &str) {
 }
 
 #[test]
+fn area_id_components_survive_ppe_roundtrip() {
+    assert_roundtrip(
+        "MSGAREAID id = AreaId(7, 1)\nPRINTLN id.Conference, \":\", id.Area\nPRINTLN AreaId(2, 3).Area\n",
+        "7:1\n3\n",
+    );
+}
+
+#[test]
 fn legacy_310_gosub_into_procedure_roundtrips() {
     let source = "DECLARE PROCEDURE helper()\nhelper()\nEND\nPROCEDURE helper()\nPRINTLN \"helper reached\"\nRETURN\nENDPROC\n";
     let mut original = compile_with_runtime(source, false, 310);

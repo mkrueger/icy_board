@@ -63,6 +63,8 @@ hint-temporal-until=Signed distance from this value to the argument, in whole da
 hint-temporal-change=Returns a changed value without modifying the receiver. Invalid calendar changes, empty values and overflow raise an error.
 hint-temporal-create=Constructs a validated value. FromUtc combines a DATE and TIME as UTC; FromUnix takes signed whole seconds since 1970-01-01T00:00:00Z.
 hint-temporal-component=Reads a component without changing the value. TIMESTAMP components are UTC; DayOfWeek uses Sunday=0. Empty values raise an error.
+hint-member-area-id-conference=Conference number of this message-area identifier (read-only).
+hint-member-area-id-area=Area number of this message-area identifier (read-only).
 hint-member-user-birthday=Native calendar birthday, without legacy year truncation. Writable on Session.User; empty values are rejected.
 hint-member-user-calendar=Native calendar DATE from the UTC expiry timestamp. Writable on Session.User; assigning a nonempty date stores midnight UTC. Errors leave the value unchanged and update Error.Last(). Invalid users return empty.
 hint-member-native-date=Read-only native calendar DATE from the stored UTC timestamp. Invalid objects return empty.
