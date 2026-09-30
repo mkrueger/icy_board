@@ -410,7 +410,7 @@ Member               Type              Description
 Member               Type              Description
 ===================  ================  ==================================================
 ``Name``             ``STRING``        Directory name
-``Number``           ``INTEGER``       The number it was fetched under
+``Number``           ``INTEGER``       One-based number, as ``F`` takes it
 ``Valid``            ``BOOLEAN``       Whether the requested directory exists
 ``Path``             ``STRING``        Where the files are kept
 ``IsFree``           ``BOOLEAN``       Whether downloads here cost no time or bytes

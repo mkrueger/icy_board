@@ -14,6 +14,10 @@ releases.
   and the `AREA` command now use the same number. `AreaId(conf, 0)` and a plain
   conference number still address the first area. PPEs that added one to
   `Area.Number` or passed zero-based areas above 0 to `AreaId()` must be updated.
+- File directories are numbered from 1 as well: `Directory.Number` and
+  `@DIRNUM@` now show the number the `F` command takes, and `Directory.Number`
+  is 0 for a directory that does not exist. PPEs that added one to
+  `Directory.Number` must be updated.
 
 ### Fixed
 

@@ -1600,7 +1600,8 @@ an empty conference object, so its properties can still be read.
 
 | Directory member | Type | Description |
 | :--- | :--- | :--- |
-| `Name`, `Number`, `Valid` | | Name, the number it was fetched under, and whether it exists |
+| `Name`, `Valid` | | Name and whether it exists |
+| `Number` | `INTEGER` | One-based number, as the `F` command takes it; 0 when the directory does not exist |
 | `Path` | `STRING` | Where the files are kept |
 | `IsFree` | `BOOLEAN` | Whether downloads here cost no time or bytes |
 | `HasNewFiles` | `BOOLEAN` | Whether the directory is flagged as having new files |
@@ -1733,8 +1734,8 @@ IF item.HasAccess() QUEST item.Number
 not a filesystem glob. It returns a read-only `FILEPAGE`. `after` defaults to
 zero and is an exclusive row-ID cursor; `limit` defaults to 15 and must be in
 `1..100`. Results follow ascending filebase row ID, not filename or configured
-display sort order. `Directory.Number` is zero-based; add one when displaying
-the number accepted by the BBS `F` command.
+display sort order. `Directory.Number` is the one-based number the BBS `F`
+command accepts.
 
 | FILEPAGE member | Type | Description |
 | :--- | :--- | :--- |

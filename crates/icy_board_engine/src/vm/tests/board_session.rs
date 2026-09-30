@@ -242,6 +242,8 @@ fn board_objects_know_their_own_number() {
         CONFERENCE conf = Board.Conferences[1]
         PrintLn conf.Number, " ", conf.Name, " ", conf.Valid
         PrintLn conf.Areas[1].Number, " ", conf.Areas[1].Name, " ", conf.Areas[1].Valid
+        PrintLn conf.Directories[1].Number, " ", conf.Directories[1].Name, " ", conf.Directories[1].Valid
+        PrintLn conf.Directories[2].Number, " ", conf.Directories[2].Valid
         "#,
         |board| {
             seed_board(board);
@@ -255,10 +257,18 @@ fn board_objects_know_their_own_number() {
                     ..Default::default()
                 },
             ])));
+            let mut directories = crate::icy_board::file_directory::DirectoryList::default();
+            for name in ["Uploads", "Nodelists"] {
+                directories.push(crate::icy_board::file_directory::FileDirectory {
+                    name: name.to_string(),
+                    ..Default::default()
+                });
+            }
+            board.conferences[1].directories = Some(std::sync::Arc::new(directories));
         },
     );
 
-    assert_eq!(output, "1 Second 1\n2 Second 1\n");
+    assert_eq!(output, "1 Second 1\n2 Second 1\n2 Nodelists 1\n0 0\n");
 }
 
 /// `Session` is read live rather than snapshotted, so a value kept in a

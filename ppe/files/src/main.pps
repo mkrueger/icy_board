@@ -172,7 +172,7 @@ PROCEDURE Draw()
             COLOR @X07
             PRINT " "
         ENDIF
-        PRINT Right(STRING(directory.Number + 1), 4), " "
+        PRINT Right(STRING(directory.Number), 4), " "
         PrintText(Left(directory.Name, 48))
         PRINT " ", Left(DownloadStatus(directory), 11)
         IF directory.HasNewFiles PRINT "Yes"
@@ -435,7 +435,7 @@ PROCEDURE DrawDetails()
     PrintText(Left(directory.Name, 72))
     ANSIPOS 3, 7
     COLOR @X07
-    PRINT "Directory number: ", directory.Number + 1
+    PRINT "Directory number: ", directory.Number
     ANSIPOS 3, 9
     PRINT "Download: ", DownloadStatus(directory)
     ANSIPOS 3, 10

@@ -159,12 +159,12 @@ hyperlinks, and `@POS:40@` means column 40, not a 40-character field.
 | `@NUMDIR@` | Number of file directories configured in the current conference. |
 | `@NUMAREA@` | Number of message areas configured in the current conference. |
 | `@DIRNAME@` | Current file directory name. |
-| `@DIRNUM@` | Current file directory index, currently zero-based. |
+| `@DIRNUM@` | Current file directory number, starting at 1. |
 | `@AREANAME@` | Current message area name. |
 | `@AREANUM@` | Current message area number, starting at 1. |
 
-The numbering conventions above are not uniform: do not assume `@NODE@` and
-`@DIRNUM@` use the same base as `@AREANUM@`. The configured counts are not filtered
+The numbering conventions above are not uniform: do not assume `@NODE@` uses the
+same base as `@AREANUM@` and `@DIRNUM@`. The configured counts are not filtered
 to only the entries the caller can access.
 
 ## Dates and Session Time

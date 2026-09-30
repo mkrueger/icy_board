@@ -34,7 +34,7 @@ FOREACH conf IN Board.Conferences
             conferenceWritten = TRUE
         ENDIF
         FPUTLN 1
-        FPUTLN 1, "Directory ", fileDirectory.Number + 1, ": ", fileDirectory.Name
+        FPUTLN 1, "Directory ", fileDirectory.Number, ": ", fileDirectory.Name
         FPUTLN 1, "------------------------------------------------------------"
         IF FERR(1) GOTO WriteFailed
         directoryCount += 1

@@ -237,7 +237,8 @@ impl UserDataValue for FileDirectory {
             return Ok(VariableValue::new_unbounded_string(self.name.clone()));
         }
         if *name == *NUMBER {
-            return Ok(VariableValue::new_int(self.number as i32));
+            // The number the F command takes; a directory that does not exist has none.
+            return Ok(VariableValue::new_int(if self.valid { self.number as i32 + 1 } else { 0 }));
         }
         if *name == *VALID {
             return Ok(VariableValue::new_bool(self.valid));

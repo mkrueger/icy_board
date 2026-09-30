@@ -461,7 +461,7 @@ than failing, so its properties can still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Directory name |
-| `Number` | `INTEGER` | The number it was fetched under |
+| `Number` | `INTEGER` | One-based number, as the `F` command takes it; 0 when the directory does not exist |
 | `Valid` | `BOOLEAN` | Whether the requested directory exists |
 | `Path` | `STRING` | Where the files are kept |
 | `IsFree` | `BOOLEAN` | Whether downloads here cost no time or bytes |

@@ -3691,7 +3691,7 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::DirNum => {
-                result = self.session.current_file_directory.to_string();
+                result = (self.session.current_file_directory + 1).to_string();
             }
             MacroCommand::AreaName => {
                 if let Some(area) = self
@@ -5101,6 +5101,18 @@ mod screen_tests {
         for name in ["DIRNAME", "AREANAME"] {
             let result = state.run_macro(TerminalTarget::User, name.parse().unwrap()).await;
             assert_eq!(result.as_deref(), Some(""), "{name}");
+        }
+    }
+
+    /// `@DIRNUM@` shows the number the F command takes, like `@AREANUM@` for AREA.
+    #[tokio::test]
+    async fn number_macros_are_one_based() {
+        let (mut state, _peer) = graphics_state().await;
+        state.session.current_file_directory = 1;
+        state.session.current_message_area = 1;
+        for name in ["DIRNUM", "AREANUM"] {
+            let result = state.run_macro(TerminalTarget::User, name.parse().unwrap()).await;
+            assert_eq!(result.as_deref(), Some("2"), "{name}");
         }
     }
 
