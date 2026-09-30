@@ -47,10 +47,11 @@ pub fn text(domain: &str, key: &str) -> String {
     loaders.get(domain).expect("unknown CLI translation domain").get(key)
 }
 
-/// Only the Unix locale lookup reads the POSIX variables; macOS asks CoreFoundation
-/// alone, so an explicitly requested language would be ignored there. Parser
-/// diagnostics get the same list, through the vendored formatter.
-fn requested_languages() -> Vec<i18n_embed::unic_langid::LanguageIdentifier> {
+/// The languages the caller asked for: LANGUAGE, LC_ALL, LC_MESSAGES and LANG in that
+/// order, then the desktop's. Use this instead of `DesktopLanguageRequester`, which on
+/// macOS asks CoreFoundation alone and ignores the POSIX variables. Parser diagnostics
+/// get the same list, through the vendored formatter.
+pub fn requested_languages() -> Vec<i18n_embed::unic_langid::LanguageIdentifier> {
     let mut tags: Vec<String> = Vec::new();
     for variable in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
         let Ok(value) = std::env::var(variable) else {

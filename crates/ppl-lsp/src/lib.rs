@@ -18,16 +18,13 @@ use rust_embed::RustEmbed;
 #[folder = "i18n"] // path to the compiled localization resources
 struct Localizations;
 
-use i18n_embed::{
-    DesktopLanguageRequester,
-    fluent::{FluentLanguageLoader, fluent_language_loader},
-};
+use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
 
 use once_cell::sync::Lazy;
 use tower_lsp::lsp_types::Position;
 pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
     let loader = fluent_language_loader!();
-    let requested_languages: Vec<i18n_embed::unic_langid::LanguageIdentifier> = DesktopLanguageRequester::requested_languages();
+    let requested_languages = icy_board_cli::requested_languages();
     let _result = i18n_embed::select(&loader, &Localizations, &requested_languages);
     loader
 });

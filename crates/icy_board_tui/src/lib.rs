@@ -34,10 +34,7 @@ pub mod term;
 pub mod text_field;
 pub mod theme;
 
-use i18n_embed::{
-    DesktopLanguageRequester,
-    fluent::{FluentLanguageLoader, fluent_language_loader},
-};
+use i18n_embed::fluent::{FluentLanguageLoader, fluent_language_loader};
 use i18n_embed_fl::fl;
 use ratatui::{Terminal, symbols::border};
 use rust_embed::RustEmbed;
@@ -51,7 +48,7 @@ pub type TerminalType = Terminal<term::IcyBoardBackend<std::io::Stdout>>;
 use once_cell::sync::Lazy;
 pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
     let loader = fluent_language_loader!();
-    let requested_languages = DesktopLanguageRequester::requested_languages();
+    let requested_languages = icy_board_cli::requested_languages();
     let _result = i18n_embed::select(&loader, &Localizations, &requested_languages);
     loader.set_use_isolating(false);
     loader
