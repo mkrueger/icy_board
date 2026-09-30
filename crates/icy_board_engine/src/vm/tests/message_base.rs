@@ -430,3 +430,14 @@ fn the_last_read_pointer_clamps_to_the_highest_message() {
     );
     assert!(output.ends_with("[3]"), "unexpected clamped pointer: {output:?}");
 }
+
+/// A conference with an empty area list has no message base to count.
+#[test]
+fn message_numbers_are_zero_without_areas() {
+    let output = run_ppl_on("PRINT LOMSGNUM(), \":\", HIMSGNUM(), \":\", ACTMSGNUM()", |board| {
+        for conference in board.conferences.iter_mut() {
+            conference.areas = Some(std::sync::Arc::new(crate::icy_board::message_area::AreaList::default()));
+        }
+    });
+    assert_eq!(output, "0:0:0");
+}

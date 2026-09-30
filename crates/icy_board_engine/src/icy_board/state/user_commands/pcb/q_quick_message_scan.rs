@@ -121,11 +121,15 @@ impl IcyBoardState {
             return Ok(());
         }
         self.display_text(IceText::Scanning, display_flags::DEFAULT).await?;
-        let conf = format!(
-            "{}/{}",
-            self.session.current_conference.name,
-            self.session.current_conference.areas.as_ref().unwrap()[area].name
-        );
+        let area_name = self
+            .session
+            .current_conference
+            .areas
+            .as_ref()
+            .and_then(|areas| areas.get(area))
+            .map(|area| area.name.as_str())
+            .unwrap_or_default();
+        let conf = format!("{}/{}", self.session.current_conference.name, area_name);
         self.println(TerminalTarget::Both, &conf).await?;
 
         self.display_text(

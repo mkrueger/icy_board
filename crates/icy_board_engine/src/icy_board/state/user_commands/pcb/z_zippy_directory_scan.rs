@@ -224,7 +224,8 @@ impl IcyBoardState {
         let mut public_upload = false;
         let mut read_date = false;
         let mut numbers = Vec::new();
-        let max_dirs = self.session.current_conference.directories.as_ref().unwrap().len();
+        let directories = self.session.current_conference.directories.clone().unwrap_or_default();
+        let max_dirs = directories.len();
         while let Some(token) = self.session.tokens.pop_front() {
             if read_date {
                 read_date = false;
@@ -276,7 +277,7 @@ impl IcyBoardState {
                     }
                 }
                 t => {
-                    self.add_numbers(&mut numbers, t).await?;
+                    self.add_numbers(&mut numbers, t, max_dirs).await?;
                 }
             }
         }
@@ -291,13 +292,9 @@ impl IcyBoardState {
         }
 
         for p in numbers {
-            let desc = self.session.current_conference.directories.as_ref().unwrap()[p - 1].name.clone();
-            res.numbers.push((
-                p,
-                desc,
-                self.session.current_conference.directories.as_ref().unwrap()[p - 1].path.clone(),
-                self.session.current_conference.directories.as_ref().unwrap()[p - 1].metadata_path.clone(),
-            ));
+            if let Some(dir) = directories.get(p - 1) {
+                res.numbers.push((p, dir.name.clone(), dir.path.clone(), dir.metadata_path.clone()));
+            }
         }
 
         if public_upload {
@@ -312,7 +309,7 @@ impl IcyBoardState {
         Ok(res)
     }
 
-    async fn add_numbers(&mut self, numbers: &mut Vec<usize>, token: &str) -> Res<()> {
+    async fn add_numbers(&mut self, numbers: &mut Vec<usize>, token: &str, max_dirs: usize) -> Res<()> {
         let mut beg = 0;
         let mut end = 0;
         let mut parse_end = false;
@@ -328,10 +325,7 @@ impl IcyBoardState {
                 parse_end = true;
             }
         }
-        if beg < 1
-            || beg > self.session.current_conference.directories.as_ref().unwrap().len()
-            || parse_end && (end < beg || end > self.session.current_conference.directories.as_ref().unwrap().len())
-        {
+        if beg < 1 || beg > max_dirs || parse_end && (end < beg || end > max_dirs) {
             self.display_text(IceText::InvalidFileNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
             return Ok(());

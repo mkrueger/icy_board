@@ -2361,7 +2361,9 @@ pub async fn kbdfilusued(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 
 pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = 0;
-    let msg_base: PathBuf = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
+    let Some(msg_base) = vm.icy_board_state.message_area_path(area) else {
+        return Ok(VariableValue::new_int(0));
+    };
     match JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.lowest_message_number() as i32)),
         Err(err) => {
@@ -2373,7 +2375,9 @@ pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = 0;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
+    let Some(msg_base) = vm.icy_board_state.message_area_path(area) else {
+        return Ok(VariableValue::new_int(0));
+    };
     match JamMessageBase::open(&msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.highest_message_number() as i32)),
         Err(err) => {
@@ -2450,7 +2454,9 @@ pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 }
 pub async fn actmsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let area = vm.icy_board_state.session.current_message_area;
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
+    let Some(msg_base) = vm.icy_board_state.message_area_path(area) else {
+        return Ok(VariableValue::new_int(0));
+    };
     match jamjam::jam::JamMessageBase::open(msg_base) {
         Ok(base) => Ok(VariableValue::new_int(base.active_messages() as i32)),
         Err(err) => {

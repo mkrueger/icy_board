@@ -118,7 +118,8 @@ impl IcyBoardState {
         let mut res = DirNumbers::default();
         let mut read_date = false;
         let mut numbers = Vec::new();
-        let max_dirs = self.session.current_conference.directories.as_ref().unwrap().len();
+        let areas = self.session.current_conference.areas.clone().unwrap_or_default();
+        let max_areas = areas.len();
         while let Some(token) = self.session.tokens.pop_front() {
             if read_date {
                 read_date = false;
@@ -130,7 +131,7 @@ impl IcyBoardState {
             }
             match token.as_str() {
                 "A" => {
-                    for num in 1..=max_dirs {
+                    for num in 1..=max_areas {
                         numbers.push(num);
                     }
                 }
@@ -145,25 +146,21 @@ impl IcyBoardState {
                     }
                 }
                 t => {
-                    self.add_area_numbers(&mut numbers, t).await?;
+                    self.add_area_numbers(&mut numbers, t, max_areas).await?;
                 }
             }
         }
 
         for p in numbers {
-            let desc = self.session.current_conference.areas.as_ref().unwrap()[p - 1].name.clone();
-            res.numbers.push((
-                p,
-                desc,
-                self.session.current_conference.areas.as_ref().unwrap()[p - 1].path.clone(),
-                PathBuf::new(),
-            ));
+            if let Some(area) = areas.get(p - 1) {
+                res.numbers.push((p, area.name.clone(), area.path.clone(), PathBuf::new()));
+            }
         }
 
         Ok(res)
     }
 
-    async fn add_area_numbers(&mut self, numbers: &mut Vec<usize>, token: &str) -> Res<()> {
+    async fn add_area_numbers(&mut self, numbers: &mut Vec<usize>, token: &str, max_areas: usize) -> Res<()> {
         let mut beg = 0;
         let mut end = 0;
         let mut parse_end = false;
@@ -179,10 +176,7 @@ impl IcyBoardState {
                 parse_end = true;
             }
         }
-        if beg < 1
-            || beg > self.session.current_conference.areas.as_ref().unwrap().len()
-            || parse_end && (end < beg || end > self.session.current_conference.areas.as_ref().unwrap().len())
-        {
+        if beg < 1 || beg > max_areas || parse_end && (end < beg || end > max_areas) {
             self.session.op_text = token.to_string();
             self.display_text(IceText::InvalidAreaNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;

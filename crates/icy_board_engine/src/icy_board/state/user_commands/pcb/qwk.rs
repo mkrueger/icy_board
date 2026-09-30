@@ -61,7 +61,17 @@ impl IcyBoardState {
         let Some((conf_num, area_num)) = table.get(&number) else {
             return Ok(());
         };
-        let high_msg = self.board.lock().await.conferences[*conf_num].areas.as_ref().unwrap()[*area_num].get_high_msg() as usize;
+        let Some(high_msg) = self
+            .board
+            .lock()
+            .await
+            .conferences
+            .get(*conf_num)
+            .and_then(|conference| conference.areas.as_ref()?.get(*area_num))
+            .map(|area| area.get_high_msg() as usize)
+        else {
+            return Ok(());
+        };
 
         self.session.op_text = format!("(1-{high_msg})");
 

@@ -40,7 +40,8 @@ impl IcyBoardState {
             let mut offline_matches = Vec::new();
             self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
 
-            for dir in self.session.current_conference.directories.as_ref().unwrap().clone().iter() {
+            let directories = self.session.current_conference.directories.clone().unwrap_or_default();
+            for dir in directories.iter() {
                 let files = self.get_filebase(&dir.path, &dir.metadata_path).await?;
                 let mut options = MatchOptions::new();
                 options.case_sensitive = false;

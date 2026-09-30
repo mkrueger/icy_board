@@ -3680,20 +3680,28 @@ impl IcyBoardState {
                 }
             }
             MacroCommand::DirName => {
-                if let Some(dirs) = &self.session.current_conference.directories {
-                    result = dirs[self.session.current_file_directory].name.clone();
-                } else {
-                    result = String::new();
+                if let Some(dir) = self
+                    .session
+                    .current_conference
+                    .directories
+                    .as_ref()
+                    .and_then(|dirs| dirs.get(self.session.current_file_directory))
+                {
+                    result = dir.name.clone();
                 }
             }
             MacroCommand::DirNum => {
                 result = self.session.current_file_directory.to_string();
             }
             MacroCommand::AreaName => {
-                if let Some(areas) = &self.session.current_conference.areas {
-                    result = areas[self.session.current_message_area].name.clone();
-                } else {
-                    result = String::new();
+                if let Some(area) = self
+                    .session
+                    .current_conference
+                    .areas
+                    .as_ref()
+                    .and_then(|areas| areas.get(self.session.current_message_area))
+                {
+                    result = area.name.clone();
                 }
             }
             MacroCommand::AreaNum => {
@@ -5080,6 +5088,57 @@ mod screen_tests {
 
     fn attribute_of(screen: &VirtualScreen) -> u8 {
         screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink)
+    }
+
+    /// A conference may have an empty directory or area list, e.g. an FTN
+    /// conference that receives no files yet.
+    #[tokio::test]
+    async fn name_macros_are_empty_for_empty_lists() {
+        let (mut state, _peer) = graphics_state().await;
+        state.session.current_conference.directories = Some(Arc::new(crate::icy_board::file_directory::DirectoryList::default()));
+        state.session.current_conference.areas = Some(Arc::new(crate::icy_board::message_area::AreaList::default()));
+
+        for name in ["DIRNAME", "AREANAME"] {
+            let result = state.run_macro(TerminalTarget::User, name.parse().unwrap()).await;
+            assert_eq!(result.as_deref(), Some(""), "{name}");
+        }
+    }
+
+    /// `TS A` selects every message area, however many file directories there are.
+    #[tokio::test]
+    async fn text_search_all_counts_areas_not_directories() {
+        use crate::icy_board::{
+            file_directory::{DirectoryList, FileDirectory},
+            message_area::{AreaList, MessageArea},
+        };
+        let (mut state, _peer) = graphics_state().await;
+        let mut directories = DirectoryList::default();
+        directories.push(FileDirectory::default());
+        directories.push(FileDirectory::default());
+        let mut areas = AreaList::default();
+        areas.push(MessageArea {
+            name: "General".into(),
+            ..Default::default()
+        });
+        state.session.current_conference.directories = Some(Arc::new(directories));
+        state.session.current_conference.areas = Some(Arc::new(areas));
+
+        state.session.push_tokens("A");
+        let numbers = state.get_area_numbers().await.unwrap().numbers;
+        assert_eq!(numbers.iter().map(|(num, name, _, _)| (*num, name.as_str())).collect::<Vec<_>>(), [(1, "General")]);
+
+        state.session.current_conference.directories = None;
+        state.session.push_tokens("A");
+        assert_eq!(state.get_area_numbers().await.unwrap().numbers.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn flagging_files_without_directories_finds_nothing() {
+        let (mut state, _peer) = graphics_state().await;
+        state.session.current_conference.directories = None;
+        state.session.push_tokens("FILE.ZIP");
+        assert!(state.flag_files_cmd(false).await.unwrap());
+        assert!(state.session.flagged_files.is_empty());
     }
 
     /// CP437 spells 0x07 as a bullet, so a translated bell reaches the caller as a dot
