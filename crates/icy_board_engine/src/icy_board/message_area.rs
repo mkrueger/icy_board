@@ -198,7 +198,7 @@ impl MessageArea {
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct AreaList {
-    #[serde(rename = "area")]
+    #[serde(rename = "area", default)]
     areas: Vec<MessageArea>,
 }
 
@@ -332,5 +332,22 @@ impl UserDataValue for MessageArea {
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         log::error!("Invalid method call on MessageArea ({name})");
         Err("Function not found".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AreaList;
+    use crate::icy_board::IcyBoardSerializer;
+
+    #[test]
+    fn empty_area_list_file_loads_as_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, content) in [("empty.toml", ""), ("blank.toml", "\n  \n"), ("explicit.toml", "area = []\n")] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, content).unwrap();
+            let list = AreaList::load(&path).unwrap();
+            assert!(list.is_empty(), "{name}");
+        }
     }
 }
