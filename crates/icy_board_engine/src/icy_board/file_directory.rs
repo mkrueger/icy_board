@@ -108,7 +108,7 @@ pub struct FileDirectory {
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct DirectoryList {
-    #[serde(rename = "area")]
+    #[serde(rename = "area", default)]
     areas: Vec<FileDirectory>,
 }
 
@@ -289,5 +289,22 @@ impl UserDataValue for FileDirectory {
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         log::error!("Invalid method call on FileDirectory ({name})");
         Err("Function not found".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DirectoryList;
+    use crate::icy_board::IcyBoardSerializer;
+
+    #[test]
+    fn empty_directory_list_file_loads_as_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, content) in [("empty.toml", ""), ("blank.toml", "\n  \n"), ("explicit.toml", "area = []\n")] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, content).unwrap();
+            let list = DirectoryList::load(&path).unwrap();
+            assert!(list.is_empty(), "{name}");
+        }
     }
 }

@@ -510,8 +510,9 @@ Local message and file-area mappings
 
 FTN mappings live in the ordinary conference lists, not in an FTN ``[[area]]``
 table. The conference's ``area_file`` selects its message list and ``dir_file``
-its file-directory list. Both list roots use **``[[area]]``**, and both require
-the ``area`` array to exist on deserialization (``area = []`` is an empty list).
+its file-directory list. Both list roots use **``[[area]]``**. The message list
+requires the ``area`` array to exist on deserialization (``area = []`` is an empty
+list); an empty file-directory list file loads as a list without directories.
 Runtime ``number`` and ``valid`` fields are skipped, not persisted settings.
 QWKnet and ZCONNECT instead keep their remote-to-JAM mappings per hub/link in
 their network file; the same JAM path should be exposed to callers through
