@@ -342,6 +342,22 @@ fn ppe_convert_keeps_the_root_and_lowercases_only_descendants() {
 }
 
 #[test]
+fn ppe_convert_does_not_replace_a_distinct_lowercase_file() {
+    let root = temp_dir("LowercaseTwin");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("FILE.BIN"), b"upper").unwrap();
+    fs::write(root.join("file.bin"), b"lower").unwrap();
+    // A case-insensitive filesystem cannot hold both names, so there is no conflict to test.
+    if fs::read_dir(&root).unwrap().count() == 2 {
+        let status = icbsetup().args(["ppe-convert", root.to_str().unwrap()]).status().unwrap();
+        assert!(!status.success());
+        assert_eq!(fs::read(root.join("FILE.BIN")).unwrap(), b"upper");
+        assert_eq!(fs::read(root.join("file.bin")).unwrap(), b"lower");
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn create_gives_sysop_a_password() {
     let output = temp_dir("create");
 

@@ -614,8 +614,13 @@ fn rename_to_lowercase(path: &Path) -> Result<()> {
     if lower == name.to_string_lossy() {
         return Ok(());
     }
-    let target = path.with_file_name(lower);
-    if target.exists() {
+    let target = path.with_file_name(&lower);
+    // A case-insensitive filesystem reports the file itself under its lowercase name;
+    // only an entry with exactly that name is another file.
+    if target.exists()
+        && fs::read_dir(target.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new(".")))?
+            .any(|entry| entry.is_ok_and(|entry| entry.file_name() == lower.as_str()))
+    {
         return Err(eyre!("Can't rename {}: {} already exists", path.display(), target.display()));
     }
     println!("Rename {} to {}", path.display(), target.display());
