@@ -704,7 +704,7 @@ async fn rejected_scanner_keeps_quarantine_without_credit() {
         config.publish_policy = UploadPublishPolicy::AfterProcessing;
         config.quarantine_path = root.path().join("quarantine");
         config.scanner.enabled = true;
-        config.scanner.executable = "/bin/false".into();
+        config.scanner.executable = "/usr/bin/false".into();
         config.scanner.arguments = vec!["{file}".into()];
     }
     let file = completed("infected.bin", b"test scanner rejection");

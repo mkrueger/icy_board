@@ -527,7 +527,9 @@ async fn local_d_and_bd_none_default_copy_only_completed_files_and_retain_collis
         assert_eq!(std::fs::read(destination.join("A.ZIP")).unwrap(), std::fs::read(&a).unwrap());
         assert_eq!(std::fs::read(destination.join("C.ZIP")).unwrap(), std::fs::read(&c).unwrap());
         assert_eq!(std::fs::read(destination.join("b.zip")).unwrap(), b"existing destination");
-        assert!(!destination.join("B.ZIP").exists());
+        // Exact names: a case-insensitive filesystem also answers to B.ZIP for b.zip.
+        let names: Vec<_> = std::fs::read_dir(&destination).unwrap().map(|entry| entry.unwrap().file_name()).collect();
+        assert!(!names.iter().any(|name| name == "B.ZIP"), "{names:?}");
         assert_eq!(std::fs::read_dir(&destination).unwrap().count(), 3, "no staging files may remain");
         assert_eq!(std::fs::read(&b).unwrap(), vec![0u8; 2048]);
         assert_eq!(state.session.flagged_files, [b]);

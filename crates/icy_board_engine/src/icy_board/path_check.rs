@@ -363,7 +363,12 @@ mod tests {
     fn a_file_spelled_the_dos_way_is_reported_as_spelling() {
         let root = board(&["GEN/ICBTEXT.TOML"], &[]);
         let problem = check_path(&root.path().join("gen/icbtext.toml"), PathKind::File);
-        assert!(matches!(problem, Some(PathProblem::WrongCase(_))), "{problem:?}");
+        if crate::icy_board::case_insensitive_fs(root.path()) {
+            // The configured spelling opens the file there, so nothing needs fixing.
+            assert_eq!(problem, None);
+        } else {
+            assert!(matches!(problem, Some(PathProblem::WrongCase(_))), "{problem:?}");
+        }
     }
 
     #[test]

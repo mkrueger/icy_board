@@ -1026,7 +1026,7 @@ mod tests {
         let (first, field) = stage_attachment(root.path(), source.path(), "report.zip").unwrap();
         let (second, _) = stage_attachment(root.path(), source.path(), "report.zip").unwrap();
         assert_ne!(first.to_path_buf(), second.to_path_buf());
-        assert_eq!(first.parent(), Some(root.path()));
+        assert_eq!(first.parent(), Some(root.path().canonicalize().unwrap().as_path()));
         assert_eq!(field.field_type(), SubfieldType::EnclFwAlias);
         let encoded = std::str::from_utf8(field.content()).unwrap();
         let parts: Vec<_> = encoded.split('\0').collect();

@@ -123,9 +123,15 @@ async fn context_reads_and_path_resolution_match_board_without_mutable_snapshot_
     };
     assert_eq!(expected[0], PathBuf::new());
     assert_eq!(expected[1], dir.path().join("users.toml"));
-    assert_eq!(expected[2], dir.path().join("MixedCase/Users.txt"));
+    if crate::icy_board::case_insensitive_fs(dir.path()) {
+        // Every spelling opens the file there, so each is handed back as written.
+        assert_eq!(expected[2], dir.path().join("mixedcase/users.TXT"));
+        assert_eq!(expected[4], dir.path().join("MixedCase/Users.txt"));
+    } else {
+        assert_eq!(expected[2], dir.path().join("MixedCase/Users.txt"));
+        assert_eq!(expected[4], expected[2]);
+    }
     assert_eq!(expected[3], dir.path().join("missing.toml"));
-    assert_eq!(expected[4], expected[2]);
     assert_eq!(expected[5], expected[2]);
     assert_eq!(expected[6], dir.path().join("missing-absolute.toml"));
     bounded(IcyBoard::write_users(&board, move |context| {

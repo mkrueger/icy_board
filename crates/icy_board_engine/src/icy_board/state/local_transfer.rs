@@ -275,7 +275,8 @@ mod tests {
         assert_eq!(fs::read(path).unwrap(), b"original");
     }
 
-    #[cfg(unix)]
+    // APFS stores only UTF-8 names, so macOS cannot create the file this needs.
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn non_utf8_paths_remain_os_paths_and_partial_batches_count_only_successes() {
         use std::{ffi::OsStr, os::unix::ffi::OsStrExt};

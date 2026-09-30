@@ -1045,6 +1045,17 @@ pub fn lookup_case_insensitive(path: &Path) -> PathBuf {
     if corrected { resolved } else { path.to_path_buf() }
 }
 
+/// Whether `dir` is on a case-insensitive filesystem, as macOS and Windows use by default.
+/// There a DOS spelling already opens the file, so lookups hand it back as written.
+#[cfg(test)]
+pub(crate) fn case_insensitive_fs(dir: &Path) -> bool {
+    let probe = dir.join(".CaseProbe");
+    fs::write(&probe, b"").unwrap();
+    let insensitive = dir.join(".caseprobe").exists();
+    fs::remove_file(&probe).unwrap();
+    insensitive
+}
+
 fn entry_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
     let dir = if dir.as_os_str().is_empty() { Path::new(".") } else { dir };
     let name = name.to_str()?;
@@ -1501,23 +1512,37 @@ mod tests {
     #[test]
     fn test_a_dos_name_finds_the_file_it_means() {
         let root = board(&["gen/brdm.ppe"]);
-        assert_eq!(lookup_case_insensitive(&root.path().join("GEN/BRDM.PPE")), root.path().join("gen/brdm.ppe"));
+        let dos = root.path().join("GEN/BRDM.PPE");
+        let expected = if case_insensitive_fs(root.path()) {
+            dos.clone()
+        } else {
+            root.path().join("gen/brdm.ppe")
+        };
+        assert_eq!(lookup_case_insensitive(&dos), expected);
     }
 
     #[test]
     fn test_every_directory_on_the_way_is_looked_up() {
         let root = board(&["Ppe/Door/setup.cfg"]);
-        assert_eq!(
-            lookup_case_insensitive(&root.path().join("PPE/DOOR/SETUP.CFG")),
+        let dos = root.path().join("PPE/DOOR/SETUP.CFG");
+        let expected = if case_insensitive_fs(root.path()) {
+            dos.clone()
+        } else {
             root.path().join("Ppe/Door/setup.cfg")
-        );
+        };
+        assert_eq!(lookup_case_insensitive(&dos), expected);
     }
 
     #[test]
     fn test_a_file_that_is_nowhere_leaves_the_path_as_it_was() {
         let root = board(&["gen/brdm.ppe"]);
         let path = root.path().join("GEN/NOTHERE.PPE");
-        assert_eq!(lookup_case_insensitive(&path), root.path().join("gen/NOTHERE.PPE"));
+        let expected = if case_insensitive_fs(root.path()) {
+            path.clone()
+        } else {
+            root.path().join("gen/NOTHERE.PPE")
+        };
+        assert_eq!(lookup_case_insensitive(&path), expected);
     }
 
     #[test]

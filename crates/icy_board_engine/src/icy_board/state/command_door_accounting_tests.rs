@@ -786,7 +786,10 @@ async fn native_door32_socket_transport_and_expanded_arguments() {
         assert_eq!(lines.len(), 11);
         assert_eq!(&lines[2..], &local.lines().collect::<Vec<_>>()[2..]);
         assert_eq!(transport.matches("\r\n").count(), 11);
-        assert_eq!(std::fs::read_to_string(work.join("cwd")).unwrap(), work.to_string_lossy());
+        assert_eq!(
+            std::fs::read_to_string(work.join("cwd")).unwrap(),
+            work.canonicalize().unwrap().to_string_lossy()
+        );
         assert!(!work.join("door32.sys").exists() && !root.path().join("door32.sys").exists());
         assert!(!state.session.is_logoff_requested());
     }
@@ -1264,7 +1267,7 @@ async fn native_door_umrc_original_menu_roundtrip() {
 #[tokio::test]
 async fn started_local_door_bills_once_and_only_explicit_command_rates_add_to_it() {
     let (_root, mut state, _peer) = fixture(true).await;
-    let game = door("/bin/true");
+    let game = door("/usr/bin/true");
     state.session.current_conference.doors = Some(Arc::new(DoorList {
         doors: vec![game.clone()],
         accounts: vec![],
@@ -1290,7 +1293,7 @@ async fn started_local_door_bills_once_and_only_explicit_command_rates_add_to_it
 async fn multiple_door_actions_charge_each_launch_but_the_command_only_once() {
     let (_root, mut state, _peer) = fixture(true).await;
     state.session.current_conference.doors = Some(Arc::new(DoorList {
-        doors: vec![door("/bin/true")],
+        doors: vec![door("/usr/bin/true")],
         accounts: vec![],
     }));
     let mut cmd = command(CommandType::Door, "GAME");

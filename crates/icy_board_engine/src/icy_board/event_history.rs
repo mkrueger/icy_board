@@ -295,7 +295,7 @@ mod tests {
         assert!(journal.claim(&event, now(), false).unwrap().is_none());
         assert!(EventHistory::open(dir.path(), now()).is_err());
         let log = journal.start(&entry.key, now()).unwrap();
-        assert!(log.starts_with(dir.path()));
+        assert!(log.starts_with(dir.path().canonicalize().unwrap()));
         drop(journal);
         let mut journal = EventHistory::open(dir.path(), now()).unwrap();
         assert_eq!(journal.entries()[0].result, EventResult::Interrupted);

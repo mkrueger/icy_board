@@ -256,7 +256,7 @@ fn attachment_paths_reject_traversal_wildcards_and_alias_escape() {
     std::fs::write(temp.path().join("stored.zip"), b"attachment").unwrap();
     let field = |name: &str| MessageSubfield::new(SubfieldType::EnclFwAlias, BString::from(name));
     let (path, alias) = attachment_path(temp.path(), &field("stored.zip\0display.zip")).unwrap();
-    assert_eq!(path, temp.path().join("stored.zip"));
+    assert_eq!(path, temp.path().canonicalize().unwrap().join("stored.zip"));
     assert_eq!(alias, "display.zip");
     for name in [
         "",

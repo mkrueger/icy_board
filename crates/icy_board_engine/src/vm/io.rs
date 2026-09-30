@@ -673,7 +673,8 @@ mod tests {
     use super::{DiskIO, PCBoardIO};
     use tempfile::TempDir;
 
-    #[cfg(unix)]
+    // APFS stores only UTF-8 names, so macOS cannot create the file this needs.
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn a6_answer_file_preserves_native_path_and_participates_in_sharing() {
         use std::os::unix::ffi::OsStringExt;
