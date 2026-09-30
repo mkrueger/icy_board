@@ -2243,7 +2243,7 @@ dependencies = [
  "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "twox-hash",
- "unarc-rs",
+ "unarc-rs 0.7.0",
  "walkdir",
  "zip",
 ]
@@ -4131,7 +4131,7 @@ dependencies = [
  "rgb",
  "serde",
  "thiserror 2.0.21",
- "unarc-rs",
+ "unarc-rs 0.6.3",
  "unicode-segmentation",
  "unicode-width",
  "utf8parse",
@@ -5590,6 +5590,12 @@ name = "lzma-rust2"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e2a88783b84d2d67ef2791778a9e76bfb68b8017aaf6c9d7d5f2626a478b16c"
+
+[[package]]
+name = "lzma-rust2"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fde178a3caf126c440fa15628147772d8ee590a39477d711353fbe2e58a73a5b"
 
 [[package]]
 name = "mac_address"
@@ -7955,6 +7961,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a611d15b50743feb4c76b7d03edcb0e64f399c26961e4efe6975bc398be6aa3d"
 
 [[package]]
+name = "rars"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d61643d05cb7e5045cc4f3e066ecf4b4e7ac394b9a052067906f530e91d3c88"
+dependencies = [
+ "aes",
+ "aho-corasick",
+ "getrandom 0.4.3",
+ "hmac",
+ "rayon",
+ "sha1",
+ "sha2 0.11.0",
+ "zeroize",
+]
+
+[[package]]
 name = "ratatui"
 version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9210,6 +9232,24 @@ dependencies = [
  "getrandom 0.4.3",
  "js-sys",
  "lzma-rust2 0.20.1",
+ "ppmd-rust",
+ "sha2 0.11.0",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "sevenz-rust2"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a4f883677093690e91fef8ae81fad8bce9e2c3a079b61054f05ce0d3ecf681e"
+dependencies = [
+ "aes",
+ "bzip2",
+ "cbc",
+ "crc32fast",
+ "getrandom 0.4.3",
+ "js-sys",
+ "lzma-rust2 0.21.0",
  "ppmd-rust",
  "sha2 0.11.0",
  "wasm-bindgen",
@@ -10984,11 +11024,35 @@ dependencies = [
  "flate2",
  "log",
  "salzweg",
- "sevenz-rust2",
+ "sevenz-rust2 0.22.2",
  "sha-1",
  "tar",
  "thiserror 2.0.21",
  "unrar",
+ "zip",
+]
+
+[[package]]
+name = "unarc-rs"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "736f43d0f415e67d5c2713c3f86003780a50af2f770445367d20a6f6a220f6f2"
+dependencies = [
+ "bitstream-io",
+ "blowfish",
+ "bzip2",
+ "chrono",
+ "crc16",
+ "crc32fast",
+ "delharc",
+ "flate2",
+ "log",
+ "rars",
+ "salzweg",
+ "sevenz-rust2 0.23.0",
+ "sha1",
+ "tar",
+ "thiserror 2.0.21",
  "zip",
 ]
 
@@ -12734,6 +12798,20 @@ name = "zeroize"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "zerotrie"
