@@ -6,7 +6,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -43,21 +42,7 @@ mod terminal_type {
     // pub const MAXLN: usize = 40;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum TerminalEmulation {
-    #[default]
-    Ansi,
-    Utf8Ansi,
-    Avatar,
-    Ascii,
-    PETscii,
-    ATAscii,
-    ViewData,
-    Mode7,
-    Rip,
-    Skypix,
-    AtariST,
-}
+pub use icy_terminal_emulation::TerminalEmulation;
 
 fn terminal_name(terminal: TerminalEmulation) -> &'static [u8] {
     match terminal {

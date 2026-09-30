@@ -4215,6 +4215,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "http",
+ "icy_terminal_emulation",
  "lazy_static",
  "libc",
  "log",
@@ -4291,6 +4292,13 @@ checksum = "c917a041c4c1e8438172eb0dc7a4cb0eba2f22975fbf6681c51e78e4f507e996"
 dependencies = [
  "quantette",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "icy_terminal_emulation"
+version = "0.2.2"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

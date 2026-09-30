@@ -1,0 +1,9 @@
+[package]
+name = "icy_terminal_emulation"
+description = "The terminal emulation type shared by icy_net and icy_engine, without networking dependencies."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }

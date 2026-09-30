@@ -13,6 +13,7 @@ members = [
 	"crates/icy_board_cli",
 	"crates/mkicbmnu",
 	"crates/icy_net",
+	"crates/icy_terminal_emulation",
 	"crates/mkicbtxt",
 	"crates/icboard",
 	"crates/icbsetup",
