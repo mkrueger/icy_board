@@ -1,0 +1,23 @@
+# Vendored clap-i18n-richformatter 0.3.2 (MIT, see LICENSE), patched in the
+# workspace Cargo.toml. The only change adds
+# `init_clap_rich_formatter_localizer_for`, so the caller chooses the language:
+# upstream always asks the desktop, which on macOS ignores LANG and LC_ALL.
+[package]
+name = "clap-i18n-richformatter"
+version = "0.3.2"
+edition = "2024"
+license = "MIT"
+description = "Clap rich formatter with i18n support"
+publish = false
+
+[dependencies]
+i18n-embed = { version = "0.16.0", features = ["fluent-system", "desktop-requester"] }
+i18n-embed-fl = { version = "0.10", package = "i18n-embed-fl-no-check-hashmap-on-ra" }
+rust-embed = "8.5.0"
+unic-langid = "0.9.5"
+clap = "4"
+clap-i18n-derive = { version = "0.1.0", optional = true }
+
+[features]
+default = ["derive"]
+derive = ["dep:clap-i18n-derive"]
