@@ -409,7 +409,8 @@ mod tests {
         crate::genhelp::install_defaults(&creator.destination, &config).unwrap();
 
         let output = creator.destination.join(&config.paths.help_path);
-        let resolved_output = output.canonicalize().unwrap();
+        // The ledger keeps the path as configured; system links such as macOS's /var stay.
+        let absolute_output: PathBuf = std::path::absolute(&output).unwrap().components().collect();
         let ledger_path = creator.destination.join("main/help-generation.toml");
         let ledger_bytes = fs::read(&ledger_path).unwrap();
         let ledger: toml::Value = toml::from_str(std::str::from_utf8(&ledger_bytes).unwrap()).unwrap();
@@ -439,7 +440,7 @@ mod tests {
             let matching: Vec<_> = entries.iter().filter(|entry| entry["name"].as_str() == Some(name.as_str())).collect();
             assert_eq!(matching.len(), 1, "{name}");
             let entry = matching[0];
-            assert_eq!(entry["output"].as_str(), resolved_output.to_str(), "{name}");
+            assert_eq!(entry["output"].as_str(), absolute_output.to_str(), "{name}");
             assert_eq!(entry["hash"].as_str(), Some(sha256(&expected).as_str()), "{name}");
             assert_eq!(entry["source_hash"].as_str(), Some(source.source_hash.as_str()), "{name}");
             let settings_hash = entry["settings_hash"].as_str().unwrap();
