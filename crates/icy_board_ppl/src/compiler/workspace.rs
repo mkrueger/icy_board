@@ -590,13 +590,15 @@ mod tests {
     #[test]
     fn equal_transitive_dependency_names_do_not_merge_different_packages() {
         let temp = tempfile::tempdir().unwrap();
-        let first_util = package(&temp.path().join("first-util"), "first-util", BTreeMap::new());
+        // Dependencies are identified by canonical path; macOS keeps temp under /var -> /private/var.
+        let dir = temp.path().canonicalize().unwrap();
+        let first_util = package(&dir.join("first-util"), "first-util", BTreeMap::new());
         fs::write(
             first_util.file_name.parent().unwrap().join("src/util.pps"),
             "PROCEDURE Run()\n  PRINTLN \"first\"\nENDPROC\n",
         )
         .unwrap();
-        let second_util = package(&temp.path().join("second-util"), "second-util", BTreeMap::new());
+        let second_util = package(&dir.join("second-util"), "second-util", BTreeMap::new());
         fs::write(
             second_util.file_name.parent().unwrap().join("src/util.pps"),
             "PROCEDURE Run()\n  PRINTLN \"second\"\nENDPROC\n",
@@ -604,7 +606,7 @@ mod tests {
         .unwrap();
 
         let first = package(
-            &temp.path().join("first"),
+            &dir.join("first"),
             "first",
             BTreeMap::from([("util".to_string(), path_dependency("../first-util"))]),
         );
@@ -614,7 +616,7 @@ mod tests {
         )
         .unwrap();
         let second = package(
-            &temp.path().join("second"),
+            &dir.join("second"),
             "second",
             BTreeMap::from([("util".to_string(), path_dependency("../second-util"))]),
         );
@@ -625,7 +627,7 @@ mod tests {
         .unwrap();
 
         let mut root = package(
-            &temp.path().join("application"),
+            &dir.join("application"),
             "application",
             BTreeMap::from([
                 ("first".to_string(), path_dependency("../first")),
@@ -661,7 +663,9 @@ mod tests {
     #[test]
     fn resolves_revision_pinned_git_library_sources() {
         let temp = tempfile::tempdir().unwrap();
-        let repository = package(&temp.path().join("repository"), "library", BTreeMap::new());
+        // Dependencies are identified by canonical path; macOS keeps temp under /var -> /private/var.
+        let dir = temp.path().canonicalize().unwrap();
+        let repository = package(&dir.join("repository"), "library", BTreeMap::new());
         fs::write(repository.file_name.parent().unwrap().join("src/library.pps"), "MODULE Library\nENDMODULE\n").unwrap();
         let repository_dir = repository.file_name.parent().unwrap();
         run_git(["init", "--quiet", repository_dir.to_string_lossy().as_ref()]).unwrap();
@@ -682,11 +686,7 @@ mod tests {
             branch: None,
             tag: None,
         };
-        let mut root = package(
-            &temp.path().join("application"),
-            "application",
-            BTreeMap::from([("library".to_string(), dependency)]),
-        );
+        let mut root = package(&dir.join("application"), "application", BTreeMap::from([("library".to_string(), dependency)]));
         fs::write(root.file_name.parent().unwrap().join("src/main.pps"), "IMPORT Library AS Lib\n").unwrap();
 
         root.resolve_dependencies().unwrap();
