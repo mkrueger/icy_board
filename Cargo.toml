@@ -60,7 +60,7 @@ ratatui = "0.30.2"
 terminfo = "0.9.0"
 ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm", "image-defaults"] }
 rodio = { version = "0.22.2", features = ["tracing"] }
-log = "0.4.33"
+log = "0.4.34"
 chrono = { version = "0.4.45", features = ["serde"] }
 bstr = "1.13.1"
 base64 = "0.23.1"
@@ -102,7 +102,7 @@ ariadne = "0.6.0"
 relative-path = "2.0.1"
 bitflags = "2.13.2"
 tui-markdown = "0.3"
-tui-input = "0.15.4"
+tui-input = "0.15.5"
 
 russh = "0.63.3"
 
@@ -124,3 +124,7 @@ opt-level = 3
 [patch."https://github.com/mkrueger/icy_board"]
 codepages = { path = "crates/codepages" }
 icy_net = { path = "crates/icy_net" }
+
+# Adds a way to pass the POSIX locale to the parser diagnostics; see its Cargo.toml.
+[patch.crates-io]
+clap-i18n-richformatter = { path = "vendor/clap-i18n-richformatter" }

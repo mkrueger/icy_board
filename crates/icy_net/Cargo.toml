@@ -25,7 +25,7 @@ serial2-tokio = { version = "0.1.25", features = ["unix"] }
 
 # SSH
 russh = { workspace = true }
-zeroize = "1.8.2"
+zeroize = "1.9.0"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.30.0", features = [
@@ -35,14 +35,14 @@ tokio-tungstenite = { version = "0.30.0", features = [
 
 http = "1.5.0"
 url = "2.5.8"
-rustls = { version = "0.23.43", features = [
+rustls = { version = "0.23.45", features = [
     "tls12",
  #   "dangerous_configuration"  # Allow invalid certs/etc.
 ]}
 rustls-pemfile = "2"
 webpki-roots = "1.0.9"
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
-md5 = "0.8"
+md5 = "0.8.1"
 
 [target.'cfg(unix)'.dependencies]
 libc_unix = { package = "libc", version = "0.2" }

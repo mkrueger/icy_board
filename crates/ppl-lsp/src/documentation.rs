@@ -596,6 +596,8 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "name" | "location" | "operator" | "sysopname" | "nodecount" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-property")),
             "conferences" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-conferences")),
             "users" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-users")),
+            "adduser" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-add-user")),
+            "finduser" => Some(fl!(LANGUAGE_LOADER, "hint-member-board-find-user")),
             _ => None,
         };
     }

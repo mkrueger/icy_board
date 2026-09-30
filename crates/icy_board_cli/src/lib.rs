@@ -6,7 +6,7 @@
 use std::{collections::HashMap, ffi::OsString, sync::OnceLock};
 
 use clap::{Arg, ArgAction, Command, CommandFactory, FromArgMatches};
-use clap_i18n_richformatter::{ClapI18nRichFormatter, init_clap_rich_formatter_localizer};
+use clap_i18n_richformatter::{ClapI18nRichFormatter, init_clap_rich_formatter_localizer_for};
 use i18n_embed::{DesktopLanguageRequester, fluent::FluentLanguageLoader};
 use rust_embed::RustEmbed;
 
@@ -48,7 +48,8 @@ pub fn text(domain: &str, key: &str) -> String {
 }
 
 /// Only the Unix locale lookup reads the POSIX variables; macOS asks CoreFoundation
-/// alone, so an explicitly requested language would be ignored there.
+/// alone, so an explicitly requested language would be ignored there. Parser
+/// diagnostics get the same list, through the vendored formatter.
 fn requested_languages() -> Vec<i18n_embed::unic_langid::LanguageIdentifier> {
     let mut tags: Vec<String> = Vec::new();
     for variable in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
@@ -72,7 +73,7 @@ fn requested_languages() -> Vec<i18n_embed::unic_langid::LanguageIdentifier> {
 
 /// Build a command with localized help at every subcommand level.
 pub fn command<T: CommandFactory>() -> Command {
-    FORMATTER.get_or_init(init_clap_rich_formatter_localizer);
+    FORMATTER.get_or_init(|| init_clap_rich_formatter_localizer_for(&requested_languages()));
     localize(T::command())
 }
 

@@ -29,7 +29,7 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (MARGINS_ID, 11),
         (PALETTE_ID, 3),
         (MACROS_ID, 6),
-        (BOARD_ID, 7),
+        (BOARD_ID, 9),
         (SESSION_ID, 18),
         (USER_ID, 60),
         (MSG_ID, 18),

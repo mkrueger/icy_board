@@ -243,7 +243,7 @@ legacy_source_hash = "b5a5511fe3b4e9ef87dbea5f542d16bb1bfd29b809c0260c2d82cf8a96
 [[topics]]
 id = "hlpj"
 locales = ["en", "de"]
-source_hash = "73c2e06c485993c9b160431eefce37d11e1435d8fa1ab975f0d6b7312440b1ce"
+source_hash = "ddf38b083e823321ab2e8622990f1e3080be3c8152cf48a83846de7910f42783"
 legacy_source_hash = "9e654e0b818da7e29b0dc9466d45f66d8319bbc60d92d260a0b84d137b0f24ac"
 [topics.translations.de]
 upstream_hash = ""
