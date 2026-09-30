@@ -280,11 +280,28 @@ fn regular_source(path: &Path) -> ZipResult<()> {
 
 fn reject_links(path: &Path) -> ZipResult<()> {
     for ancestor in path.ancestors() {
-        if !ancestor.as_os_str().is_empty() && std::fs::symlink_metadata(ancestor).map_err(io_error)?.file_type().is_symlink() {
+        if ancestor.as_os_str().is_empty() {
+            continue;
+        }
+        let metadata = std::fs::symlink_metadata(ancestor).map_err(io_error)?;
+        if metadata.file_type().is_symlink() && !system_link(ancestor, &metadata) {
             return Err(invalid("ZIP sources must not contain symbolic links"));
         }
     }
     Ok(())
+}
+
+/// Links directly under `/` belong to the system (macOS's /var and /tmp, merged-/usr
+/// Linux's /bin), not to anyone who could plant them for a PPE.
+#[cfg(unix)]
+fn system_link(path: &Path, metadata: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    path.parent() == Some(Path::new("/")) && metadata.uid() == 0
+}
+
+#[cfg(not(unix))]
+fn system_link(_path: &Path, _metadata: &std::fs::Metadata) -> bool {
+    false
 }
 
 fn timestamp(time: chrono::DateTime<chrono::Utc>) -> DateTime {
@@ -590,6 +607,26 @@ impl UserDataValue for PplZipWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn zip_sources_refuse_user_links_but_not_system_ones() {
+        let real = tempfile::tempdir().unwrap();
+        let links = tempfile::tempdir().unwrap();
+        std::fs::write(real.path().join("source.txt"), b"x").unwrap();
+        std::os::unix::fs::symlink(real.path(), links.path().join("alias")).unwrap();
+        assert!(reject_links(&real.path().join("source.txt")).is_ok());
+        assert!(reject_links(&links.path().join("alias/source.txt")).is_err());
+        // Merged-/usr Linux links /bin, macOS links /var and /tmp; all sit directly under /.
+        for system in ["/bin", "/var", "/tmp"] {
+            let path = Path::new(system);
+            if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+                if let Err(error) = reject_links(path) {
+                    panic!("{system}: {}", error.message);
+                }
+            }
+        }
+    }
 
     #[test]
     fn zip_archive_publication_and_failure() {

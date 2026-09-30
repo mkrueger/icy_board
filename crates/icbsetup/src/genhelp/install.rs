@@ -207,10 +207,28 @@ fn validate_stored_output(value: &str) -> Res<()> {
 
 fn metadata(path: &Path) -> Res<Option<fs::Metadata>> {
     match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() && system_link(path, &meta) => fs::metadata(path)
+            .map(Some)
+            .map_err(|error| format!("Cannot inspect {}: {error}", path.display()).into()),
         Ok(meta) if meta.file_type().is_symlink() => Err(format!("Symlink denied: {}", path.display()).into()),
         Ok(meta) => Ok(Some(meta)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(format!("Cannot inspect {}: {error}", path.display()).into()),
+    }
+}
+
+/// Links directly under `/` belong to the system (macOS's /var and /tmp, merged-/usr
+/// Linux's /bin), not to anyone the board could be protecting itself from.
+fn system_link(path: &Path, meta: &fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        path.parent() == Some(Path::new("/")) && meta.uid() == 0
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (path, meta);
+        false
     }
 }
 
@@ -1214,6 +1232,18 @@ mod tests {
             symlink(outside.path().join("missing"), dir.path().join("main").join(name)).unwrap();
             assert!(apply(dir.path(), &[], &options()).is_err());
             fs::remove_file(dir.path().join("main").join(name)).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn system_links_directly_under_root_are_followed() {
+        // macOS keeps /var and /tmp behind links; merged-/usr Linux does the same for /bin.
+        for system in ["/bin", "/var", "/tmp"] {
+            let path = Path::new(system);
+            if fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+                assert_eq!(resolve_directory(Path::new("/"), path).unwrap(), path, "{system}");
+            }
         }
     }
 

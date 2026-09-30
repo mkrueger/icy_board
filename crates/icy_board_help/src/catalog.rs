@@ -190,13 +190,30 @@ fn validate_markdown(path: &str, markdown: &str) -> Result<()> {
 fn reject_symlink_components(path: &Path) -> Result<()> {
     for component in path.ancestors().filter(|p| !p.as_os_str().is_empty()) {
         match fs::symlink_metadata(component) {
-            Ok(meta) if meta.file_type().is_symlink() => return Err(invalid(format!("Symlink paths are not allowed: {}", component.display()))),
+            Ok(meta) if meta.file_type().is_symlink() && !system_link(component, &meta) => {
+                return Err(invalid(format!("Symlink paths are not allowed: {}", component.display())));
+            }
             Ok(_) => {}
             Err(e) if e.kind() == ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
     }
     Ok(())
+}
+
+/// Links directly under `/` belong to the system (macOS's /var and /tmp, merged-/usr
+/// Linux's /bin), not to anyone the help sources need protecting from.
+fn system_link(path: &Path, meta: &fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        path.parent() == Some(Path::new("/")) && meta.uid() == 0
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (path, meta);
+        false
+    }
 }
 
 fn source_topic(name: &str, known: &BTreeSet<String>) -> Result<String> {
@@ -588,5 +605,17 @@ mod tests {
         assert!(sources(Some(&temp.0)).is_err());
         assert!(export(&temp.0.join("linked/new")).is_err());
         assert!(sources(Some(&temp.0.join("linked"))).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn system_links_directly_under_root_are_allowed() {
+        // macOS keeps /var and /tmp behind links; merged-/usr Linux does the same for /bin.
+        for system in ["/bin", "/var", "/tmp"] {
+            let path = Path::new(system);
+            if fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+                assert!(reject_symlink_components(&path.join("missing")).is_ok(), "{system}");
+            }
+        }
     }
 }
