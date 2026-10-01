@@ -24,6 +24,12 @@ use crate::connection::proxy::{ProxyConfig, connect_tcp};
 use crate::{Connection, ConnectionType, telnet::TermCaps};
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
+/// How much received data `fill_buffer_nonblocking` moves out of the channel ahead of the reader.
+/// Anything beyond stays queued in russh, which stops reading the socket once its channel queue is
+/// full, so a server sending faster than the terminal consumes gets slowed down by TCP instead of
+/// piling up here.
+const READ_BUFFER_LIMIT: usize = 64 * 1024;
+
 pub struct SSHConnection {
     client: SshClient,
     channel: Channel<Msg>,
@@ -288,7 +294,7 @@ impl SSHConnection {
         // Use a very short timeout to make this non-blocking
         let timeout = Duration::from_millis(1);
 
-        loop {
+        while self.read_buffer.len() < READ_BUFFER_LIMIT {
             match tokio::time::timeout(timeout, self.channel.wait()).await {
                 Ok(Some(msg)) => {
                     match msg {
@@ -319,6 +325,7 @@ impl SSHConnection {
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -384,6 +391,11 @@ impl Connection for SSHConnection {
         // Try to fill buffer without blocking
         self.fill_buffer_nonblocking().await?;
 
+        // Data is still arriving, and taking more would bypass the read buffer limit
+        if self.read_buffer.len() >= READ_BUFFER_LIMIT {
+            return Ok(ConnectionState::Connected);
+        }
+
         // Use timeout to check if channel is still responsive
         let timeout = Duration::from_millis(1);
         match tokio::time::timeout(timeout, self.channel.wait()).await {
@@ -437,8 +449,29 @@ impl Connection for SSHConnection {
     }
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
-        self.channel.make_writer().write_all(buf).await?;
-        Ok(())
+        // While the write waits, keep taking received data. With the read buffer limit, russh can
+        // be blocked on a full channel queue, and then it would not process the window adjustment
+        // the write may be waiting for.
+        let mut writer = self.channel.make_writer();
+        let write = writer.write_all(buf);
+        tokio::pin!(write);
+        loop {
+            tokio::select! {
+                biased;
+                result = &mut write => {
+                    result?;
+                    return Ok(());
+                }
+                msg = self.channel.wait() => match msg {
+                    Some(ChannelMsg::Data { data }) => self.read_buffer.extend_from_slice(&data),
+                    Some(ChannelMsg::Eof | ChannelMsg::Close) | None => {
+                        write.await?;
+                        return Ok(());
+                    }
+                    Some(_) => {}
+                },
+            }
+        }
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
@@ -505,6 +538,10 @@ impl SshClient {
         let config = client::Config {
             inactivity_timeout: None,
             preferred,
+            // russh re-grants the window as data arrives, not as it is read, so the window is how
+            // much the server can send past a terminal that has stopped reading. The 2 MB default
+            // adds seconds of lag to a fast stream; 256 KB still allows 2.5 MB/s at 100 ms RTT.
+            window_size: 256 * 1024,
             // keepalive_interval: Some(Duration::from_secs(30)),
             // keepalive_max: 3,
             ..<_>::default()
@@ -1034,7 +1071,10 @@ mod tests {
         }
     }
 
-    async fn spawn_server(server: TestServer, host_key: PrivateKey) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+    async fn spawn_server<H: server::Handler<Error = russh::Error> + Send + 'static>(
+        server: H,
+        host_key: PrivateKey,
+    ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let config = Arc::new(server::Config {
@@ -1056,6 +1096,96 @@ mod tests {
             window_size: (80, 25),
             terminal: TerminalEmulation::Ansi,
         }
+    }
+
+    const STREAM_CHUNK: usize = 32 * 1024;
+
+    fn stream_byte(offset: usize) -> u8 {
+        (offset % STREAM_CHUNK % 251) as u8
+    }
+
+    /// Writes `total` bytes into the session channel as fast as the transport accepts them.
+    struct StreamingServer {
+        total: usize,
+        written: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl server::Handler for StreamingServer {
+        type Error = russh::Error;
+
+        async fn auth_password(&mut self, _: &str, _: &str) -> Result<server::Auth, Self::Error> {
+            Ok(server::Auth::Accept)
+        }
+
+        async fn channel_open_session(
+            &mut self,
+            channel: Channel<server::Msg>,
+            reply: server::ChannelOpenHandle,
+            _: &mut server::Session,
+        ) -> Result<(), Self::Error> {
+            reply.accept().await;
+            let (total, written) = (self.total, self.written.clone());
+            tokio::spawn(async move {
+                let chunk: Vec<u8> = (0..STREAM_CHUNK).map(stream_byte).collect();
+                let mut sent = 0;
+                while sent < total {
+                    let len = chunk.len().min(total - sent);
+                    if channel.data(&chunk[..len]).await.is_err() {
+                        return;
+                    }
+                    sent += len;
+                    written.store(sent, std::sync::atomic::Ordering::SeqCst);
+                }
+            });
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_client_that_stops_reading_holds_back_the_server() {
+        const TOTAL: usize = 32 * 1024 * 1024;
+        let written = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (address, server) = spawn_server(
+            StreamingServer {
+                total: TOTAL,
+                written: written.clone(),
+            },
+            generated_key(Algorithm::Ed25519),
+        )
+        .await;
+        let mut connection = SSHConnection::open(address.to_string(), test_caps(), Credentials::password("sysop", "secret"))
+            .await
+            .unwrap();
+
+        // A terminal that has fallen behind keeps polling but reads nothing. Wait until the server
+        // stops getting data out.
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let mut stalled_at = usize::MAX;
+        loop {
+            for _ in 0..8 {
+                connection.poll().await.unwrap();
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+            let now = written.load(std::sync::atomic::Ordering::SeqCst);
+            if now == stalled_at {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "the server never stalled");
+            stalled_at = now;
+        }
+        assert!(stalled_at < TOTAL, "the whole stream was pulled into the client");
+        assert!(connection.read_buffer.len() < READ_BUFFER_LIMIT + STREAM_CHUNK);
+
+        // Nothing is lost or reordered once the terminal catches up.
+        let mut received = Vec::with_capacity(TOTAL);
+        let mut buf = vec![0; 64 * 1024];
+        while received.len() < TOTAL {
+            let count = connection.read(&mut buf).await.unwrap();
+            assert!(count > 0, "the stream ended after {} bytes", received.len());
+            received.extend_from_slice(&buf[..count]);
+        }
+        assert!(received.iter().enumerate().all(|(offset, byte)| *byte == stream_byte(offset)));
+        server.abort();
     }
 
     #[tokio::test]
