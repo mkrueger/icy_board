@@ -27,7 +27,7 @@ use crate::{
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use codepages::tables::CP437_TO_UNICODE;
+use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use icy_engine::BufferType;
 use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_header::SubfieldType};
 
@@ -43,6 +43,9 @@ use crate::{
 use super::super::errors::IcyError;
 use super::super::expressions::predefined_functions::message_status;
 use std::fmt::Write as _;
+
+/// `PCBoard`'s `MAX_STR_LEN`, the widest field FPUTPAD writes.
+const MAX_PCBOARD_STRING_LEN: usize = 256;
 
 /// A statement that is not implemented yet. `PCBoard` never aborted a PPE over one,
 /// so the call is logged and skipped rather than killing the session.
@@ -210,22 +213,26 @@ pub async fn fget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn fput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
-
-    for value in &args[1..] {
-        let text = vm.eval_expr(value).await?.as_string();
-        vm.io.fput(channel, text)?;
-    }
-    Ok(())
+    put_items(vm, channel, &args[1..], false).await
 }
 
 pub async fn fputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
+    put_items(vm, channel, &args[1..], true).await
+}
 
-    for value in &args[1..] {
-        let text = vm.eval_expr(value).await?.as_string();
-        vm.io.fput(channel, text)?;
+/// FPUT, FPUTLN and their FD variants: every item is written as text. A line ends in LF;
+/// `PCBoard` wrote CRLF, and FGET reads both.
+async fn put_items(vm: &mut VirtualMachine<'_>, channel: i32, items: &[PPEExpr], line_end: bool) -> Res<()> {
+    let utf8 = vm.variable_table.get_version() >= 400;
+    let mut text = String::new();
+    for value in items {
+        text.push_str(&vm.eval_expr(value).await?.as_string());
     }
-    vm.io.fput(channel, "\n".to_string())?;
+    if line_end {
+        text.push('\n');
+    }
+    vm.io.fput(channel, &text, utf8)?;
     Ok(())
 }
 
@@ -262,23 +269,20 @@ pub async fn fputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 fn fputpad_internal(vm: &mut VirtualMachine<'_>, channel: i32, text: String, width: i32) -> Res<()> {
-    let abs_width = width.unsigned_abs() as usize;
-    let padded = match width.cmp(&0) {
-        std::cmp::Ordering::Greater => {
-            // Positive width: right-justify (left-pad with spaces)
-            if text.len() >= abs_width { text } else { format!("{text:>abs_width$}") }
-        }
-        std::cmp::Ordering::Less => {
-            // Negative width: left-justify (right-pad with spaces)
-            if text.len() >= abs_width { text } else { format!("{text:<abs_width$}") }
-        }
-        std::cmp::Ordering::Equal => {
-            // Width of 0: just the text as-is
-            text
-        }
+    // PCBoard's `%*.*s`: right-justify for a positive width, left-justify for a negative one,
+    // truncate to the width, write nothing for zero and no line end.
+    let abs_width = (width.unsigned_abs() as usize).min(MAX_PCBOARD_STRING_LEN);
+    if abs_width == 0 {
+        return Ok(());
+    }
+    let text: String = text.chars().take(abs_width).collect();
+    let padded = if width < 0 {
+        format!("{text:<abs_width$}")
+    } else {
+        format!("{text:>abs_width$}")
     };
-    vm.io.fput(channel, padded)?;
-    vm.io.fput(channel, "\n".to_string())?;
+    let utf8 = vm.variable_table.get_version() >= 400;
+    vm.io.fput(channel, &padded, utf8)?;
     Ok(())
 }
 
@@ -1721,12 +1725,17 @@ pub async fn fflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
-    let size = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int() as usize;
+    let size = io_size(vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int());
     internal_fread(vm, channel, size, &args[1]).await
 }
 
-/// A read that hit the end of the file comes back short, so the bytes that are
-/// missing count as zero instead of taking the node down.
+/// FREAD and FWRITE sizes; `PCBoard` treated a negative size as zero.
+fn io_size(size: i32) -> usize {
+    usize::try_from(size).unwrap_or(0)
+}
+
+/// A read that hit the end of the file comes back short. `PCBoard` stored the bytes it got,
+/// so the bytes that are missing count as zero instead of taking the node down.
 fn read_bytes<const N: usize>(data: &[u8]) -> [u8; N] {
     let mut bytes = [0u8; N];
     let len = data.len().min(N);
@@ -1737,7 +1746,7 @@ fn read_bytes<const N: usize>(data: &[u8]) -> [u8; N] {
 async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, arg: &PPEExpr) -> Res<()> {
     let val = vm.eval_expr(arg).await?;
 
-    let result = vm.io.fread(channel, size)?;
+    let mut result = vm.io.fread(channel, size)?;
 
     if let Some(empty) = val.get_type().empty_temporal() {
         match empty.decode(&result) {
@@ -1749,6 +1758,10 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
 
     match val.get_type() {
         VariableType::Bytes => {
+            // A BYTES value is all or nothing; a short read leaves it empty.
+            if result.len() < size {
+                result.clear();
+            }
             vm.set_variable(arg, VariableValue::new_bytes(result)).await?;
         }
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
@@ -1772,25 +1785,22 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
         VariableType::Double => {
             vm.set_variable(arg, VariableValue::new_double(f64::from_le_bytes(read_bytes(&result)))).await?;
         }
-        _ => match result.len() {
-            0 => {
-                vm.set_variable(arg, VariableValue::new_int(0)).await?;
-            }
-            1 => {
-                vm.set_variable(arg, VariableValue::new_int(result[0] as i32)).await?;
-            }
-            2 => {
-                vm.set_variable(arg, VariableValue::new_int(i16::from_le_bytes(result[..2].try_into().unwrap()) as i32))
-                    .await?;
-            }
-            4 => {
-                vm.set_variable(arg, VariableValue::new_int(i32::from_le_bytes(result[..4].try_into().unwrap())))
-                    .await?;
-            }
-            _ => {
-                log::error!("fread: invalid size: {}", result.len());
-            }
-        },
+        VariableType::Long if vm.variable_table.get_version() >= 400 => {
+            vm.set_variable(arg, VariableValue::new_long(i64::from_le_bytes(read_bytes(&result)))).await?;
+        }
+        VariableType::ULong if vm.variable_table.get_version() >= 400 => {
+            vm.set_variable(arg, VariableValue::new_ulong(u64::from_le_bytes(read_bytes(&result)))).await?;
+        }
+        _ => {
+            // The requested size decides the width, so a short read keeps the bytes it got.
+            let value = match size {
+                0 => 0,
+                1 => i32::from(result.first().copied().unwrap_or_default()),
+                2 => i32::from(i16::from_le_bytes(read_bytes(&result))),
+                _ => i32::from_le_bytes(read_bytes(&result)),
+            };
+            vm.set_variable(arg, VariableValue::new_int(value)).await?;
+        }
     }
     Ok(())
 }
@@ -1798,7 +1808,7 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
 pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let channel = get_file_channel(vm, args).await?;
     let val = vm.eval_expr(&args[1]).await?;
-    let size = vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int() as usize;
+    let size = io_size(vm.eval_expr(&args[2]).await?.checked_numeric()?.as_int());
     internal_fwrite(vm, channel, val, size).await
 }
 
@@ -1838,8 +1848,9 @@ pub async fn fputrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let value = vm.eval_expr(&args[1]).await?;
     match crate::vm::record_io::encode_lines(&value, &vm.variable_table) {
         Ok(lines) => {
+            let utf8 = vm.variable_table.get_version() >= 400;
             for line in lines {
-                vm.io.fput(channel, format!("{line}\n"))?;
+                vm.io.fput(channel, &format!("{line}\n"), utf8)?;
             }
         }
         Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
@@ -1900,6 +1911,10 @@ async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: Variabl
     }
     let mut v = match val.get_type() {
         VariableType::Bytes => val.as_byte_slice().to_vec(),
+        // Legacy FREAD decodes CP437, so legacy FWRITE has to encode it.
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString if vm.variable_table.get_version() < 400 => {
+            val.as_string().chars().map(|c| UNICODE_TO_CP437.get(&c).copied().unwrap_or(b'?')).collect()
+        }
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
             if val.as_bool() {
@@ -1911,12 +1926,13 @@ async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: Variabl
         VariableType::Byte | VariableType::SByte => unsafe { vec![val.data.byte_value] },
         VariableType::Word | VariableType::SWord => unsafe { val.data.word_value.to_le_bytes().to_vec() },
         VariableType::Double => unsafe { val.data.double_value.to_le_bytes().to_vec() },
+        VariableType::Long if vm.variable_table.get_version() >= 400 => val.as_long().to_le_bytes().to_vec(),
+        VariableType::ULong if vm.variable_table.get_version() >= 400 => val.as_ulong().to_le_bytes().to_vec(),
         _ => unsafe { val.data.int_value.to_le_bytes().to_vec() },
     };
 
-    while v.len() < size {
-        v.push(0);
-    }
+    // PCBoard wrote exactly `size` bytes, which keeps fixed-width records aligned.
+    v.resize(size, 0);
     vm.io.fwrite(channel, &v).map_err(|e| {
         log::error!("fwrite error: {e} ({channel})");
         e
@@ -1942,19 +1958,10 @@ pub async fn fdget(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn fdput(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    for value in args {
-        let text = vm.eval_expr(value).await?.as_string();
-        vm.io.fput(vm.fd_default_out, text)?;
-    }
-    Ok(())
+    put_items(vm, vm.fd_default_out, args, false).await
 }
 pub async fn fdputln(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    for value in args {
-        let text = vm.eval_expr(value).await?.as_string();
-        vm.io.fput(vm.fd_default_out, text)?;
-    }
-    vm.io.fput(vm.fd_default_out, "\n".to_string())?;
-    Ok(())
+    put_items(vm, vm.fd_default_out, args, true).await
 }
 
 pub async fn fdputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1964,13 +1971,13 @@ pub async fn fdputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 }
 
 pub async fn fdread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let size = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as usize;
+    let size = io_size(vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int());
     internal_fread(vm, vm.fd_default_in, size, &args[0]).await
 }
 
 pub async fn fdwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let val = vm.eval_expr(&args[0]).await?;
-    let size = vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int() as usize;
+    let size = io_size(vm.eval_expr(&args[1]).await?.checked_numeric()?.as_int());
     internal_fwrite(vm, vm.fd_default_out, val, size).await
 }
 

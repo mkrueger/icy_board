@@ -542,7 +542,7 @@ hint-statement-fclose=Kanal @1 schließen
     Akzeptiert auch Kanal -1 als „Kanal“ der Funktion `ReadLine()` und schließt ihn.
 hint-statement-fget=Lesen Sie eine Zeile vom Kanal @1 und weisen Sie sie @2 zu
 hint-statement-fput=Schreibt einen oder mehrere Ausdrücke @2 in Kanal @1.
-hint-statement-fputln=Schreibt einen oder mehrere Ausdrücke @2 in Kanal @1 und schließt mit einem Wagenrücklauf/Zeilenvorschubpaar ab.
+hint-statement-fputln=Schreibt einen oder mehrere Ausdrücke @2 in Kanal @1 und schließt mit einem Zeilenvorschub ab.
 hint-statement-resetdisp=Setzen Sie die Anzeige nach einem Benutzerabbruch zurück
 hint-statement-startdisp=Starten Sie die Anzeigeüberwachung im Modus @1
     ### Gültige Modi

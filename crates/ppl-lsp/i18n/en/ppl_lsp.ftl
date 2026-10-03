@@ -539,7 +539,7 @@ hint-statement-fclose=
     Accept channel -1 as the `ReadLine()` function 'channel' and close it
 hint-statement-fget=Read a line from channel @1 and assign it to @2
 hint-statement-fput=Write one or more @2 out to channel @1
-hint-statement-fputln=Write one or more @2 out to channel @1 and terminate with a carriage return/line feed pair
+hint-statement-fputln=Write one or more @2 out to channel @1 and terminate with a line feed
 hint-statement-resetdisp=Reset the display after an user abort
 hint-statement-startdisp=
     Start display monitoring in mode @1

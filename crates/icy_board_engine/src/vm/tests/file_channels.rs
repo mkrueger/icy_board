@@ -7,6 +7,260 @@ use super::{run_ppl, run_ppl_with_files};
 
 const CONTENT: &[u8] = b"first line\r\nsecond line\r\n";
 
+/// Prints the bytes of a file as hex, the way the PCBoard oracle probe dumped them.
+const DUMP: &str = r#"
+PROCEDURE Dump(STRING name)
+  STRING hex
+  BYTE c
+  INTEGER n
+  FOPEN 3, name, O_RD, S_DN
+  FREAD 3, c, 1
+  WHILE (!FERR(3)) DO
+    hex = hex + RIGHT("0" + I2S(c, 16), 2)
+    INC n
+    FREAD 3, c, 1
+  ENDWHILE
+  FCLOSE 3
+  PRINTLN n, ":", hex
+ENDPROC
+"#;
+
+#[test]
+fn file_io_regression_long_binary_values_keep_all_eight_bytes() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+        LONG original = ToLong(4294967295) + 2
+        LONG restored
+        ULONG unsigned = ToULong("18446744073709551615")
+        ULONG unsignedRestored
+        LONG negative = ToLong("-9223372036854775808")
+        LONG negativeRestored
+        BYTES raw
+        FCREATE 1, "long.dat", O_RW, S_DN
+        FWRITE 1, original, 8
+        FWRITE 1, unsigned, 8
+        FDEFOUT 1
+        FDWRITE negative, 8
+        FREWIND 1
+        FREAD 1, raw, 24
+        PRINTLN raw.ToHex(), " err=", FERR(1)
+        FREWIND 1
+        FREAD 1, restored, 8
+        FREAD 1, unsignedRestored, 8
+        FDEFIN 1
+        FDREAD negativeRestored, 8
+        PRINTLN restored, " ", unsignedRestored, " ", negativeRestored, " err=", FERR(1)
+        FCLOSE 1
+        "#,
+    );
+    assert_eq!(
+        output,
+        "0100000001000000FFFFFFFFFFFFFFFF0000000000000080 err=0\n4294967297 18446744073709551615 -9223372036854775808 err=0\n"
+    );
+}
+
+#[test]
+fn file_io_regression_short_long_reads_zero_fill_missing_bytes() {
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 400
+        LONG value
+        ULONG unsigned
+        FOPEN 1, "short.dat", O_RD, S_DN
+        FREAD 1, value, 8
+        PRINTLN value, " err=", FERR(1)
+        FREWIND 1
+        FREAD 1, unsigned, 8
+        PRINTLN unsigned, " err=", FERR(1)
+        FCLOSE 1
+        "#,
+        &[("short.dat", &[1, 0, 0, 0, 1])],
+    );
+    assert_eq!(output, "4294967297 err=1\n4294967297 err=1\n");
+}
+
+#[test]
+fn file_io_regression_long_writes_keep_requested_record_widths() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+        LONG value = ToLong("-1")
+        ULONG unsigned = ToULong("18446744073709551615")
+        BYTES raw
+        FCREATE 1, "widths.dat", O_RW, S_DN
+        FWRITE 1, value, 10
+        FWRITE 1, unsigned, 6
+        FWRITE 1, value, 0
+        FWRITE 1, unsigned, -1
+        FREWIND 1
+        FREAD 1, raw, 16
+        PRINTLN raw.ToHex(), " err=", FERR(1)
+        FCLOSE 1
+        "#,
+    );
+    assert_eq!(output, "FFFFFFFFFFFFFFFF0000FFFFFFFFFFFF err=0\n");
+}
+
+#[test]
+fn file_io_regression_empty_text_writes_validate_channels_without_writing() {
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 400
+        FPUT 2, ""
+        PRINTLN "closed=", FERR(2)
+        FDEFOUT 2
+        FDPUT ""
+        PRINTLN "default=", FERR(2)
+        FOPEN 2, "readonly.dat", O_RD, S_DN
+        FPUT 2, ""
+        PRINTLN "readonly=", FERR(2)
+        FCLOSE 2
+        FCREATE 2, "empty.dat", O_WR, S_DN
+        FPUT 2, ""
+        PRINTLN "writable=", FERR(2), " size=", FILEINF("empty.dat", 4)
+        FCLOSE 2
+        "#,
+        &[("readonly.dat", b"unchanged")],
+    );
+    assert_eq!(output, "closed=1\ndefault=1\nreadonly=1\nwritable=0 size=0\n");
+}
+
+/// Byte-for-byte the output of PCBoard 15.4/M with PPLC 3.40 for the same statements:
+/// CP437 without a BOM and FPUTPAD padding or truncating without a line end. FPUTLN ends lines
+/// with LF here where PCBoard wrote CRLF.
+#[test]
+fn legacy_text_output_matches_pcboard_bytes() {
+    let source = format!(
+        r#"
+DECLARE PROCEDURE Dump(STRING name)
+FCREATE 2, "new.dat", O_WR, S_DN
+FPUT 2, "A", CHR(129)
+FPUTLN 2, "B"
+FPUTPAD 2, "C", 3
+FPUTPAD 2, "D", -3
+FPUTPAD 2, "ABCDE", 3
+FPUTPAD 2, "ABCDE", -3
+FPUTPAD 2, "XY", 0
+FCLOSE 2
+Dump("new.dat")
+END
+{DUMP}"#
+    );
+    let output = super::run_ppl_with_files_on_runtime(&source, 340, &[]);
+    assert_eq!(output.to_uppercase(), "16:4181420A202043442020414243414243\n");
+}
+
+/// PCBoard 15.4/M: FOPEN O_WR overwrites in place, FAPPEND writes follow FSEEK, FSEEK from the end adds.
+#[test]
+fn legacy_open_modes_and_seek_match_pcboard() {
+    let source = format!(
+        r#"
+DECLARE PROCEDURE Dump(STRING name)
+BYTE b
+FOPEN 2, "owr.dat", O_WR, S_DN
+FPUT 2, "xy"
+FCLOSE 2
+Dump("owr.dat")
+FAPPEND 2, "app.dat", O_WR, S_DN
+FSEEK 2, 0, 0
+FPUT 2, "xy"
+FCLOSE 2
+Dump("app.dat")
+FOPEN 2, "sk.dat", O_RD, S_DN
+FSEEK 2, -2, 2
+FREAD 2, b, 1
+PRINTLN "end-2=", b, " ferr=", FERR(2)
+FSEEK 2, 2, 2
+FREAD 2, b, 1
+PRINTLN "end+2 ferr=", FERR(2)
+FCLOSE 2
+END
+{DUMP}"#
+    );
+    let seed: &[u8] = b"12345\r\nABCDE\r\n";
+    let output = super::run_ppl_with_files_on_runtime(&source, 340, &[("owr.dat", seed), ("app.dat", seed), ("sk.dat", seed)]);
+    assert_eq!(
+        output.to_uppercase(),
+        "14:78793334350D0A41424344450D0A\n14:78793334350D0A41424344450D0A\nEND-2=13 FERR=0\nEND+2 FERR=1\n"
+    );
+}
+
+/// PCBoard 15.4/M stored the bytes a short FREAD got: one byte left for a WORD gives 65.
+/// FWRITE writes exactly the requested size, and legacy strings go out as CP437.
+#[test]
+fn legacy_binary_io_keeps_sizes_and_cp437() {
+    let source = format!(
+        r#"
+DECLARE PROCEDURE Dump(STRING name)
+WORD w
+STRING s
+w = 4660
+FOPEN 2, "w.dat", O_RD, S_DN
+FREAD 2, w, 2
+PRINTLN "word=", w, " ferr=", FERR(2)
+FCLOSE 2
+FCREATE 2, "fw.dat", O_WR, S_DN
+FWRITE 2, "ABCDEFGH", 4
+FWRITE 2, CHR(129), 1
+FWRITE 2, 513, 2
+FWRITE 2, "Z", -5
+FCLOSE 2
+Dump("fw.dat")
+FOPEN 2, "fw.dat", O_RD, S_DN
+FREAD 2, s, 5
+PRINTLN "[", s, "]"
+FCLOSE 2
+END
+{DUMP}"#
+    );
+    let output = super::run_ppl_with_files_on_runtime(&source, 340, &[("w.dat", b"A")]);
+    assert_eq!(output.to_uppercase(), "WORD=65 FERR=1\n7:41424344810102\n[ABCDÜ]\n");
+}
+
+/// Runtime 400 keeps writing UTF-8, and starts a new file with a BOM.
+#[test]
+fn runtime_400_text_output_is_utf8_with_crlf() {
+    let source = format!(
+        r#";$LANGVERSION 400
+DECLARE PROCEDURE Dump(STRING name)
+FCREATE 2, "new.dat", O_WR, S_DN
+FPUTLN 2, "ü"
+FCLOSE 2
+Dump("new.dat")
+EXIT
+{DUMP}"#
+    );
+    let output = super::run_ppl_with_files(&source, &[]);
+    assert_eq!(output.to_uppercase(), "6:EFBBBFC3BC0A\n");
+}
+
+#[test]
+fn fget_frewind_fput_overwrites_existing_bytes_like_pcboard() {
+    let output = super::run_ppl_in_ppe_dir(
+        r#"
+        STRING line, linenew
+        linenew = "new line"
+        FOPEN 1, PPEPATH() + "test.dat", O_RW, S_DW
+        FGET 1, line
+        FREWIND 1
+        FPUT 1, linenew
+        PRINTLN "write error=", FERR(1)
+        FFLUSH 1
+        PRINTLN "flush error=", FERR(1)
+        FREWIND 1
+        FGET 1, line
+        PRINTLN "[", line, "]"
+        FCLOSE 1
+        FOPEN 1, PPEPATH() + "test.dat", O_RD, S_DN
+        FGET 1, line
+        PRINTLN "[", line, "]"
+        FGET 1, line
+        PRINTLN "[", line, "]"
+        FCLOSE 1
+        "#,
+        "ppe/file-test",
+        &[("ppe/file-test/test.dat", b"old content\r\nsecond line\r\n")],
+    );
+    assert_eq!(output, "write error=0\nflush error=0\n[new lineent]\n[new lineent]\n[second line]\n");
+}
+
 #[test]
 fn temporal_binary_channels_preserve_precision_and_reject_corruption() {
     let output = run_ppl_with_files(
@@ -183,7 +437,8 @@ fn reading_a_byte_past_the_end_sets_the_error_flag() {
     assert_eq!(output, "first=65 err=0\nsecond=0 err=1 ok=1\n");
 }
 
-/// The same for a value that needs more bytes than the file has left.
+/// The same for a value that needs more bytes than the file has left. PCBoard 15.4/M kept
+/// the byte it read, so one byte "A" left for a WORD reads as 65.
 #[test]
 fn reading_a_word_from_a_file_with_one_byte_left_does_not_end_the_ppe() {
     let output = run_ppl_with_files(
@@ -197,7 +452,7 @@ fn reading_a_word_from_a_file_with_one_byte_left_does_not_end_the_ppe() {
     "#,
         &[("data.pag", b"A")],
     );
-    assert_eq!(output, "w=0 err=1\nstill running\n");
+    assert_eq!(output, "w=65 err=1\nstill running\n");
 }
 
 #[test]

@@ -1087,7 +1087,13 @@ FAPPEND (1.00)
   **Remarks**
     Opens a file for appending data to the end without destroying existing content. Creates 
     the file if it doesn't exist. Channel 0 is reserved for script questionnaires but 
-    available otherwise. FAPPEND requires O_RW access regardless of specification.
+    available otherwise. FAPPEND always opens the file for reading and writing, whatever
+    access mode is given, so the channel can be read back after FREWIND.
+
+    Writes go to the current end of the file, with a cross-process file lock so several
+    nodes can append to one log without overwriting each other. Text encoding detection
+    and the first UTF-8 BOM are included in that lock.
+    After FSEEK or FREWIND, reads and writes use that position instead, as in PCBoard.
 
   **Example**
 
@@ -1179,8 +1185,8 @@ FCREATE (1.00)
 
   **Remarks**
     Creates a new file, destroying any existing file with the same name. Channel 0 is 
-    reserved for script questionnaires but available otherwise. Using O_RD doesn't make 
-    sense for a newly created empty file.
+    reserved for script questionnaires but available otherwise. The access mode applies
+    to the channel: O_RW can read back what was written, O_RD cannot write.
 
   **Example**
 
@@ -1428,7 +1434,7 @@ FDPUTLN (2.00)
     * :PPL:`exp` – Expression(s) to write (optional)
 
   **Remarks**
-    Writes expressions to the file channel set by FDEFOUT with carriage return/line feed 
+    Writes expressions to the file channel set by FDEFOUT with a line feed
     appended. Functionally identical to FPUTLN but uses the default channel. Can be called 
     without arguments to write a blank line. Simplifies code when writing multiple lines 
     to the same file.
@@ -1466,8 +1472,8 @@ FDPUTPAD (2.00)
   **Remarks**
     Writes expression padded to specified width using the channel set by FDEFOUT. 
     Positive width right-justifies (left-pads), negative width left-justifies (right-pads). 
-    Functionally identical to FPUTPAD but uses default channel. Appends newline after 
-    padded text.
+    Functionally identical to FPUTPAD but uses default channel: longer text is truncated
+    and no line end is written.
 
   **Example**
 
@@ -1708,6 +1714,15 @@ FGET (1.00)
     fields exist on the line, you must parse them manually. Sets file error flag if 
     end of file is reached.
 
+    CR/LF, a lone CR and a lone LF all end a line; a DOS end-of-file marker (Ctrl-Z) ends
+    the text. PCBoard only recognised CR and also set the error flag on a last line
+    without a line end; Icy Board returns that line normally and sets the flag on the
+    next read, so the usual ``WHILE (!FERR(1))`` loop does not drop it.
+
+    Text and binary operations share one byte position. Reading a line advances
+    past its line ending; a subsequent FREAD or write starts at that position.
+    FREWIND returns to the beginning without closing the channel.
+
   **Example**
 
     .. code-block:: PPL
@@ -1746,8 +1761,10 @@ FOPEN (1.00)
 
   **Remarks**
     Opens a file for read/write access with specified sharing. O_RD expects the file to 
-    exist; O_WR and O_RW create the file if it doesn't exist. Channel 0 is reserved for 
-    script questionnaires but available otherwise.
+    exist; O_WR and O_RW create the file if it doesn't exist. An existing file is never
+    truncated, not even with O_WR: writes overwrite bytes in place. Use FCREATE to start
+    with an empty file. Channel 0 is reserved for script questionnaires but available
+    otherwise.
 
   **Example**
 
@@ -1818,6 +1835,12 @@ FREAD (2.00)
     FREAD reads exact byte counts regardless of content. Useful for binary formats, fixed-
     length records, or data structures. File pointer advances by number of bytes read.
 
+    If fewer bytes are left than requested, the error flag is set and the variable gets
+    the bytes that were read; missing bytes of a number count as zero. A BYTES variable
+    is left empty instead. A negative size reads nothing.
+
+    From runtime 400 on, LONG and ULONG values use eight-byte little-endian binary data.
+
   **Example**
 
     .. code-block:: PPL
@@ -1859,7 +1882,8 @@ FSEEK (2.00)
   **Remarks**
     Positions the file pointer for random access operations. Allows moving forward or 
     backward from the specified base position. Essential for binary file operations and 
-    updating specific records in data files.
+    updating specific records in data files. With SEEK_END the offset is added to the
+    file size, so a negative offset moves before the end.
 
   **Example**
 
@@ -1898,6 +1922,20 @@ FPUT (1.00)
     Evaluates one or more expressions of any type and writes results to the specified 
     channel. Does not append carriage return/line feed. At least one expression required.
 
+    Writes at the current byte position without truncating the file. After
+    FREWIND, writing ``"new line"`` over ``"old content"`` leaves
+    ``"new lineent"``. A longer write can overwrite the original line ending
+    and part of the next line. Use FCREATE to discard the previous contents,
+    and FPUTLN when a line ending is required.
+
+    The text is encoded to match the file: UTF-8 for a file that starts with a BOM or,
+    from runtime 400 on, holds valid UTF-8; CP437 otherwise. A new or empty file is
+    written as CP437 without a BOM by older PPEs, as PCBoard did, and as UTF-8 with a
+    BOM from runtime 400 on. Characters CP437 cannot represent are written as ``?``.
+
+    An empty result writes no bytes or BOM, but still checks that the channel is open
+    for writing and reports invalid access through FERR.
+
   **Example**
 
     .. code-block:: PPL
@@ -1924,8 +1962,9 @@ FPUTLN (1.00)
 
   **Remarks**
     Evaluates zero or more expressions and writes results to the specified channel with 
-    carriage return/line feed appended. Can be called with just channel number to write 
-    blank line.
+    a line feed appended. Can be called with just channel number to write blank line.
+    PCBoard wrote a carriage return/line feed pair; Icy Board writes Unix line endings,
+    and FGET reads either.
 
   **Example**
 
@@ -1954,9 +1993,10 @@ FPUTPAD (1.00)
     * :PPL:`width` – Width for padding (-256 to 256)
 
   **Remarks**
-    Writes expression padded to specified width with spaces, then appends newline. 
-    Positive width: right-justified (left-padded). Negative width: left-justified 
-    (right-padded).
+    Writes expression padded to specified width with spaces. Positive width:
+    right-justified (left-padded). Negative width: left-justified (right-padded).
+    Longer text is truncated to the width, a width of 0 writes nothing, and no line
+    end is written, as in PCBoard.
 
   **Example**
 
@@ -2082,6 +2122,13 @@ FWRITE (2.00)
     Writes raw binary data to current file position. Expression is evaluated and written 
     as binary bytes, not text. Essential for creating binary files, fixed-length records, 
     or structured data files. File pointer advances by number of bytes written.
+
+    Exactly ``size`` bytes are written: longer values are cut off and shorter ones are
+    padded with zero bytes. Strings are written as CP437 by PPEs before runtime 400 and
+    as UTF-8 from runtime 400 on, matching how FREAD decodes them.
+
+    From runtime 400 on, LONG and ULONG values use eight-byte little-endian binary data,
+    subject to the same truncation and zero-padding rules.
 
   **Example**
 
