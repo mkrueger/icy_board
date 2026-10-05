@@ -8,6 +8,13 @@ releases.
 
 ## [Unreleased]
 
+### Added
+
+- PPL 4.00 can read archives: `Archive.Open()` returns an `ArchiveReader` that
+  lists members, reads them as bytes or text and extracts single files, in every
+  format unarc-rs supports (ZIP, RAR, 7z, ARJ, LHA, ACE, ARC, ZOO, TAR and more).
+  `ArchiveEntry.Kind` distinguishes files, directories, links and special entries.
+
 ### Changed
 
 - PPL message areas are numbered from 1: `Area.Number`, the area in `AreaId()`
