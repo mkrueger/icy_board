@@ -67,6 +67,28 @@ fn temporal_signatures_are_named_chained_and_versioned() {
     }
 }
 
+#[test]
+fn archive_signatures_and_array_results_are_versioned() {
+    let (ast, visitor) = analyze("ARCHIVEOPTIONS options\nARCHIVEREADER reader\nARCHIVEENTRY entry\n", 400);
+    for (line, expected) in [
+        ("Archive.Open(", "Archive.Open(STRING path, [ArchiveOptions options]) ArchiveReader"),
+        ("reader.Extract(", "ArchiveReader.Extract(STRING destination, [BOOLEAN overwrite]) BOOLEAN"),
+        ("reader.ReadBytes(", "ArchiveReader.ReadBytes() BYTES"),
+        ("reader.ReadText(", "ArchiveReader.ReadText() STRING"),
+    ] {
+        assert_eq!(signature(&visitor, line, 400).signatures[0].label, expected);
+        assert!(get_signature_help_for_version(line, &visitor, 350).is_none(), "{line}");
+    }
+    assert_array(&ast, &visitor, "Archive.Formats().", 1, false);
+    for receiver in ["Archive.", "reader.", "entry."] {
+        let items = complete(&ast, &visitor, receiver);
+        assert!(
+            !items.iter().any(|item| matches!(item.label.as_str(), "HasAccess" | "CanDownload")),
+            "{receiver}"
+        );
+    }
+}
+
 fn assert_array(ast: &Ast, visitor: &SemanticVisitor, line: &str, rank: u8, resizable: bool) {
     let items = complete(ast, visitor, line);
     let labels: Vec<_> = items.iter().map(|item| item.label.as_str()).collect();

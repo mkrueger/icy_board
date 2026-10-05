@@ -42,6 +42,7 @@ pub use accounting::AccountingSession;
 pub mod functions;
 pub mod local_transfer;
 pub mod menu_runner;
+pub mod ppl_archive;
 pub mod ppl_array;
 pub mod ppl_audio;
 pub mod ppl_board;

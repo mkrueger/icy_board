@@ -35,3 +35,19 @@ fn routines_show_reference_count_code_lenses() {
         .collect();
     assert!(titles.iter().any(|title| *title == "1 reference"), "{lenses}");
 }
+
+#[test]
+fn archive_hover_is_localized_in_separate_servers() {
+    for (locale, expected) in [("en_US.UTF-8", "Skips unread current data"), ("de_DE.UTF-8", "Überspringt ungelesene Daten")] {
+        let mut server = Server::ready_in_locale(locale);
+        let uri = "file:///tmp/archive-hints.pps";
+        server.opened(uri, ";$LANGVERSION 400\nARCHIVEREADER reader = Archive.Open(\"data.zip\")\nreader.Next()\n");
+        let hover = server.request(
+            "textDocument/hover",
+            json!({"textDocument": {"uri": uri}, "position": {"line": 2, "character": 8}}),
+        );
+        let text = hover["contents"]["value"].as_str().unwrap_or_else(|| panic!("{locale}: {hover}"));
+        assert!(text.contains(expected), "{locale}: {text}");
+        assert!(text.contains("Error.Last()"), "{locale}: {text}");
+    }
+}

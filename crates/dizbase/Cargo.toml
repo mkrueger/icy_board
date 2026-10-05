@@ -16,7 +16,7 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 
 zip = { workspace = true }
-unarc-rs = {  version = "0.7.0" }
+unarc-rs = { workspace = true }
 rusqlite = { version = "0.40", features = ["bundled"] }
 twox-hash = { version="2.1.4", features=["xxhash3_64", "std"] }
 

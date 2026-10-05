@@ -93,6 +93,10 @@ pub const ZIP_ID: usize = 58;
 pub const ZIP_WRITER_ID: usize = 59;
 pub const BULLETIN_ID: usize = 60;
 pub const SURVEY_ID: usize = 61;
+pub const ARCHIVE_ID: usize = 62;
+pub const ARCHIVE_OPTIONS_ID: usize = 63;
+pub const ARCHIVE_READER_ID: usize = 64;
+pub const ARCHIVE_ENTRY_ID: usize = 65;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them. Their current compact order is what a PPE stores.
@@ -113,6 +117,7 @@ pub const CHECKSUM_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 13;
 pub const ZIP_METHOD_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 14;
 pub const ZIP64_MODE_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 15;
 pub const ZIP_ENCODING_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 16;
+pub const ARCHIVE_ENTRY_KIND_ENUM_ID: u32 = EVENT_KIND_ENUM_ID - 17;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -132,7 +137,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 17;
+pub const BUILTIN_ENUM_COUNT: usize = 18;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = 65_536;
@@ -419,6 +424,18 @@ impl UserTypeRegistry {
         self.register_enum(ZIP_METHOD_ENUM_ID, "ZipMethod", &[("Deflate", 8), ("Stored", 0)]);
         self.register_enum(ZIP64_MODE_ENUM_ID, "Zip64Mode", &[("Auto", 0), ("Never", 1)]);
         self.register_enum(ZIP_ENCODING_ENUM_ID, "ZipEncoding", &[("Utf8", 0), ("Cp437", 1)]);
+        self.register_enum(
+            ARCHIVE_ENTRY_KIND_ENUM_ID,
+            "ArchiveEntryKind",
+            &[
+                ("File", 0),
+                ("Directory", 1),
+                ("SymbolicLink", 2),
+                ("HardLink", 3),
+                ("Special", 4),
+                ("Unknown", 5),
+            ],
+        );
     }
 
     /// Retain the existing builtin metadata without inventing member names.

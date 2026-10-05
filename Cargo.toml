@@ -32,6 +32,7 @@ authors = ["Mike Krüger <mkrueger@posteo.de>"]
 [workspace.dependencies]
 codepages = { path = "crates/codepages" }
 dizbase = { path = "crates/dizbase" }
+unarc-rs = "0.7.2"
 jamjam = { git = "https://github.com/mkrueger/jamjam", branch = "main" }
 icy_board_tui = { path = "crates/icy_board_tui" }
 icy_board_buildinfo = { path = "crates/icy_board_buildinfo" }

@@ -1,11 +1,12 @@
 use i18n_embed_fl::fl;
 use icy_board_ppl::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
 use icy_board_ppl::parser::{
-    AUDIO_ID, BOARD_ID, BULLETIN_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID,
-    EVENT_ID, EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
-    HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
-    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, SURVEY_ID,
-    TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID, UserTypeRegistry, ZIP_ENCODING_ENUM_ID, ZIP_ID, ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
+    ARCHIVE_ENTRY_ID, ARCHIVE_ENTRY_KIND_ENUM_ID, ARCHIVE_ID, ARCHIVE_OPTIONS_ID, ARCHIVE_READER_ID, AUDIO_ID, BOARD_ID, BULLETIN_ID, CHECKSUM_ENUM_ID,
+    CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID, EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID,
+    FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID,
+    MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID,
+    REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, SURVEY_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
+    UserTypeRegistry, ZIP_ENCODING_ENUM_ID, ZIP_ID, ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
 };
 use std::fmt::Write as _;
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
@@ -194,6 +195,16 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == ZIP_WRITER_ID as u32 => {
             get_sig_hint(Signature::new("ZIPWRITER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-zip-writer"))
         }
+        VariableType::UserData(id) if id == ARCHIVE_ID as u32 => get_sig_hint(Signature::new("ARCHIVE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-archive")),
+        VariableType::UserData(id) if id == ARCHIVE_OPTIONS_ID as u32 => {
+            get_sig_hint(Signature::new("ARCHIVEOPTIONS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-archive-options"))
+        }
+        VariableType::UserData(id) if id == ARCHIVE_READER_ID as u32 => {
+            get_sig_hint(Signature::new("ARCHIVEREADER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-archive-reader"))
+        }
+        VariableType::UserData(id) if id == ARCHIVE_ENTRY_ID as u32 => {
+            get_sig_hint(Signature::new("ARCHIVEENTRY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-archive-entry"))
+        }
         VariableType::UserData(id) if id == DOOR_ID as u32 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
         VariableType::UserData(id) if id == CONTACT_ID as u32 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
         VariableType::UserData(id)
@@ -214,6 +225,7 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
                     | ZIP_METHOD_ENUM_ID
                     | ZIP64_MODE_ENUM_ID
                     | ZIP_ENCODING_ENUM_ID
+                    | ARCHIVE_ENTRY_KIND_ENUM_ID
             ) =>
         {
             get_sig_hint(Signature::new("ENUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-enum-400"))
@@ -309,6 +321,47 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     let VariableType::UserData(id) = var_type else {
         return None;
     };
+    if id == ARCHIVE_ID as u32 {
+        return match name.as_str() {
+            "open" => Some(fl!(LANGUAGE_LOADER, "hint-archive-open")),
+            "options" => Some(fl!(LANGUAGE_LOADER, "hint-archive-options")),
+            "formats" => Some(fl!(LANGUAGE_LOADER, "hint-archive-formats")),
+            _ => None,
+        };
+    }
+    if id == ARCHIVE_OPTIONS_ID as u32 {
+        return match name.as_str() {
+            "password" => Some(fl!(LANGUAGE_LOADER, "hint-archive-password")),
+            "format" => Some(fl!(LANGUAGE_LOADER, "hint-archive-format-option")),
+            "maxentrybytes" | "maxtotalbytes" | "maxentries" => Some(fl!(LANGUAGE_LOADER, "hint-archive-limits")),
+            _ => None,
+        };
+    }
+    if id == ARCHIVE_READER_ID as u32 {
+        return match name.as_str() {
+            "valid" => Some(fl!(LANGUAGE_LOADER, "hint-archive-valid")),
+            "format" => Some(fl!(LANGUAGE_LOADER, "hint-archive-format")),
+            "entry" => Some(fl!(LANGUAGE_LOADER, "hint-archive-entry")),
+            "next" => Some(fl!(LANGUAGE_LOADER, "hint-archive-next")),
+            "readbytes" => Some(fl!(LANGUAGE_LOADER, "hint-archive-read-bytes")),
+            "readtext" => Some(fl!(LANGUAGE_LOADER, "hint-archive-read-text")),
+            "extract" => Some(fl!(LANGUAGE_LOADER, "hint-archive-extract")),
+            "rewind" => Some(fl!(LANGUAGE_LOADER, "hint-archive-rewind")),
+            "close" => Some(fl!(LANGUAGE_LOADER, "hint-archive-close")),
+            _ => None,
+        };
+    }
+    if id == ARCHIVE_ENTRY_ID as u32 {
+        return match name.as_str() {
+            "kind" | "isdirectory" | "islink" => Some(fl!(LANGUAGE_LOADER, "hint-archive-entry-kind")),
+            "linktarget" | "haslinktarget" => Some(fl!(LANGUAGE_LOADER, "hint-archive-link-target")),
+            "date" | "time" => Some(fl!(LANGUAGE_LOADER, "hint-archive-entry-time")),
+            _ => Some(fl!(LANGUAGE_LOADER, "hint-archive-entry-metadata")),
+        };
+    }
+    if id == ARCHIVE_ENTRY_KIND_ENUM_ID {
+        return Some(fl!(LANGUAGE_LOADER, "hint-archive-entry-kind"));
+    }
     if id == ZIP_ID as u32 && name == "create" {
         return Some(fl!(LANGUAGE_LOADER, "hint-zip-create"));
     }
@@ -787,6 +840,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
         "path" => "hint-param-zip-path",
         "overwrite" => "hint-param-zip-overwrite",
+        "destination" => "hint-param-archive-destination",
         "level" => "hint-param-zip-level",
         "encoding" => "hint-param-zip-encoding",
         "sourcepath" => "hint-param-zip-source-path",
@@ -1736,6 +1790,7 @@ mod test {
                 "hint-http-",
                 "hint-regex-",
                 "hint-string-",
+                "hint-archive-",
             ];
 
             catalog

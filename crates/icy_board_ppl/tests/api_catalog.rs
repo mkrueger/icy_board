@@ -209,6 +209,8 @@ fn validity_members_follow_the_documented_rule() {
         ("Area", vec!["Valid"]),
         ("Audio", vec!["Valid"]),
         ("Bulletin", vec!["Valid"]),
+        ("ArchiveEntry", vec!["Valid"]),
+        ("ArchiveReader", vec!["Valid"]),
         ("Conference", vec!["Valid"]),
         ("Directory", vec!["Valid"]),
         ("Door", vec!["Valid"]),

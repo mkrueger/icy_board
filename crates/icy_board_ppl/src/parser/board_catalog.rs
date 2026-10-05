@@ -1,9 +1,10 @@
 use super::{
-    AUDIO_ID, BOARD_ID, BULLETIN_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
-    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID, FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID,
-    HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
-    MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, SURVEY_ID, TERM_INFO_ID, TERM_INPUT_ID,
-    TERMINAL_ID, USER_ID, ZIP_ENCODING_ENUM_ID, ZIP_ID, ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
+    ARCHIVE_ENTRY_ID, ARCHIVE_ENTRY_KIND_ENUM_ID, ARCHIVE_ID, ARCHIVE_OPTIONS_ID, ARCHIVE_READER_ID, AUDIO_ID, BOARD_ID, BULLETIN_ID, CONFERENCE_ID,
+    CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID, EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, FILE_ENTRY_ID,
+    FILE_PAGE_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID, MESSAGE_AREA_ID,
+    MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID, REGEX_MATCH_ID,
+    REGEX_OPTIONS_ENUM_ID, SESSION_ID, SURFACE_ID, SURVEY_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID, ZIP_ENCODING_ENUM_ID, ZIP_ID,
+    ZIP_METHOD_ENUM_ID, ZIP_WRITER_ID, ZIP64_MODE_ENUM_ID,
 };
 use crate::{
     compiler::user_data::UserDataMemberRegistry,
@@ -41,6 +42,10 @@ pub const TYPES: &[(usize, &str, Option<FuncOpCode>)] = &[
     (ZIP_WRITER_ID, "ZipWriter", None),
     (BULLETIN_ID, "Bulletin", None),
     (SURVEY_ID, "Survey", None),
+    (ARCHIVE_ID, "Archive", None),
+    (ARCHIVE_OPTIONS_ID, "ArchiveOptions", None),
+    (ARCHIVE_READER_ID, "ArchiveReader", None),
+    (ARCHIVE_ENTRY_ID, "ArchiveEntry", None),
 ];
 
 fn n(name: &str) -> unicase::Ascii<String> {
@@ -49,6 +54,53 @@ fn n(name: &str) -> unicase::Ascii<String> {
 
 fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F) {
     match id {
+        ARCHIVE_ID => {
+            registry.add_named_static_function_with(
+                n("Open"),
+                vec![("path", V::UnboundedString), ("options", V::UserData(ARCHIVE_OPTIONS_ID as u32))],
+                1,
+                V::UserData(ARCHIVE_READER_ID as u32),
+            );
+            registry.add_static_function(n("Options"), Vec::new(), V::UserData(ARCHIVE_OPTIONS_ID as u32));
+            registry.add_static_array_function_with(n("Formats"), Vec::new(), 0, V::UnboundedString, 1);
+        }
+        ARCHIVE_OPTIONS_ID => {
+            registry.add_property(n("Password"), V::Password, true);
+            registry.add_property(n("Format"), V::UnboundedString, true);
+            registry.add_property(n("MaxEntryBytes"), V::Long, true);
+            registry.add_property(n("MaxTotalBytes"), V::Long, true);
+            registry.add_property(n("MaxEntries"), V::Integer, true);
+        }
+        ARCHIVE_READER_ID => {
+            registry.add_property(n("Valid"), V::Boolean, false);
+            registry.add_property(n("Format"), V::UnboundedString, false);
+            registry.add_property(n("Entry"), V::UserData(ARCHIVE_ENTRY_ID as u32), false);
+            registry.add_function(n("Next"), Vec::new(), V::Boolean);
+            registry.add_function(n("ReadBytes"), Vec::new(), V::Bytes);
+            registry.add_function(n("ReadText"), Vec::new(), V::UnboundedString);
+            registry.add_named_function_with(
+                n("Extract"),
+                vec![("destination", V::UnboundedString), ("overwrite", V::Boolean)],
+                1,
+                V::Boolean,
+            );
+            registry.add_function(n("Rewind"), Vec::new(), V::Boolean);
+            registry.add_function(n("Close"), Vec::new(), V::Boolean);
+        }
+        ARCHIVE_ENTRY_ID => {
+            for name in ["Valid", "HasLinkTarget", "IsDirectory", "IsLink", "IsEncrypted"] {
+                registry.add_property(n(name), V::Boolean, false);
+            }
+            for name in ["Index", "Size", "CompressedSize"] {
+                registry.add_property(n(name), V::Long, false);
+            }
+            for name in ["Name", "FileName", "Method", "LinkTarget"] {
+                registry.add_property(n(name), V::UnboundedString, false);
+            }
+            registry.add_property(n("Kind"), V::UserData(ARCHIVE_ENTRY_KIND_ENUM_ID), false);
+            registry.add_property(n("Date"), V::CalendarDate, false);
+            registry.add_property(n("Time"), V::ClockTime, false);
+        }
         ZIP_ID => {
             registry.add_named_static_function_with(
                 n("Create"),

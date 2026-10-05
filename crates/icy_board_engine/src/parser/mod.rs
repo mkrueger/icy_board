@@ -20,7 +20,10 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
         doors::Door,
         file_directory::FileDirectory,
         message_area::MessageArea,
-        state::{ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user, ppl_zip},
+        state::{
+            ppl_archive, ppl_audio, ppl_board, ppl_error, ppl_events, ppl_files, ppl_http, ppl_message, ppl_regex, ppl_surface, ppl_terminal_info, ppl_user,
+            ppl_zip,
+        },
         surveys::PplSurvey,
     };
 
@@ -52,6 +55,10 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
     bind::<ppl_regex::PplRegexMatch>(&mut registry, REGEX_MATCH_ID);
     bind::<ppl_zip::PplZip>(&mut registry, ZIP_ID);
     bind::<ppl_zip::PplZipWriter>(&mut registry, ZIP_WRITER_ID);
+    bind::<ppl_archive::PplArchive>(&mut registry, ARCHIVE_ID);
+    bind::<ppl_archive::PplArchiveOptions>(&mut registry, ARCHIVE_OPTIONS_ID);
+    bind::<ppl_archive::PplArchiveReader>(&mut registry, ARCHIVE_READER_ID);
+    bind::<ppl_archive::PplArchiveEntry>(&mut registry, ARCHIVE_ENTRY_ID);
     // These facades otherwise dispatch into the live session even without a handle.
     macro_rules! inert {
         ($($id:ident),+ $(,)?) => {$(
@@ -67,7 +74,8 @@ fn runtime_factories(mut registry: UserTypeRegistry) -> UserTypeRegistry {
         MACROS_ID,
         SESSION_ID,
         HTTP_ID,
-        ZIP_ID
+        ZIP_ID,
+        ARCHIVE_ID
     );
     registry
 }
@@ -97,10 +105,13 @@ impl<const ID: usize> InertHost<ID> {
     }
 
     fn fail(vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>) {
-        use crate::icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_NET, ERR_KIND_TERM, ERR_KIND_USER, PplError};
+        use crate::icy_board::state::ppl_error::{
+            ERR_INVALID, ERR_KIND_FILE, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_NET, ERR_KIND_TERM, ERR_KIND_USER, PplError,
+        };
         let kind = match ID {
             GFX_ID => ERR_KIND_GFX,
             HTTP_ID => ERR_KIND_NET,
+            ARCHIVE_ID => ERR_KIND_FILE,
             SESSION_ID => ERR_KIND_USER,
             TERMINAL_ID if name.as_str().eq_ignore_ascii_case("SetFont") || name.as_str().eq_ignore_ascii_case("LoadFont") => ERR_KIND_FONT,
             _ => ERR_KIND_TERM,

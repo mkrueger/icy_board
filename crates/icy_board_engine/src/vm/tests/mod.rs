@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod array_parameters;
+mod archive;
 mod array_sort;
 mod array_type_checks;
 mod array_values;

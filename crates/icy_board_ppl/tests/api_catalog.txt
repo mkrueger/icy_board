@@ -431,6 +431,49 @@ TYPE Survey (61)
     3 getter AnswerFile: UnboundedString
     4 func   HasAccess() -> Boolean
 
+TYPE Archive (62)
+    0 func   static Open(path: UnboundedString, options?: ArchiveOptions) -> ArchiveReader
+    1 func   static Options() -> ArchiveOptions
+    2 func   static Formats() -> UnboundedString[1]
+
+TYPE ArchiveOptions (63)
+    0 field  Password: Password
+    1 field  Format: UnboundedString
+    2 field  MaxEntryBytes: Long
+    3 field  MaxTotalBytes: Long
+    4 field  MaxEntries: Integer
+
+TYPE ArchiveReader (64)
+    0 getter Valid: Boolean
+    1 getter Format: UnboundedString
+    2 getter Entry: ArchiveEntry
+    3 func   Next() -> Boolean
+    4 func   ReadBytes() -> Bytes
+    5 func   ReadText() -> UnboundedString
+    6 func   Extract(destination: UnboundedString, overwrite?: Boolean) -> Boolean
+    7 func   Rewind() -> Boolean
+    8 func   Close() -> Boolean
+
+TYPE ArchiveEntry (65)
+    0 getter Valid: Boolean
+    1 getter HasLinkTarget: Boolean
+    2 getter IsDirectory: Boolean
+    3 getter IsLink: Boolean
+    4 getter IsEncrypted: Boolean
+    5 getter Index: Long
+    6 getter Size: Long
+    7 getter CompressedSize: Long
+    8 getter Name: UnboundedString
+    9 getter FileName: UnboundedString
+   10 getter Method: UnboundedString
+   11 getter LinkTarget: UnboundedString
+   12 getter Kind: ArchiveEntryKind
+   13 getter Date: CalendarDate
+   14 getter Time: ClockTime
+
+ENUM ArchiveEntryKind (2147483630)
+  File=0, Directory=1, SymbolicLink=2, HardLink=3, Special=4, Unknown=5
+
 ENUM ZipEncoding (2147483631)
   Utf8=0, Cp437=1
 

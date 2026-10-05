@@ -24,6 +24,14 @@ pub trait UserDataMemberRegistry {
     /// `Surface.New`. It is an ordinary member otherwise, so adding one needs
     /// nothing from the runtime.
     fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
+    fn add_static_array_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<VariableType>,
+        required: usize,
+        return_type: VariableType,
+        return_rank: u8,
+    );
 
     fn set_parameter_names(&mut self, name: &unicase::Ascii<String>, names: Vec<String>);
 
@@ -246,6 +254,18 @@ impl UserDataMemberRegistry for UserDataRegistry {
     fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType) {
         self.statics.insert(name.clone());
         self.add_function_with(name, parameters, required, return_type);
+    }
+
+    fn add_static_array_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<VariableType>,
+        required: usize,
+        return_type: VariableType,
+        return_rank: u8,
+    ) {
+        self.statics.insert(name.clone());
+        self.add_array_function_with(name, parameters, required, return_type, return_rank);
     }
 
     fn set_parameter_names(&mut self, name: &unicase::Ascii<String>, names: Vec<String>) {

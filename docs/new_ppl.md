@@ -1803,6 +1803,166 @@ capture `Error.Last()` immediately. A successful read clears the operation error
 The existing `DOWNLOAD` command is unchanged; file selection and full transfer
 acceptance remain separate from this read-only API.
 
+### Reading Archives (4.00)
+
+`Archive` is a format-neutral reader backed by **unarc-rs**. It supports the
+formats and compression methods implemented by the installed backend, including
+legacy BBS archives, ZIP, RAR, 7z, TAR, compressed TAR and single-file compression.
+`Archive.Formats()` returns the supported format names as a dynamic `STRING[]`.
+`Zip.Create()` remains the separate ZIP-writing API.
+
+There are no `HasAccess()` or `CanDownload()` members and no implicit board
+file-area checks. Opening uses ordinary PPL file-path resolution; archive
+passwords are decoding credentials, not board access levels.
+
+| Static call | Result |
+| :--- | :--- |
+| `Archive.Open(path [, options])` | `ARCHIVEREADER`; check `Valid` |
+| `Archive.Options()` | Mutable `ARCHIVEOPTIONS` with defaults |
+| `Archive.Formats()` | Supported format names as `STRING[]` |
+
+Automatic detection checks content first and uses filename hints when needed.
+The compound extensions `.tgz`/`.tar.gz`, `.tbz`/`.tbz2`/`.tar.bz2` and `.tar.Z`
+select the corresponding TAR wrapper when compatible with the detected stream.
+An explicit `options.Format` overrides detection.
+
+Options are copied when opening. Changing an options object afterward does not
+change an existing reader.
+
+| Writable option | Default | Maximum |
+| :--- | :--- | :--- |
+| `Password` | Empty `PASSWORD` | Optional backend password |
+| `Format` | Empty `STRING` (automatic) | Case-insensitive supported format name |
+| `MaxEntryBytes` | 16 MiB (`LONG`) | 64 MiB |
+| `MaxTotalBytes` | 64 MiB (`LONG`) | 256 MiB |
+| `MaxEntries` | 10,000 (`INTEGER`) | 100,000 |
+
+Numeric limits must be positive: zero or negative values report `ErrCode.Invalid`,
+and values above the maximum report `ErrCode.Limit`. Invalid assignments leave the
+previous value unchanged and update `Error.Last()`. Encrypted headers may require
+a password even to enumerate entries. Unsupported encryption and wrong/missing
+passwords are reported explicitly.
+
+For case-sensitive passwords, assign a string literal or a `STRING` variable
+directly to `options.Password`. The archive setter preserves its exact case.
+An existing native `PASSWORD` variable retains PPL's board-password normalization,
+which may already have lowercased the value before this API receives it.
+
+The byte limits bound accepted decompressed data, not peak process memory or CPU
+time. unarc-rs buffers entries, and some legacy decoders check actual output size
+only after allocation. Compressed containers, solid-archive dictionaries, headers
+and caches can require additional work or memory. Do not treat these limits as an
+isolation boundary for hostile archives.
+
+#### Forward-only reader
+
+| Member | Result / behavior |
+| :--- | :--- |
+| `Valid` | Read-only `BOOLEAN`; open and usable |
+| `Format` | Read-only format name |
+| `Entry` | Read-only current `ARCHIVEENTRY` snapshot |
+| `Next()` | `BOOLEAN`; skips unread current data and advances |
+| `ReadBytes()` | Current regular file as `BYTES` |
+| `ReadText()` | Current regular file as `STRING`, using runtime-400 file-text decoding |
+| `Extract(destination [, overwrite])` | `BOOLEAN`; extract the current regular file to an explicit server-side path |
+| `Rewind()` | `BOOLEAN`; reset the cursor without resetting the decompression budget |
+| `Close()` | `BOOLEAN`; release resources, safe to repeat |
+
+Before the first `Next()` and at the end, `Entry.Valid` is false. `Next()` returns
+false at both end-of-archive and failure: `Error.Last().OK` distinguishes them.
+End-of-archive does not close the reader. Each current entry can be read only
+once, using any one of the three read/extract calls. A second read reports
+`ErrCode.Invalid`; use `Rewind()` to read it again.
+
+Metadata-only iteration skips unread data through the backend without applying
+the byte read limits to each listed file. `MaxEntries` counts entry visits over
+the reader's lifetime, including after rewinding. `MaxTotalBytes` counts decoded
+file data across reads and rewinds; rewinding does not replenish either budget.
+For solid ACE archives, reading after skipping earlier entries replays preceding
+file data to rebuild the compression history. That decoded data also consumes
+the byte budget, and a required predecessor can exceed the configured read limit.
+Backend decompression or limit failures invalidate the reader; invalid cursor
+operations such as reading an entry twice leave it usable.
+
+`ReadBytes()` returns empty bytes for both an empty file and a failure, so check
+`Error.Last()` immediately. `ReadText()` returns the text before the first NUL
+or Ctrl-Z byte, so a SAUCE record or other trailing data in a `FILE_ID.DIZ` is
+not part of the result; use `ReadBytes()` to get the complete member. The
+returned text is decoded like runtime-400 file text: UTF-8 when it has a BOM or
+is valid UTF-8, otherwise CP437. This differs from the strict UTF-8-only
+`BYTES.ToString()`.
+It does not execute BBS macros. Sanitize untrusted text and filenames for the
+terminal renderer before displaying them.
+
+Extraction never derives a disk path from the member's stored name. It writes a
+temporary file and publishes only on success. `overwrite` defaults to false.
+Symbolic-link destinations and special files are rejected; links in the archive
+are never followed or created. The archive file and the extraction destination
+must not themselves be symbolic links, but linked directories along either path
+are followed like any other PPL file access. Extraction never overwrites the
+archive being read, including through a linked directory or a hard link. A saved
+metadata snapshot survives cursor movement and closing, but cannot itself be used
+to read old entry data.
+
+#### Entry metadata
+
+All `ARCHIVEENTRY` properties are read-only:
+
+| Property | Type | Meaning |
+| :--- | :--- | :--- |
+| `Valid` | `BOOLEAN` | Snapshot represents an entry |
+| `Index` | `LONG` | Zero-based ordinal; duplicate names remain distinct |
+| `Name` | `STRING` | Full stored archive path |
+| `FileName` | `STRING` | Last path component |
+| `Size`, `CompressedSize` | `LONG` | Sizes reported by archive metadata, not trusted allocation limits |
+| `Method` | `STRING` | Backend compression-method description |
+| `Kind` | `ArchiveEntryKind` | `File`, `Directory`, `SymbolicLink`, `HardLink`, `Special` or `Unknown` |
+| `LinkTarget` | `STRING` | Stored target when exposed by the backend; never resolved |
+| `HasLinkTarget` | `BOOLEAN` | Whether a target is available |
+| `IsDirectory`, `IsLink` | `BOOLEAN` | Convenience checks derived from `Kind` |
+| `IsEncrypted` | `BOOLEAN` | Backend entry encryption metadata |
+| `Date`, `Time` | Native `DATE`, `TIME` | Archive date/time components, empty when unavailable; no assumed timezone |
+
+Only regular files can be read or extracted. Directories report `Invalid`;
+links, special and unknown entries report `Unsupported`. They are still listed
+and are never silently represented as empty regular files. Some formats cannot
+expose link targets through their headers, so `HasLinkTarget` can be false for a
+known link.
+
+```PPL
+ARCHIVEREADER reader = Archive.Open("upload.lzh")
+IF !reader.Valid THEN
+    PRINTLN Error.Last().Message
+    EXIT
+ENDIF
+
+WHILE reader.Next() DO
+    ARCHIVEENTRY entry = reader.Entry
+    IF entry.Kind = ArchiveEntryKind.File THEN
+        IF UPPER(entry.FileName) = "FILE_ID.DIZ" THEN
+            STRING description = reader.ReadText()
+            IF Error.Last().OK THEN
+                PRINTLN description
+            ENDIF
+            BREAK
+        ENDIF
+    ENDIF
+ENDWHILE
+ERROR result = Error.Last()
+IF !result.OK PRINTLN result.Message
+reader.Close()
+```
+
+Archive failures use `ErrKind.File`: `Unavailable` for missing input, `Io` for
+I/O, `Format` for corrupt data, `Unsupported` for unsupported formats or methods,
+`Denied` for password failures, `Limit` for processing limits and option values
+above their maximum, and `Invalid` for other invalid options or cursor state.
+Successful operations clear the last operation error. Capture it before cleanup
+calls such as `Close()`.
+
+This API does not append to archives, extract entire trees, resolve links, open
+nested archives automatically, or assemble multi-volume archives.
+
 ### Marking Files (4.00)
 
 `directory.Flag(fileName)` adds one file from that directory to the current

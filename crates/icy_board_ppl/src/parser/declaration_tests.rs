@@ -262,6 +262,10 @@ fn board_object_type_ids_are_compact() {
         ("ZIPWRITER", 59),
         ("BULLETIN", 60),
         ("SURVEY", 61),
+        ("ARCHIVE", 62),
+        ("ARCHIVEOPTIONS", 63),
+        ("ARCHIVEREADER", 64),
+        ("ARCHIVEENTRY", 65),
     ];
 
     for (name, id) in expected {
@@ -414,6 +418,7 @@ fn builtin_enum_ids_leave_room_for_wide_record_ids() {
         ("ZipMethod", 241),
         ("Zip64Mode", 240),
         ("ZipEncoding", 239),
+        ("ArchiveEntryKind", 238),
     ];
 
     for (name, id) in expected {

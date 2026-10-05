@@ -186,6 +186,15 @@ fn builtin_statement(name: &str) -> Option<SignatureInformation> {
 
 fn member_call(visitor: &SemanticVisitor, call: &CallContext, language_version: u16) -> Option<SignatureInformation> {
     let receiver = receiver_type_for_version(visitor, &call.receiver, language_version)?;
+    if language_version < icy_board_ppl::parser::FIRST_BOARD_OBJECT_LANGUAGE_VERSION
+        && matches!(
+            receiver.variable_type,
+            VariableType::UserData(id)
+                if visitor.type_registry.get_type_from_id(id).is_some()
+        )
+    {
+        return None;
+    }
     if language_version < icy_board_ppl::parser::FIRST_BOARD_OBJECT_LANGUAGE_VERSION && receiver.rank == 0 && scalar_type(receiver.variable_type) {
         return None;
     }

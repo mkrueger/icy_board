@@ -17,6 +17,11 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 const DOMAIN: &str = "ENUM Shade\n First = 7\n Second = -3\n Alias = 7\nENDENUM\n";
 
+fn raw_enum_name(ordinal: u32) -> String {
+    let first = icy_board_engine::parser::EVENT_KIND_ENUM_ID - icy_board_engine::parser::BUILTIN_ENUM_COUNT as u32;
+    format!("ENUM{}", first - ordinal)
+}
+
 #[test]
 fn enum_bitwise_roundtrips_nested_operations_and_unnamed_regex_values() {
     for language in [350, 400] {
@@ -220,12 +225,13 @@ fn scalars_aliases_defaults_and_equality_roundtrip_in_both_languages() {
             "{DOMAIN}Shade value\nPRINT value, \"|\"\nvalue = Shade.Second\nPRINT value, \"|\", value = Shade.Second, \"|\", Shade.First <> value\nvalue = Shade.Alias\nPRINT \"|\", TOINTEGER(value)\n"
         );
         for text in roundtrip(compile(&source, language), language, "7|-3|1|1|7") {
-            assert!(text.contains("ENUM ENUM2147483630"), "{text}");
+            let name = raw_enum_name(0);
+            assert!(text.contains(&format!("ENUM {name}")), "{text}");
             assert!(
                 text.contains("MEMBER001 = 7") && text.contains("MEMBER002 = -3") && text.contains("MEMBER003 = 7"),
                 "{text}"
             );
-            assert!(text.contains("ENUM2147483630.MEMBER002"), "{text}");
+            assert!(text.contains(&format!("{name}.MEMBER002")), "{text}");
         }
     }
 }
@@ -309,7 +315,7 @@ fn checked_casts_and_reverse_conversions_roundtrip() {
             "{DOMAIN}INTEGER number = -4\nShade value = Shade(number + 1)\nPRINT TOINTEGER(value), \"|\", Shade(number + 1) = Shade.Second, \"|\", Shade.First = Shade(7)\n"
         );
         for text in roundtrip(compile(&source, language), language, "-3|1|1") {
-            assert!(text.contains("ENUM2147483630("), "{text}");
+            assert!(text.contains(&format!("{}(", raw_enum_name(0))), "{text}");
             assert!(!text.contains("EnumCast"), "{text}");
         }
     }
@@ -378,7 +384,8 @@ ENDFUNC
         .enums
         .remove(&(icy_board_engine::parser::EVENT_KIND_ENUM_ID - icy_board_engine::parser::BUILTIN_ENUM_COUNT as u32));
     for text in roundtrip(executable, 400, "-3|7") {
-        assert!(text.contains("ENUM ENUM2147483629") && text.contains("ENUM2147483629("), "{text}");
+        let name = raw_enum_name(1);
+        assert!(text.contains(&format!("ENUM {name}")) && text.contains(&format!("{name}(")), "{text}");
     }
 }
 
@@ -460,7 +467,7 @@ ENDFUNC
     }
     executable.in_memory_script = Some(script);
     for text in roundtrip(executable, 400, "-3|-3|-3|1") {
-        assert!(text.matches("ENUM2147483630(").count() >= 3, "{text}");
+        assert!(text.matches(&format!("{}(", raw_enum_name(0))).count() >= 3, "{text}");
         assert!(text.to_ascii_uppercase().contains("STRINGCOMPARISON("), "{text}");
     }
 }
@@ -481,8 +488,13 @@ Second two = Second.Other
 PRINT TOINTEGER(one), ",", TOINTEGER(two)
 "#;
     for text in roundtrip(compile(source, 400), 400, "-3,-3") {
-        assert!(text.contains("ENUM ENUM2147483630") && text.contains("ENUM ENUM2147483629"), "{text}");
-        assert!(text.contains("ENUM2147483630.MEMBER002") && text.contains("ENUM2147483629.MEMBER002"), "{text}");
+        let first = raw_enum_name(0);
+        let second = raw_enum_name(1);
+        assert!(text.contains(&format!("ENUM {first}")) && text.contains(&format!("ENUM {second}")), "{text}");
+        assert!(
+            text.contains(&format!("{first}.MEMBER002")) && text.contains(&format!("{second}.MEMBER002")),
+            "{text}"
+        );
     }
 }
 

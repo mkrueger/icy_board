@@ -10,7 +10,7 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
     let metadata = UserTypeRegistry::icy_board_registry();
     assert_eq!(runtime.registered_types, metadata.registered_types);
     assert_eq!(runtime.enums(), metadata.enums());
-    assert_eq!(runtime.types.len(), 30);
+    assert_eq!(runtime.types.len(), 34);
     for (id, count) in [
         (CONFERENCE_ID, 20),
         (BULLETIN_ID, 4),
@@ -40,6 +40,10 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (REGEX_MATCH_ID, 13),
         (FILE_ENTRY_ID, 8),
         (FILE_PAGE_ID, 4),
+        (ARCHIVE_ID, 3),
+        (ARCHIVE_OPTIONS_ID, 5),
+        (ARCHIVE_READER_ID, 9),
+        (ARCHIVE_ENTRY_ID, 15),
     ] {
         let actual = runtime.get_type_from_id(id as u32).unwrap();
         let expected = metadata.get_type_from_id(id as u32).unwrap();
@@ -67,7 +71,18 @@ fn runtime_factories_produce_dispatchable_objects() {
     for (&id, members) in &runtime.types {
         assert!(metadata.types[&id].static_receiver.is_none());
         assert!(metadata.types[&id].empty_value.is_none());
-        let has_static = [SURFACE_ID, AUDIO_ID, ERROR_ID, HTTP_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, REGEX_ID, ZIP_ID].contains(&(id as usize));
+        let has_static = [
+            SURFACE_ID,
+            AUDIO_ID,
+            ERROR_ID,
+            HTTP_ID,
+            HTTP_REQUEST_ID,
+            HTTP_RESPONSE_ID,
+            REGEX_ID,
+            ZIP_ID,
+            ARCHIVE_ID,
+        ]
+        .contains(&(id as usize));
         assert_eq!(members.static_receiver.is_some(), has_static, "type {id}");
         assert!(members.empty_value.is_some(), "type {id}");
         for factory in [members.static_receiver, members.empty_value].into_iter().flatten() {
