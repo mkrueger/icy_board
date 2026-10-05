@@ -38,3 +38,11 @@ fn a_ppe_can_pass_area_number_to_the_area_command() {
     });
     assert!(output.contains("Second (2) Selected"), "{output}");
 }
+
+/// Typing the smallest `i32` used to overflow while turning it into an index and
+/// took the whole session down; it is an invalid area like any other.
+#[test]
+fn area_rejects_the_smallest_number_without_crashing() {
+    let output = test_output("AREA -2147483648\n\n".to_string(), setup_two_areas);
+    assert!(output.contains("(-2147483648) is an invalid Area selection!"), "{output}");
+}

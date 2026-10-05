@@ -97,6 +97,27 @@ fn test_file_directory_lists_every_file() {
     assert!(output.contains("BETA.ZIP"), "{output}");
 }
 
+/// The directory F lists becomes the current one, so the directory menu PPE and
+/// `@DIRNUM@` show the number the caller just used.
+#[test]
+fn listing_a_directory_makes_it_the_current_one() {
+    let (dir, metadata_path) = file_area();
+    let output = test_output("F 2 R\n\n".to_string(), |board| {
+        setup_area(board, &dir, &metadata_path);
+        let mut directories = board.conferences[0].directories.as_deref().cloned().unwrap();
+        directories.push(FileDirectory {
+            name: "Second".to_string(),
+            path: dir.clone(),
+            metadata_path: metadata_path.clone(),
+            ..Default::default()
+        });
+        board.conferences[0].directories = Some(std::sync::Arc::new(directories));
+        board.conferences[0].dir_menu =
+            crate::tests::compile_test_ppe(r#"PRINTLN "[directory=", Session.Directory.Number, " macro=@DIRNUM@]""#).with_extension("");
+    });
+    assert!(output.contains("[directory=2 macro=2]"), "{output}");
+}
+
 /// The date field is prefilled, so typing over only part of it submits fewer than the
 /// six digits the scan expects. That used to index past the end of the answer and took
 /// the whole session down with it.

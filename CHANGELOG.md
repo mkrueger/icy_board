@@ -23,6 +23,11 @@ releases.
 
 - The `AREA` command's search list and its confirmation showed zero-based
   numbers, so choosing a listed number joined the wrong area.
+- Entering `-2147483648` as an area or bulletin number ended the session
+  instead of reporting an invalid number.
+- `@DIRNUM@`, `@DIRNAME@` and `Session.Directory` always reported the first
+  directory. They now follow the directory last listed with `F`, and joining a
+  conference resets them to its first directory.
 
 ## [0.2.2] - 2026-09-12
 

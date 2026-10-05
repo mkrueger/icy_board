@@ -65,6 +65,19 @@ fn test_blt_show_invalid() {
     );
 }
 
+/// The smallest `i32` used to overflow while turning it into an index; it is an
+/// invalid bulletin like any other.
+#[test]
+fn test_blt_show_smallest_number_is_invalid() {
+    let output = test_output("B -2147483648\n".to_string(), |board| {
+        setup_conference(board);
+    });
+    assert_eq!(
+        output,
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mB -2147483648\n\n\u{1b}[1;31mSorry, Sysop, you entered an invalid Bulletin #!\n\n\n\u{1b}[33m(H)elp, (1-2), Bulletin List Command? \u{1b}[0m"
+    );
+}
+
 #[test]
 fn test_blt_a_subcommand() {
     let output = test_output("B A\n".to_string(), |board| {

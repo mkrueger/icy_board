@@ -57,7 +57,8 @@ impl IcyBoardState {
                             search_text.push_str(token);
                             search_text.push(' ');
                         } else if let Ok(num) = token.parse::<i32>() {
-                            area_num = num - 1;
+                            // Saturate so i32::MIN stays negative and is reported as an invalid area.
+                            area_num = num.saturating_sub(1);
                         } else {
                             if !name.is_empty() {
                                 name.push(' ');

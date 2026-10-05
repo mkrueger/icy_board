@@ -1479,6 +1479,7 @@ impl IcyBoardState {
         c.valid = true;
         self.session.current_conference = c;
         self.session.current_message_area = 0;
+        self.session.current_file_directory = 0;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             state.cur_conference = self.session.current_conference_number;
         }
@@ -5115,6 +5116,20 @@ mod screen_tests {
             let result = state.run_macro(TerminalTarget::User, name.parse().unwrap()).await;
             assert_eq!(result.as_deref(), Some("2"), "{name}");
         }
+    }
+
+    /// A directory chosen in one conference must not carry over to the next, which may
+    /// have fewer directories, just as the message area does not.
+    #[tokio::test]
+    async fn changing_conference_resets_the_current_directory_and_area() {
+        let (mut state, _peer) = graphics_state().await;
+        state.get_board().await.conferences.push(crate::icy_board::conferences::Conference::default());
+        state.get_board().await.conferences.push(crate::icy_board::conferences::Conference::default());
+        state.session.current_file_directory = 1;
+        state.session.current_message_area = 1;
+        assert!(state.set_current_conference(1).await.unwrap());
+        assert_eq!(state.session.current_file_directory, 0);
+        assert_eq!(state.session.current_message_area, 0);
     }
 
     /// `TS A` selects every message area, however many file directories there are.

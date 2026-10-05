@@ -85,7 +85,8 @@ impl IcyBoardState {
                     }
                     _ => {
                         if let Ok(number) = text.parse::<i32>() {
-                            files.push(number - 1);
+                            // Saturate so i32::MIN stays negative and is reported as an invalid bulletin.
+                            files.push(number.saturating_sub(1));
                         }
                     }
                 }

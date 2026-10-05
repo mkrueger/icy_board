@@ -63,8 +63,10 @@ impl IcyBoardState {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
                     if area.list_security.session_can_access(&self.session) {
-                        self.display_file_area(&area.path.clone(), &area.metadata_path.clone(), FileFilter::all())
-                            .await?;
+                        let (path, metadata_path) = (area.path.clone(), area.metadata_path.clone());
+                        // The listed directory becomes the current one for @DIRNUM@ and Session.Directory.
+                        self.session.current_file_directory = number as usize - 1;
+                        self.display_file_area(&path, &metadata_path, FileFilter::all()).await?;
                         self.new_line().await?;
                         continue;
                     }
