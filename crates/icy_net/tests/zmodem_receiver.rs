@@ -3,7 +3,7 @@ use std::{future::Future, time::Duration};
 use icy_net::{
     Connection,
     connection::channel::ChannelConnection,
-    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCE, ZCRCW, ZFrameType, Zmodem},
+    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem},
 };
 
 async fn bounded<T>(future: impl Future<Output = T>) -> T {
@@ -13,11 +13,166 @@ async fn bounded<T>(future: impl Future<Output = T>) -> T {
 }
 
 async fn receiver() -> (Zmodem, TransferState, ChannelConnection, ChannelConnection) {
+    receiver_with_block_length(1024).await
+}
+
+async fn receiver_with_block_length(block_length: usize) -> (Zmodem, TransferState, ChannelConnection, ChannelConnection) {
     let (mut conn, mut peer) = ChannelConnection::create_pair();
-    let mut protocol = Zmodem::new(1024);
+    let mut protocol = Zmodem::new(block_length);
     let state = bounded(protocol.initiate_recv(&mut conn)).await.unwrap();
     assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
     (protocol, state, conn, peer)
+}
+
+#[tokio::test]
+async fn receiver_accepts_large_streaming_subpackets_independently_of_upload_block_size() {
+    for block_length in [1024, 8192] {
+        for kind in [HeaderType::Bin, HeaderType::Bin32] {
+            for size in [1024, 1025, 2048, 4096, 8192] {
+                let (mut protocol, mut state, mut conn, mut peer) = receiver_with_block_length(block_length).await;
+                let encode = |marker, data: &[u8]| {
+                    if kind == HeaderType::Bin32 {
+                        Zmodem::encode_subpacket_crc32(marker, data, false)
+                    } else {
+                        Zmodem::encode_subpacket_crc16(marker, data, false)
+                    }
+                };
+                let data: Vec<u8> = (0..size).map(|index| (index % 256) as u8).collect();
+                let mut expected = data.clone();
+                expected.extend_from_slice(b"tail");
+                let metadata = format!("large.bin\0{}\0", expected.len());
+                let mut bytes = Header::empty(ZFrameType::File).build(kind, false);
+                bytes.extend(encode(ZCRCW, metadata.as_bytes()));
+                peer.send(&bytes).await.unwrap();
+                bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+                assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+
+                let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+                bytes.extend(encode(ZCRCG, &data));
+                bytes.extend(encode(ZCRCE, b"tail"));
+                peer.send(&bytes).await.unwrap();
+                bounded(async {
+                    while state.recieve_state.cur_bytes_transfered < expected.len() as u64 {
+                        protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+                    }
+                })
+                .await;
+                assert_eq!(state.recieve_state.total_bytes_transfered, expected.len() as u64);
+                assert_eq!(state.recieve_state.errors, 0);
+                assert_eq!(state.recieve_state.warnings, 0);
+
+                Header::from_number(ZFrameType::Eof, expected.len() as u32)
+                    .write(&mut peer, kind, false)
+                    .await
+                    .unwrap();
+                bounded(async {
+                    while state.recieve_state.finished_files.is_empty() {
+                        protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+                    }
+                })
+                .await;
+                let path = &state.recieve_state.finished_files[0].1;
+                let received = std::fs::read(path).unwrap();
+                std::fs::remove_file(path).unwrap();
+                assert_eq!(received, expected, "{size}-byte {kind:?} subpacket with {block_length}-byte uploads");
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn receiver_keeps_a_bounded_limit_for_oversized_subpackets() {
+    for block_length in [1024, 8192] {
+        for kind in [HeaderType::Bin, HeaderType::Bin32] {
+            let (mut protocol, mut state, mut conn, mut peer) = receiver_with_block_length(block_length).await;
+            let encode = |marker, data: &[u8]| {
+                if kind == HeaderType::Bin32 {
+                    Zmodem::encode_subpacket_crc32(marker, data, false)
+                } else {
+                    Zmodem::encode_subpacket_crc16(marker, data, false)
+                }
+            };
+            let mut bytes = Header::empty(ZFrameType::File).build(kind, false);
+            bytes.extend(encode(ZCRCW, b"oversized.bin\x008193\x00"));
+            peer.send(&bytes).await.unwrap();
+            bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+            bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+            let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+            bytes.extend(encode(ZCRCE, &vec![b'A'; 8193]));
+            peer.send(&bytes).await.unwrap();
+            let error = bounded(async {
+                loop {
+                    if let Err(error) = protocol.update_transfer(&mut conn, &mut state).await {
+                        break error;
+                    }
+                }
+            })
+            .await;
+            assert_eq!(error.to_string(), "subpacket overflow: length 8193 exceeds max 8192");
+            assert_eq!(state.recieve_state.cur_bytes_transfered, 0, "oversized data is never written");
+            assert!(state.recieve_state.finished_files.is_empty());
+        }
+    }
+}
+
+#[tokio::test]
+async fn receiver_checks_crc_before_writing_large_subpackets() {
+    for kind in [HeaderType::Bin, HeaderType::Bin32] {
+        let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+        let encode = |marker, data: &[u8]| {
+            if kind == HeaderType::Bin32 {
+                Zmodem::encode_subpacket_crc32(marker, data, false)
+            } else {
+                Zmodem::encode_subpacket_crc16(marker, data, false)
+            }
+        };
+        let data = vec![b'A'; 8192];
+        let mut bytes = Header::empty(ZFrameType::File).build(kind, false);
+        bytes.extend(encode(ZCRCW, b"crc.bin\x008192\x00"));
+        peer.send(&bytes).await.unwrap();
+        bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+        bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+
+        let mut corrupt = encode(ZCRCE, &data);
+        corrupt[0] = b'B';
+        let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+        bytes.extend(corrupt);
+        peer.send(&bytes).await.unwrap();
+        bounded(async {
+            while state.recieve_state.warnings == 0 {
+                protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+            }
+        })
+        .await;
+        assert_eq!(state.recieve_state.cur_bytes_transfered, 0);
+        let retry = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+        assert_eq!(retry.frame_type, ZFrameType::RPos);
+        assert_eq!(retry.number(), 0);
+
+        let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+        bytes.extend(encode(ZCRCE, &data));
+        peer.send(&bytes).await.unwrap();
+        bounded(async {
+            while state.recieve_state.cur_bytes_transfered < data.len() as u64 {
+                protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+            }
+        })
+        .await;
+        Header::from_number(ZFrameType::Eof, data.len() as u32)
+            .write(&mut peer, kind, false)
+            .await
+            .unwrap();
+        bounded(async {
+            while state.recieve_state.finished_files.is_empty() {
+                protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+            }
+        })
+        .await;
+        let path = &state.recieve_state.finished_files[0].1;
+        let received = std::fs::read(path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(received, data, "only the CRC-validated retransmission is written");
+    }
 }
 
 async fn metadata(info: &[u8], kind: HeaderType) -> (icy_net::Result<()>, TransferState, ChannelConnection) {

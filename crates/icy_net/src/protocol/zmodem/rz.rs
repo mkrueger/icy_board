@@ -49,7 +49,8 @@ impl Rz {
     pub fn new(block_length: usize) -> Self {
         Self {
             state: RecvState::Idle,
-            block_length,
+            // Remote senders can use 8 KiB subpackets even when our uploads use 1 KiB.
+            block_length: block_length.max(8 * 1024),
             retries: 0,
             errors: 0,
             can_count: 0,
