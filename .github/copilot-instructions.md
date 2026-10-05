@@ -28,3 +28,10 @@
 - For rendering bugs, test the rendered terminal output, including the reported geometry; parser output alone is not sufficient.
 - Add regression coverage when practical. Do not weaken assertions just to make tests pass.
 - Preserve test command exit statuses; when piping output, use `pipefail` so a failing test is not hidden by a successful filter.
+
+## Commits
+
+- When creating Git commits, do not add Copilot or AI `Co-authored-by` trailers.
+- Ensure commit messages are clear, concise, and follow the project's existing style.
+- Use the imperative mood in commit messages (e.g., "Add feature" instead of "Added feature").
+- Reference relevant issues or pull requests in the commit message when applicable.
