@@ -371,6 +371,11 @@ impl Connection for TelnetConnection {
         ConnectionType::Telnet
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     fn take_terminal_size_change(&mut self) -> Option<(u16, u16)> {
         self.pending_terminal_size.take()
     }

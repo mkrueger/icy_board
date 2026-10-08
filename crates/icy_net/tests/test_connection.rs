@@ -54,6 +54,13 @@ impl TestConnection {
 
 #[async_trait]
 impl Connection for TestConnection {
+    fn unread(&mut self, buf: &[u8]) -> icy_net::Result<()> {
+        for byte in buf.iter().rev() {
+            self.buffer.push_front(*byte);
+        }
+        Ok(())
+    }
+
     fn get_connection_type(&self) -> ConnectionType {
         ConnectionType::Raw // Use Raw if Channel doesn't exist yet
     }

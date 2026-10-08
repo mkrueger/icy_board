@@ -59,6 +59,13 @@ pub trait Connection: Send + Unpin {
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()>;
 
+    /// Prepend already-decoded payload for the next `read` or `try_read`.
+    /// Protocols use this to preserve terminal input encountered during completion.
+    fn unread(&mut self, _buf: &[u8]) -> crate::Result<()> {
+        log::error!("Connection does not support returning buffered payload");
+        Err(NetError::Unsupported.into())
+    }
+
     async fn poll(&mut self) -> crate::Result<ConnectionState> {
         Ok(ConnectionState::Connected)
     }
@@ -87,6 +94,13 @@ pub trait Connection: Send + Unpin {
 }
 
 pub struct NullConnection {}
+
+pub fn drain_buffer(buffer: &mut Vec<u8>, buf: &mut [u8]) -> usize {
+    let count = buffer.len().min(buf.len());
+    buf[..count].copy_from_slice(&buffer[..count]);
+    buffer.drain(..count);
+    count
+}
 
 #[async_trait]
 impl Connection for NullConnection {

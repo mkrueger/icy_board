@@ -964,7 +964,8 @@ pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protoc
         TransferProtocolType::XModemCRC => Some(Box::new(XYmodem::new(XYModemVariant::XModemCRC))),
         TransferProtocolType::XModem1k => Some(Box::new(XYmodem::new(XYModemVariant::XModem1k))),
         TransferProtocolType::XModem1kG => Some(Box::new(XYmodem::new(XYModemVariant::XModem1kG))),
-        TransferProtocolType::YModem | TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
+        TransferProtocolType::YModem => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
+        TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModemG))),
         TransferProtocolType::ZModem => Some(Box::new(Zmodem::new(1024))),
         TransferProtocolType::ZModem8k => Some(Box::new(Zmodem::new(8 * 1024))),
     }

@@ -51,6 +51,11 @@ impl Connection for RawConnection {
         ConnectionType::Raw
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         // First, check if we have buffered data from a previous poll
         if !self.read_buffer.is_empty() {

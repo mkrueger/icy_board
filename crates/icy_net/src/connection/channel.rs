@@ -35,6 +35,13 @@ impl Connection for ChannelConnection {
         ConnectionType::Channel
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        for byte in buf.iter().rev() {
+            self.buffer.push_front(*byte);
+        }
+        Ok(())
+    }
+
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         if buf.is_empty() {
             return Ok(0);

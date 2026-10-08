@@ -263,12 +263,14 @@ impl From<super::modem::ModemConfiguration> for Serial {
 
 pub struct SerialConnection {
     port: Box<SerialPort>,
+    read_buffer: Vec<u8>,
 }
 
 impl SerialConnection {
     pub fn open(serial: Serial) -> crate::Result<Self> {
         Ok(Self {
             port: Box::new(serial.open()?),
+            read_buffer: Vec::new(),
         })
     }
 }
@@ -279,12 +281,23 @@ impl Connection for SerialConnection {
         ConnectionType::Serial
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if !self.read_buffer.is_empty() {
+            return Ok(super::drain_buffer(&mut self.read_buffer, buf));
+        }
         let res = self.port.read(buf).await?;
         Ok(res)
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if !self.read_buffer.is_empty() {
+            return Ok(super::drain_buffer(&mut self.read_buffer, buf));
+        }
         // Use a reasonable timeout for serial communication
         // 50ms gives the hardware time to buffer data
         match timeout(Duration::from_millis(50), self.port.read(buf)).await {

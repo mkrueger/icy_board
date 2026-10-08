@@ -71,6 +71,14 @@ async fn output(peer: &mut ChannelConnection) -> String {
     }
 }
 
+#[tokio::test]
+async fn native_ymodem_g_receiver_requests_streaming_mode() {
+    let (mut connection, mut peer) = ChannelConnection::create_pair();
+    let mut protocol = create_protocol(&TransferProtocolType::YModemG).unwrap();
+    protocol.initiate_recv(&mut connection).await.unwrap();
+    assert_eq!(peer.read_u8().await.unwrap(), b'G');
+}
+
 fn request(name: &str, private: bool, description: &str) -> UploadRequest {
     UploadRequest {
         name: name.into(),
@@ -748,12 +756,16 @@ async fn native_xmodem_uses_requested_name_and_remote_cancel_never_completes_a_f
                     sender.update_transfer(&mut peer, &mut sent).await.unwrap();
                     tokio::task::yield_now().await;
                 }
+                peer.send(b"!").await.unwrap();
             })
         })
         .await
         .expect("native XMODEM upload stalled");
         let receipt = receipt.unwrap();
         assert_eq!(receipt.files.len(), usize::from(!cancel));
+        if !cancel {
+            assert_eq!(state.connection.read_u8().await.unwrap(), b'!');
+        }
         state
             .finish_uploads(receipt, &[request("REQUESTED.BIN", false, "requested description")], true, "X")
             .await

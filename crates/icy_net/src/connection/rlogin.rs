@@ -238,6 +238,11 @@ impl Connection for RloginConnection {
         ConnectionType::Rlogin
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     /// Blocking read with internal buffering.
     /// Strategy:
     /// 1. Serve any previously buffered bytes.

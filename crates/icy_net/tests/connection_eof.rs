@@ -135,6 +135,45 @@ async fn tcp_pair() -> (TcpStream, TcpStream) {
     (stream, peer)
 }
 
+async fn assert_pushback(connection: &mut dyn Connection) {
+    connection.unread(b"C").unwrap();
+    connection.unread(b"\xffB").unwrap();
+    connection.unread(b"A").unwrap();
+    assert_eq!(connection.read(&mut []).await.unwrap(), 0);
+    assert_eq!(connection.try_read(&mut []).await.unwrap(), 0);
+    assert_eq!(connection.read_u8().await.unwrap(), b'A');
+    let mut byte = [0];
+    assert_eq!(connection.try_read(&mut byte).await.unwrap(), 1);
+    assert_eq!(byte, [255]);
+    let mut rest = [0; 2];
+    connection.read_exact(&mut rest).await.unwrap();
+    assert_eq!(&rest, b"BC");
+}
+
+#[tokio::test]
+async fn payload_pushback_preserves_order_across_network_transports() {
+    let (mut connection, _peer) = ChannelConnection::create_pair();
+    assert_pushback(&mut connection).await;
+    let (stream, _peer) = tcp_pair().await;
+    assert_pushback(&mut RawConnection::accept(stream).await.unwrap()).await;
+    let (stream, _peer) = tcp_pair().await;
+    assert_pushback(&mut TelnetConnection::accept(stream).unwrap()).await;
+    let (stream, _peer) = tcp_pair().await;
+    let config = RloginConfig {
+        user_name: String::new(),
+        password: String::new(),
+        terminal_emulation: TerminalEmulation::Ansi,
+        swapped: false,
+        escape_sequence: None,
+    };
+    assert_pushback(&mut RloginConnection::accept(stream, config).await.unwrap()).await;
+    let (stream, peer) = tcp_pair().await;
+    let (server, client) = tokio::join!(accept_websocket(stream), tokio_tungstenite::client_async("ws://localhost/", peer));
+    let mut connection = server.unwrap();
+    let _peer = client.unwrap();
+    assert_pushback(&mut connection).await;
+}
+
 #[tokio::test]
 async fn raw_tcp_delivers_payload_then_default_read_u8_fails_on_eof() {
     let (stream, mut peer) = tcp_pair().await;

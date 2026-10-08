@@ -335,6 +335,11 @@ impl Connection for SSHConnection {
         ConnectionType::SSH
     }
 
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
@@ -1185,6 +1190,29 @@ mod tests {
             received.extend_from_slice(&buf[..count]);
         }
         assert!(received.iter().enumerate().all(|(offset, byte)| *byte == stream_byte(offset)));
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn returned_payload_is_read_before_new_ssh_data() {
+        let (address, server) = spawn_server(
+            TestServer {
+                password: Some("secret".into()),
+                public_key: None,
+            },
+            generated_key(Algorithm::Ed25519),
+        )
+        .await;
+        let mut connection = SSHConnection::open(address.to_string(), test_caps(), Credentials::password("sysop", "secret"))
+            .await
+            .unwrap();
+        connection.unread(b"BC").unwrap();
+        connection.unread(b"A").unwrap();
+        assert_eq!(connection.read_u8().await.unwrap(), b'A');
+        let mut byte = [0];
+        assert_eq!(connection.try_read(&mut byte).await.unwrap(), 1);
+        assert_eq!(byte, *b"B");
+        assert_eq!(connection.read_u8().await.unwrap(), b'C');
         server.abort();
     }
 

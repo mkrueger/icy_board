@@ -46,6 +46,13 @@ impl Receiver {
     async fn step(&mut self) -> icy_net::Result<()> {
         bounded(self.protocol.update_transfer(&mut self.conn, &mut self.state)).await
     }
+    async fn settle(&mut self) {
+        tokio::time::timeout(Duration::from_secs(12), self.protocol.update_transfer(&mut self.conn, &mut self.state))
+            .await
+            .expect("completion grace exceeded deadline")
+            .unwrap();
+        assert!(self.state.is_finished);
+    }
     async fn block(&mut self, bytes: &[u8]) -> icy_net::Result<()> {
         self.peer.send(bytes).await.unwrap();
         self.step().await?;
@@ -75,6 +82,171 @@ impl Drop for Receiver {
             let _ = std::fs::remove_file(path);
         }
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn slow_continuous_packets_reset_the_inter_byte_timer() {
+    for header in [false, true] {
+        let mut r = Receiver::new(if header { XYModemVariant::YModem } else { XYModemVariant::XModem1k }).await;
+        let bytes = packet(if header { 0 } else { 1 }, if header { b"file\03\0" } else { b"abc" }, 1024, 0);
+        r.peer.send(&bytes[..1]).await.unwrap();
+        r.step().await.unwrap();
+        let started = tokio::time::Instant::now();
+        let (sent, received) = tokio::join!(
+            async {
+                for chunk in bytes[1..].chunks(24) {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    r.peer.send(chunk).await.unwrap();
+                }
+            },
+            r.protocol.update_transfer(&mut r.conn, &mut r.state)
+        );
+        received.unwrap();
+        let _: () = sent;
+        assert!(started.elapsed() > Duration::from_secs(4));
+        assert_eq!(r.byte().await, ACK);
+        if header {
+            assert_eq!(r.byte().await, b'C');
+            assert_eq!(r.state.recieve_state.file_size, 3);
+        } else {
+            assert_eq!(r.state.recieve_state.total_bytes_transfered, 1024);
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn truncated_packets_purge_late_tail_and_retransmit_in_the_same_mode() {
+    for header in [false, true] {
+        let mut r = Receiver::new(XYModemVariant::YModem).await;
+        if !header {
+            r.offer(b"file\03\0", 128).await;
+        }
+        let bytes = packet(if header { 0 } else { 1 }, if header { b"file\03\0" } else { b"abc" }, 128, 0);
+        // Repeated header timeouts must not switch an established CRC transfer to checksum.
+        for _ in 0..4 {
+            r.peer.send(&bytes[..5]).await.unwrap();
+            r.step().await.unwrap();
+            let (_, result) = tokio::join!(
+                async {
+                    tokio::time::sleep(Duration::from_millis(1200)).await;
+                    r.peer.send(&bytes[5..]).await.unwrap();
+                },
+                r.protocol.update_transfer(&mut r.conn, &mut r.state)
+            );
+            result.unwrap();
+            assert_eq!(r.byte().await, NAK);
+            assert!(!r.state.is_finished);
+            assert_eq!(r.state.recieve_state.total_bytes_transfered, 0);
+        }
+        r.block(&bytes).await.unwrap();
+        assert_eq!(r.byte().await, ACK);
+        if header {
+            assert_eq!(r.byte().await, b'C');
+            r.block(&packet(1, b"abc", 128, 26)).await.unwrap();
+            assert_eq!(r.byte().await, ACK);
+        }
+        r.finish().await;
+        assert_eq!(r.content(), b"abc");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn truncated_packet_retry_budget_and_streaming_abort_are_bounded() {
+    for variant in [XYModemVariant::XModemCRC, XYModemVariant::XModem1kG] {
+        let mut r = Receiver::new(variant).await;
+        for attempt in 1..=10 {
+            r.peer.send(&[SOH, 1, 254, b'a']).await.unwrap();
+            r.step().await.unwrap();
+            let result = tokio::time::timeout(Duration::from_secs(3), r.protocol.update_transfer(&mut r.conn, &mut r.state))
+                .await
+                .unwrap();
+            if variant == XYModemVariant::XModem1kG || attempt == 10 {
+                assert!(result.is_err());
+                assert_eq!(r.byte().await, CAN);
+                assert!(r.state.is_finished);
+                assert!(r.state.recieve_state.finished_files.is_empty());
+                break;
+            }
+            result.unwrap();
+            assert_eq!(r.byte().await, NAK);
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn lost_final_acks_are_reissued_and_followup_input_is_preserved() {
+    for variant in [XYModemVariant::XModemCRC, XYModemVariant::YModem, XYModemVariant::YModemG] {
+        let mut r = Receiver::new(variant).await;
+        let last = if variant == XYModemVariant::XModemCRC {
+            vec![EOT]
+        } else {
+            packet(0, b"", 128, 0)
+        };
+        if variant == XYModemVariant::XModemCRC {
+            r.peer.send(&last).await.unwrap();
+            r.step().await.unwrap();
+        } else {
+            r.block(&last).await.unwrap();
+        }
+        assert_eq!(r.byte().await, ACK);
+        assert!(!r.state.is_finished);
+        // Exercise the reference sender's ten-second retry interval.
+        tokio::time::advance(Duration::from_secs(10)).await;
+        r.peer.send(&last).await.unwrap();
+        r.step().await.unwrap();
+        assert_eq!(r.byte().await, ACK);
+        assert!(!r.state.is_finished);
+        r.peer.send(b"\r\nMain menu\r\n").await.unwrap();
+        r.step().await.unwrap();
+        assert!(r.state.is_finished);
+        let mut input = [0; 13];
+        r.conn.read_exact(&mut input).await.unwrap();
+        assert_eq!(&input, b"\r\nMain menu\r\n");
+        assert_eq!(r.state.recieve_state.finished_files.len(), usize::from(variant == XYModemVariant::XModemCRC));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn partial_final_header_is_returned_and_retries_do_not_extend_grace() {
+    let mut r = Receiver::new(XYModemVariant::YModem).await;
+    let last = packet(0, b"", 128, 0);
+    r.block(&last).await.unwrap();
+    assert_eq!(r.byte().await, ACK);
+    for _ in 0..5 {
+        tokio::time::advance(Duration::from_secs(2)).await;
+        r.peer.send(&last).await.unwrap();
+        r.step().await.unwrap();
+        assert_eq!(r.byte().await, ACK);
+    }
+    r.peer.send(&last[..2]).await.unwrap();
+    r.settle().await;
+    let mut input = [0; 2];
+    r.conn.read_exact(&mut input).await.unwrap();
+    assert_eq!(&input, &last[..2]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn checksum_terminal_retries_and_matching_input_prefixes_preserve_payload() {
+    let mut r = Receiver::new(XYModemVariant::YModem).await;
+    // Negotiate checksum through the receiver's normal startup fallback.
+    for expected in [b'C', b'C', NAK] {
+        r.protocol.update_transfer(&mut r.conn, &mut r.state).await.unwrap();
+        assert_eq!(r.byte().await, expected);
+    }
+    let mut last = vec![SOH, 0, 255];
+    last.resize(132, 0);
+    r.block(&last).await.unwrap();
+    assert_eq!(r.byte().await, ACK);
+    r.peer.send(&last).await.unwrap();
+    r.step().await.unwrap();
+    assert_eq!(r.byte().await, ACK);
+    let input = [SOH, 0, b'M', b'e', b'n', b'u'];
+    r.peer.send(&input).await.unwrap();
+    r.step().await.unwrap();
+    assert!(r.state.is_finished);
+    let mut preserved = [0; 6];
+    r.conn.read_exact(&mut preserved).await.unwrap();
+    assert_eq!(preserved, input);
 }
 
 #[tokio::test]
@@ -150,26 +322,29 @@ async fn received_byte_accounting_excludes_padding_and_duplicate_blocks() {
     assert_eq!(r.state.recieve_state.total_bytes_transfered, 3);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn xmodem_empty_file_is_accepted_without_a_data_block() {
     for variant in [XYModemVariant::XModemCRC, XYModemVariant::XModem1kG] {
         let mut r = Receiver::new(variant).await;
         r.peer.send(&[EOT]).await.unwrap();
         r.step().await.unwrap();
         assert_eq!(r.byte().await, ACK);
+        assert!(!r.state.is_finished);
+        r.settle().await;
         assert!(r.state.is_finished);
         assert_eq!(r.content(), b"");
         assert_eq!(r.peer.try_read(&mut [0]).await.unwrap(), 0);
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn xmodem_g_finishes_single_file_without_requesting_a_batch_header() {
     let mut r = Receiver::new(XYModemVariant::XModem1kG).await;
     r.block(&packet(1, b"abc", 128, 26)).await.unwrap();
     r.peer.send(&[EOT]).await.unwrap();
     r.step().await.unwrap();
     assert_eq!(r.byte().await, ACK);
+    r.settle().await;
     assert!(r.state.is_finished);
     assert_eq!(r.peer.try_read(&mut [0]).await.unwrap(), 0);
     assert_eq!(r.content(), b"abc");
@@ -189,7 +364,7 @@ async fn double_can_cancels_before_or_during_a_file() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn repeated_eot_after_lost_ack_does_not_duplicate_a_finished_file() {
     let mut r = Receiver::new(XYModemVariant::YModem).await;
     r.offer(b"file\00\0", 128).await;
@@ -201,6 +376,7 @@ async fn repeated_eot_after_lost_ack_does_not_duplicate_a_finished_file() {
     assert_eq!(r.state.recieve_state.finished_files.len(), 1);
     r.block(&packet(0, b"", 128, 0)).await.unwrap();
     assert_eq!(r.byte().await, ACK);
+    r.settle().await;
     assert!(r.state.is_finished);
 }
 
@@ -303,7 +479,7 @@ async fn crc_error_budget_resets_after_successful_data() {
     assert_eq!(r.content(), vec![42; 256]);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn real_sender_receiver_matrix_all_variants_and_block_edges() {
     use std::io::Write;
     for variant in [
@@ -323,7 +499,7 @@ async fn real_sender_receiver_matrix_all_variants_and_block_edges() {
             let mut receiver = XYmodem::new(variant);
             let mut send = sender.initiate_send(&mut send_conn, &[file.path().to_path_buf()]).await.unwrap();
             let mut recv = receiver.initiate_recv(&mut recv_conn).await.unwrap();
-            bounded(async {
+            tokio::time::timeout(Duration::from_secs(12), async {
                 tokio::join!(
                     async {
                         while !send.is_finished {
@@ -339,7 +515,8 @@ async fn real_sender_receiver_matrix_all_variants_and_block_edges() {
                     }
                 );
             })
-            .await;
+            .await
+            .expect("sender/receiver matrix exceeded completion deadline");
             assert_eq!(send.send_state.finished_files.len(), 1, "{variant:?} size {len}");
             assert_eq!(recv.recieve_state.finished_files.len(), 1, "{variant:?} size {len}");
             let path = tempfile::TempPath::try_from_path(&recv.recieve_state.finished_files[0].1).unwrap();
@@ -364,7 +541,7 @@ async fn missing_initial_data_request_is_repeated_in_negotiated_mode() {
     assert_eq!(r.content(), b"abc");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn local_cancel_stops_both_directions_and_protocol_can_be_reused() {
     use std::io::Write;
     let mut r = Receiver::new(XYModemVariant::XModemCRC).await;
@@ -398,6 +575,7 @@ async fn local_cancel_stops_both_directions_and_protocol_can_be_reused() {
     r.peer.send(&[EOT]).await.unwrap();
     r.step().await.unwrap();
     assert_eq!(r.byte().await, ACK);
+    r.settle().await;
     assert!(r.state.is_finished);
     assert_eq!(r.content(), b"abc");
 }

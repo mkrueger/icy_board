@@ -208,6 +208,7 @@ pub struct SSHConnection {
     channel_id: russh::ChannelId,
     handle: russh::server::Handle,
     closed: bool,
+    read_buffer: Vec<u8>,
 }
 
 unsafe impl Send for SSHConnection {}
@@ -220,6 +221,7 @@ impl SSHConnection {
             channel_id,
             handle,
             closed: false,
+            read_buffer: Vec::new(),
         }
     }
 
@@ -243,7 +245,15 @@ impl Connection for SSHConnection {
         ConnectionType::SSH
     }
 
+    fn unread(&mut self, buf: &[u8]) -> icy_net::Result<()> {
+        self.read_buffer.splice(..0, buf.iter().copied());
+        Ok(())
+    }
+
     async fn read(&mut self, buf: &mut [u8]) -> icy_net::Result<usize> {
+        if !self.read_buffer.is_empty() {
+            return Ok(icy_net::connection::drain_buffer(&mut self.read_buffer, buf));
+        }
         match self.channel.read(buf).await {
             Ok(size) => Ok(size),
             Err(e) => match e.kind() {
@@ -261,6 +271,9 @@ impl Connection for SSHConnection {
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> icy_net::Result<usize> {
+        if !self.read_buffer.is_empty() {
+            return Ok(icy_net::connection::drain_buffer(&mut self.read_buffer, buf));
+        }
         // Non-blocking attempt: immediate timeout -> treat Pending as no data (return 0)
         match timeout(Duration::from_millis(0), self.channel.read(buf)).await {
             // Future completed within the timeout

@@ -1,7 +1,7 @@
 use std::{io::Write, time::Duration};
 
 use tempfile::NamedTempFile;
-use tokio::time::timeout;
+use tokio::time::{Instant, timeout, timeout_at};
 
 use super::{Checksum, XYModemConfiguration, constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof, truncate_to_file_size};
 use crate::{
@@ -15,6 +15,9 @@ use crate::{
 
 /// Timeout for waiting for a byte from the sender (3 seconds)
 const READ_TIMEOUT: Duration = Duration::from_secs(3);
+const BYTE_TIMEOUT: Duration = Duration::from_secs(1);
+// Cover the reference sender's ten-second EOT retry without waiting indefinitely.
+const FINAL_ACK_TIMEOUT: Duration = Duration::from_secs(11);
 
 /// Maximum number of retries before giving up
 const MAX_RETRIES: usize = 5;
@@ -30,6 +33,7 @@ pub enum RecvState {
     ReadYModemHeader(usize, usize),
     ReadBlock(usize, usize),
     ReadBlockStart(u8, usize),
+    FinishReceive,
 }
 
 /// specification: <http://pauillac.inria.fr/~doligez/zmodem/ymodem.txt>
@@ -46,6 +50,10 @@ pub struct Ry {
     received_data: bool,
     last_file_finished: bool,
     previous_can: bool,
+    mode_negotiated: bool,
+    final_deadline: Option<Instant>,
+    final_packet: Vec<u8>,
+    final_match: Vec<u8>,
 }
 
 impl Ry {
@@ -63,6 +71,10 @@ impl Ry {
             received_data: false,
             last_file_finished: false,
             previous_can: false,
+            mode_negotiated: false,
+            final_deadline: None,
+            final_packet: Vec::new(),
+            final_match: Vec::new(),
         }
     }
 
@@ -119,10 +131,10 @@ impl Ry {
                             return Err(XYModemError::Timeout.into());
                         }
                         // Fallback chain: Streaming (G) -> CRC (C) -> Checksum (NAK)
-                        if retries == 1 && self.configuration.streaming_enabled {
+                        if !self.mode_negotiated && retries == 1 && self.configuration.streaming_enabled {
                             transfer_state.recieve_state.log_info("No streaming response, falling back to CRC mode");
                             self.configuration.streaming_enabled = false;
-                        } else if retries == 2 && self.configuration.checksum_mode == Checksum::CRC16 {
+                        } else if !self.mode_negotiated && retries == 2 && self.configuration.checksum_mode == Checksum::CRC16 {
                             transfer_state.recieve_state.log_info("No CRC response, falling back to checksum mode");
                             self.configuration.checksum_mode = Checksum::Default;
                         }
@@ -133,6 +145,7 @@ impl Ry {
                 };
 
                 if start == SOH || start == STX {
+                    self.mode_negotiated = true;
                     let len = if start == SOH { DEFAULT_BLOCK_LENGTH } else { EXT_BLOCK_LENGTH };
                     if self.configuration.is_ymodem() {
                         self.recv_state = RecvState::ReadYModemHeader(len, retries);
@@ -178,12 +191,13 @@ impl Ry {
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
                 let mut block = vec![0; 2 + len + chksum_size];
-                match timeout(READ_TIMEOUT, com.read_exact(&mut block)).await {
-                    Ok(result) => result?,
-                    Err(_) => {
-                        self.cancel(com).await?;
-                        return Err(XYModemError::Timeout.into());
+                match read_packet(com, &mut block).await {
+                    Ok(()) => {}
+                    Err(error) if is_timeout(error.as_ref()) => {
+                        self.retry_incomplete_packet(com, transfer_state, retries, true).await?;
+                        return Ok(());
                     }
+                    Err(error) => return Err(error),
                 }
 
                 if block[0] != block[1] ^ 0xFF {
@@ -230,7 +244,10 @@ impl Ry {
                 if block[0] == 0 {
                     transfer_state.recieve_state.log_info("End of batch transfer detected");
                     com.send(&[ACK]).await?;
-                    self.recv_state = RecvState::None;
+                    let mut packet = vec![if len == DEFAULT_BLOCK_LENGTH { SOH } else { STX }];
+                    packet.extend_from_slice(&[0, 255]);
+                    packet.extend_from_slice(body);
+                    self.begin_completion(packet);
                     return Ok(());
                 }
 
@@ -370,12 +387,13 @@ impl Ry {
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
                 let mut block = vec![0; 2 + len + chksum_size];
-                match timeout(READ_TIMEOUT, com.read_exact(&mut block)).await {
-                    Ok(result) => result?,
-                    Err(_) => {
-                        self.cancel(com).await?;
-                        return Err(XYModemError::Timeout.into());
+                match read_packet(com, &mut block).await {
+                    Ok(()) => {}
+                    Err(error) if is_timeout(error.as_ref()) => {
+                        self.retry_incomplete_packet(com, transfer_state, retries, false).await?;
+                        return Ok(());
                     }
+                    Err(error) => return Err(error),
                 }
 
                 let block_num = block[0];
@@ -484,6 +502,7 @@ impl Ry {
                 }
                 self.recv_state = RecvState::ReadBlockStart(0, 0);
             }
+            RecvState::FinishReceive => self.complete_receive(com, transfer_state).await?,
         }
         Ok(())
     }
@@ -493,6 +512,70 @@ impl Ry {
         self.cur_out_file = None;
         self.pending_finished_file = None;
         super::cancel_xymodem_transfer(com).await
+    }
+
+    async fn retry_incomplete_packet(&mut self, com: &mut dyn Connection, state: &mut TransferState, retries: usize, header: bool) -> crate::Result<()> {
+        state.recieve_state.log_warning("Incomplete packet timed out");
+        self.errors += 1;
+        state.recieve_state.errors = self.errors;
+        if self.configuration.is_streaming() || self.errors >= MAX_ERRORS || header && retries >= MAX_ERRORS {
+            self.cancel(com).await?;
+            return Err(XYModemError::TooManyRetriesReadingBlock.into());
+        }
+        // Discard the rest of the damaged packet before requesting a fresh one.
+        if let Err(error) = purge_packet(com).await {
+            self.cancel(com).await?;
+            return Err(error);
+        }
+        com.send(&[NAK]).await?;
+        self.recv_state = if header {
+            RecvState::StartReceive(retries + 1)
+        } else {
+            RecvState::ReadBlockStart(0, retries + 1)
+        };
+        Ok(())
+    }
+
+    fn begin_completion(&mut self, packet: Vec<u8>) {
+        self.final_deadline = Some(Instant::now() + FINAL_ACK_TIMEOUT);
+        self.final_packet = packet;
+        self.final_match.clear();
+        self.recv_state = RecvState::FinishReceive;
+    }
+
+    async fn complete_receive(&mut self, com: &mut dyn Connection, state: &mut TransferState) -> crate::Result<()> {
+        state.current_state = "Confirming completion...";
+        let deadline = self.final_deadline.expect("completion has a deadline");
+        loop {
+            if Instant::now() >= deadline {
+                break;
+            }
+            let mut bytes = vec![0; self.final_packet.len() - self.final_match.len()];
+            let count = match timeout_at(deadline, com.read(&mut bytes)).await {
+                Ok(result) => result?,
+                Err(_) => 0,
+            };
+            if count == 0 {
+                break;
+            }
+            let matches = self.final_packet[self.final_match.len()..].starts_with(&bytes[..count]);
+            self.final_match.extend_from_slice(&bytes[..count]);
+            if !matches {
+                break;
+            }
+            if self.final_match.len() == self.final_packet.len() {
+                com.send(&[ACK]).await?;
+                self.final_match.clear();
+                return Ok(());
+            }
+        }
+        if !self.final_match.is_empty() {
+            com.unread(&self.final_match)?;
+            self.final_match.clear();
+        }
+        self.finish_received_file(state)?;
+        self.recv_state = RecvState::None;
+        Ok(())
     }
 
     fn finish_received_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<()> {
@@ -523,8 +606,7 @@ impl Ry {
         self.pending_finished_file = Some(file);
         if !self.configuration.is_ymodem() {
             com.send(&[ACK]).await?;
-            self.finish_received_file(state)?;
-            self.recv_state = RecvState::None;
+            self.begin_completion(vec![EOT]);
         } else if self.configuration.is_streaming() {
             com.send(&[ACK, self.start_byte()]).await?;
             self.finish_received_file(state)?;
@@ -533,6 +615,7 @@ impl Ry {
             com.send(&[NAK]).await?;
             self.recv_state = RecvState::ReadBlockStart(1, 0);
         }
+
         Ok(())
     }
 
@@ -596,6 +679,40 @@ impl Ry {
             }
         }
     }
+}
+
+fn is_timeout(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    matches!(error.downcast_ref::<XYModemError>(), Some(XYModemError::Timeout))
+}
+
+async fn read_packet(com: &mut dyn Connection, bytes: &mut [u8]) -> crate::Result<()> {
+    let mut offset = 0;
+    while offset < bytes.len() {
+        let count = timeout(BYTE_TIMEOUT, com.read(&mut bytes[offset..]))
+            .await
+            .map_err(|_| XYModemError::Timeout)??;
+        if count == 0 {
+            return Err(crate::NetError::ConnectionClosed.into());
+        }
+        offset += count;
+    }
+    Ok(())
+}
+
+async fn purge_packet(com: &mut dyn Connection) -> crate::Result<()> {
+    timeout(READ_TIMEOUT, async {
+        let mut bytes = [0; EXT_BLOCK_LENGTH];
+        loop {
+            match timeout(BYTE_TIMEOUT, com.read(&mut bytes)).await {
+                Ok(Ok(0)) => return Err(crate::NetError::ConnectionClosed.into()),
+                Ok(Ok(_)) => {}
+                Ok(Err(error)) => return Err(error),
+                Err(_) => return Ok(()),
+            }
+        }
+    })
+    .await
+    .map_err(|_| XYModemError::Timeout)?
 }
 
 fn parse_file_info(block: &[u8]) -> Result<(String, Option<u64>), XYModemError> {

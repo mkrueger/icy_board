@@ -60,6 +60,14 @@ fn schema_prefix(is_secure: bool) -> &'static str {
 
 #[async_trait]
 impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnection<S> {
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        let mut bytes = Vec::with_capacity(buf.len() + self.data.len());
+        bytes.extend_from_slice(buf);
+        bytes.extend_from_slice(&self.data);
+        self.data = bytes.into();
+        Ok(())
+    }
+
     fn get_connection_type(&self) -> ConnectionType {
         if self.is_secure {
             ConnectionType::SecureWebsocket

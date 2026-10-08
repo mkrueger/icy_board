@@ -27,13 +27,14 @@ use crate::{
 /// Timeout for waiting for a response from the receiver (3 seconds)
 const READ_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_RETRIES: usize = 5;
+const MAX_START_ATTEMPTS: usize = 20;
 // The YMODEM reference specifies up to ten EOT transmissions until ACK.
 const MAX_EOT_ATTEMPTS: usize = 10;
 
 #[derive(Debug)]
 pub enum SendState {
     None,
-    InitiateSend,
+    InitiateSend(usize),
     SendYModemHeader(usize),
     AckSendYmodemHeader(usize),
     WaitYModemDataRequest(usize),
@@ -100,9 +101,11 @@ impl Sy {
         }
         match self.send_state {
             SendState::None => {}
-            SendState::InitiateSend => {
+            SendState::InitiateSend(attempt) => {
                 transfer_state.current_state = "Initiate send…";
-                transfer_state.send_state.log_info("Starting transfer, waiting for receiver ready signal...");
+                if attempt == 0 {
+                    transfer_state.send_state.log_info("Starting transfer, waiting for receiver ready signal...");
+                }
 
                 match self.get_mode(com).await {
                     Ok(_) => {
@@ -115,8 +118,16 @@ impl Sy {
                             .send_state
                             .log_info(format!("Receiver ready - using {} mode with {} verification", variant_str, mode_str));
                     }
+                    Err(e) if Self::is_timeout(e.as_ref()) && attempt + 1 < MAX_START_ATTEMPTS => {
+                        transfer_state.send_state.log_warning("Still waiting for receiver ready signal");
+                        self.send_state = SendState::InitiateSend(attempt + 1);
+                        return Ok(());
+                    }
                     Err(e) => {
                         transfer_state.send_state.log_error(format!("Failed to establish connection mode: {}", e));
+                        if Self::is_timeout(e.as_ref()) {
+                            self.cancel(com).await?;
+                        }
                         return Err(e);
                     }
                 }
@@ -564,7 +575,7 @@ impl Sy {
     }
 
     pub fn send(&mut self, files: &[PathBuf]) {
-        self.send_state = SendState::InitiateSend;
+        self.send_state = SendState::InitiateSend(0);
         for f in files {
             self.file_queue.push_back(f.clone());
         }

@@ -86,7 +86,48 @@ impl Sender {
         sender.step().await;
         sender
     }
+}
 
+#[tokio::test(start_paused = true)]
+async fn delayed_receiver_startup_is_accepted_without_sending_data_early() {
+    let file = file(b"abc");
+    let mut protocol = XYmodem::new(XYModemVariant::XModemCRC);
+    let mut wire = Wire::default();
+    let mut state = protocol.initiate_send(&mut wire, &[file.path().into()]).await.unwrap();
+    for _ in 0..3 {
+        protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+        assert!(!state.is_finished);
+        assert!(wire.sent.is_empty());
+    }
+    wire.input.push_back(Input::Byte(b'C'));
+    protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+    protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+    assert_block(&wire.sent[0], 1, b"abc", 0x1a, true);
+}
+
+#[tokio::test(start_paused = true)]
+async fn receiver_startup_wait_is_bounded_to_one_minute() {
+    let file = file(b"abc");
+    let mut protocol = XYmodem::new(XYModemVariant::XModemCRC);
+    let mut wire = Wire::default();
+    let mut state = protocol.initiate_send(&mut wire, &[file.path().into()]).await.unwrap();
+    let start = tokio::time::Instant::now();
+    for attempt in 0..20 {
+        let result = protocol.update_transfer(&mut wire, &mut state).await;
+        if attempt == 19 {
+            assert!(result.is_err());
+        } else {
+            result.unwrap();
+            assert!(!state.is_finished);
+        }
+    }
+    assert_eq!(start.elapsed(), Duration::from_secs(60));
+    assert!(state.is_finished);
+    assert_eq!(wire.sent, vec![vec![CAN; 6]]);
+    assert!(state.send_state.finished_files.is_empty());
+}
+
+impl Sender {
     fn reply(&mut self, bytes: &[u8]) {
         self.wire.input.extend(bytes.iter().copied().map(Input::Byte));
     }

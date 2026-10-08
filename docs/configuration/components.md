@@ -473,6 +473,14 @@ A/ASCII, X/Xmodem, C/CRC, O/1K, F/1K-G, Y/Ymodem, G/Ymodem-G, Z/Zmodem,
 8/Zmodem-8k and N/None. Y, G, Z, 8 and N are marked batch; none is marked
 bidirectional. An absent root list simply yields an empty list instead.
 
+Native YMODEM-G uploads request streaming mode with `G`. X/YMODEM senders
+allow up to one minute for the receiver's initial request. Packet reads use
+a one-second inactivity timeout, not a whole-packet deadline; non-streaming
+receivers purge incomplete packets before requesting retransmission.
+After the final ACK, receivers allow up to eleven seconds for retransmissions.
+Ordinary terminal input ends this grace period early and is preserved for
+the next connection read.
+
 Standalone protocol file:
 
 ```toml
