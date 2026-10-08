@@ -1,8 +1,18 @@
-use crate::tests::{compile_test_ppe, fixture, setup_conference, test_output, test_ppe_output, test_user_output};
+use crate::tests::{compile_test_ppe, fixture, setup_conference, test_login_output, test_output, test_ppe_output, test_user_output};
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
 use icy_board_engine::icy_board::conferences::Conference;
 use icy_board_engine::icy_board::icb_config::DisplayNewsBehavior;
+use icy_board_engine::icy_board::user_base::Password;
+
+fn setup_password_protected_conference(board: &mut IcyBoard) {
+    setup_conference(board);
+    board.conferences[1].is_public = false;
+    board.conferences[1].password = Password::PlainText("TEST".to_string());
+    let conferences = toml::to_string(&board.conferences).unwrap();
+    board.conferences = toml::from_str(&conferences).unwrap();
+    board.config.message.disable_message_scan_prompt = true;
+}
 
 /// Conference 7 with its own news and intro. The news file is newer than the caller's last call.
 fn setup_join_files(board: &mut IcyBoard) {
@@ -101,6 +111,42 @@ fn test_cmd_j_join() {
         output,
         "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mJ 1\n\n\u{1b}[1;32mTESTCONF (1) Joined\n\nPress (Enter) to continue? \u{1b}[0m"
     );
+}
+
+#[test]
+fn test_cmd_j_password_protected_conference_accepts_correct_password() {
+    for password in ["TEST", "test", "TeSt"] {
+        let output = test_login_output(format!("TEST USER\n\nJ 1\n{password}\n"), setup_password_protected_conference);
+
+        assert!(position(&output, "Conference Password") < position(&output, "TESTCONF (1) Joined"), "{output}");
+        assert!(!output.contains("Wrong password entered"), "{output}");
+        let password_field = output.split_once("Conference Password").unwrap().1.lines().next().unwrap();
+        assert!(!password_field.contains(password), "conference password was echoed:\n{output}");
+    }
+}
+
+#[test]
+fn test_cmd_j_password_protected_conference_accepts_correct_password_on_retry() {
+    let output = test_login_output("TEST USER\n\nJ 1\nWRONG\nTEST\n".to_string(), setup_password_protected_conference);
+
+    assert_eq!(output.matches("Conference Password").count(), 2, "{output}");
+    assert_eq!(output.matches("Wrong password entered").count(), 1, "{output}");
+    assert!(
+        position(&output, "Wrong password entered") < position(&output, "TESTCONF (1) Joined"),
+        "{output}"
+    );
+}
+
+#[test]
+fn test_cmd_j_password_protected_conference_rejects_wrong_passwords() {
+    let output = test_login_output("TEST USER\n\nJ 1\nWRONG\nWRONG\n\n".to_string(), setup_password_protected_conference);
+
+    assert_eq!(output.matches("Conference Password").count(), 2, "{output}");
+    assert_eq!(output.matches("Wrong password entered").count(), 2, "{output}");
+    assert!(!output.contains("TESTCONF (1) Joined"), "{output}");
+    assert!(output.contains("Conference # to join (Enter)=none"), "{output}");
+    assert!(output.contains("Main Board Command?"), "{output}");
+    assert!(!output.contains("TESTCONF (1) Conference Command?"), "{output}");
 }
 
 #[test]

@@ -129,6 +129,10 @@ No `[password.PlainText]` table is used. Protected PPE passwords use the
 plaintext storage representation if
 serialized. Door and security-level passwords are ordinary strings instead.
 
+Plaintext password checks ignore case, including uppercase values saved by
+editors or imported from PCBoard. Hash creation and verification normalize the
+password to lowercase; the stored hash itself is not case-normalized.
+
 Password-field fragment (the exact saved plaintext representation):
 
 ```toml

@@ -102,8 +102,13 @@ impl Password {
         }
     }
 
+    /// Password checks ignore case, including plaintext stored by editors or imports.
     pub fn is_valid(&self, pwd: &str) -> bool {
-        self == &Password::PlainText(pwd.to_lowercase().clone())
+        let pwd = pwd.to_lowercase();
+        match self {
+            Password::PlainText(stored) | Password::Protected(stored) => stored.to_lowercase() == pwd,
+            Password::Argon2(_) | Password::BCrypt(_) => self.verify(&pwd),
+        }
     }
 }
 
@@ -153,5 +158,56 @@ impl FromStr for Password {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Password::PlainText(s.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Password;
+    use serde::Deserialize;
+
+    #[test]
+    fn plaintext_password_validation_ignores_stored_and_entered_case() {
+        for stored in ["TEST", "test", "TeSt"] {
+            for password in [
+                Password::PlainText(stored.to_string()),
+                Password::Protected(stored.to_string()),
+                stored.parse().unwrap(),
+            ] {
+                for entered in ["TEST", "test", "TeSt"] {
+                    assert!(password.is_valid(entered));
+                }
+                assert!(!password.is_valid("WRONG"));
+                assert!(!password.is_valid(""));
+            }
+        }
+    }
+
+    #[test]
+    fn uppercase_password_loaded_from_toml_accepts_any_case() {
+        #[derive(Deserialize)]
+        struct StoredPassword {
+            password: Password,
+        }
+
+        for source in [r#"password = "TEST""#, r#"password = '"TEST"'"#] {
+            let stored: StoredPassword = toml::from_str(source).unwrap();
+            assert_eq!(stored.password.to_string(), "TEST");
+            for entered in ["TEST", "test", "TeSt"] {
+                assert!(stored.password.is_valid(entered));
+            }
+            assert!(!stored.password.is_valid("WRONG"));
+        }
+    }
+
+    #[test]
+    fn hashed_password_validation_keeps_lowercase_normalization() {
+        for password in [Password::new_argon2("TeSt"), Password::new_bcrypt("TeSt")] {
+            for entered in ["TEST", "test", "TeSt"] {
+                assert!(password.is_valid(entered));
+            }
+            assert!(!password.is_valid("WRONG"));
+            assert!(!password.is_valid(""));
+        }
     }
 }
