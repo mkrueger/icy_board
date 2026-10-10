@@ -8,17 +8,6 @@ releases.
 
 ## [Unreleased]
 
-### Fixed
-
-- Missing advertisement rule files no longer reject uploads: archive
-  transformations are skipped, preserving the original file and FILE_ID.DIZ
-  extraction. Enabled virus scanning and approval policies still apply.
-- Single-file ZMODEM uploads complete the session handshake instead of reporting
-  a remote cancellation at 100%. Additional queued files beyond the upload limit
-  are skipped without receiving their payloads.
-- ZMODEM binary CRC-16 headers and subpackets use the protocol's network byte order,
-  allowing transfers with independent clients that select CRC-16.
-
 ## [0.2.3] - 2026-10-10
 
 Fourth public beta. This release includes the Windows board-creation fix and
@@ -65,6 +54,16 @@ file transfers, conference selection and door handling.
 
 ### Fixed
 
+- Single-file ZMODEM uploads complete the session handshake instead of reporting
+  a remote cancellation at 100% (#27). Additional queued files beyond the upload
+  limit are skipped without receiving their payloads.
+- ZMODEM binary CRC-16 headers and subpackets use the protocol's network byte order,
+  allowing transfers with independent clients that select CRC-16.
+- Missing advertisement rule files no longer reject uploads: archive
+  transformations are skipped, preserving the original file and FILE_ID.DIZ
+  extraction. Enabled virus scanning and approval policies still apply.
+- The bundled `area`, `cnfn`, `dir`, `door` and `script2` PPEs for new boards
+  are recompiled with the current compiler.
 - Windows board creation no longer aborts with
   `Embedded English fingerprint mismatch: hlp!.md` (#28, #32). Checkouts
   preserve embedded source bytes, and catalog fingerprint verification runs
@@ -927,7 +926,8 @@ First public beta of IcyBoard 0.2.
 Last release before the 0.2 beta series. Earlier release history is available
 from the repository tags and GitHub Releases.
 
-[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.2...HEAD
+[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.3...HEAD
+[0.2.3]: https://github.com/mkrueger/icy_board/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/mkrueger/icy_board/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-beta.1...0.2.1
 [0.2.0-beta.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-lsp1...0.2.0-beta.1
