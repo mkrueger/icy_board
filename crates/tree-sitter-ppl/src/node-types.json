@@ -2249,6 +2249,26 @@
     "named": false
   },
   {
+    "type": "ARCHIVE",
+    "named": false
+  },
+  {
+    "type": "ARCHIVEENTRY",
+    "named": false
+  },
+  {
+    "type": "ARCHIVEENTRYKIND",
+    "named": false
+  },
+  {
+    "type": "ARCHIVEOPTIONS",
+    "named": false
+  },
+  {
+    "type": "ARCHIVEREADER",
+    "named": false
+  },
+  {
     "type": "AREA",
     "named": false
   },

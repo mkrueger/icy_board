@@ -2219,6 +2219,66 @@
           },
           "named": false,
           "value": "ZIPENCODING"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[aA][rR][cC][hH][iI][vV][eE]"
+            }
+          },
+          "named": false,
+          "value": "ARCHIVE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[aA][rR][cC][hH][iI][vV][eE][oO][pP][tT][iI][oO][nN][sS]"
+            }
+          },
+          "named": false,
+          "value": "ARCHIVEOPTIONS"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[aA][rR][cC][hH][iI][vV][eE][rR][eE][aA][dD][eE][rR]"
+            }
+          },
+          "named": false,
+          "value": "ARCHIVEREADER"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[aA][rR][cC][hH][iI][vV][eE][eE][nN][tT][rR][yY]"
+            }
+          },
+          "named": false,
+          "value": "ARCHIVEENTRY"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[aA][rR][cC][hH][iI][vV][eE][eE][nN][tT][rR][yY][kK][iI][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "ARCHIVEENTRYKIND"
         }
       ]
     },

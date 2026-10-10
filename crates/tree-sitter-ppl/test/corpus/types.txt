@@ -181,3 +181,32 @@ IF item.HasAccess() PRINTLN item.Name
       argument: (member_access
         object: (identifier)
         member: (identifier)))))
+
+================================================================================
+Archive objects and entry kind
+================================================================================
+
+Archive archive
+archiveoptions options
+ArchiveReader reader
+ArchiveEntry entry
+ArchiveEntryKind kind
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator name: (identifier))))
