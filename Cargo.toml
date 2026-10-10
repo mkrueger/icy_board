@@ -25,7 +25,7 @@ members = [
 	"crates/icy_board_buildinfo",
 ]
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 

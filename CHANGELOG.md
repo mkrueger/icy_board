@@ -8,8 +8,34 @@ releases.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-10
+
+Fourth public beta. This release includes the Windows board-creation fix and
+file-area maintenance and deletion fixes. It also extends PPL 4.00 and improves
+file transfers, conference selection and door handling.
+
+### Compatibility
+
+- PPL 4.00 remains unstable. Review the area and directory numbering changes
+  below and recompile affected PPEs.
+- Relative file-area paths in lists inside a board now use the nearest ancestor
+  containing `icboard.toml`, matching the normal BBS layout. Standalone lists
+  retain list-relative paths. Use absolute paths for externally located lists
+  or differently named board configurations.
+- Before the version bump, full CI checks passed on Linux and macOS, and the
+  Windows embedded-help checks passed. Release-package builds and manual runtime
+  checks still need review before publishing. This remains a beta release.
+
 ### Added
 
+- `icbfile delete` deletes an exact, case-insensitive filename from disk and
+  removes its database entry. Already-missing files can have their entries
+  removed; disk deletion failures retain the entry.
+- PPL 4.00 ZIP writer APIs, bulletin and survey access, and `Board.AddUser` and
+  `Board.FindUser`.
+- Native PPL 4.00 date/time values and arithmetic, and PPL/PPE target 3.01 support.
+- Native DOS setup console, DOS image setup and X00 installation helpers,
+  door arguments and private drop files, and socket-connected doors.
 - PPL 4.00 can read archives: `Archive.Open()` returns an `ArchiveReader` that
   lists members, reads them as bytes or text and extracts single files, in every
   format unarc-rs supports (ZIP, RAR, 7z, ARJ, LHA, ACE, ARC, ZOO, TAR and more).
@@ -28,6 +54,24 @@ releases.
 
 ### Fixed
 
+- Windows board creation no longer aborts with
+  `Embedded English fingerprint mismatch: hlp!.md` (#28, #32). Checkouts
+  preserve embedded source bytes, and catalog fingerprint verification runs
+  in tests rather than blocking startup.
+- `icbfile` resolves nested board area lists against the board root instead of
+  opening a different database (#31). `check --prune` without `--area` checks
+  every area in the supplied list. Unavailable storage and inspection errors
+  fail explicitly; cached BBS listings refresh externally changed entries.
+- Conference plaintext passwords accept stored and entered mixed case.
+- X/YMODEM packet timeouts and final ACK recovery, ZMODEM flow control,
+  8 KiB receive subpackets and 1 KiB uploads.
+- SSH reads apply backpressure when the consumer falls behind (#30).
+- PPL file-channel handling, UTF-8 text reads, dot-relative PPE resources,
+  malformed list/loop diagnostics and empty index-list crashes.
+- Conference join ordering and registration checks, new-file scan date input,
+  logoff display hooks, PCBoard user-record compatibility and local status rows.
+- POSIX locale selection on all platforms, native stdio door buffering and
+  door terminal restoration.
 - The `AREA` command's search list and its confirmation showed zero-based
   numbers, so choosing a listed number joined the wrong area.
 - Entering `-2147483648` as an area or bulletin number ended the session
