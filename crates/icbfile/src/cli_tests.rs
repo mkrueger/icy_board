@@ -50,6 +50,12 @@ fn cli_subcommands_keep_their_names_positionals_and_short_options() {
     assert_eq!(cmd.desc.as_deref(), Some("new description"));
     assert_eq!(cmd.free, Some(true));
     assert_eq!(cmd.locked, Some(false));
+    let Some(Command::Delete(cmd)) = parse(&["delete", "areas.toml", "TEST.ZIP", "-a", "Games"]).command else {
+        panic!()
+    };
+    assert_eq!(cmd.target, Path::new("areas.toml"));
+    assert_eq!(cmd.file, "TEST.ZIP");
+    assert_eq!(cmd.area.as_deref(), Some("Games"));
     let Some(Command::Fingerprints(cmd)) = parse(&["fingerprints", "intros"]).command else {
         panic!()
     };
@@ -157,6 +163,7 @@ fn cli_option_values_may_start_with_hyphens_but_positionals_need_separator() {
 fn cli_rejects_missing_values_unknown_commands_and_duplicate_options() {
     for args in [
         vec!["icbfile", "areas"],
+        vec!["icbfile", "delete", "files"],
         vec!["icbfile", "repack", "files", "--max-members", "-1"],
         vec!["icbfile", "import", "files", "--format", "unknown"],
         vec!["icbfile", "set", "files", "test.zip", "--free"],

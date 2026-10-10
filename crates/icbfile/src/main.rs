@@ -54,6 +54,8 @@ enum Command {
     Export(Export),
     #[command(name = "set")]
     Set(Set),
+    #[command(name = "delete")]
+    Delete(Delete),
     #[command(name = "repack")]
     Repack(Repack),
     #[command(name = "fingerprints")]
@@ -170,6 +172,19 @@ struct Set {
 }
 
 #[derive(Args)]
+#[command(about = text("icbfile", "delete-about"))]
+struct Delete {
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
+    target: PathBuf,
+
+    #[arg(value_name = "file", help = text("icbfile", "delete-file"))]
+    file: String,
+
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
+    area: Option<String>,
+}
+
+#[derive(Args)]
 #[command(about = text("icbfile", "repack-about"))]
 struct Repack {
     #[arg(value_name = "target", help = text("icbfile", "target"))]
@@ -269,6 +284,7 @@ fn run(cli: Cli) -> Res<()> {
         Command::Import(cmd) => import(&cmd),
         Command::Export(cmd) => export(open(&cmd.target, &cmd.area)?, cmd.output.as_deref()),
         Command::Set(cmd) => set(&cmd),
+        Command::Delete(cmd) => delete(&cmd),
         Command::Repack(cmd) => repack(&cmd),
         Command::Fingerprints(cmd) => fingerprints(&cmd),
     }
@@ -281,7 +297,7 @@ fn open(target: &Path, area: &Option<String>) -> Res<FileBase> {
         if area.is_some() {
             return Err("--area only applies when the target is a file_areas.toml".into());
         }
-        return FileBase::open(target, target.join("dir"));
+        return FileBase::open_checked(target, target.join("dir"));
     }
     if !target.is_file() {
         return Err(format!("{} is neither a directory nor a file", target.display()).into());
@@ -296,14 +312,42 @@ fn open(target: &Path, area: &Option<String>) -> Res<FileBase> {
 }
 
 fn open_area(target: &Path, directory: &icy_board_engine::icy_board::file_directory::FileDirectory) -> Res<FileBase> {
-    let base = target.parent().unwrap_or(Path::new("."));
+    let target = fs::canonicalize(target)?;
+    let parent = target.parent().ok_or("area list has no parent directory")?;
+    let base = parent
+        .ancestors()
+        .find(|ancestor| ancestor.join(icy_board_engine::DEFAULT_ICYBOARD_FILE).is_file())
+        .unwrap_or(parent);
     let path = resolve(base, &directory.path);
     let metadata_path = if directory.metadata_path.as_os_str().is_empty() {
         path.join("dir")
     } else {
         resolve(base, &directory.metadata_path)
     };
-    FileBase::open(&path, metadata_path)
+    FileBase::open_checked(&path, metadata_path)
+}
+
+fn delete(cmd: &Delete) -> Res<()> {
+    let mut base = open(&cmd.target, &cmd.area)?;
+    let header = base
+        .iter()
+        .find(|header| header.name.eq_ignore_ascii_case(&cmd.file))
+        .ok_or_else(|| format!("{} is not in this area", cmd.file))?;
+    let name = header.name.clone();
+    let mut components = Path::new(&name).components();
+    if !matches!(components.next(), Some(std::path::Component::Normal(_))) || components.next().is_some() {
+        return Err(format!("invalid file name in this area: {name}").into());
+    }
+    let path = base.full_path(header);
+    match fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("can't delete {}: {err}; database entry retained", path.display()).into()),
+    }
+    base.remove_file(&path)
+        .map_err(|err| format!("{} is gone from disk, but its database entry could not be removed: {err}", path.display()))?;
+    println!("{}: {name}", text("icbfile", "deleted"));
+    Ok(())
 }
 
 fn select_area<'a>(list: &'a DirectoryList, selector: &str) -> Res<&'a icy_board_engine::icy_board::file_directory::FileDirectory> {
@@ -460,11 +504,14 @@ fn check(mut base: FileBase, prune: bool) -> Res<()> {
     let mut missing = Vec::new();
     for header in &headers {
         let path = base.full_path(header);
-        if !path.exists() {
-            missing.push(header.name.clone());
-            continue;
-        }
-        let (size, _) = (fs::metadata(&path)?.len(), ());
+        let size = match fs::metadata(&path) {
+            Ok(metadata) => metadata.len(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(header.name.clone());
+                continue;
+            }
+            Err(err) => return Err(format!("can't inspect {}: {err}", path.display()).into()),
+        };
         if size != header.size {
             println!("size changed: {} is {} bytes, listed as {}", header.name, size, header.size);
         }

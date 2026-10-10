@@ -102,7 +102,11 @@ Every command takes a target, which is one of:
 * **a directory** — used directly, with the database in `<dir>/.icy/dir.db`.
   Convenient for a quick look at a directory that is not wired into a board yet.
 * **a `file_areas.toml` plus `--area`** — resolves `path` and `metadata_path` exactly the
-  way the BBS does, so the database ends up where the board will look for it.
+  way the BBS does when the list is inside a board: relative paths use the nearest
+  ancestor directory containing `icboard.toml`, not the list's own directory.
+  For a standalone list with no such ancestor, relative paths use the list's directory.
+  Absolute paths are unchanged. For a board with a differently named configuration or
+  an area list outside its root, use absolute area paths.
   `--area` takes either the area name (case-insensitive) or its index. For `check`,
   omitting `--area` checks every area in the supplied list.
 
@@ -124,6 +128,7 @@ icbfile check  <target> [-a AREA] [--prune]
 icbfile import <target> <listing>... [-a AREA] [-f FORMAT] [-n] [--overwrite] [--keep-missing]
 icbfile export <target> [-a AREA] [-o FILE]
 icbfile set    <target> <file> [-a AREA] [--desc TEXT] [--free BOOL] [--locked BOOL]
+icbfile delete <target> <file> [-a AREA]
 ```
 
 Run any command with `--help` for the full option list.
@@ -284,6 +289,27 @@ checked and the command exits with an error.
 Add `--prune` to drop missing entries from the checked areas. Without it, missing
 entries are retained. Ensure all storage is mounted and accessible before pruning:
 missing entries lose their descriptions and download counters permanently.
+
+An unavailable or unreadable file directory is an error, not an empty area.
+Maintenance commands do not create a database for an unavailable directory or prune
+its entries.
+
+### Deleting a file
+
+```sh
+icbfile delete conferences/main/dir.toml pcb154f.zip --area General
+```
+
+Deletes the disk file and its database entry, including descriptions and counters.
+Use an exact filename; matching ignores ASCII case, but wildcards and paths are not
+accepted. There is no confirmation prompt. If the disk file is already missing, only
+the database entry is removed. If disk deletion fails, the entry is retained and the
+command exits with an error.
+
+The BBS has no dedicated interactive file-deletion command. You can use `icbfile delete`,
+or delete a file from disk and run `icbfile check --prune`. Open BBS sessions refresh
+externally changed entries the next time they access the area, so deleted entries no
+longer appear in subsequent listings.
 
 ### Exporting
 

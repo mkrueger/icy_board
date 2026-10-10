@@ -348,8 +348,13 @@ The file-directory-list argument is decoded by `DirectoryList::load` using the
 component `[[area]]` schema, including when named `file_areas.toml`. A plain
 directory argument opens its file base instead. Area selection by number is
 zero-based; names are matched case-insensitively. Relative directory/metadata
-paths are resolved against the list's parent; empty metadata paths use `dir`
-inside the directory. The file-base database itself is not TOML.
+paths use the nearest ancestor containing `icboard.toml`, or the list's parent
+for a standalone list. Absolute paths are unchanged; empty metadata paths use
+`dir` inside the directory. The file-base database itself is not TOML.
+
+`delete` removes a named disk file and its database entry. `check --prune`
+removes missing entries without deleting existing disk files. Unavailable
+directories are errors, so maintenance does not prune offline storage.
 
 The `fingerprints` subcommand writes a catalog, defaulting to `bbstros.toml`;
 each scanned file produces `name`, `crc`, `file_size` and `sha256`.

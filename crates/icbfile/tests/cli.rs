@@ -22,6 +22,246 @@ fn decoded(bytes: &[u8]) -> String {
     String::from_utf8(bytes.to_vec()).unwrap()
 }
 
+fn nested_area(root: &TempDir) -> (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf) {
+    fs::write(root.path().join("icboard.toml"), "").unwrap();
+    let config = root.path().join("conferences/main/dir.toml");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(
+        &config,
+        r#"
+            [[area]]
+            name = "General"
+            path = "files/general"
+            metadata_path = "metadata/general"
+            password = ""
+        "#,
+    )
+    .unwrap();
+    let path = root.path().join("files/general");
+    fs::create_dir_all(&path).unwrap();
+    let metadata = root.path().join("metadata/general");
+    (config, path, metadata)
+}
+
+#[test]
+fn check_nested_board_area_uses_the_live_database_and_prunes_deleted_files() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, metadata) = nested_area(&root);
+        fs::write(path.join("pcb154f.zip"), "deleted archive").unwrap();
+        fs::write(path.join("KEEP.TXT"), "keep this file").unwrap();
+        let mut base = FileBase::open(&path, &metadata).unwrap();
+        base.set_description(&path.join("pcb154f.zip"), "authored description").unwrap();
+        base.iter_mut().find(|h| h.name == "pcb154f.zip").unwrap().dl_counter = 7;
+        base.save().unwrap();
+        drop(base);
+        fs::remove_file(path.join("pcb154f.zip")).unwrap();
+
+        let target = config.to_str().unwrap();
+        let output = run(locale, &["check", target, "--area", "general"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        let stdout = decoded(&output.stdout);
+        assert!(stdout.contains("missing: pcb154f.zip") && stdout.contains("2 file(s), 1 missing"), "{stdout}");
+        let mut base = FileBase::open(&path, &metadata).unwrap();
+        assert_eq!(base.description(&path.join("pcb154f.zip")).unwrap().as_deref(), Some("authored description"));
+        assert_eq!(base.iter().find(|h| h.name == "pcb154f.zip").unwrap().dl_counter, 7);
+        drop(base);
+
+        let output = run(locale, &["check", target, "--prune"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        assert!(decoded(&output.stdout).contains("1 missing (removed)"));
+        let base = FileBase::open(&path, &metadata).unwrap();
+        assert_eq!(base.to_vec().len(), 1);
+        assert_eq!(base[0].name, "KEEP.TXT");
+        assert_eq!(fs::read_to_string(path.join("KEEP.TXT")).unwrap(), "keep this file");
+        assert!(!config.parent().unwrap().join("metadata").exists());
+    }
+}
+
+#[test]
+fn check_unavailable_storage_fails_without_creating_or_pruning_a_database() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, metadata) = nested_area(&root);
+        fs::remove_dir(&path).unwrap();
+        let output = run(locale, &["check", config.to_str().unwrap(), "--area", "general", "--prune"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(decoded(&output.stderr).contains("can't read file directory"));
+        assert!(!FileBase::database_path(&metadata).exists());
+        assert!(!decoded(&output.stdout).contains("0 file(s)"));
+
+        fs::create_dir(&path).unwrap();
+        fs::write(path.join("OFFLINE.TXT"), "offline").unwrap();
+        drop(FileBase::open(&path, &metadata).unwrap());
+        let offline = root.path().join("offline");
+        fs::rename(&path, &offline).unwrap();
+        let output = run(locale, &["check", config.to_str().unwrap(), "--prune"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(decoded(&output.stderr).contains("can't read file directory"));
+        fs::rename(&offline, &path).unwrap();
+        assert!(FileBase::open(&path, &metadata).unwrap().contains_name("OFFLINE.TXT"));
+    }
+}
+
+#[test]
+fn nested_board_paths_are_shared_by_scan_set_import_export_and_list() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, metadata) = nested_area(&root);
+        fs::write(path.join("RULES.TXT"), "rules").unwrap();
+        let target = config.to_str().unwrap();
+        for args in [
+            vec!["scan", target, "--all"],
+            vec!["set", target, "RULES.TXT", "--area", "General", "--desc", "Board rules"],
+        ] {
+            let output = run(locale, &args);
+            assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        }
+        let listing = root.path().join("FILES.BBS");
+        fs::write(&listing, "RULES.TXT Imported rules\n").unwrap();
+        let output = run(locale, &["import", target, listing.to_str().unwrap(), "--area", "General", "--overwrite"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        for command in ["list", "export"] {
+            let output = run(locale, &[command, target, "--area", "General"]);
+            assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+            let stdout = decoded(&output.stdout);
+            assert!(stdout.contains("RULES.TXT") && stdout.contains("Imported rules"), "{stdout}");
+        }
+        let mut base = FileBase::open(&path, &metadata).unwrap();
+        assert_eq!(base.description(&path.join("RULES.TXT")).unwrap().as_deref(), Some("Imported rules"));
+        assert!(!config.parent().unwrap().join("metadata").exists());
+    }
+}
+
+#[test]
+fn absolute_area_paths_and_default_metadata_are_preserved() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, _) = nested_area(&root);
+        fs::write(
+            &config,
+            format!(
+                "[[area]]\nname = \"General\"\npath = \"{}\"\nmetadata_path = \"\"\npassword = \"\"\n",
+                path.display()
+            ),
+        )
+        .unwrap();
+        fs::write(path.join("MISSING.TXT"), "missing").unwrap();
+        drop(FileBase::open(&path, path.join("dir")).unwrap());
+        fs::remove_file(path.join("MISSING.TXT")).unwrap();
+        let output = run(locale, &["check", config.to_str().unwrap(), "--area", "General", "--prune"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        assert!(decoded(&output.stdout).contains("1 missing (removed)"));
+        assert!(FileBase::open(&path, path.join("dir")).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn delete_removes_disk_files_and_missing_entries_from_the_live_board_database() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, metadata) = nested_area(&root);
+        for name in ["pcb154f.zip", "MISSING.TXT", "KEEP.TXT"] {
+            fs::write(path.join(name), name).unwrap();
+        }
+        let mut base = FileBase::open(&path, &metadata).unwrap();
+        base.set_description(&path.join("pcb154f.zip"), "authored description").unwrap();
+        base.set_description(&path.join("MISSING.TXT"), "missing description").unwrap();
+        drop(base);
+        fs::remove_file(path.join("MISSING.TXT")).unwrap();
+
+        for name in ["PCB154F.ZIP", "missing.txt"] {
+            let output = run(locale, &["delete", config.to_str().unwrap(), name, "--area", "General"]);
+            assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+            let expected = if locale == "de_DE" { "gelöscht:" } else { "deleted:" };
+            assert!(decoded(&output.stdout).contains(expected));
+            assert!(!FileBase::open(&path, &metadata).unwrap().contains_name(name));
+        }
+        assert!(!path.join("pcb154f.zip").exists());
+        assert!(!path.join("MISSING.TXT").exists());
+        assert_eq!(fs::read_to_string(path.join("KEEP.TXT")).unwrap(), "KEEP.TXT");
+        let output = run(locale, &["list", config.to_str().unwrap(), "--area", "0"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        let stdout = decoded(&output.stdout);
+        assert!(
+            stdout.contains("KEEP.TXT") && !stdout.contains("pcb154f.zip") && !stdout.contains("MISSING.TXT"),
+            "{stdout}"
+        );
+
+        let output = run(locale, &["delete", config.to_str().unwrap(), "keep.txt", "--area", "0"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        assert!(!path.join("KEEP.TXT").exists());
+        assert!(FileBase::open(&path, &metadata).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn delete_rejects_unknown_names_and_retains_entries_when_disk_deletion_fails() {
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("files");
+        fs::create_dir(&path).unwrap();
+        fs::write(path.join("KEEP.TXT"), "keep").unwrap();
+        fs::write(root.path().join("OUTSIDE.TXT"), "outside").unwrap();
+        let metadata = path.join("dir");
+        drop(FileBase::open(&path, &metadata).unwrap());
+        for name in ["UNKNOWN.TXT", "*.TXT", "../OUTSIDE.TXT"] {
+            let output = run(locale, &["delete", path.to_str().unwrap(), name]);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(decoded(&output.stderr).contains("is not in this area"));
+        }
+        assert_eq!(fs::read_to_string(root.path().join("OUTSIDE.TXT")).unwrap(), "outside");
+        fs::remove_file(path.join("KEEP.TXT")).unwrap();
+        fs::create_dir(path.join("KEEP.TXT")).unwrap();
+        let output = run(locale, &["delete", path.to_str().unwrap(), "KEEP.TXT"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(decoded(&output.stderr).contains("database entry retained"));
+        assert!(path.join("KEEP.TXT").is_dir());
+        assert!(FileBase::open(&path, &metadata).unwrap().contains_name("KEEP.TXT"));
+        fs::remove_dir(path.join("KEEP.TXT")).unwrap();
+        fs::write(path.join("KEEP.TXT"), "keep").unwrap();
+        let output = run(locale, &["delete", path.to_str().unwrap(), "keep.txt"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        assert!(!path.join("KEEP.TXT").exists());
+        assert!(FileBase::open(&path, metadata).unwrap().is_empty());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn check_inspection_errors_do_not_prune_and_delete_does_not_follow_symlinks() {
+    use std::os::unix::fs::symlink;
+
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("files");
+        fs::create_dir(&path).unwrap();
+        for name in ["LOOP.TXT", "MISSING.TXT"] {
+            fs::write(path.join(name), name).unwrap();
+        }
+        let outside = root.path().join("OUTSIDE.TXT");
+        fs::write(&outside, "outside").unwrap();
+        symlink(&outside, path.join("LINK.TXT")).unwrap();
+        let metadata = path.join("dir");
+        drop(FileBase::open(&path, &metadata).unwrap());
+        fs::remove_file(path.join("LOOP.TXT")).unwrap();
+        fs::remove_file(path.join("MISSING.TXT")).unwrap();
+        symlink("LOOP.TXT", path.join("LOOP.TXT")).unwrap();
+
+        let output = run(locale, &["check", path.to_str().unwrap(), "--prune"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(decoded(&output.stderr).contains("can't inspect"));
+        let base = FileBase::open(&path, &metadata).unwrap();
+        assert!(base.contains_name("LOOP.TXT") && base.contains_name("MISSING.TXT"));
+        drop(base);
+        let output = run(locale, &["delete", path.to_str().unwrap(), "LINK.TXT"]);
+        assert_eq!(output.status.code(), Some(0), "{}", decoded(&output.stderr));
+        assert!(fs::symlink_metadata(path.join("LINK.TXT")).is_err());
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "outside");
+        assert!(!FileBase::open(&path, &metadata).unwrap().contains_name("LINK.TXT"));
+    }
+}
+
 #[test]
 fn check_defaults_to_all_areas_and_only_prunes_when_requested() {
     for locale in ["en_US", "de_DE"] {
@@ -178,7 +418,7 @@ fn help_and_no_arguments_keep_their_streams_and_exit_codes_in_both_languages() {
         let stdout = decoded(&help.stdout);
         assert!(stdout.contains(about), "{stdout}");
         assert!(stdout.contains(options), "{stdout}");
-        for command in ["areas", "list", "scan", "check", "import", "export", "set", "repack", "fingerprints"] {
+        for command in ["areas", "list", "scan", "check", "import", "export", "set", "delete", "repack", "fingerprints"] {
             assert!(stdout.contains(command), "{stdout}");
         }
         let no_args = run(locale, &[]);
@@ -203,6 +443,7 @@ fn every_subcommand_help_is_localized_without_translating_identifiers() {
         ),
         ("export", "encoded as cp437", "als cp437 kodiert"),
         ("set", "the new description", "die neue Beschreibung"),
+        ("delete", "no wildcards", "keine Platzhalter"),
         ("repack", "zip deflate compression level", "zip-Deflate-Kompressionsstufe"),
         ("fingerprints", "where to write the fingerprints", "Ausgabepfad für die Fingerabdrücke"),
     ];

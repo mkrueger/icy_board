@@ -4909,12 +4909,13 @@ impl IcyBoardState {
     }
 
     pub async fn get_filebase(&mut self, dir: &PathBuf, metadata_path: &PathBuf) -> Res<Arc<Mutex<FileBase>>> {
-        if let Some(some) = self.file_bases.get(dir) {
-            return Ok(some.clone());
-        }
-        match FileBase::open(dir, metadata_path) {
-            Ok(new_base) => {
-                let arc: Arc<Mutex<FileBase>> = Arc::new(Mutex::new(new_base));
+        let result = if let Some(base) = self.file_bases.get(dir) {
+            base.lock().await.refresh().map(|()| base.clone())
+        } else {
+            FileBase::open(dir, metadata_path).map(|base| Arc::new(Mutex::new(base)))
+        };
+        match result {
+            Ok(arc) => {
                 self.file_bases.insert(dir.clone(), arc.clone());
                 Ok(arc)
             }

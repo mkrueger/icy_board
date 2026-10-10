@@ -76,6 +76,45 @@ async fn fixture(input: &str) -> (TempDir, IcyBoardState, ChannelConnection) {
 }
 
 #[tokio::test]
+async fn file_listing_refreshes_external_deletions_in_an_open_session() {
+    use icy_engine::{EditableScreen, TextPane};
+
+    let (root, mut state, _peer) = fixture("\r\r").await;
+    let path = root.path().join("paid");
+    let metadata = root.path().join("paid-metadata");
+    let screen_text = |state: &IcyBoardState| {
+        let screen = &state.display_screen().buffer;
+        let top = screen.first_visible_line();
+        (top..top + screen.height())
+            .flat_map(|y| (0..screen.width()).map(move |x| screen.char_at((x, y).into()).ch))
+            .collect::<String>()
+    };
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        state.display_file_area(&path, &metadata, crate::icy_board::state::user_commands::mods::filebrowser::FileFilter::all()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(screen_text(&state).contains("A.ZIP"));
+    let cached = state.get_filebase(&path, &metadata).await.unwrap();
+    let mut maintenance = FileBase::open_checked(&path, &metadata).unwrap();
+    std::fs::remove_file(path.join("A.ZIP")).unwrap();
+    maintenance.remove_file(&path.join("A.ZIP")).unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        state.display_file_area(&path, &metadata, crate::icy_board::state::user_commands::mods::filebrowser::FileFilter::all()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let text = screen_text(&state);
+    assert!(!text.contains("A.ZIP") && text.contains("B.ZIP"), "{text}");
+    assert!(!cached.lock().await.contains_name("A.ZIP"));
+    assert!(path.join("B.ZIP").is_file());
+}
+
+#[tokio::test]
 async fn accounting_only_finished_paid_files_and_per_file_whole_kib() {
     let (root, mut state, _peer) = fixture("").await;
     enable_activity_accounting(

@@ -56,6 +56,7 @@ pub enum FileBaseError {
 
 pub struct FileBase {
     connection: Connection,
+    data_version: i64,
     dir: PathBuf,
     /// Names that live in the directory but are not downloadable files.
     reserved_names: HashSet<String>,
@@ -95,6 +96,18 @@ impl FileBase {
     }
 
     pub fn open<P: AsRef<Path>>(dir: &Path, meta_data_path: P) -> crate::Result<Self> {
+        Self::open_impl(dir, meta_data_path, false)
+    }
+
+    /// Maintenance must not report success or prune entries when storage is unavailable.
+    pub fn open_checked<P: AsRef<Path>>(dir: &Path, meta_data_path: P) -> crate::Result<Self> {
+        Self::open_impl(dir, meta_data_path, true)
+    }
+
+    fn open_impl<P: AsRef<Path>>(dir: &Path, meta_data_path: P, strict: bool) -> crate::Result<Self> {
+        if strict {
+            fs::read_dir(dir).map_err(|err| format!("can't read file directory {}: {err}", dir.display()))?;
+        }
         let db_path = Self::database_path(&meta_data_path);
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent)?;
@@ -102,19 +115,33 @@ impl FileBase {
         let connection = Connection::open(&db_path)?;
         Self::configure(&connection)?;
         Self::migrate(&connection)?;
+        let data_version = connection.pragma_query_value(None, "data_version", |row| row.get(0))?;
 
         let mut res = Self {
             connection,
+            data_version,
             dir: dir.to_path_buf(),
             reserved_names: Self::reserved_names(&meta_data_path),
             name_map: HashMap::new(),
             file_headers: Vec::new(),
         };
         res.load_headers()?;
-        if let Err(err) = res.scan_path() {
+        if strict {
+            res.scan_path()?;
+        } else if let Err(err) = res.scan_path() {
             log::error!("Filebase error scanning path: {}", err);
         }
         Ok(res)
+    }
+
+    /// Reload externally changed entries without discarding unchanged in-memory headers.
+    pub fn refresh(&mut self) -> crate::Result<()> {
+        let version = self.connection.pragma_query_value(None, "data_version", |row| row.get(0))?;
+        if self.data_version != version {
+            self.load_headers()?;
+            self.data_version = version;
+        }
+        Ok(())
     }
 
     /// An index left behind by the old binary format sits in the directory it describes.
@@ -631,8 +658,47 @@ mod tests {
         let path = dir.path().join("ALPHA.TXT");
 
         let mut base = base(&dir);
+        base.set_description(&path, "removed description").unwrap();
+        fs::remove_file(&path).unwrap();
         base.remove_file(&path).unwrap();
         assert!(base.is_empty());
+        let metadata_count: i64 = base.connection.query_row("SELECT COUNT(*) FROM metadata", [], |row| row.get(0)).unwrap();
+        assert_eq!(metadata_count, 0);
+        drop(base);
+        assert!(self::base(&dir).is_empty());
+    }
+
+    #[test]
+    fn test_cached_headers_refresh_after_external_removal() {
+        let dir = TempDir::new().unwrap();
+        write(&dir, "ALPHA.TXT", b"alpha");
+        write(&dir, "KEEP.TXT", b"keep");
+        let mut cached = base(&dir);
+        cached[0].dl_counter = 7;
+        cached.refresh().unwrap();
+        assert_eq!(cached[0].dl_counter, 7);
+        let mut other = base(&dir);
+        let path = dir.path().join("ALPHA.TXT");
+        fs::remove_file(&path).unwrap();
+        other.remove_file(&path).unwrap();
+        cached.refresh().unwrap();
+        assert_eq!(names(&cached), ["KEEP.TXT"]);
+    }
+
+    #[test]
+    fn test_checked_open_rejects_unavailable_storage_but_normal_open_keeps_offline_entries() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("missing");
+        let metadata = dir.path().join("index");
+        assert!(FileBase::open_checked(&path, &metadata).is_err());
+        assert!(!FileBase::database_path(&metadata).exists());
+        fs::create_dir(&path).unwrap();
+        fs::write(path.join("OFFLINE.TXT"), "offline").unwrap();
+        drop(FileBase::open_checked(&path, &metadata).unwrap());
+        fs::remove_file(path.join("OFFLINE.TXT")).unwrap();
+        fs::remove_dir(&path).unwrap();
+        assert!(FileBase::open_checked(&path, &metadata).is_err());
+        assert!(FileBase::open(&path, &metadata).unwrap().contains_name("OFFLINE.TXT"));
     }
 
     #[test]
