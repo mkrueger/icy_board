@@ -16,6 +16,11 @@ use crate::Connection;
 
 #[async_trait]
 pub trait Protocol {
+    /// Returns whether the receiver enforces this limit without aborting the session.
+    fn set_receive_limit(&mut self, _limit: usize) -> bool {
+        false
+    }
+
     async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()>;
 
     async fn initiate_send(&mut self, com: &mut dyn Connection, files: &[PathBuf]) -> crate::Result<TransferState>;

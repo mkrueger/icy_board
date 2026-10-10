@@ -627,6 +627,7 @@ impl IcyBoardState {
             receipt.failed = true;
             return Ok(receipt);
         };
+        let receiver_limits_files = protocol.set_receive_limit(limit);
         let mut transfer = match timeout(Duration::from_secs(30), protocol.initiate_recv(&mut *self.connection)).await {
             Ok(Ok(state)) => UploadReceiveGuard(state),
             _ => {
@@ -664,9 +665,8 @@ impl IcyBoardState {
             if receipt.failed || transfer.0.is_finished {
                 break;
             }
-            if receipt.files.len() >= limit {
-                // Native API has no receive-count setter. Stop at the completion
-                // boundary, before polling a second header/payload (NoBatchUp).
+            if receipt.files.len() >= limit && !receiver_limits_files {
+                // Other native protocols still stop at the first completion boundary.
                 let _ = timeout(Duration::from_secs(2), protocol.cancel_transfer(&mut *self.connection)).await;
                 break;
             }

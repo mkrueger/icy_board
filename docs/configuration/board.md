@@ -385,6 +385,14 @@ failures require review instead of publishing the failed result. For
 `preserve`, source ZIP comments retain their raw bytes; comments from
 other archive formats are not carried over by the archive reader.
 
+When advertisement removal is enabled and a nonempty configured rules path is
+missing, all archive transformations are skipped: no repacking, advertisement
+insertion/removal or comment changes. The original upload is retained and the
+skip is logged and recorded in its processing report. FILE_ID.DIZ extraction at
+publication, an enabled virus scanner and the publication policy still apply.
+Empty rule paths disable only their category; malformed or unreadable rules
+remain processing errors requiring review.
+
 An absent `[upload_processing]` is backward-compatible. A present empty
 table is **not**: its five required numeric fields are still mandatory.
 Likewise, omitting the whole scanner gets its default executable and

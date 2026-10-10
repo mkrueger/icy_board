@@ -73,7 +73,25 @@ impl UploadProcessor {
     async fn process_inner(&self, id: &str, original_name: &str) -> Res<QuarantineRecord> {
         let mut record = self.quarantine.load(id)?;
         let mut payload = self.quarantine.payload_path(&record);
-        if self.archive_processing_enabled() {
+        let mut archive_processing = self.archive_processing_enabled();
+        if archive_processing && self.config.remove_advertisements {
+            for path in [&self.config.advertisement_file_rules, &self.config.advertisement_description_rules] {
+                if path.as_os_str().is_empty() {
+                    continue;
+                }
+                match std::fs::metadata(path) {
+                    Ok(_) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        let message = format!("archive processing skipped: rules file {path:?} is missing; original upload retained");
+                        log::warn!("{}", upload_log_message(original_name, id, &message));
+                        record.processing_report.push(message);
+                        archive_processing = false;
+                    }
+                    Err(error) => return Err(format!("Unable to inspect upload rules file {path:?}: {error}").into()),
+                }
+            }
+        }
+        if archive_processing {
             let rules = if self.config.remove_advertisements {
                 FingerprintData::load_split(&self.config.advertisement_file_rules, &self.config.advertisement_description_rules)?
             } else {
@@ -381,6 +399,116 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn missing_rules_preserve_archive_and_publish_file_id() {
+        use dizbase::file_base::{FileBase, metadata::MetadataType};
+
+        for missing_category in 0..2 {
+            for policy in [UploadPublishPolicy::AfterProcessing, UploadPublishPolicy::ManualApproval] {
+                let root = tempfile::tempdir().unwrap();
+                let paths = [root.path().join("members.toml"), root.path().join("descriptions.toml")];
+                std::fs::write(&paths[1 - missing_category], "").unwrap();
+                let config = UploadProcessingConfig {
+                    publish_policy: policy,
+                    quarantine_path: root.path().join("quarantine"),
+                    remove_advertisements: true,
+                    repack_to_zip: true,
+                    advertisement_file_rules: paths[0].clone(),
+                    advertisement_description_rules: paths[1].clone(),
+                    advertisement_file: root.path().join("missing-ad.txt"),
+                    archive_comment_mode: ArchiveCommentMode::Replace,
+                    replacement_archive_comment: "must not replace".into(),
+                    ..Default::default()
+                };
+                let (quarantine, record) = queued_zip(root.path(), &config, false);
+                let mut archive = zip::ZipWriter::new(std::fs::File::create(quarantine.payload_path(&record)).unwrap());
+                for (name, content) in [("PAYLOAD.TXT", "payload"), ("FILE_ID.DIZ", "Original description")] {
+                    archive.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+                    archive.write_all(content.as_bytes()).unwrap();
+                }
+                archive.set_comment("Original comment").unwrap();
+                archive.finish().unwrap();
+                let original = std::fs::read(quarantine.payload_path(&record)).unwrap();
+                let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+                assert_eq!(
+                    processed.status,
+                    if policy == UploadPublishPolicy::ManualApproval {
+                        QuarantineStatus::AwaitingApproval
+                    } else {
+                        QuarantineStatus::ReadyToPublish
+                    },
+                    "{:?}",
+                    processed.processing_report
+                );
+                assert!(processed.processing_report.iter().any(|line| line.starts_with("archive processing skipped:")));
+                assert_eq!(processed.original_name, record.original_name);
+                assert_eq!(processed.payload_file, record.payload_file);
+                assert_eq!(std::fs::read(quarantine.payload_path(&processed)).unwrap(), original);
+                let published = super::super::upload_publish::publish_quarantine_record(&quarantine, &record.id, "test", "publish").unwrap();
+                let destination = published.destination.join(&published.original_name);
+                assert_eq!(std::fs::read(&destination).unwrap(), original);
+                let mut base = FileBase::open(&published.destination, &published.metadata_path).unwrap();
+                let metadata = base.read_metadata(&destination).unwrap();
+                assert!(
+                    metadata
+                        .iter()
+                        .any(|item| item.metadata_type == MetadataType::FileID && item.data == b"Original description")
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn invalid_or_unreadable_rules_still_require_review() {
+        for directory_rule in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("members.toml");
+            if directory_rule {
+                std::fs::create_dir(&path).unwrap();
+            } else {
+                std::fs::write(&path, "not valid TOML [").unwrap();
+            }
+            let config = UploadProcessingConfig {
+                publish_policy: UploadPublishPolicy::AfterProcessing,
+                quarantine_path: root.path().join("quarantine"),
+                remove_advertisements: true,
+                advertisement_file_rules: path,
+                advertisement_description_rules: Default::default(),
+                ..Default::default()
+            };
+            let (quarantine, record) = queued_zip(root.path(), &config, false);
+            let original = std::fs::read(quarantine.payload_path(&record)).unwrap();
+            let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+            assert_eq!(processed.status, QuarantineStatus::NeedsReview);
+            assert!(processed.processing_report.iter().any(|line| line.starts_with("error:")));
+            assert_eq!(std::fs::read(quarantine.payload_path(&processed)).unwrap(), original);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn missing_rules_do_not_bypass_virus_scanner() {
+        let root = tempfile::tempdir().unwrap();
+        let config = UploadProcessingConfig {
+            publish_policy: UploadPublishPolicy::AfterProcessing,
+            quarantine_path: root.path().join("quarantine"),
+            remove_advertisements: true,
+            advertisement_file_rules: root.path().join("missing.toml"),
+            advertisement_description_rules: Default::default(),
+            scanner: UploadScannerConfig {
+                enabled: true,
+                executable: PathBuf::from("/bin/sh"),
+                arguments: vec!["-c".into(), "exit 1".into(), "{file}".into()],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let (_, record) = queued_zip(root.path(), &config, false);
+        let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+        assert_eq!(processed.status, QuarantineStatus::NeedsReview);
+        assert!(processed.processing_report.iter().any(|line| line == "virus scanner: infected"));
+    }
+
+    #[tokio::test]
     async fn upload_split_rules_clean_only_enabled_categories() {
         use std::io::Read;
 
@@ -581,6 +709,8 @@ mod tests {
                 let path = root.path().join("invalid rules.toml");
                 if malformed {
                     std::fs::write(&path, "[[malformed").unwrap();
+                } else {
+                    std::fs::create_dir(&path).unwrap();
                 }
                 let mut config = UploadProcessingConfig {
                     publish_policy: UploadPublishPolicy::AfterProcessing,

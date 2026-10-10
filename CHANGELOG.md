@@ -8,6 +8,17 @@ releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Missing advertisement rule files no longer reject uploads: archive
+  transformations are skipped, preserving the original file and FILE_ID.DIZ
+  extraction. Enabled virus scanning and approval policies still apply.
+- Single-file ZMODEM uploads complete the session handshake instead of reporting
+  a remote cancellation at 100%. Additional queued files beyond the upload limit
+  are skipped without receiving their payloads.
+- ZMODEM binary CRC-16 headers and subpackets use the protocol's network byte order,
+  allowing transfers with independent clients that select CRC-16.
+
 ## [0.2.3] - 2026-10-10
 
 Fourth public beta. This release includes the Windows board-creation fix and

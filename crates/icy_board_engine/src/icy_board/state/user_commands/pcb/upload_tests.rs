@@ -738,6 +738,43 @@ async fn rejected_scanner_keeps_quarantine_without_credit() {
 }
 
 #[tokio::test]
+async fn missing_upload_rules_report_success_and_preserve_file_id() {
+    use std::io::{Cursor, Write};
+
+    let (root, mut state, mut peer) = fixture("").await;
+    {
+        let mut board = state.get_board().await;
+        let config = &mut board.config.upload_processing;
+        config.publish_policy = UploadPublishPolicy::AfterProcessing;
+        config.quarantine_path = root.path().join("quarantine");
+        config.remove_advertisements = true;
+        config.repack_to_zip = true;
+        config.advertisement_file_rules = root.path().join("missing-members.toml");
+        config.advertisement_description_rules = root.path().join("missing-descriptions.toml");
+    }
+    let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    archive.start_file("FILE_ID.DIZ", zip::write::SimpleFileOptions::default()).unwrap();
+    archive.write_all(b"Archive description").unwrap();
+    let original = archive.finish().unwrap().into_inner();
+    finish_bounded(
+        &mut state,
+        UploadReceipt {
+            files: vec![completed("UPLOAD.ZIP", &original)],
+            ..Default::default()
+        },
+        &[request("UPLOAD.ZIP", false, "entered description")],
+        false,
+    )
+    .await;
+    let text = output(&mut peer).await;
+    assert!(text.contains("Transfer Successful"), "{text:?}");
+    assert!(!text.contains("Transfer Aborted"), "{text:?}");
+    assert_eq!(std::fs::read(root.path().join("public/UPLOAD.ZIP")).unwrap(), original);
+    assert_description(&mut state, root.path(), "public", "UPLOAD.ZIP", "Archive description").await;
+    assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_uploads, 1);
+}
+
+#[tokio::test]
 async fn native_xmodem_uses_requested_name_and_remote_cancel_never_completes_a_file() {
     for cancel in [false, true] {
         let (root, mut state, mut peer) = fixture("").await;
@@ -818,11 +855,10 @@ async fn native_upload_command_retains_single_names_but_enabled_batch_describes_
                 let mut sender = Zmodem::new(1024);
                 let mut transfer = sender.initiate_send(&mut peer, &paths).await.unwrap();
                 while !transfer.is_finished {
-                    if sender.update_transfer(&mut peer, &mut transfer).await.is_err() {
-                        break;
-                    }
+                    sender.update_transfer(&mut peer, &mut transfer).await.unwrap();
                     tokio::task::yield_now().await;
                 }
+                assert_eq!(transfer.send_state.errors, 0, "{:?}", transfer.send_state.output_log);
             })
         })
         .await
@@ -844,6 +880,165 @@ async fn native_upload_command_retains_single_names_but_enabled_batch_describes_
         .await
         .unwrap();
     }
+}
+
+#[tokio::test]
+#[ignore = "requires an independent lrzsz sender; set ICY_LSZ to its executable"]
+async fn single_zmodem_upload_from_lrzsz_over_telnet() {
+    use icy_net::connection::telnet::{TelnetConnection, TermCaps, TerminalEmulation};
+    use std::process::Stdio;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        process::Command,
+    };
+
+    let executable = std::env::var("ICY_LSZ").expect("set ICY_LSZ to the lrzsz sz/lsz executable");
+    for (crc16, extra_file, zedzap) in [(false, false, false), (false, true, false), (true, false, false), (false, false, true)] {
+        let (root, mut state, _unused_peer) = fixture("known description\r\r").await;
+        state.session.tokens.push_back("UPLOAD.BIN".into());
+        state.session.current_user.as_mut().unwrap().protocol = if zedzap { "8" } else { "Z" }.into();
+        let source = root.path().join("UPLOAD.BIN");
+        let expected: Vec<u8> = (0..109_180).map(|n| (n % 256) as u8).collect();
+        std::fs::write(&source, &expected).unwrap();
+        let extra = root.path().join("EXTRA.BIN");
+        std::fs::write(&extra, b"must not be received").unwrap();
+        let raw_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let telnet_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut command = Command::new(&executable);
+        command.args(["--binary", "--quiet", "--tcp-client"]);
+        command.arg(raw_listener.local_addr().unwrap().to_string());
+        if crc16 {
+            command.arg("--16-bit-crc");
+        }
+        if zedzap {
+            command.arg("--start-8k");
+        }
+        command.arg(&source);
+        if extra_file {
+            command.arg(&extra);
+        }
+        let child = command.stderr(Stdio::piped()).stdout(Stdio::null()).kill_on_drop(true).spawn().unwrap();
+        timeout(Duration::from_secs(20), async {
+            let (raw, _) = raw_listener.accept().await.unwrap();
+            let mut client = TelnetConnection::open(
+                telnet_listener.local_addr().unwrap().to_string(),
+                TermCaps {
+                    window_size: (80, 25),
+                    terminal: TerminalEmulation::Ansi,
+                },
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+            let (server, _) = telnet_listener.accept().await.unwrap();
+            state.connection = Box::new(TelnetConnection::accept(server).unwrap());
+            let (stop, mut stopped) = tokio::sync::oneshot::channel();
+            let bridge = tokio::spawn(async move {
+                let (mut incoming, mut outgoing) = raw.into_split();
+                let mut from_sender = [0; 8192];
+                let mut from_board = [0; 8192];
+                let mut ready = false;
+                let mut handshake = Vec::new();
+                let mut sender_done = false;
+                loop {
+                    tokio::select! {
+                        result = &mut stopped => {
+                            result.unwrap();
+                            break;
+                        }
+                        count = incoming.read(&mut from_sender), if ready && !sender_done => {
+                            let count = count.unwrap();
+                            if count == 0 {
+                                sender_done = true;
+                                continue;
+                            }
+                            client.send(&from_sender[..count]).await.unwrap();
+                        }
+                        count = client.read(&mut from_board) => {
+                            let count = count.unwrap();
+                            if count == 0 {
+                                break;
+                            }
+                            if ready {
+                                if !sender_done && let Err(error) = outgoing.write_all(&from_board[..count]).await {
+                                    assert!(
+                                        matches!(error.kind(), std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset),
+                                        "sender bridge failed: {error}"
+                                    );
+                                    sender_done = true;
+                                }
+                            } else {
+                                // Terminal prompts can make sz select YMODEM before it sees ZRINIT.
+                                handshake.extend_from_slice(&from_board[..count]);
+                                if let Some(start) = handshake.windows(4).position(|bytes| bytes == b"**\x18B") {
+                                    outgoing.write_all(&handshake[start..]).await.unwrap();
+                                    ready = true;
+                                    handshake.clear();
+                                } else if handshake.len() > 3 {
+                                    handshake.drain(..handshake.len() - 3);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            state.upload_file().await.unwrap();
+            let output = child.wait_with_output().await.unwrap();
+            stop.send(()).unwrap();
+            bridge.await.unwrap();
+            assert!(
+                output.status.success(),
+                "sender failed (CRC16={crc16}, extra={extra_file}, 8k={zedzap}): {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        })
+        .await
+        .unwrap_or_else(|_| panic!("independent Telnet upload stalled (CRC16={crc16}, extra={extra_file}, 8k={zedzap})"));
+        assert_eq!(std::fs::read(root.path().join("public/UPLOAD.BIN")).unwrap(), expected);
+        assert!(!root.path().join("public/EXTRA.BIN").exists());
+        assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_uploads, 1);
+        assert_description(&mut state, root.path(), "public", "UPLOAD.BIN", "known description").await;
+    }
+}
+
+#[tokio::test]
+async fn single_zmodem_upload_completes_without_remote_cancellation() {
+    use icy_net::protocol::{Header, ZFrameType};
+
+    let (root, mut state, mut peer) = fixture("known description\r\r").await;
+    state.session.tokens.push_back("UPLOAD.BIN".into());
+    state.session.current_user.as_mut().unwrap().protocol = "Z".into();
+    let source = root.path().join("UPLOAD.BIN");
+    let expected: Vec<u8> = (0..109_180).map(|n| (n % 256) as u8).collect();
+    std::fs::write(&source, &expected).unwrap();
+    let (result, ()) = timeout(Duration::from_secs(10), async {
+        tokio::join!(state.upload_file(), async {
+            loop {
+                if let Ok(Some(header)) = Header::read(&mut peer, &mut 0).await
+                    && header.frame_type == ZFrameType::RIinit
+                {
+                    break;
+                }
+            }
+            let mut sender = Zmodem::new(1024);
+            let mut transfer = sender.initiate_send(&mut peer, std::slice::from_ref(&source)).await.unwrap();
+            while !transfer.is_finished {
+                sender.update_transfer(&mut peer, &mut transfer).await.unwrap();
+            }
+            assert_eq!(transfer.send_state.errors, 0, "{:?}", transfer.send_state.output_log);
+            assert_eq!(transfer.send_state.finished_files.len(), 1);
+        })
+    })
+    .await
+    .expect("single upload stalled");
+    result.unwrap();
+    let text = output(&mut peer).await;
+    assert!(text.contains("Transfer Successful"), "{text:?}");
+    assert!(!text.contains("Transfer Aborted"), "{text:?}");
+    assert_eq!(std::fs::read(root.path().join("public/UPLOAD.BIN")).unwrap(), expected);
+    assert_eq!(state.session.current_user.as_ref().unwrap().stats.num_uploads, 1);
+    assert_description(&mut state, root.path(), "public", "UPLOAD.BIN", "known description").await;
 }
 
 #[tokio::test]
@@ -939,15 +1134,15 @@ async fn paired_zmodem_receives_native_names_and_stops_no_batch_after_first_payl
                 let mut sender = Zmodem::new(1024);
                 let mut transfer = sender.initiate_send(&mut peer, &paths).await.unwrap();
                 while !transfer.is_finished {
-                    if sender.update_transfer(&mut peer, &mut transfer).await.is_err() {
-                        break;
-                    }
+                    sender.update_transfer(&mut peer, &mut transfer).await.unwrap();
                     if cancel_after_first && !transfer.send_state.finished_files.is_empty() {
                         sender.cancel_transfer(&mut peer).await.unwrap();
                         break;
                     }
                     tokio::task::yield_now().await;
                 }
+                assert_eq!(transfer.send_state.errors, 0, "{:?}", transfer.send_state.output_log);
+                assert_eq!(transfer.send_state.finished_files.len(), if limit == 1 || cancel_after_first { 1 } else { 2 });
             })
         })
         .await

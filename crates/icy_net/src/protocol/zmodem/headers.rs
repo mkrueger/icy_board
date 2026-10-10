@@ -160,7 +160,7 @@ impl Header {
                 append_zdle_encoded(&mut res, &self.data, escape_ctrl_chars);
                 // Compute CRC16 on raw body
                 let crc16 = get_crc16_buggy(&raw);
-                append_zdle_encoded(&mut res, &u16::to_le_bytes(crc16), escape_ctrl_chars);
+                append_zdle_encoded(&mut res, &u16::to_be_bytes(crc16), escape_ctrl_chars);
             }
 
             HeaderType::Bin32 => {
@@ -270,7 +270,7 @@ impl Header {
         match header_type {
             ZBIN => {
                 let crc16 = get_crc16_buggy(&header_data[0..5]);
-                let check_crc16 = u16::from_le_bytes(header_data[5..7].try_into().unwrap());
+                let check_crc16 = u16::from_be_bytes(header_data[5..7].try_into().unwrap());
                 if crc16 != check_crc16 {
                     return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
                 }
@@ -374,7 +374,7 @@ impl Header {
         match header_type {
             ZBIN => {
                 let crc16 = get_crc16_buggy(&header_data[0..5]);
-                let check_crc16 = u16::from_le_bytes(header_data[5..7].try_into().unwrap());
+                let check_crc16 = u16::from_be_bytes(header_data[5..7].try_into().unwrap());
                 if crc16 != check_crc16 {
                     return Err(ZModemError::CRC16Mismatch(crc16, check_crc16).into());
                 }

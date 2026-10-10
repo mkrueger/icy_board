@@ -25,6 +25,77 @@ async fn receiver_with_block_length(block_length: usize) -> (Zmodem, TransferSta
 }
 
 #[tokio::test]
+async fn crc16_wire_bytes_use_network_byte_order() {
+    use icy_net::protocol::rz::read_subpacket;
+
+    let header = [b'*', 0x18, b'A', 4, 0, 0, 0, 0, 0x89, 0x06];
+    assert_eq!(Header::empty(ZFrameType::File).build(HeaderType::Bin, false), header);
+    let data = [b'h', b'e', b'l', b'l', b'o', 0x18, b'h', 0x66, 0x81];
+    assert_eq!(Zmodem::encode_subpacket_crc16(ZCRCE, b"hello", false), data);
+    for nonblocking in [false, true] {
+        let (mut conn, mut peer) = ChannelConnection::create_pair();
+        peer.send(&header).await.unwrap();
+        let parsed = if nonblocking {
+            bounded(Header::try_read(&mut conn, &mut 0)).await
+        } else {
+            bounded(Header::read(&mut conn, &mut 0)).await
+        }
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.frame_type, ZFrameType::File);
+        peer.send(&data).await.unwrap();
+        assert_eq!(
+            bounded(read_subpacket(&mut conn, 1024, false, false)).await.unwrap(),
+            (b"hello".to_vec(), true, false)
+        );
+    }
+}
+
+#[tokio::test]
+async fn receive_limit_skips_extra_file_without_accepting_payload_or_canceling() {
+    let (mut conn, mut peer) = ChannelConnection::create_pair();
+    let mut protocol = Zmodem::new(1024);
+    assert!(protocol.set_receive_limit(1));
+    let mut state = bounded(protocol.initiate_recv(&mut conn)).await.unwrap();
+    bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"first\x005\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    bytes.extend(Header::from_number(ZFrameType::Eof, 5).build(HeaderType::Hex, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.finished_files.is_empty() {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    let (_, received) = state.recieve_state.finished_files.pop().unwrap();
+    assert_eq!(std::fs::read(&received).unwrap(), b"hello");
+    std::fs::remove_file(received).unwrap();
+
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"extra\x009999\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::Skip);
+    assert!(state.recieve_state.finished_files.is_empty());
+    assert_eq!(state.recieve_state.total_bytes_transfered, 5);
+    assert!(!state.is_finished);
+    Header::empty(ZFrameType::Fin).write(&mut peer, HeaderType::Hex, false).await.unwrap();
+    peer.send(b"OO").await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::Fin);
+    assert!(state.is_finished);
+    assert_eq!(state.recieve_state.errors, 0);
+}
+
+#[tokio::test]
 async fn receiver_accepts_large_streaming_subpackets_independently_of_upload_block_size() {
     for block_length in [1024, 8192] {
         for kind in [HeaderType::Bin, HeaderType::Bin32] {

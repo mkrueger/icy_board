@@ -28,6 +28,7 @@ use super::{Protocol, TransferState};
 
 pub struct Zmodem {
     block_length: usize,
+    receive_limit: usize,
     rz: Option<rz::Rz>,
     sz: Option<sz::Sz>,
 }
@@ -36,6 +37,7 @@ impl Zmodem {
     pub fn new(block_length: usize) -> Self {
         Self {
             block_length,
+            receive_limit: usize::MAX,
             sz: None,
             rz: None,
         }
@@ -56,7 +58,7 @@ impl Zmodem {
         append_zdle_encoded(&mut v, data, escape_ctl_chars);
 
         v.extend_from_slice(&[ZDLE, zcrc_byte]);
-        append_zdle_encoded(&mut v, &u16::to_le_bytes(crc), escape_ctl_chars);
+        append_zdle_encoded(&mut v, &u16::to_be_bytes(crc), escape_ctl_chars);
         v
     }
 
@@ -140,6 +142,14 @@ fn from_hex(n: u8) -> crate::Result<u8> {
 
 #[async_trait]
 impl Protocol for Zmodem {
+    fn set_receive_limit(&mut self, limit: usize) -> bool {
+        self.receive_limit = limit;
+        if let Some(rz) = &mut self.rz {
+            rz.set_receive_limit(limit);
+        }
+        true
+    }
+
     async fn update_transfer(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if let Some(rz) = &mut self.rz {
             rz.update_transfer(com, transfer_state).await?;
@@ -161,6 +171,7 @@ impl Protocol for Zmodem {
 
     async fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
         let mut rz = Rz::new(self.block_length);
+        rz.set_receive_limit(self.receive_limit);
         rz.recv(com).await?;
         self.rz = Some(rz);
         Ok(TransferState::new(self.get_name().to_string()))

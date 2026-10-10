@@ -35,6 +35,8 @@ pub struct Rz {
     last_send: Instant,
 
     cur_out_file: Option<NamedTempFile>,
+    receive_limit: usize,
+    received_files: usize,
 
     can_fullduplex: bool,
     can_esc_control: bool,
@@ -65,11 +67,17 @@ impl Rz {
             escape_8th_bit: false,
             attn_seq: vec![0],
             cur_out_file: None,
+            receive_limit: usize::MAX,
+            received_files: 0,
         }
     }
 
     pub fn is_active(&self) -> bool {
         !matches!(self.state, RecvState::Idle)
+    }
+
+    pub fn set_receive_limit(&mut self, limit: usize) {
+        self.receive_limit = limit;
     }
 
     async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
@@ -316,7 +324,7 @@ impl Rz {
             let header = match header_type {
                 ZBIN => {
                     let crc16 = get_crc16_buggy(&header_data[0..5]);
-                    let check_crc16 = u16::from_le_bytes(header_data[5..7].try_into().unwrap());
+                    let check_crc16 = u16::from_be_bytes(header_data[5..7].try_into().unwrap());
                     if crc16 != check_crc16 {
                         continue; // CRC mismatch, keep scanning
                     }
@@ -440,6 +448,14 @@ impl Rz {
 
                 match pck {
                     Ok((block, _, _)) => {
+                        if self.received_files >= self.receive_limit {
+                            transfer_state
+                                .recieve_state
+                                .log_info("Upload limit reached, skipping additional file".to_string());
+                            Header::empty(ZFrameType::Skip).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                            self.state = RecvState::SendZRINIT;
+                            return Ok(true);
+                        }
                         // Successful file header subpacket: reset per-file retry counters
                         self.errors = 0;
                         let (file_name, file_size) = match parse_file_info(&block) {
@@ -581,6 +597,7 @@ impl Rz {
                 if let Some(named_file) = self.cur_out_file.take() {
                     let path = &named_file.keep()?.1;
                     transfer_state.recieve_state.finish_file(path.clone());
+                    self.received_files += 1;
                 } else {
                     return Err(ZModemError::NoFileOpen.into());
                 }
@@ -836,7 +853,7 @@ async fn check_crc(com: &mut dyn Connection, use_crc32: bool, data: &[u8], zcrc_
     } else {
         let crc = get_crc16_buggy_zlde(data, zcrc_byte);
         let crc_bytes = read_zdle_bytes(com, 2).await?;
-        let check_crc = u16::from_le_bytes(crc_bytes.try_into().unwrap());
+        let check_crc = u16::from_be_bytes(crc_bytes.try_into().unwrap());
         if crc == check_crc {
             Ok(true)
         } else {
