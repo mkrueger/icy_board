@@ -982,6 +982,10 @@ async fn native_door_rejects_socket_placeholder_without_a_socket_connection() {
 #[cfg(target_os = "linux")]
 #[tokio::test]
 async fn native_door32_parallel_launches_do_not_inherit_other_sockets() {
+    let inherited_sockets: std::collections::HashSet<_> = std::fs::read_dir("/proc/self/fd")
+        .unwrap()
+        .filter_map(|entry| std::fs::read_link(entry.unwrap().path()).ok())
+        .collect();
     let (root, mut first, mut first_peer) = fixture(false).await;
     let (other_root, mut second, mut second_peer) = fixture(false).await;
     let game = native_door32_fixture(root.path(), "wait", false);
@@ -995,6 +999,7 @@ async fn native_door32_parallel_launches_do_not_inherit_other_sockets() {
     let forbidden: Vec<_> = std::fs::read_dir("/proc/self/fd")
         .unwrap()
         .filter_map(|entry| std::fs::read_link(entry.unwrap().path()).ok())
+        .filter(|target| !inherited_sockets.contains(target))
         .map(|target| target.to_string_lossy().into_owned())
         .filter(|target| target.starts_with("socket:["))
         .collect();

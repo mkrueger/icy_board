@@ -5154,7 +5154,10 @@ mod screen_tests {
 
         state.session.push_tokens("A");
         let numbers = state.get_area_numbers().await.unwrap().numbers;
-        assert_eq!(numbers.iter().map(|(num, name, _, _)| (*num, name.as_str())).collect::<Vec<_>>(), [(1, "General")]);
+        assert_eq!(
+            numbers.iter().map(|(num, name, _, _)| (*num, name.as_str())).collect::<Vec<_>>(),
+            [(1, "General")]
+        );
 
         state.session.current_conference.directories = None;
         state.session.push_tokens("A");
