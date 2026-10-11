@@ -9,6 +9,7 @@ PPL Reference
    language
    preprocessor
    data_types
+   objects
    constants
    functions
    statements

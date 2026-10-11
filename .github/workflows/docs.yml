@@ -5,22 +5,28 @@ on:
     paths:
       - "docs/**"
       - "crates/icy_board_help/data/**"
+      - "crates/icy_board_ppl/**"
+      - "crates/ppl-lsp/**"
       - "crates/tree-sitter-ppl/README.md"
       - "compat/*.md"
       - "assets/**"
       - "INSTALL.md"
       - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/docs.yml"
   push:
     branches: [main]
     paths:
       - "docs/**"
       - "crates/icy_board_help/data/**"
+      - "crates/icy_board_ppl/**"
+      - "crates/ppl-lsp/**"
       - "crates/tree-sitter-ppl/README.md"
       - "compat/*.md"
       - "assets/**"
       - "INSTALL.md"
       - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
     inputs:
@@ -37,6 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check PPL API reference
+        env:
+          LANGUAGE: en
+        run: |
+          cargo test-low --locked -p ppl-lsp --example api_reference
+          cargo run --locked --jobs 4 -p ppl-lsp --example api_reference -- --check
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

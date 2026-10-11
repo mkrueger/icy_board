@@ -5,6 +5,10 @@ Icy Board evolves PPL through an explicit *language version*. A source can put
 available as `pplc --lang-version`, `[compiler] language_version` in `ppl.toml`
 and the `PPL_LANG_VERSION` environment default.
 
+For API lookup, use the [PPL 4.00 object and library reference](source/ppl/objects.md)
+and its [complete type/member index](source/ppl/api/index.md). This chapter
+provides the detailed behavioral explanations linked from those member pages.
+
 The *runtime version* is separate. It controls the PPE format written to disk.
 Icy Board writes one runtime of its own, 4.00. Lower supported targets use
 PCBoard formats. The table distinguishes syntax that can lower to classic
@@ -1003,9 +1007,10 @@ power-loss durability guarantee and no automatic schema migration.
 
 ### Board objects
 
-Board objects are read-only snapshots rather than custom records. They expose
-the configured conferences, message areas, file directories and doors without
-making a PPE parse Icy Board's TOML files. `Board` and `Session` are the way in:
+Configured conference, area, directory and door objects are read-only snapshots
+rather than custom records. They expose the board configuration without making
+a PPE parse Icy Board's TOML files. Other object types can be live handles,
+mutable resources or values, as described below. `Board` and `Session` are the way in:
 one for what the board is configured to be, one for the call in progress. The
 detailed member table follows below.
 

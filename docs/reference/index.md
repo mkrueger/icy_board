@@ -3,7 +3,7 @@
 Use this page for direct lookup. For a guided path, start with
 [board concepts](concepts.md) or [sysop administration](administration.md).
 The website search includes command topics, configuration tables, macros,
-PPL functions and PPL statements.
+PPL objects and their APIs, functions and statements.
 
 ## A–Z subject index
 
@@ -46,6 +46,7 @@ PPL functions and PPL statements.
 | PPL data types | [Type reference](../source/ppl/data_types.rst) |
 | PPL functions | [Function reference](../source/ppl/functions.rst) |
 | PPL language | [Language reference](../source/ppl/language.rst), [versioned additions](../new_ppl.md) |
+| PPL objects and library APIs | [Object model and task index](../source/ppl/objects.md), [complete type/member index](../source/ppl/api/index.md) |
 | PPL preprocessor | [Directives](../source/ppl/preprocessor.rst) |
 | PPL statements | [Statement reference](../source/ppl/statements.rst) |
 | PPE format | [Binary format](../ppe_format.md) |
@@ -67,7 +68,7 @@ PPL functions and PPL statements.
 | Command topics | Built-in English caller help, including explicitly unavailable commands. |
 | Configuration tables | Persisted fields, defaults, required values and representation. |
 | Tool reference | Operator CLI entry points and links to detailed workflows. |
-| PPL handbook | Language, constants, functions, statements and compatibility. |
+| PPL handbook | Language, object/library APIs, records, enums, constants, functions, statements and compatibility. |
 | New PPL reference | Versioned extensions and host-object APIs beyond classic PCBoard. |
 | Compatibility audits | Detailed implementation differences and remaining gaps. |
 

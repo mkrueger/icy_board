@@ -31,6 +31,8 @@ contain binary data.
 
 Detailed references:
 
+- [Object and library API](source/ppl/objects.md) — board/session/user objects,
+  messages, files, terminal resources, HTTP, records, enums and every member signature
 - [PPL compiler](pplc.md) — projects, command-line options, output and language versions
 - [New in PPL](new_ppl.md) — language additions beyond PCBoard
 - [PPE format](ppe_format.md) — binary format for tooling authors

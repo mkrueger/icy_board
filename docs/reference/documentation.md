@@ -100,7 +100,9 @@ environment variable to a commit or tag when building a historical checkout.
 | Configuration fields and examples | `docs/configuration/`; old RST locations link here |
 | Caller and sysop command topics | `crates/icy_board_help/data/en/`; indexed by `docs/reference/commands.md` |
 | PPL language, functions, statements and constants | `docs/source/ppl/` |
-| Versioned PPL additions and host APIs | `docs/new_ppl.md` |
+| PPL object model and ZIP usage | `docs/source/ppl/objects.md`, `docs/source/ppl/zip.md` |
+| Generated PPL type/member pages | `docs/source/ppl/api/`; regenerate, do not edit by hand |
+| Versioned PPL additions and detailed API behavior | `docs/new_ppl.md` |
 | Display macros | `docs/macros.md` |
 | Theme and build configuration | `docs/source/conf.py`, `_static/`, `_templates/` |
 
@@ -111,6 +113,41 @@ HTML rendering does not validate BBS line wrapping or CP437 output.
 Some older narrative handbook chapters remain available through legacy links.
 When consolidating another chapter, compare its contents first; do not delete
 unique instructions merely because the chapter title matches a newer guide.
+
+## Updating the PPL API reference
+
+The type/member pages are checked-in generated documentation. Ordinary HTML
+and PDF builds do not need Rust. Their signatures, array ranks, optional
+parameters, access modes, records and enum values come from the compiler
+registry; descriptions use the same English documentation as `ppl-lsp`.
+Behavioral guides remain authored Markdown, linked from each type page.
+
+After changing the registry, editor descriptions or generator:
+
+```sh
+LANGUAGE=en cargo run --locked --jobs 4 -p ppl-lsp --example api_reference -- --write
+LANGUAGE=en cargo test-low --locked -p ppl-lsp --example api_reference
+LANGUAGE=en cargo run --locked --jobs 4 -p ppl-lsp --example api_reference -- --check
+```
+
+In PowerShell, set `$env:LANGUAGE = "en"` before these Cargo commands rather
+than using the shell prefix. The generator rejects non-English output instead
+of overwriting the English reference with a machine's preferred language.
+It also rejects missing type/member descriptions, incomplete inventories,
+stale pages and obsolete generated Markdown files. Remove an obsolete page
+explicitly after confirming its type was removed.
+
+Edit signatures in `crates/icy_board_ppl/src/parser/board_catalog.rs` (and
+record/enum definitions in `type_registry.rs`), not in the generated pages.
+Editor descriptions live in `crates/ppl-lsp/src/documentation.rs` and its
+localization resources. The generator is
+`crates/ppl-lsp/examples/api_reference.rs`; new host types need a link to their
+behavioral guide. Its tests compile the complete examples directly from the
+object-model and ZIP guides for language/runtime 400.
+
+The documentation workflow runs the tests and a freshness check before
+building the website, including when compiler or language-server APIs change.
+Commit regenerated pages together with the corresponding source change.
 
 ## Reference-page standard
 
