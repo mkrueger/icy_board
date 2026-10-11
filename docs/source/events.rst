@@ -2,7 +2,7 @@ Timed events
 ============
 
 For the current implementation and its PCBoard source comparison, see the
-`timed-event source review <../events.md>`_. It covers the built-in editor,
+:doc:`timed-event source review </docs/events>`. It covers the built-in editor,
 caller announcements, same-process listener restart/full board reload, and
 remaining parity differences and the current validation scope.
 

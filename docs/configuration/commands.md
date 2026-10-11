@@ -46,8 +46,8 @@ lookup code does not consult it: global commands are still searched.
 Changing this flag is not a way to disable inherited commands. The setup
 creator uses true for Main Board.
 
-See [Conferences](components.md#component-conferences) for the complete conference schema and
-[Menus](components.md#component-menus) for the separate menu-file schema.
+See [Conferences](components.md#conferences) for the complete conference schema and
+[Menus](components.md#interactive-menus) for the separate menu-file schema.
 
 ## Native command-list format
 
@@ -124,7 +124,7 @@ is different from the comma-separated **parameter** of the `GotoXY` action.
 Saving suppresses empty display/help strings, the default position and
 autorun mode, zero time and empty actions. `keyword` is still written when
 empty. `security` uses the special expression serialization described in
-[Security expressions](components.md#component-security-expressions): an omitted value means `"0"`;
+[Security expressions](components.md#security-expressions-and-passwords): an omitted value means `"0"`;
 boolean `true` is suppressed on save, not the integer default.
 
 ## Complete CommandAction schema
@@ -352,7 +352,7 @@ PCBoard sub-option is implemented.
 The same Command schema appears in menu files under **plural**
 `[[commands]]`, with `[[commands.actions]]`. A menu is a root record
 with required `title`, not a CommandList. Its complete fields and a
-standalone example are in [Menus](components.md#component-menus).
+standalone example are in [Menus](components.md#interactive-menus).
 
 The current conference's `users_menu` or `sysop_menu` supplies the menu
 for ordinary callers or sysops. The current-menu display path tries a PPE
@@ -427,7 +427,7 @@ to a TOML filename does not convert it.
 
 Legacy PCBoard MNU files are a separate line-oriented import format with
 numeric option types. Native Menu files use the root schema in
-[Menus](components.md#component-menus) and string action variants above. Imported numeric
+[Menus](components.md#interactive-menus) and string action variants above. Imported numeric
 MNU type codes are not accepted as native `command_type` values.
 
 ## Validation checklist
@@ -435,7 +435,7 @@ MNU type codes are not accepted as native `command_type` values.
 1. Use `[[command]]` in standalone lists and `[[commands]]` in menus.
 2. Supply each action's `command_type` with exact case and spelling.
 3. Store security as strings and positions as two integers; consult
-   [Security expressions](components.md#component-security-expressions) for parser limitations.
+   [Security expressions](components.md#security-expressions-and-passwords) for parser limitations.
 4. Avoid self-recursive `Command` aliases; use `GlobalCommand` when
    forwarding an overridden built-in.
 5. Check list order, abbreviations, resource paths and ordinary-caller access.

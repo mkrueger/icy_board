@@ -1,4 +1,4 @@
-## NewMarcos
+# New display macros
 
 For the complete reference, including standard codes, colors, field widths,
 alignment, and trimming, see [Display Macros](macros.md).
@@ -13,4 +13,3 @@ IcyBoard adds following new macros.
 | @AREANUM@ | Number of current message area |
 | @SYSOPNAME@ | Name of the sysop (usually 'SYSOP') as configured in setup or sysop real name, if configured |
 | @VERSION@ | Icy Board version number |
-

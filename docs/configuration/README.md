@@ -4,9 +4,10 @@
 
 This is the on-disk format reference for IcyBoard's configuration and persisted
 TOML data. It describes exact field names, types, required fields, loading
-defaults, enum values and examples. These Markdown chapters mirror the
-[handbook reference](../source/configuration/index.rst) for reading directly
-in the repository. Keep both versions synchronized when changing a format.
+defaults, enum values and examples. These Markdown chapters are the canonical
+source for both the website and repository reference. The earlier
+reStructuredText chapter locations remain as compatibility links, not copies
+to maintain.
 
 This is not the specification of PCBoard's binary configuration files. Import
 those with `icbsetup` rather than renaming them or translating their labels
@@ -25,6 +26,18 @@ table; they are not replacements for the complete configuration.
 - [Tool and project TOML files](tools.md)
 - [User, text and runtime data](data.md)
 
+```{toctree}
+:hidden:
+
+board
+components
+commands
+networks
+events
+tools
+data
+```
+
 ## Which format do I need?
 
 The configured path selects a document; its basename does not define the schema.
@@ -38,7 +51,7 @@ Setup/import may choose different names.
 | Message-area and file-directory lists | Conference `area_file` and `dir_file` | [Components](components.md); both use `[[area]]`, with different schemas |
 | Language, security-level and transfer-protocol lists | `paths.language_file`, `paths.pwrd_sec_level_file`, `paths.protocol_data_file` | [Components](components.md) |
 | Door, bulletin and survey lists | Conference `doors_file`, `blt_file`, `survey_file` | [Components](components.md) |
-| Interactive menus (normally `*.mnu`) | Menu action or conference menu | [Menus](components.md#component-menus); native menus are TOML despite their extension |
+| Interactive menus (normally `*.mnu`) | Menu action or conference menu | [Menus](components.md#interactive-menus); native menus are TOML despite their extension |
 | Accounting rates | `accounting.cfg_file` | [Components](components.md) |
 | `security_tables.toml` | Beside the configured user database | [Components](components.md) and [data](data.md) |
 | FTN, QWKnet and ZCONNECT configuration | `paths.ftn_file`, `paths.qwknet_file`, `paths.zconnect_file` | [Networks](networks.md) |

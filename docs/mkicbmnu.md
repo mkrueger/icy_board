@@ -8,7 +8,7 @@ format.
 
 Start with [Getting started](gettingstarted.md) for a working board and
 [Installation](../INSTALL.md) for the tools. See the
-[menu schema](configuration/components.md#component-menus) and
+[menu schema](configuration/components.md#interactive-menus) and
 [command reference](configuration/commands.md) for the underlying records.
 This guide describes the current editor and its limits; “Test” does not mean
 running a caller session.
@@ -417,7 +417,7 @@ unsafe argument forms, and invalid context-free results are errors. This is a
 conservative partial classifier, not a full expression type/arity checker:
 Unknown does not certify that the expression will evaluate successfully.
 Parser limitations also remain; follow the
-[security-expression reference](configuration/components.md#component-security-expressions)
+[security-expression reference](configuration/components.md#security-expressions-and-passwords)
 rather than treating successful parsing as policy verification.
 
 “Command security allows” says only that this command-level expression allows

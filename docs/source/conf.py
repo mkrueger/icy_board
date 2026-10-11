@@ -3,6 +3,12 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -13,21 +19,53 @@ author = 'Mike Krüger'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = []
+extensions = ['myst_parser', 'reference_links']
 
 templates_path = ['_templates']
-exclude_patterns = [
-    'customizing/internationalization.rst',
-    'customizing/look_and_feel.rst',
-    'customizing/menus.rst',
+root_doc = 'docs/source/index'
+source_suffix = {'.rst': 'restructuredtext', '.md': 'markdown'}
+include_patterns = [
+    'INSTALL.md',
+    'docs/*.md',
+    'docs/configuration/*.md',
+    'docs/reference/*.md',
+    'docs/source/**',
+    'crates/icy_board_help/data/en/*.md',
+    'crates/tree-sitter-ppl/README.md',
+    'compat/README.md',
+    'compat/COMMAND_AUDIT.md',
+    'compat/OPTIONS_AUDIT.md',
+    'compat/DECLARE_AUDIT.md',
 ]
-
+exclude_patterns = [
+    'docs/build/**',
+    'docs/source/customizing/internationalization.rst',
+    'docs/source/customizing/look_and_feel.rst',
+    'docs/source/customizing/menus.rst',
+    'docs/ftn_review.md',
+    'docs/message_entry_reading_audit_2026-09-06.md',
+    'docs/x86_native_dos_door_requirements.md',
+]
+myst_heading_anchors = 6
+myst_enable_extensions = ['colon_fence', 'deflist']
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+html_theme = 'furo'
+html_title = 'Icy Board Reference'
+html_theme_options = {
+    'source_repository': 'https://github.com/mkrueger/icy_board/',
+    'source_branch': os.environ.get('ICY_REFERENCE_REVISION', 'main'),
+    'source_directory': '',
+    'navigation_with_keys': True,
+}
+html_static_path = ['_static']
+html_css_files = ['reference.css']
+html_additional_pages = {'index': 'start.html'}
+html_copy_source = False
+html_show_sourcelink = True
 
 import re
 from pygments.lexer import RegexLexer, bygroups
@@ -124,6 +162,7 @@ class PPLLexer(RegexLexer):
         ],
     }
 lexers['PPL'] = PPLLexer(startinline=True)
+lexers['ppl'] = PPLLexer(startinline=True)
 
 import pathlib
 import re
@@ -153,7 +192,7 @@ rst_epilog = f"""
 # than as a stack of web pages.
 
 latex_documents = [
-    ("index", "icyboard.tex", "Icy Board Handbook", author, "manual"),
+    (root_doc, "icyboard.tex", "Icy Board Reference", author, "manual"),
 ]
 
 latex_toplevel_sectioning = "chapter"
@@ -173,7 +212,21 @@ latex_elements = {
     # carry the box drawing characters or every screen listing comes out ragged.
     "fontpkg": r"""
 \usepackage{fontspec}
+\usepackage{newunicodechar}
+\setmainfont{DejaVu Sans}
+\setsansfont{DejaVu Sans}
 \setmonofont{DejaVu Sans Mono}[Scale=0.85]
+\newfontfamily\icbsymbols{Noto Sans Symbols 2}
+\newfontfamily\icbcjk{Droid Sans Fallback}
+\newunicodechar{⎀}{{\ttfamily\symbol{"2380}}}
+\newunicodechar{␛}{{\icbsymbols\symbol{"241B}}}
+\newunicodechar{␠}{{\icbsymbols\symbol{"2420}}}
+\newunicodechar{📥}{{\icbsymbols\symbol{"1F4E5}}}
+\newunicodechar{界}{{\icbcjk\symbol{"754C}}}
+\newunicodechar{💯}{100\%}
+\newunicodechar{✅}{\ensuremath{\checkmark}}
+\newunicodechar{❌}{\ensuremath{\times}}
+\newunicodechar{️}{}
 """,
     "sphinxsetup": ",".join(
         [
@@ -185,13 +238,13 @@ latex_elements = {
         ]
     ),
     "maketitle": rf"""
-\hypersetup{{pdftitle={{Icy Board Handbook}}, pdfauthor={{{author}}}}}
+\hypersetup{{pdftitle={{Icy Board Reference}}, pdfauthor={{{author}}}}}
 \begin{{titlepage}}
   \centering
   \vspace*{{5cm}}
   {{\Huge\bfseries Icy Board\par}}
   \vspace{{1cm}}
-  {{\Large A re-creation of PCBoard\par}}
+  {{\Large Sysop Handbook and Reference\par}}
   \vspace{{3cm}}
   {{\large Version {release}\par}}
   \vfill

@@ -1,8 +1,20 @@
 # Icy Board documentation
 
-The [project README](../README.md) explains what Icy Board is and what it can
-do. This directory holds task-oriented guides and Markdown format references. The full
-handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
+The [Icy Board project](https://github.com/mkrueger/icy_board) explains what
+the board does. The [full reference](source/index.rst) combines the operational
+guides, exact configuration schemas, built-in command help and PPL handbook
+into one searchable HTML site and a PDF edition.
+
+## Full reference
+
+- [Reference index](reference/index.md): alphabetical lookup and PCBoard terms.
+- [Caller and sysop commands](reference/commands.md): all 68 built-in English help topics.
+- [Board concepts](reference/concepts.md): conferences, areas, nodes, inboxes and storage.
+- [Sysop administration](reference/administration.md): operation, access, backup and upgrades.
+- [Programs and CLI options](reference/tools.md): the board and its utilities.
+- [Customization](reference/customization.md): menus, prompts, artwork and languages.
+- [Troubleshooting](reference/troubleshooting.md): symptoms and diagnostic paths.
+- [Build and publish the reference](reference/documentation.md): HTML, PDF, offline use and CI.
 
 ## Run a board
 
@@ -47,8 +59,6 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 | [Display macros](macros.md) | Complete `@`-code reference, field width, alignment, trimming, colors and current limitations. |
 | [New `@` macros](new_macros.md) | Macros beyond PCBoard's set. |
 | [PPE format](ppe_format.md) | Binary format reference for tooling authors. |
-| [PPL 4.00 API audit](ppl400_api_audit.md) | Item-by-item verdicts on the 4.00 API, language extensions, PPL style and pre-freeze improvements. |
-| [PPL 4.00 API review](ppl400_api_review.md) | Earlier sector-level design summary of the 4.00 object API. |
 
 PPL editor support consists of the tree-sitter grammar for syntax and the
 `ppl-lsp` language server for diagnostics, completion, hover, navigation,

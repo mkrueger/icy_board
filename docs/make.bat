@@ -7,8 +7,9 @@ REM Command file for Sphinx documentation
 if "%SPHINXBUILD%" == "" (
 	set SPHINXBUILD=sphinx-build
 )
-set SOURCEDIR=source
+set SOURCEDIR=..
 set BUILDDIR=build
+if "%SPHINXOPTS%" == "" set SPHINXOPTS=-W --keep-going
 
 %SPHINXBUILD% >NUL 2>NUL
 if errorlevel 9009 (
@@ -25,11 +26,14 @@ if errorlevel 9009 (
 
 if "%1" == "" goto help
 
-%SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+%SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% -c source %SPHINXOPTS% %O%
+set BUILD_RESULT=%ERRORLEVEL%
 goto end
 
 :help
-%SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+%SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% -c source %SPHINXOPTS% %O%
+set BUILD_RESULT=%ERRORLEVEL%
 
 :end
 popd
+exit /b %BUILD_RESULT%

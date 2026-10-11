@@ -14,3 +14,4 @@ icb/
 
 # Documentation build output
 docs/build/
+docs/**/__pycache__/

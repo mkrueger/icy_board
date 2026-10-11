@@ -233,7 +233,7 @@ Global and conference command lists have the required root array
 command. Menu files instead use `[[commands]]` and
 `[[commands.actions]]`. The command fields, action fields, complete enum
 vocabulary, security behavior, legacy import and working examples are
-specified in [Adding and overriding commands](commands.md#adding-commands).
+specified in [Adding and overriding commands](commands.md).
 
 <a id="component-menus"></a>
 
@@ -255,7 +255,7 @@ file must be imported, not passed directly to the TOML loader.
 | `pass_through` | bool / false | Stored pass-through setting |
 | `prompt` | string / empty | Prompt printed before input |
 | `prompts` | array of two-string arrays / empty | Imported alternate prompt selector/text pairs |
-| `commands` | array of Command records / empty | Full schema in [Adding and overriding commands](commands.md#adding-commands) |
+| `commands` | array of Command records / empty | Full schema in [Adding and overriding commands](commands.md) |
 
 For example, `prompts = [["expert", "Command? "]]` has the correct tuple
 shape; it is not a table keyed by language. Currently the runner uses

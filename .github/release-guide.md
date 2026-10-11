@@ -9,6 +9,7 @@ Take **one** row. Every download already contains what that row needs.
 | **Write PPL in VS Code** | `ppl-vscode-#TAG-<platform>.vsix` |
 | **Write PPL in Helix, Neovim, Zed or another LSP editor** | `ppl-lsp-#TAG-<platform>.tar.gz` (`.zip` on Windows) |
 | **Read the manual** | `icyboard-manual-#TAG.pdf` |
+| **Browse and search the reference offline** | `icyboard-reference-#TAG.zip` — extract it and open `index.html` |
 
 `<platform>` is one of:
 

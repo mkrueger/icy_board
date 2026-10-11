@@ -1,0 +1,25 @@
+.sidebar-brand-text {
+    font-weight: 700;
+}
+
+article table.align-default {
+    margin-left: 0;
+    width: 100%;
+}
+
+article table td,
+article table th {
+    white-space: normal;
+}
+
+.toctree-wrapper > ul {
+    padding-left: 1.25rem;
+}
+
+@media print {
+    .sidebar-drawer,
+    .toc-drawer,
+    .related-pages {
+        display: none;
+    }
+}

@@ -101,8 +101,8 @@ software documentation. New rules should start with `report_only`; these four
 templates were approved after reviewing their matches. Existing default hashes continue to remove their
 known variants as before.
 
-See the [historical report-only raw-byte corpus trial](../assets/archive_text_audit/text-rule-trial/README.md)
-and its [individual findings](../assets/archive_text_audit/text-rule-trial/findings.tsv).
+See the [historical report-only raw-byte corpus trial](https://github.com/mkrueger/icy_board/blob/main/assets/archive_text_audit/text-rule-trial/README.md)
+and its [individual findings](https://github.com/mkrueger/icy_board/blob/main/assets/archive_text_audit/text-rule-trial/findings.tsv).
 The review example also supports `--text-rules AUDIT MEMBER_CATALOG NEW_REPORT_DIRECTORY`
 to replay a catalog against the audit's original raw blobs without editing archives.
 

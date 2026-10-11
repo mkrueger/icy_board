@@ -7,13 +7,13 @@ contract.
 
 ## Evidence and limits
 
-- **Original compiler:** 23 authored sources in [declare](declare) were compiled
+- **Original compiler:** 23 authored sources in [declare](https://github.com/mkrueger/icy_board/tree/main/compat/declare) were compiled
   with PPLC 3.40 under DOSBox-X, without `/DISARR`. There are **13 accepted and
   10 rejected** sources. This is compiler evidence, not a PCBoard runtime run.
 - The first 21 logs and the 13 successful PPEs are in
-  [target/declare-oracle](../target/declare-oracle). The two additional
+  `target/declare-oracle`. The two additional
   unused-formal probes and a repeated declaration-only control are in
-  [target/legacy-parameter-oracle](../target/legacy-parameter-oracle).
+  `target/legacy-parameter-oracle`.
   Original binaries and generated PPEs are local artifacts, not
   required golden files to distribute.
 - [declare_compatibility.rs](../crates/icy_board_engine/tests/declare_compatibility.rs)
@@ -39,7 +39,7 @@ contract.
 ## Original PPLC 3.40 results
 
 The first 21 rows have matching local logs in
-[target/declare-oracle](../target/declare-oracle). The final two logs are linked
+`target/declare-oracle`. The final two logs are linked
 separately below. Accepted signatures are recorded in the
 [golden case table](../crates/icy_board_engine/tests/declare_compatibility.rs);
 an emitted result slot must not be confused with procedure `pass_flags`.
@@ -106,8 +106,8 @@ implementation types, results and `VAR` requirements available even when the
 implementation is in a later file. The cross-file tests keep declarations
 first and vary caller/implementation order; they do not prove arbitrary
 declaration ordering or original PPLC multi-file behavior. The shared path is
-[module lowering](../crates/icy_board_engine/src/compiler/modules.rs),
-[signature collection](../crates/icy_board_engine/src/semantic/mod.rs),
+[module lowering](../crates/icy_board_ppl/src/compiler/modules.rs),
+[signature collection](../crates/icy_board_ppl/src/semantic/mod.rs),
 [compiler analysis](../crates/icy_board_engine/src/compiler/mod.rs), and
 [LSP analysis](../crates/ppl-lsp/src/main.rs).
 

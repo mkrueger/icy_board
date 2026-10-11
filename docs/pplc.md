@@ -1,4 +1,4 @@
-## PPLC
+# PPL compiler (PPLC)
 
 PPLC works basically like the old one - specify file name and you're all set. 
 But it has way more to offer now:
@@ -40,7 +40,7 @@ Options:
   --help, help      display usage information
 ```
 
-### Coloured output
+## Coloured output
 
 Diagnostics are coloured only when someone is looking at a terminal. When the
 output is piped, redirected or read by an editor, `pplc` writes plain text, so
@@ -48,7 +48,7 @@ escape sequences never end up in a log or an output pane. `--mono` forces plain
 text even on a terminal, `NO_COLOR` does the same through the environment, and
 `CLICOLOR_FORCE` keeps the colour when piping into a pager such as `less -R`.
 
-### Check mode
+## Check mode
 
 `--check` validates source diagnostics and formatting without writing a PPE or
 changing the source. It returns a nonzero status for invalid code **or** a
@@ -56,7 +56,7 @@ formatting difference. A formatting-only diff does not mean a program cannot
 compile. Use `--format` to apply formatting, or `--format --stdout` to inspect
 the formatted source without changing the file.
 
-### Effective configuration
+## Effective configuration
 
 `--print-config` reads a source or `ppl.toml`, including `;$LANGVERSION`, and
 shows the settings the compiler would use without creating an executable or a
@@ -87,7 +87,7 @@ Defines                none
 an editor can discover a package's actual output instead of reproducing the
 compiler's rules.
 
-### Compression and debug names
+## Compression and debug names
 
 Runtime 400 stores the program in sections, and each section can be packed with
 Zstd. `--compression zstd` turns that on; the default is `none`. The choice is
@@ -101,7 +101,7 @@ the program changes: stripped and unstripped builds have the same content
 identity. Qualified host API names remain necessary for binding in both forms.
 There is no source path, source text or line number in either form.
 
-### Disassembling
+## Disassembling
 
 Instead of creating a .PPE executable it can print a disassembler. This is useful to find out what the compiler does with the input code.
 
@@ -138,7 +138,7 @@ section and jumps address instruction indices. The listing there prints the
 instructions and their operands without the word dump, and ends with the
 instruction count instead of a script buffer size.
 
-### Supported versions
+## Supported versions
 
 PPLC targets PCBoard 15.0-15.4 and Icy Board. `--runtime` selects the target
 container; `--version` only prints the compiler version and exits.
@@ -153,7 +153,7 @@ entirely — sectioned, unencrypted and validated before it runs, described in
 PPEs from the unreleased 400 beta use the old container and have to be
 recompiled; the loader says so instead of misreading them.
 
-### Packages
+## Packages
 Packages are a new feature. They help to create bigger projects and to distribute/generate PPLs with different versions.
 
 A package is basically:
@@ -175,7 +175,7 @@ An explicit `;$LANGVERSION` in a source still takes precedence over the CLI.
 It's possible to generate/copy more files to handle CP437 for targetting DOS/PCBOARD.
 
 
-### PPL.TOML
+## PPL.TOML
 
 Let's take a look at the toml:
 

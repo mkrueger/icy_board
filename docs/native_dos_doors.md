@@ -95,7 +95,7 @@ keeps the original image as `<image>.pre-fossil.bak`, preserves the existing
 configuration, copies the archive's files (including license and documentation)
 into `C:\FOSSIL`, and appends this boot entry to `C:\FDCONFIG.SYS`:
 
-```dos
+```text
 DEVICE=C:\FOSSIL\X00.SYS E B,0,57600
 ```
 

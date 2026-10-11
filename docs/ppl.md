@@ -159,7 +159,7 @@ I think it improves the language and it's open for discussion. Note that some al
 
 `tools/setup-editor.sh` builds the language server and sets up the Helix and
 Neovim installations it finds, so those two are one command from a source
-checkout. [VS Code](../editors/vscode) is installed from the `.vsix` of a
+checkout. [VS Code](https://github.com/mkrueger/icy_board/tree/main/editors/vscode) is installed from the `.vsix` of a
 [release](https://github.com/mkrueger/icy_board/releases) and
 [Zed](https://github.com/mkrueger/zed-ppl) from its repository as a dev
 extension; [Editor installation](../INSTALL.md#ppl-in-your-editor) walks through
