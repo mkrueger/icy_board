@@ -23,6 +23,44 @@ fn diagnostics(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn scalar_member_argument_counts_are_reported_at_compile_time() {
+    for (declaration, call) in [
+        ("STRING text = \"hello\"", "text.Left()"),
+        ("STRING text = \"hello\"", "text.Left(1, 2)"),
+        ("STRING text = \"hello\"", "text.Len(1)"),
+        ("BYTES raw = TOBYTES(\"hello\")", "raw.ToHex(1)"),
+        ("", "STRING.Repeat(\"x\")"),
+        ("", "BYTES.FromBase64()"),
+    ] {
+        let source = format!("{declaration}\nPRINTLN {call}\n");
+        let errors = diagnostics(&source);
+        assert!(errors.iter().any(|error| error.contains("arguments passed")), "{source}\n{errors:?}");
+    }
+}
+
+#[test]
+fn every_scalar_member_rejects_argument_counts_outside_its_signature() {
+    use icy_board_engine::semantic::{BYTES_MEMBERS, STRING_MEMBERS};
+
+    for (members, typ, declaration, receiver) in [
+        (STRING_MEMBERS, "STRING", "STRING text = \"hello\"", "text"),
+        (BYTES_MEMBERS, "BYTES", "BYTES raw = TOBYTES(\"hello\")", "raw"),
+    ] {
+        for member in members {
+            let receiver = if member.is_static { typ } else { receiver };
+            let maximum = *member.arguments.end();
+            let too_few = member.arguments.start().checked_sub(1);
+            for given in too_few.into_iter().chain(std::iter::once(maximum + 1)) {
+                let arguments = vec!["0"; given].join(", ");
+                let source = format!("{declaration}\nPRINTLN {receiver}.{}({arguments})\n", member.name);
+                let errors = diagnostics(&source);
+                assert!(errors.iter().any(|error| error.contains("arguments passed")), "{source}\n{errors:?}");
+            }
+        }
+    }
+}
+
+#[test]
 fn a_member_that_does_not_exist_is_reported_and_does_not_stop_the_compiler() {
     let errors = diagnostics("CONFERENCE c = CONFINFO(0)\nPRINTLN c.Nmae\n");
     assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");

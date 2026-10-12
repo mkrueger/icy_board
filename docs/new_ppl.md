@@ -709,6 +709,14 @@ exactly like the classic functions. `Remove` and `Insert` use the same
 zero-based positions. `ToInt` is the member form of the classic `S2I`. A single
 character is also reachable through zero-based indexing (`text[0]`).
 
+For member calls, a declared variable or constant takes precedence over a
+built-in board type with the same name (case-insensitively). For example, after
+`STRING msg = "hello"`, both `msg.Left(1)` and `LEFT(msg, 1)` return `"h"`;
+the receiver is the string variable, not the `MSG` board type.
+Likewise, a variable named `len` is a value in `len.Left(1)`, not a call to
+the predefined `LEN` function. String and byte member calls with missing or
+excess arguments are compilation errors, including their static forms.
+
 `Substring` retains `MID`'s padding rule: it returns the requested positive
 number of code points, using spaces for positions outside the text. A
 non-positive length returns an empty string. Indexing outside the text returns

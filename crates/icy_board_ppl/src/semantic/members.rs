@@ -400,6 +400,10 @@ pub(super) fn takes_whole_array(opcode: OpCode, signature: StatementSignature, i
 }
 
 impl SemanticVisitor {
+    pub(super) fn has_receiver_value(&mut self, name: &unicase::Ascii<String>) -> bool {
+        self.lookup_constant(name).is_some() || self.lookup_variable(name).is_some()
+    }
+
     /// Looks a callable member up on a board object.
     pub(super) fn member_function_signature(
         &self,
@@ -457,7 +461,7 @@ impl SemanticVisitor {
             }
             Expression::MemberReference(member) => {
                 let static_type = if let Expression::Identifier(name) = member.get_expression() {
-                    if self.lookup_variable(name.get_identifier()).is_none() {
+                    if !self.has_receiver_value(name.get_identifier()) {
                         if self.type_registry.get_board_object(name.get_identifier()).is_some()
                             || self.type_registry.get_enum(name.get_identifier()).is_some()
                             || string_type_name(member.get_expression(), self.lang_version)
@@ -533,16 +537,62 @@ impl SemanticVisitor {
 
     /// Walks a member receiver once and caches nested expressions.
     pub(super) fn visit_receiver(&mut self, receiver: &Expression, member_token: &Spanned<Token>) -> VariableType {
-        if matches!(receiver, Expression::Identifier(_)) {
-            return receiver.visit(self);
-        }
         let key = member_token.span.start;
-        if let Some(cached) = self.receiver_types.get(&key) {
+        if !matches!(receiver, Expression::Identifier(_))
+            && let Some(cached) = self.receiver_types.get(&key)
+        {
             return *cached;
         }
+        // The receiver is a value, not the callee of the enclosing member call. An
+        // unresolved name keeps the call context, so it is reported once.
+        let isolate = match receiver {
+            Expression::Identifier(identifier) => self.has_receiver_value(identifier.get_identifier()),
+            _ => true,
+        };
+        let outer_func_call = self.cur_func_call;
+        if isolate {
+            self.cur_func_call = 0;
+        }
         let receiver_type = receiver.visit(self);
-        self.receiver_types.insert(key, receiver_type);
+        self.cur_func_call = outer_func_call;
+        if !matches!(receiver, Expression::Identifier(_)) {
+            self.receiver_types.insert(key, receiver_type);
+        }
         receiver_type
+    }
+
+    pub(super) fn check_scalar_member_arg_count(&mut self, call: &crate::ast::FunctionCallExpression) -> bool {
+        let Expression::MemberReference(member) = call.get_expression() else {
+            return true;
+        };
+        let members = match self.member_receiver_type_lookup.get(&member.get_identifier_token().span.start) {
+            Some(typ) if carries_string_members(*typ, member.get_identifier()) => STRING_MEMBERS,
+            Some(VariableType::Bytes) => BYTES_MEMBERS,
+            _ => return true,
+        };
+        let is_static = matches!(
+            member.get_expression(),
+            Expression::Identifier(name)
+                if !self.has_receiver_value(name.get_identifier())
+                    && (string_type_name(member.get_expression(), self.lang_version)
+                        || crate::parser::built_in_type(name.get_identifier(), self.lang_version) == Some(VariableType::Bytes))
+        );
+        let Some(signature) = members
+            .iter()
+            .find(|signature| signature.is_static == is_static && *member.get_identifier() == signature.name)
+        else {
+            return true;
+        };
+        let given = call.get_arguments().len();
+        if signature.arguments.contains(&given) {
+            return true;
+        }
+        self.check_expr_arg_range(*signature.arguments.start(), *signature.arguments.end(), given, call.get_expression());
+        for argument in call.get_arguments() {
+            argument.visit(self);
+            self.reject_bare_array_value(argument);
+        }
+        false
     }
 
     pub(super) fn static_receiver(&mut self, expression: &Expression, member: &unicase::Ascii<String>) -> StaticReceiver {
@@ -550,7 +600,7 @@ impl SemanticVisitor {
             return StaticReceiver::NotAType;
         };
         let identifier = base.get_identifier();
-        if self.lookup_variable(identifier).is_some() {
+        if self.has_receiver_value(identifier) {
             return StaticReceiver::NotAType;
         }
         let Some(VariableType::UserData(type_id)) = self.type_registry.get_board_object(identifier) else {

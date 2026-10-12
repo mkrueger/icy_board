@@ -196,6 +196,82 @@ fn c2_wide_code_parameters_and_composed_records_survive_files() {
 }
 
 #[test]
+fn string_members_on_variables_named_like_board_types_survive_files() {
+    roundtrip(
+        r#"
+STRING msg = "hello"
+PRINTLN LEFT(msg, 1), "|", msg.Left(1)
+PRINTLN msg.Right(2), "|", msg.Len()
+PRINTLN msg.Left(3).Right(2)
+Show("world")
+PROCEDURE Show(STRING msg)
+PRINTLN LEFT(msg, 1), "|", msg.Left(1)
+ENDPROC
+"#,
+        400,
+        400,
+        "h|h\nlo|5\nel\nw|w\n",
+    );
+}
+
+#[test]
+fn member_receivers_named_like_predefined_functions_survive_files() {
+    roundtrip(
+        r#"
+STRING len = "hello"
+STRING left = "world"
+PRINTLN len.Left(1), "|", left.Right(1)
+PRINTLN LEFT(len.Left(2), 1), "|", LEN(left.Right(2))
+"#,
+        400,
+        400,
+        "h|d\nh|2\n",
+    );
+}
+
+#[test]
+fn every_board_type_name_can_be_a_string_member_receiver() {
+    for &(_, name, _) in icy_board_engine::parser::board_catalog::TYPES {
+        let name = name.to_ascii_lowercase();
+        roundtrip(
+            &format!("STRING {name} = \"hello\"\nPRINTLN {name}.Left(1), \"|\", LEFT({name}, 1)\n"),
+            400,
+            400,
+            "h|h\n",
+        );
+    }
+}
+
+#[test]
+fn member_receivers_keep_their_value_types_in_nested_calls() {
+    roundtrip(
+        r#"
+CONST STRING msg = "hello"
+CONST STRING len = "world"
+PRINTLN msg.Left(1), "|", len.Right(1)
+BYTES left = TOBYTES("abc")
+PRINTLN left.ToHex(), "|", LEFT(left.ToString(), 1)
+STRING board[1]
+board[0] = "hello"
+PRINTLN board.Len(), "|", board[0].Left(1)
+STRING mid = "abc"
+PRINTLN (mid).Left(1), "|", Greet()
+Show("param")
+FUNCTION Greet() STRING
+Greet = "hello"
+Greet = Greet.Left(2)
+ENDFUNC
+PROCEDURE Show(STRING msg)
+PRINTLN msg.Left(1)
+ENDPROC
+"#,
+        400,
+        400,
+        "h|d\n616263|a\n2|h\na|he\np\n",
+    );
+}
+
+#[test]
 fn s5_unicode_positions_bytes_and_transformations_survive_files() {
     let source = format!(
         r#"

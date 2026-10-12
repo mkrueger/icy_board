@@ -585,7 +585,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
         if let Expression::Identifier(base) = member_reference_expression.get_expression()
-            && self.lookup_variable(base.get_identifier()).is_none()
+            && !self.has_receiver_value(base.get_identifier())
             && matches!(
                 crate::parser::built_in_type(base.get_identifier(), self.lang_version),
                 Some(VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
@@ -625,7 +625,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             };
         }
         if let Expression::Identifier(base) = member_reference_expression.get_expression()
-            && self.lookup_variable(base.get_identifier()).is_none()
+            && !self.has_receiver_value(base.get_identifier())
             && crate::parser::built_in_type(base.get_identifier(), self.lang_version) == Some(VariableType::Bytes)
         {
             self.member_receiver_type_lookup
@@ -1131,11 +1131,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         self.callee_member = None;
         self.cur_func_call = outer_func_call;
 
+        if !self.check_scalar_member_arg_count(call) {
+            return VariableType::None;
+        }
+
         // A member call is decided by the receiver's type, whatever expression produced it.
         if let Expression::MemberReference(member) = call.get_expression() {
             if string_type_name(member.get_expression(), self.lang_version)
                 && let Expression::Identifier(base) = member.get_expression()
-                && self.lookup_variable(base.get_identifier()).is_none()
+                && !self.has_receiver_value(base.get_identifier())
             {
                 match member.get_identifier().as_ref().to_ascii_lowercase().as_str() {
                     "join" if call.get_arguments().len() == 2 => {
@@ -1209,7 +1213,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 member.get_expression(),
                 Expression::Identifier(identifier)
                     if crate::parser::built_in_type(identifier.get_identifier(), self.lang_version) == Some(VariableType::Bytes)
-                        && self.lookup_variable(identifier.get_identifier()).is_none()
+                        && !self.has_receiver_value(identifier.get_identifier())
             ) && member.get_identifier().as_ref().eq_ignore_ascii_case("FromBase64")
                 && call.get_arguments().len() == 1
             {
@@ -1222,7 +1226,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
             let registered_type_receiver = matches!(
                 member.get_expression(),
-                Expression::Identifier(identifier) if self.type_registry.get_board_object(identifier.get_identifier()).is_some()
+                Expression::Identifier(identifier)
+                    if !self.has_receiver_value(identifier.get_identifier())
+                        && self.type_registry.get_board_object(identifier.get_identifier()).is_some()
             );
             let receiver_type = if registered_type_receiver {
                 VariableType::None
