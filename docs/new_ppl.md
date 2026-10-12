@@ -301,10 +301,10 @@ PROCEDURE DrawRow(INTEGER item, INTEGER row)
 ENDPROC
 ```
 
-One optional space after `;;;` is removed; other Markdown indentation is
-preserved. A blank line or ordinary comment breaks attachment. When both a
-`DECLARE` statement and its implementation have documentation, the declaration
-is canonical.
+One optional space after `;;;` is removed; other Markdown indentation and
+Unicode text are preserved. A blank line or ordinary comment breaks attachment.
+When both a `DECLARE` statement and its implementation have documentation, the
+declaration is canonical.
 
 A `;;;` block is an ordinary comment to the compiler, so it needs no language
 version and changes no PPE: the text never reaches the file. It is read by the
@@ -339,6 +339,10 @@ merely other ways of writing `( )`, so this is where they gain a meaning of
 their own rather than where they first parse.
 
 ### Loops
+
+From language 350, parentheses can group just part of an `IF`, `ELSEIF` or
+`WHILE` condition, for example `IF (count + 1) > limit THEN`. In earlier
+languages, parentheses must enclose the whole condition.
 
 ```PPL
 REPEAT

@@ -644,6 +644,9 @@ Unknown and duplicate fields are errors. A field holding another record requires
 the exact nominal type. Record literals need runtime 400; the PPE stores type and
 field ids rather than their source names.
 
+A record literal can also be a member receiver, as in
+`PRINT Point { X = 10 }.X`, without an intermediate variable.
+
 Record fields may be one-, two- or three-dimensional arrays, including arrays
 of an earlier record type or a host-object type. Explicit bounds are fixed by
 the layout and cannot be changed by `REDIM` or `.Redim(...)`. Empty brackets

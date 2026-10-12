@@ -79,6 +79,8 @@ fn parse_ast_internal(
 }
 
 fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
+    // Lexer spans count Unicode scalar values, not UTF-8 bytes.
+    let input: Vec<_> = input.chars().collect();
     for routine_index in 0..nodes.len() {
         let routine_start = match &nodes[routine_index] {
             AstNode::Function(node) => node.get_function_token().span.start,
@@ -98,8 +100,11 @@ fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
             let Some(documentation) = text.strip_prefix(";;") else {
                 return false;
             };
-            let gap = &input[token.span.end.min(input.len())..next_start.min(input.len())];
-            if !gap.chars().all(char::is_whitespace) || gap.matches('\n').count() > 1 {
+            let Some(gap) = input.get(token.span.end..next_start) else {
+                return false;
+            };
+            // The comment token already includes its terminating newline.
+            if !gap.iter().all(|ch| ch.is_whitespace()) || gap.contains(&'\n') {
                 return false;
             }
             lines

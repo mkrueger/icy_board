@@ -361,7 +361,7 @@ impl Parser<'_> {
                     }
                     let rbrace_token = self.save_spanned_token();
                     self.next_token();
-                    return Some(Expression::RecordLiteral(RecordLiteralExpression::new(
+                    return self.parse_member_chain(Expression::RecordLiteral(RecordLiteralExpression::new(
                         identifier_token,
                         VariableType::UserData(type_id),
                         lbrace_token,

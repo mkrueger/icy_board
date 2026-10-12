@@ -816,6 +816,9 @@ Fields may appear in any order; omitted fields keep their empty value:
 Unknown and duplicate fields are errors. A field holding another record requires
 the exact nominal type.
 
+A record literal can also be a member receiver, as in
+``PRINT Point { X = 10 }.X``, without an intermediate variable.
+
 .. note::
    Records need runtime 400, which is the first format with a type table. Record
    literals need it too; the PPE stores type and field ids rather than their

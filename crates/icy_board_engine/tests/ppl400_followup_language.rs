@@ -133,6 +133,36 @@ fn rejects(source: &str) {
 const BITS: &str = "ENUM Bits\n One = 1\n Two = 2\nENDENUM\n";
 
 #[test]
+fn grouped_subexpressions_can_start_conditions() {
+    roundtrips(
+        r#"
+INTEGER n = 0
+IF (1 + 1) = 2 THEN
+PRINT "I"
+ENDIF
+IF FALSE THEN
+PRINT "bad"
+ELSEIF (2 + 2) = 4 THEN
+PRINT "E"
+ENDIF
+WHILE (n + 1) <= 2 DO
+PRINT n
+n += 1
+ENDWHILE
+"#,
+        "IE01",
+    );
+}
+
+#[test]
+fn record_literals_can_be_member_receivers() {
+    roundtrips(
+        "TYPE Item\n STRING text\nENDTYPE\nTYPE Boxed\n Item entry\n INTEGER values[1]\nENDTYPE\nPRINT Item {text=\"hello\"}.text.Left(2), \"|\", Boxed {entry=Item {text=\"nested\"}}.entry.text, \"|\", Boxed {}.values[0]\n",
+        "he|nested|0",
+    );
+}
+
+#[test]
 fn foreach_requires_array_and_assignable_nominal_scalar() {
     for source in [
         format!("{BITS}INTEGER values[] = {{99}}\nBits item\nFOREACH item IN values\nPRINT TOINTEGER(item)\nNEXT\n"),

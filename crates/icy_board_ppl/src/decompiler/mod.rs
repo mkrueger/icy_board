@@ -587,6 +587,7 @@ impl Decompiler {
         }
         match expr {
             PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.source_type(self.executable.variable_table.try_get_entry(*id)?.header.variable_type)),
+            PPEExpr::RecordLiteral(type_id, _) => Some(VariableType::UserData(*type_id)),
             PPEExpr::Member(base, id) => self.resolve_member(base, *id).map(|(_, t)| t),
             PPEExpr::IndexedMember(base, id, _) => self.resolve_member(base, *id).map(|(_, t)| t),
             PPEExpr::MemberFunctionCall(base, _, id) => {

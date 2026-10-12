@@ -460,6 +460,44 @@ fn test_if_then_ifelse_withoutthen_statement() {
 }
 
 #[test]
+fn conditions_distinguish_grouping_from_outer_parentheses() {
+    for version in [340, 350, 400] {
+        for condition in ["(1 + 1) = 2", "(TRUE) & FALSE", "(1) + 2 > 0"] {
+            for outer in [false, true] {
+                let condition = if outer { format!("({condition})") } else { condition.to_string() };
+                for source in [
+                    format!("IF {condition} PRINT 1"),
+                    format!("IF {condition} THEN\nPRINT 1\nENDIF"),
+                    format!("IF (FALSE) THEN\nELSEIF {condition} THEN\nPRINT 1\nENDIF"),
+                    format!("WHILE {condition} PRINT 1"),
+                    format!("WHILE {condition} DO\nPRINT 1\nENDWHILE"),
+                ] {
+                    let registry = UserTypeRegistry::default();
+                    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                    let mut workspace = Workspace::default();
+                    workspace.set_default_language_version(Some(version));
+                    let mut parser = Parser::new(PathBuf::from("condition.pps"), errors.clone(), &registry, &source, Encoding::Utf8, &workspace);
+                    parser.next_token();
+                    let statement = parser.parse_statement();
+                    let reporter = errors.lock().unwrap();
+                    if version < 350 && !outer {
+                        assert!(reporter.has_errors(), "language {version}: {source}");
+                    } else {
+                        assert!(
+                            !reporter.has_errors(),
+                            "language {version}: {source}\n{:?}",
+                            reporter.errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>()
+                        );
+                        assert!(statement.is_some(), "language {version}: {source}");
+                        assert!(parser.get_cur_token().is_none(), "language {version}: {source}");
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn elseif_parentheses_follow_language_version() {
     for version in [340, 350, 400] {
         for keyword in ["ELSEIF", "ELSE IF"] {

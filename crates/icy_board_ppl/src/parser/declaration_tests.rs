@@ -61,6 +61,52 @@ fn documentation_comments_attach_to_routines() {
 }
 
 #[test]
+fn documentation_comments_accept_multibyte_text() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let source = ";;; \u{754c}\nPROCEDURE Show()\nENDPROC\n";
+    let ast = parse_ast(
+        PathBuf::from("unicode.pps"),
+        errors.clone(),
+        source,
+        &registry,
+        Encoding::Utf8,
+        &Workspace::default(),
+    );
+    assert!(!errors.lock().unwrap().has_errors());
+    let documentation = ast.nodes.iter().find_map(|node| match node {
+        AstNode::Procedure(implementation) => implementation.get_documentation(),
+        _ => None,
+    });
+    assert_eq!(documentation, Some("\u{754c}"));
+}
+
+#[test]
+fn documentation_comments_preserve_unicode_and_blank_line_boundaries() {
+    for prefix in ["", "; \u{754c}\u{1f600}\n"] {
+        for gap in ["\n", "\n\n"] {
+            let registry = UserTypeRegistry::default();
+            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+            let source = format!("{prefix};;; \u{e4}{gap}PROCEDURE Show()\nENDPROC\n");
+            let ast = parse_ast(
+                PathBuf::from("unicode.pps"),
+                errors.clone(),
+                &source,
+                &registry,
+                Encoding::Utf8,
+                &Workspace::default(),
+            );
+            assert!(!errors.lock().unwrap().has_errors());
+            let documentation = ast.nodes.iter().find_map(|node| match node {
+                AstNode::Procedure(implementation) => implementation.get_documentation(),
+                _ => None,
+            });
+            assert_eq!(documentation, (gap == "\n").then_some("\u{e4}"), "{source}");
+        }
+    }
+}
+
+#[test]
 fn documentation_comments_need_no_language_version() {
     let registry = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
