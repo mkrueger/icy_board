@@ -564,6 +564,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "date" | "time" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-written")),
             "isprivate" | "isread" | "isdeleted" | "isecho" | "needspassword" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-flags")),
             "text" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-text")),
+            "markread" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-mark-read")),
             "header" => Some(fl!(LANGUAGE_LOADER, "hint-member-msg-header-value")),
             _ => None,
         };

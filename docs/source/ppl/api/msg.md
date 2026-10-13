@@ -70,6 +70,16 @@ Read-only instance property.
 
 Read-only message attribute derived from its JAM header.
 
+## MarkRead
+
+```PPL
+Msg.MarkRead() BOOLEAN
+```
+
+Instance function.
+
+Marks mail addressed to the current user's name or alias as read, sets the received timestamp and generates any requested return receipt. Returns TRUE for eligible mail, including already-read mail; FALSE otherwise. Failures update Error.Last(). Does not advance last-read pointers or change this snapshot.
+
 ## NeedsPassword
 
 `Msg.NeedsPassword: BOOLEAN`

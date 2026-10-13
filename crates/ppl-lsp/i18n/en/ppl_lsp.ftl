@@ -290,6 +290,7 @@ hint-member-msg-header=Read-only sender, recipient, subject, or status text from
 hint-member-msg-written=Native DATE or TIME component of the message's UTC creation timestamp. An invalid message returns an empty value, not midnight or a numeric zero.
 hint-member-msg-flags=Read-only message attribute derived from its JAM header.
 hint-member-msg-text=Loads and returns the message body on demand. I/O failures return an empty string and update `Error.Last()`.
+hint-member-msg-mark-read=Marks mail addressed to the current user's name or alias as read, sets the received timestamp and generates any requested return receipt. Returns TRUE for eligible mail, including already-read mail; FALSE otherwise. Failures update Error.Last(). Does not advance last-read pointers or change this snapshot.
 hint-member-contact-service=Name of the contact service, such as email, web, IRC or another configured service.
 hint-member-contact-account=Account name or address on this contact's service.
 hint-member-conference-identity=Read-only conference name, configured number, or validity flag.

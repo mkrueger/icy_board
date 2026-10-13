@@ -65,17 +65,36 @@ fn sync_receipt_files(base: &JamMessageBase) -> jamjam::Result<()> {
     Ok(())
 }
 
-/// Called only after successful body output. Re-read under the writer lock so
-/// two nodes cannot both create a receipt or overwrite one another's status.
-fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, alias: &str) -> Res<bool> {
-    Ok(base.transaction(|base| {
+fn is_recipient_mail(header: &JamMessageHeader, user: &str, alias: &str) -> bool {
+    let to = header.to().map(ToString::to_string).unwrap_or_default();
+    !header.is_deleted()
+        && !to.starts_with('@')
+        && !to.eq_ignore_ascii_case("ALL")
+        && (to.trim().eq_ignore_ascii_case(user) || (!alias.is_empty() && to.trim().eq_ignore_ascii_case(alias)))
+}
+
+pub(crate) fn mark_message_read(base: &mut JamMessageBase, number: u32, user: &str, alias: &str) -> jamjam::Result<bool> {
+    base.transaction(|base| {
+        let header = match base.read_header(number) {
+            Ok(header) => header,
+            Err(error) if crate::icy_board::state::ppl_message::message_is_missing(&error) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        if !is_recipient_mail(&header, user, alias) {
+            return Ok(false);
+        }
+        record_recipient_read(base, number, user, alias)?;
+        Ok(true)
+    })
+}
+
+/// Re-read under the writer lock so two nodes cannot both create a receipt or
+/// overwrite one another's status. The caller must have delivered the body.
+fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, alias: &str) -> jamjam::Result<bool> {
+    base.transaction(|base| {
         let mut header = base.read_header(number)?;
         let to = header.to().map(|name| name.to_string()).unwrap_or_default();
-        if header.is_deleted()
-            || to.starts_with('@')
-            || to.eq_ignore_ascii_case("ALL")
-            || !(to.trim().eq_ignore_ascii_case(user) || (!alias.is_empty() && to.trim().eq_ignore_ascii_case(alias)))
-        {
+        if !is_recipient_mail(&header, user, alias) {
             return Ok(false);
         }
         let receipt = header.is_receipt_req();
@@ -158,7 +177,7 @@ fn record_recipient_read(base: &mut JamMessageBase, number: u32, user: &str, ali
         }
         raw::update_header(base, number, &header)?;
         Ok(receipt)
-    })?)
+    })
 }
 
 fn advance_read_pointer(base: &mut JamMessageBase, user: &str, user_id: u32, number: u32) -> Res<(u32, u32)> {

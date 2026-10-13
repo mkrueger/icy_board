@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use i18n_embed::LanguageLoader;
 use icy_board_ppl::{
     compiler::workspace::{CompilerData, Workspace},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
@@ -114,6 +115,19 @@ fn completion_documentation(source: &str, label: &str) -> String {
         Documentation::String(value) => value,
         Documentation::MarkupContent(value) => value.value,
     }
+}
+
+#[test]
+fn message_mark_read_completion_has_signature_and_localized_documentation() {
+    let documentation = completion_documentation(";$LANGVERSION 400\nMSG msg\nmsg.", "MarkRead");
+    if ppl_lsp::LANGUAGE_LOADER.current_language() == "de" {
+        assert!(documentation.contains("Empfangsbestätigungen"), "{documentation}");
+        assert!(documentation.contains("Lesepositionen"), "{documentation}");
+    } else {
+        assert!(documentation.contains("return receipt"), "{documentation}");
+        assert!(documentation.contains("last-read pointers"), "{documentation}");
+    }
+    assert_eq!(help(";$LANGVERSION 400\nMSG msg\nmsg.MarkRead("), vec!["Msg.MarkRead() BOOLEAN"]);
 }
 
 #[test]

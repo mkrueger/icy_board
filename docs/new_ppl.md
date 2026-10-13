@@ -2056,6 +2056,7 @@ ENDIF
 | `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword` | `BOOLEAN` | What the header says about it |
 | `Size` | `LONG` | How many bytes the body holds |
 | `Text()` | `STRING` | The body |
+| `MarkRead()` | `BOOLEAN` | Mark personal mail addressed to the current caller as read |
 
 A message is addressed by its **number**, not by its position. A message base is
 sparse: numbering starts at `LowMsg()` and a deleted message leaves its number
@@ -2129,7 +2130,41 @@ flag. A program that must match the reader exactly is not yet able to.
 Reading changes nothing. `Read()`, `Find()` and `Text()` never set the read flag
 and never move the caller's last-read pointer, so walking an area leaves the
 board as it was and a second walk sees the same thing. `IsRead` reports the
-stored flag, which only the interactive reader sets.
+stored flag, which the interactive reader or an explicit `MarkRead()` call sets.
+
+#### Marking personal mail as read
+
+A custom reader can call `msg.MarkRead()` after successfully displaying the
+body. It uses the built-in reader's personal-mail handling: only messages
+addressed to the current caller's real name or alias (case-insensitively) are
+marked. It sets the received timestamp on the first read and generates any
+requested return receipt, clearing the request so repeated calls do not
+duplicate receipts.
+
+```PPL
+MSG msg = Session.Area.Read(number)
+IF msg.Valid THEN
+    STRING body = msg.Text()
+    IF Error.Last().OK THEN
+        PRINTLN body
+        BOOLEAN marked = msg.MarkRead()
+        IF !Error.Last().OK PRINTLN Error.Last().Message
+    ENDIF
+ENDIF
+```
+
+`TRUE` means eligible personal mail, including mail already marked read.
+Public mail (`ALL`), `@` recipients, somebody else's mail, and messages removed
+since the snapshot was obtained return `FALSE` without an error. An invalid
+`MSG` reports `ErrKind.Msg` / `ErrCode.Invalid`; no current user reports
+`ErrCode.Denied`. Filesystem and corrupt-base failures report `ErrCode.Io` and
+`ErrCode.Format` and enter an `ON ERROR` handler.
+
+The call is noninteractive and does not change conferences, consume tokens,
+advance last-read pointers, or perform read accounting. It does not verify
+that the body was displayed or apply content-access/password checks: those
+remain the custom reader's responsibility. The `MSG` remains a snapshot;
+call `area.Read(msg.Number)` again to see the updated `IsRead` and `Status`.
 
 An operation that cannot read the base is different. `Read()`, `Find()`,
 `LowMsg()`, `HighMsg()` and `Text()` keep their normal invalid/zero/empty return

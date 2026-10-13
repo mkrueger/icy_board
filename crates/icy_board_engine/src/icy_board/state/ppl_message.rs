@@ -7,7 +7,10 @@ use jamjam::jam::{attributes as jam_attributes, msg_header::JamMessageHeader};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{GenericVariableData, VariableData, VariableType, VariableValue, temporal::TemporalValue},
-    icy_board::state::ppl_error::{ERR_FORMAT, ERR_IO, ERR_KIND_MSG, PplError},
+    icy_board::state::{
+        ppl_error::{ERR_DENIED, ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_MSG, PplError},
+        user_commands::messagereader::mark_message_read,
+    },
     parser::MSG_ID,
     vm::expressions::predefined_functions::message_status,
 };
@@ -103,6 +106,7 @@ member_name!(IS_ECHO, "IsEcho");
 member_name!(NEEDS_PASSWORD, "NeedsPassword");
 member_name!(SIZE, "Size");
 member_name!(TEXT, "Text");
+member_name!(MARK_READ, "MarkRead");
 member_name!(HEADER, "Header");
 
 /// One message, read out of its area. The header travels with the value; the body
@@ -268,6 +272,31 @@ impl UserDataValue for PplMessage {
         name: &unicase::Ascii<String>,
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *MARK_READ {
+            if !self.valid {
+                vm.set_error(PplError::new(ERR_KIND_MSG, ERR_INVALID, "MarkRead requires a valid MSG"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let session = &vm.icy_board_state.session;
+            if session.current_user.is_none() || session.user_name.is_empty() {
+                vm.set_error(PplError::new(ERR_KIND_MSG, ERR_DENIED, "MarkRead requires a current user"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let user = session.user_name.clone();
+            let alias = session.alias_name.clone();
+            let result = vm.with_message_base(&self.path, |base| mark_message_read(base, self.number, &user, &alias));
+            vm.invalidate_message_base();
+            return Ok(match result {
+                Ok(marked) => {
+                    vm.operation_succeeded();
+                    VariableValue::new_bool(marked)
+                }
+                Err(error) => {
+                    vm.set_error(message_error(&format!("can't mark message {} read in", self.number), &self.path, &error));
+                    VariableValue::new_bool(false)
+                }
+            });
+        }
         if *name == *TEXT {
             if !self.valid {
                 vm.operation_succeeded();

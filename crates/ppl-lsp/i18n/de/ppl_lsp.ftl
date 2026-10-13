@@ -292,6 +292,7 @@ hint-member-msg-header=Schreibgeschützter Absender, Empfänger, Betreff oder St
 hint-member-msg-written=Native DATE- oder TIME-Komponente des UTC-Erstellungszeitstempels. Eine ungültige Nachricht liefert einen leeren Wert, weder Mitternacht noch eine numerische Null.
 hint-member-msg-flags=Schreibgeschütztes Nachrichtenattribut aus dem JAM-Kopf.
 hint-member-msg-text=Lädt den Nachrichtentext bei Bedarf. E/A-Fehler liefern eine leere Zeichenfolge und aktualisieren `Error.Last()`.
+hint-member-msg-mark-read=Markiert an den Namen oder Alias des aktuellen Benutzers adressierte Nachrichten als gelesen, setzt den Empfangszeitpunkt und erstellt angeforderte Empfangsbestätigungen. Liefert TRUE für passende Nachrichten, auch bereits gelesene; sonst FALSE. Fehler aktualisieren Error.Last(). Ändert weder Lesepositionen noch diese Momentaufnahme.
 hint-member-contact-service=Name des Kontaktdienstes, etwa E-Mail, Web, IRC oder ein anderer konfigurierter Dienst.
 hint-member-contact-account=Kontoname oder Adresse bei diesem Kontaktdienst.
 hint-member-conference-identity=Schreibgeschützter Konferenzname, konfigurierte Nummer oder Gültigkeitsstatus.

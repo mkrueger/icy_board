@@ -132,6 +132,183 @@ async fn execute(state: &mut IcyBoardState, root: &Path, source: &str) -> String
 }
 
 #[tokio::test]
+async fn message_mark_read_records_personal_mail_and_one_receipt_without_moving_pointers() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut state, _peer) = fixture(root.path(), "", false).await;
+    state.session.last_msg_read = 7;
+    state.session.highest_msg_read = 9;
+    let mut base = JamMessageBase::open(root.path().join("area1")).unwrap();
+    let mut header = base.read_header(1).unwrap();
+    header.set_to(" reader ".into());
+    header.attributes |= attributes::MSG_RECEIPTREQ;
+    jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+    let result = execute(
+        &mut state,
+        root.path(),
+        r#"
+AREA area = Board.Conferences[1].Areas[0]
+MSG original = area.Read(1)
+STRING body = original.Text()
+BOOLEAN marked = original.MarkRead()
+BOOLEAN firstOK = Error.Last().OK
+MSG fresh = area.Read(1)
+BOOLEAN again = original.MarkRead()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, marked, ":", firstOK, ":", original.IsRead, ":", fresh.IsRead, ":", again, ":", Error.Last().OK, ":", area.HighMsg()
+FCLOSE 1
+EXIT
+"#,
+    )
+    .await;
+    assert_eq!(result, "1:1:0:1:1:1:2");
+    let base = JamMessageBase::open(root.path().join("area1")).unwrap();
+    let saved = base.read_header(1).unwrap();
+    assert!(saved.is_read());
+    assert!(!saved.is_receipt_req());
+    assert!(saved.date_received > 0);
+    assert_eq!(saved.date_received, base.read_header(2).unwrap().date_written);
+    assert_eq!(saved.attributes & !attributes::MSG_READ, header.attributes & !attributes::MSG_RECEIPTREQ);
+    let receipt = base.read_header(2).unwrap();
+    assert_eq!(receipt.from().unwrap().to_string(), "RETURN RECEIPT");
+    assert_eq!(receipt.to().unwrap().to_string(), "READER");
+    assert_eq!(receipt.reply_to, 1);
+    assert_eq!(base.read_message_text(&saved).unwrap().to_string(), "Original body");
+    assert!(base.read_last_read_file().unwrap().is_empty());
+    assert_eq!((state.session.last_msg_read, state.session.highest_msg_read), (7, 9));
+}
+
+#[tokio::test]
+async fn message_mark_read_matches_name_or_alias_but_not_other_recipients() {
+    for (recipient, alias, expected) in [
+        ("reader", "", true),
+        ("rEaDeR aLiAs", "READER ALIAS", true),
+        ("ALICE", "", false),
+        ("ALL", "ALL", false),
+        ("@READER", "@READER", false),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = fixture(root.path(), "", false).await;
+        state.session.alias_name = alias.into();
+        let mut base = JamMessageBase::open(root.path().join("area1")).unwrap();
+        let mut header = base.read_header(1).unwrap();
+        header.set_to(recipient.into());
+        if !alias.is_empty() && expected {
+            header.attributes |= attributes::MSG_READ;
+            header.date_received = 1234;
+        }
+        jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+        let result = execute(
+            &mut state,
+            root.path(),
+            r#"
+AREA area = Board.Conferences[1].Areas[0]
+MSG original = area.Read(1)
+BOOLEAN marked = original.MarkRead()
+BOOLEAN ok = Error.Last().OK
+MSG fresh = area.Read(1)
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, marked, ":", ok, ":", fresh.IsRead
+FCLOSE 1
+EXIT
+"#,
+        )
+        .await;
+        assert_eq!(result, if expected { "1:1:1" } else { "0:1:0" }, "{recipient}");
+        let base = JamMessageBase::open(root.path().join("area1")).unwrap();
+        let saved = base.read_header(1).unwrap();
+        assert_eq!(saved.is_read(), expected);
+        assert_eq!(saved.date_received > 0, expected);
+        if !alias.is_empty() && expected {
+            assert_eq!(saved.date_received, 1234);
+        }
+        assert_eq!(base.highest_message_number(), 1);
+        assert!(base.read_last_read_file().unwrap().is_empty());
+    }
+}
+
+#[tokio::test]
+async fn message_mark_read_rereads_recipient_and_handles_deleted_messages() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut state, _peer) = fixture(root.path(), "", false).await;
+    let result = execute(
+        &mut state,
+        root.path(),
+        r#"
+AREA area = Board.Conferences[1].Areas[0]
+MSG original = area.Read(1)
+INTEGER changed = SETMSGHDR(1, 1, 1, "READER")
+BOOLEAN marked = original.MarkRead()
+changed = SETMSGHDR(1, 1, 1, "ALICE")
+BOOLEAN other = original.MarkRead()
+KILLMSG 1, 1
+BOOLEAN deleted = original.MarkRead()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, marked, ":", other, ":", deleted, ":", Error.Last().OK
+FCLOSE 1
+EXIT
+"#,
+    )
+    .await;
+    assert_eq!(result, "1:0:0:1");
+}
+
+#[tokio::test]
+async fn message_mark_read_invalid_or_logged_out_reports_error() {
+    for logged_in in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = fixture(root.path(), "", false).await;
+        if !logged_in {
+            state.session.current_user = None;
+        }
+        let source = format!(
+            r#"
+MSG original{}
+BOOLEAN marked = original.MarkRead()
+ERROR failure = Error.Last()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, marked, ":", failure.Kind = ErrKind.Msg, ":", failure.Code = ErrCode.{}
+FCLOSE 1
+EXIT
+"#,
+            if logged_in { "" } else { " = Board.Conferences[1].Areas[0].Read(1)" },
+            if logged_in { "Invalid" } else { "Denied" }
+        );
+        assert_eq!(execute(&mut state, root.path(), &source).await, "0:1:1");
+    }
+}
+
+#[tokio::test]
+async fn message_mark_read_base_failures_enter_on_error_handler() {
+    for corrupt in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let (mut state, _peer) = fixture(root.path(), "", false).await;
+        let damage = if corrupt {
+            "FCREATE 1, \"area1.jdx\", O_WR, S_DN\nFPUT 1, \"x\"\nFCLOSE 1"
+        } else {
+            "DELETE \"area1.jhr\""
+        };
+        let source = format!(
+            r#"
+MSG original = Board.Conferences[1].Areas[0].Read(1)
+{damage}
+MSG other = Board.Conferences[0].Areas[0].Read(1)
+ON ERROR GOTO failed
+BOOLEAN marked = original.MarkRead()
+EXIT
+:failed
+ERROR failure = Error.Last()
+FCREATE 1, "status.txt", O_WR, S_DN
+FPUTLN 1, failure.Kind = ErrKind.Msg, ":", failure.Code = ErrCode.{}
+FCLOSE 1
+EXIT
+"#,
+            if corrupt { "Format" } else { "Io" }
+        );
+        assert_eq!(execute(&mut state, root.path(), &source).await, "1:1");
+    }
+}
+
+#[tokio::test]
 async fn message_api_post_new_and_editable_initial_text() {
     for predefined in [false, true] {
         let root = tempfile::tempdir().unwrap();

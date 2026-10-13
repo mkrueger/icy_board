@@ -243,6 +243,7 @@ fn register_data_members<F: UserDataMemberRegistry>(id: usize, registry: &mut F)
                 registry.add_property(n(name), V::Boolean, false);
             }
             registry.add_function(n("Text"), Vec::new(), V::UnboundedString);
+            registry.add_function(n("MarkRead"), Vec::new(), V::Boolean);
             registry.add_property(n("Header"), V::UserData(super::MSG_HEADER_ID as u32), false);
             registry.add_property(n("WrittenAt"), V::Timestamp, false);
         }
