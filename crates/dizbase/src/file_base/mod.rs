@@ -82,6 +82,16 @@ impl DerefMut for FileBase {
 }
 
 impl FileBase {
+    /// Defaults an unset index prefix to `dir/dir`. Explicit prefixes must already
+    /// be resolved against the board root by the caller.
+    pub fn resolve_metadata_path(dir: &Path, metadata_path: &Path) -> PathBuf {
+        if metadata_path.as_os_str().is_empty() && !dir.as_os_str().is_empty() {
+            dir.join("dir")
+        } else {
+            metadata_path.to_path_buf()
+        }
+    }
+
     /// `meta_data_path` names the index; the database and its write-ahead log go into a
     /// `.icy` directory beside it, where a directory scan will never look.
     pub fn database_path<P: AsRef<Path>>(meta_data_path: P) -> PathBuf {
@@ -105,9 +115,13 @@ impl FileBase {
     }
 
     fn open_impl<P: AsRef<Path>>(dir: &Path, meta_data_path: P, strict: bool) -> crate::Result<Self> {
+        if dir.as_os_str().is_empty() {
+            return Err(FileBaseError::DirIsNoDir(dir.to_path_buf()).into());
+        }
         if strict {
             fs::read_dir(dir).map_err(|err| format!("can't read file directory {}: {err}", dir.display()))?;
         }
+        let meta_data_path = Self::resolve_metadata_path(dir, meta_data_path.as_ref());
         let db_path = Self::database_path(&meta_data_path);
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent)?;
@@ -508,6 +522,43 @@ mod tests {
         let mut names: Vec<String> = base.iter().map(|h| h.name.clone()).collect();
         names.sort();
         names
+    }
+
+    #[test]
+    fn empty_metadata_uses_separate_area_indexes_and_readers() {
+        let root = TempDir::new().unwrap();
+        for name in ["one", "two"] {
+            let dir = root.path().join(name);
+            fs::create_dir(&dir).unwrap();
+            fs::write(dir.join("SHARED.TXT"), name).unwrap();
+            fs::write(dir.join(format!("{name}.txt")), name).unwrap();
+            let mut base = FileBase::open(&dir, Path::new("")).unwrap();
+            assert_eq!(base.len(), 2, "another area's entries must not leak into this index");
+            base.set_description(&dir.join("SHARED.TXT"), name).unwrap();
+            base.iter_mut().find(|header| header.name == "SHARED.TXT").unwrap().dl_counter = 7;
+            base.save().unwrap();
+            drop(base);
+
+            let mut explicit = FileBase::open_checked(&dir, dir.join("dir")).unwrap();
+            assert_eq!(explicit.description(&dir.join("SHARED.TXT")).unwrap().as_deref(), Some(name));
+            assert_eq!(explicit.iter().find(|header| header.name == "SHARED.TXT").unwrap().dl_counter, 7);
+            assert!(dir.join(".icy/dir.db").is_file());
+            assert!(!dir.join(".icy/.icy").exists());
+            let page = reader::read_page(&dir, Path::new(""), "", 0, 100).unwrap();
+            assert_eq!(page.entries.len(), 2);
+            assert_eq!(page.entries.iter().find(|entry| entry.name == "SHARED.TXT").unwrap().description, name);
+            assert_eq!(reader::resolve_file(&dir, Path::new(""), "shared.txt").unwrap(), Some(dir.join("SHARED.TXT")));
+        }
+        assert!(!root.path().join(".icy").exists());
+    }
+
+    #[test]
+    fn an_unconfigured_file_directory_cannot_open_a_working_directory_index() {
+        assert!(FileBase::open(Path::new(""), Path::new("")).is_err());
+        assert!(FileBase::open_checked(Path::new(""), Path::new("")).is_err());
+        assert!(reader::read_page(Path::new(""), Path::new(""), "", 0, 10).is_err());
+        assert!(reader::resolve_file(Path::new(""), Path::new(""), "file.txt").is_err());
+        assert_eq!(FileBase::resolve_metadata_path(Path::new(""), Path::new("")), PathBuf::new());
     }
 
     #[test]

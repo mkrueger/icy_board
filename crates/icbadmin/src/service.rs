@@ -961,6 +961,16 @@ fn path_string(path: &Path) -> String {
     path.display().to_string()
 }
 
+/// The running board fills in the default `<location>/dir`; showing it would pin the
+/// index to the old location when only the upload location is edited.
+fn upload_metadata_string(location: &Path, metadata: &Path) -> String {
+    if !location.as_os_str().is_empty() && metadata == location.join("dir") {
+        String::new()
+    } else {
+        path_string(metadata)
+    }
+}
+
 fn set_path(target: &mut PathBuf, value: &str) {
     *target = PathBuf::from(value.trim());
 }
@@ -2463,9 +2473,9 @@ fn to_conference_dto(conf: &Conference) -> ConferenceDto {
         attachment_location: path(&conf.attachment_location),
         command_file: path(&conf.command_file),
         pub_upload_location: path(&conf.pub_upload_location),
-        pub_upload_metadata: path(&conf.pub_upload_metadata),
+        pub_upload_metadata: upload_metadata_string(&conf.pub_upload_location, &conf.pub_upload_metadata),
         private_upload_location: path(&conf.private_upload_location),
-        private_upload_metadata: path(&conf.private_upload_metadata),
+        private_upload_metadata: upload_metadata_string(&conf.private_upload_location, &conf.private_upload_metadata),
         doors_menu: path(&conf.doors_menu),
         doors_file: path(&conf.doors_file),
         blt_menu: path(&conf.blt_menu),

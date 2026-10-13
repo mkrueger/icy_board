@@ -6,7 +6,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OpenFlags, params};
 
-use super::{FileBase, file_header::FileAttributes};
+use super::{FileBase, FileBaseError, file_header::FileAttributes};
 
 pub const MAX_PAGE_SIZE: usize = 100;
 pub const MAX_SCAN_ROWS: usize = 1024;
@@ -34,9 +34,13 @@ pub fn valid_file_name(name: &str) -> bool {
 }
 
 pub fn resolve_file(dir: &Path, metadata_path: &Path, name: &str) -> crate::Result<Option<PathBuf>> {
+    if dir.as_os_str().is_empty() {
+        return Err(FileBaseError::DirIsNoDir(dir.to_path_buf()).into());
+    }
     if !valid_file_name(name) {
         return Err("invalid file name".into());
     }
+    let metadata_path = FileBase::resolve_metadata_path(dir, metadata_path);
     let connection = Connection::open_with_flags(FileBase::database_path(metadata_path), OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     connection.busy_timeout(Duration::from_secs(1))?;
     let mut statement = connection.prepare("SELECT name, attribute FROM files WHERE name = ?1 COLLATE NOCASE LIMIT 2")?;
@@ -60,9 +64,13 @@ pub fn resolve_file(dir: &Path, metadata_path: &Path, name: &str) -> crate::Resu
 }
 
 pub fn read_page(dir: &Path, metadata_path: &Path, query: &str, after: i64, limit: usize) -> crate::Result<FilePage> {
+    if dir.as_os_str().is_empty() {
+        return Err(FileBaseError::DirIsNoDir(dir.to_path_buf()).into());
+    }
     if after < 0 || !(1..=MAX_PAGE_SIZE).contains(&limit) || query.len() > 1024 {
         return Err("invalid filebase page arguments".into());
     }
+    let metadata_path = FileBase::resolve_metadata_path(dir, metadata_path);
     let connection = Connection::open_with_flags(FileBase::database_path(metadata_path), OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     connection.busy_timeout(Duration::from_secs(1))?;
     let mut statement = connection.prepare(

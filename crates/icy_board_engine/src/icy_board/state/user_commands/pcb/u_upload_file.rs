@@ -209,7 +209,7 @@ impl IcyBoardState {
             }
             // Upload locations need not also appear in the downloadable directory
             // list. Check their indexes before quarantine intake/credit as well.
-            if location.is_dir() && !metadata.as_os_str().is_empty() {
+            if location.is_dir() {
                 let base = self.get_filebase(location, metadata).await?;
                 if base.lock().await.contains_name(name) {
                     return Ok(true);

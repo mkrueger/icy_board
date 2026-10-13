@@ -263,6 +263,7 @@ impl IcyBoardCreator {
         conf.attachment_location = PathBuf::from("conferences/main/attach");
         fs::create_dir_all(self.destination.join(&conf.attachment_location))?;
         conf.pub_upload_location = PathBuf::from("conferences/main/upload");
+        conf.pub_upload_metadata = conf.pub_upload_location.join("dir");
         fs::create_dir_all(self.destination.join(&conf.pub_upload_location))?;
 
         self.logger.start_action("Write user & sysop menus…".to_string());
@@ -346,6 +347,7 @@ impl IcyBoardCreator {
         let fd = FileDirectory {
             name: "General".to_string(),
             path: PathBuf::from("conferences/main/general/files/dir00"),
+            metadata_path: PathBuf::from("conferences/main/general/files/dir00/dir"),
             ..Default::default()
         };
         fs::create_dir_all(self.destination.join(&fd.path))?;
@@ -398,6 +400,27 @@ impl IcyBoardCreator {
 mod tests {
     use super::*;
     use icy_board_help::{RenderOptions, catalog, render, sha256};
+
+    #[test]
+    fn creation_assigns_separate_board_relative_file_metadata() {
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("board");
+        fs::create_dir_all(destination.join("conferences")).unwrap();
+        let creator = IcyBoardCreator::new(&destination);
+        let conf_path = destination.join("conferences.toml");
+        // Generate only conference data, without creating or printing SYSOP credentials.
+        creator.generate_default_conference(&conf_path).unwrap();
+        let conferences = ConferenceBase::load(&conf_path).unwrap();
+        let conference = &conferences[0];
+        assert_eq!(conference.pub_upload_metadata, conference.pub_upload_location.join("dir"));
+        assert!(!conference.pub_upload_metadata.is_absolute());
+        assert!(conference.private_upload_metadata.as_os_str().is_empty());
+        let directories = DirectoryList::load(&destination.join(&conference.dir_file)).unwrap();
+        assert_eq!(directories[0].metadata_path, directories[0].path.join("dir"));
+        assert!(!directories[0].metadata_path.is_absolute());
+        assert_ne!(directories[0].metadata_path, conference.pub_upload_metadata);
+        assert!(!root.path().join(".icy").exists());
+    }
 
     fn assert_default_help(destination: &Path) {
         let creator = IcyBoardCreator::new(destination);

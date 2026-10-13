@@ -369,6 +369,10 @@ impl IcyBoard {
 
             c.pub_upload_location = get_path(&self.root_path, &c.pub_upload_location);
             c.private_upload_location = get_path(&self.root_path, &c.private_upload_location);
+            c.pub_upload_metadata =
+                dizbase::file_base::FileBase::resolve_metadata_path(&c.pub_upload_location, &get_path(&self.root_path, &c.pub_upload_metadata));
+            c.private_upload_metadata =
+                dizbase::file_base::FileBase::resolve_metadata_path(&c.private_upload_location, &get_path(&self.root_path, &c.private_upload_metadata));
 
             if let Some(areas) = &mut c.areas {
                 for area in std::sync::Arc::make_mut(areas).iter_mut() {
@@ -378,7 +382,7 @@ impl IcyBoard {
             if let Some(directories) = &mut c.directories {
                 for dir in std::sync::Arc::make_mut(directories).iter_mut() {
                     dir.path = get_path(&self.root_path, &dir.path);
-                    dir.metadata_path = get_path(&self.root_path, &dir.metadata_path);
+                    dir.metadata_path = dizbase::file_base::FileBase::resolve_metadata_path(&dir.path, &get_path(&self.root_path, &dir.metadata_path));
                 }
             }
 
@@ -1302,6 +1306,57 @@ pub trait PCBoardTextImport: PCBoardImport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_metadata_paths_resolve_per_area_and_upload_location() {
+        use conferences::Conference;
+        use file_directory::FileDirectory;
+        use std::sync::Arc;
+
+        let root = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard {
+            root_path: root.path().to_path_buf(),
+            ..Default::default()
+        };
+        let mut directories = DirectoryList::default();
+        for (path, metadata_path) in [
+            ("files/one", PathBuf::new()),
+            ("files/two", PathBuf::from("metadata/two")),
+            ("files/three", external.path().join("three")),
+        ] {
+            directories.push(FileDirectory {
+                path: path.into(),
+                metadata_path,
+                ..Default::default()
+            });
+        }
+        board.conferences.clear();
+        board.conferences.push(Conference {
+            pub_upload_location: "uploads/public".into(),
+            private_upload_location: "uploads/private".into(),
+            private_upload_metadata: "metadata/private".into(),
+            directories: Some(Arc::new(directories)),
+            ..Default::default()
+        });
+        board.conferences.push(Conference::default());
+
+        for _ in 0..2 {
+            board.resolve_paths();
+            let conference = &board.conferences[0];
+            assert_eq!(conference.pub_upload_metadata, root.path().join("uploads/public/dir"));
+            assert_eq!(conference.private_upload_metadata, root.path().join("metadata/private"));
+            let directories = conference.directories.as_ref().unwrap();
+            assert_eq!(directories[0].metadata_path, root.path().join("files/one/dir"));
+            assert_eq!(directories[1].metadata_path, root.path().join("metadata/two"));
+            assert_eq!(directories[2].metadata_path, external.path().join("three"));
+            assert!(board.conferences[1].pub_upload_metadata.as_os_str().is_empty());
+            assert!(board.conferences[1].private_upload_metadata.as_os_str().is_empty());
+        }
+        board.conferences[0].pub_upload_metadata = external.path().join("public");
+        board.resolve_paths();
+        assert_eq!(board.conferences[0].pub_upload_metadata, external.path().join("public"));
+    }
 
     #[test]
     fn upload_rule_paths_resolve_independently_and_keep_disabled_categories_empty() {

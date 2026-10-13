@@ -169,7 +169,7 @@ required string. The following are **all** remaining serialized fields.
 | `conference_type` | enum / `"Normal"` | See exact values below |
 | `users_menu`, `sysop_menu`, `news_file`, `attachment_location` | path / required | User/sysop menus, conference news and attachment storage |
 | `pub_upload_location`, `private_upload_location` | path / required | Public and private upload directories |
-| `pub_upload_metadata`, `private_upload_metadata` | path / empty | Upload metadata/index paths |
+| `pub_upload_metadata`, `private_upload_metadata` | path / empty | Upload index prefixes; empty defaults to `dir` inside the corresponding configured upload location. Explicit relative paths use the board root. |
 | `pub_upload_sort`, `private_upload_sort` | u8 / 0 | Legacy numeric upload sort codes, not `SortOrder` strings |
 | `command_file`, `intro_file` | path / required | Conference command list and introduction display file |
 | `doors_menu`, `doors_file` | path / required | Door menu and door-list TOML |
@@ -339,7 +339,7 @@ req_level_to_enter = "10"
 | --- | --- | --- |
 | `name`, `path` | string, path / required | Display name and directory holding downloadable files |
 | `password` | Password string / required | Use `""` for no password |
-| `metadata_path` | path / empty | File-base metadata/index name, not the download directory |
+| `metadata_path` | path / empty | File-base index prefix; empty defaults to `<path>/dir`. Explicit relative paths use the board root, not the process working directory. |
 | `sort_order` | enum / `"FileName"` | `NoSort`, `FileName`, `FileDate` |
 | `sort_direction` | enum / `"Ascending"` | `Ascending`, `Descending` |
 | `ftn_area_tag` | string / empty | File-echo tag matched to incoming TIC `Area`; empty disables that association |

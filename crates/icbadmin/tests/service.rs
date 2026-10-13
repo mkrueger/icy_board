@@ -568,6 +568,45 @@ async fn conference_update_writes_file_backup_and_audit() {
 }
 
 #[tokio::test]
+async fn moving_an_upload_location_moves_its_default_index() {
+    let f = fixture();
+    let path = f.backend.root_path().join("main").join("conferences.toml");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mut base = ConferenceBase::default();
+    for (location, metadata) in [("uploads/a", ""), ("uploads/b", "uploads/b/dir"), ("uploads/c", "meta/c")] {
+        base.push(Conference {
+            name: location.to_string(),
+            pub_upload_location: location.into(),
+            pub_upload_metadata: metadata.into(),
+            ..Default::default()
+        });
+    }
+    base.save(&path).unwrap();
+    reload_board(&f).await;
+    let root = f.backend.root_path().to_path_buf();
+
+    for (index, shown, new_location, saved, live) in [
+        (0, "", "moved/a", "", root.join("moved/a/dir")),
+        (1, "", "moved/b", "", root.join("moved/b/dir")),
+        (2, "meta/c", "moved/c", "meta/c", root.join("meta/c")),
+    ] {
+        let current = f.backend.get_conference(index).await.unwrap();
+        assert_eq!(current.settings.pub_upload_metadata, shown);
+        assert_eq!(current.settings.private_upload_metadata, "");
+
+        let mut patch = current.settings.clone();
+        patch.pub_upload_location = new_location.to_string();
+        let result = f.backend.update_conference(index, &patch, &current.fingerprint, "test").await.unwrap();
+        assert_eq!(result.changed_fields, vec!["pub_upload_location".to_string()]);
+
+        let reloaded = ConferenceBase::load(&path).unwrap();
+        assert_eq!(reloaded[index].pub_upload_location, PathBuf::from(new_location));
+        assert_eq!(reloaded[index].pub_upload_metadata, PathBuf::from(saved));
+        assert_eq!(f.board.lock().await.conferences[index].pub_upload_metadata, live);
+    }
+}
+
+#[tokio::test]
 async fn conference_can_be_created_and_deleted() {
     let (f, path) = conference_fixture().await;
 

@@ -302,7 +302,7 @@ impl IcyBoardState {
                 max_dirs + 1,
                 self.get_display_text(IceText::RecentUploads)?,
                 self.session.current_conference.pub_upload_location.clone(),
-                self.session.current_conference.private_upload_metadata.clone(),
+                self.session.current_conference.pub_upload_metadata.clone(),
             ));
         }
 

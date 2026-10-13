@@ -320,7 +320,7 @@ fn open_area(target: &Path, directory: &icy_board_engine::icy_board::file_direct
         .unwrap_or(parent);
     let path = resolve(base, &directory.path);
     let metadata_path = if directory.metadata_path.as_os_str().is_empty() {
-        path.join("dir")
+        PathBuf::new()
     } else {
         resolve(base, &directory.metadata_path)
     };

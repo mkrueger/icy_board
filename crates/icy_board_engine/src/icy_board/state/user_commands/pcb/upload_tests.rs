@@ -72,6 +72,81 @@ async fn output(peer: &mut ChannelConnection) -> String {
 }
 
 #[tokio::test]
+async fn uploads_with_default_metadata_are_isolated_and_maintenance_removes_duplicates() {
+    let (root, mut state, _peer) = fixture("").await;
+    let public = root.path().join("public");
+    let private = root.path().join("private");
+    state.session.current_conference.pub_upload_metadata = PathBuf::new();
+    state.session.current_conference.private_upload_metadata = PathBuf::new();
+    let source = root.path().join("payload");
+    std::fs::write(&source, b"payload").unwrap();
+    for location in [&public, &private] {
+        assert!(
+            state
+                .publish_uploaded_file(&source, "SAME.BIN", location, &PathBuf::new(), &["Authored upload".into()])
+                .await
+                .unwrap()
+        );
+        assert!(location.join(".icy/dir.db").is_file());
+        let mut maintenance = FileBase::open_checked(location, location.join("dir")).unwrap();
+        assert_eq!(maintenance.description(&location.join("SAME.BIN")).unwrap().as_deref(), Some("Authored upload"));
+        std::fs::remove_file(location.join("SAME.BIN")).unwrap();
+        assert!(state.upload_name_exists_on_system("SAME.BIN").await.unwrap());
+        maintenance.remove_file(&location.join("SAME.BIN")).unwrap();
+        assert!(!state.upload_name_exists_on_system("SAME.BIN").await.unwrap());
+    }
+    assert!(!root.path().join(".icy").exists());
+
+    let (_second_root, mut second, _second_peer) = fixture("").await;
+    second.session.current_conference.pub_upload_metadata = PathBuf::new();
+    let second_public = second.session.current_conference.pub_upload_location.clone();
+    assert!(
+        second
+            .publish_uploaded_file(&source, "SAME.BIN", &second_public, &PathBuf::new(), &[])
+            .await
+            .unwrap()
+    );
+    assert!(!state.upload_name_exists_on_system("SAME.BIN").await.unwrap());
+    assert!(second.upload_name_exists_on_system("SAME.BIN").await.unwrap());
+}
+
+#[tokio::test]
+async fn public_upload_listing_and_scan_use_the_public_index() {
+    use crate::icy_board::file_directory::{DirectoryList, FileDirectory};
+    use icy_engine::{EditableScreen, TextPane};
+
+    let (root, mut state, _peer) = fixture("\r\r").await;
+    for area in ["public", "private"] {
+        let path = root.path().join(area);
+        let metadata = root.path().join(format!("{area}-meta"));
+        std::fs::write(path.join("SHARED.TXT"), b"payload").unwrap();
+        let mut base = FileBase::open(&path, &metadata).unwrap();
+        base.set_description(&path.join("SHARED.TXT"), &format!("{area} description")).unwrap();
+    }
+    let mut directories = DirectoryList::default();
+    directories.push(FileDirectory {
+        path: root.path().join("public"),
+        ..Default::default()
+    });
+    state.session.current_conference.directories = Some(Arc::new(directories));
+    state.session.tokens.extend(["U", ""].map(str::to_string));
+    timeout(Duration::from_secs(5), state.show_file_directories_cmd()).await.unwrap().unwrap();
+    let screen = &state.display_screen().buffer;
+    let top = screen.first_visible_line();
+    let text: String = (top..top + screen.height())
+        .flat_map(|y| (0..screen.width()).map(move |x| screen.char_at((x, y).into()).ch))
+        .collect();
+    assert!(text.contains("public description"), "{text}");
+    assert!(!text.contains("private description"), "{text}");
+
+    state.session.tokens.push_back("U".into());
+    let scan = state.get_dir_numbers().await.unwrap();
+    assert_eq!(scan.numbers.len(), 1);
+    assert_eq!(scan.numbers[0].2, root.path().join("public"));
+    assert_eq!(scan.numbers[0].3, root.path().join("public-meta"));
+}
+
+#[tokio::test]
 async fn native_ymodem_g_receiver_requests_streaming_mode() {
     let (mut connection, mut peer) = ChannelConnection::create_pair();
     let mut protocol = create_protocol(&TransferProtocolType::YModemG).unwrap();

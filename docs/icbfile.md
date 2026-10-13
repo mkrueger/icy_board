@@ -31,6 +31,13 @@ Two paths matter, and they are deliberately separate:
 Keeping them apart is what makes read-only areas possible: point `path` at a mounted
 CD-ROM image and `metadata_path` at writable storage, and the area works normally.
 
+If `metadata_path` is omitted or empty, the index prefix defaults to `<path>/dir`,
+giving each area its own `<path>/.icy/dir.db`. Public and private uploads use the
+same default inside their respective upload locations. Explicit relative metadata
+paths (including `pub_upload_metadata` and `private_upload_metadata`) are resolved
+against the board root, not the directory from which the BBS was launched.
+An unconfigured upload location remains disabled.
+
 ### The database
 
 The database is placed in a `.icy` directory beside `metadata_path`, named after it:
@@ -51,6 +58,37 @@ Icy Board. It runs in WAL mode so several nodes can read an area while one of th
 
 `.icy` exists so that nothing in it can ever collide with a file a user uploads, and so
 the download directory contains only downloadable files.
+
+### Recovering indexes created outside the board
+
+Older versions could use `.icy/dir.db` in the process working directory when an
+area or upload metadata path was empty. Several areas or boards could then share
+that index, and deleting a board directory did not remove its stale entries.
+The corrected defaults no longer read or modify that shared index. Existing disk
+files are indexed in their own areas on next access; authored descriptions and
+download counters in the old database are **not automatically migrated**.
+
+Stop the BBS and back up the old database (and any remaining `-wal`/`-shm` files)
+before recovery. Do not blindly delete it or copy a shared database into every
+area. If it belonged to exactly one area, use SQLite's backup facility to make
+a consistent copy (including any pending WAL transactions) at that area's
+intended index location while the BBS is stopped, retaining any newer destination
+database as a separate backup. Mixed-area indexes need reconciliation
+before they can be reused. An intentionally external database remains supported:
+configure its absolute index prefix, for example `/old/location/dir` for
+`/old/location/.icy/dir.db`, not the `.db` path itself.
+
+Run maintenance against the area list or the actual upload directory, **not**
+against `.icy`: treating `.icy` as a file area creates a nested bookkeeping
+directory. A conference's public upload directory is not necessarily included in
+its `dir_file` list. With default upload metadata, check it directly, for example:
+
+```sh
+icbfile check /path/to/mybbs/conferences/main/upload --prune
+```
+
+For an explicit upload metadata prefix, use an area-list entry with that same
+directory and prefix. Only prune after confirming that storage is mounted.
 
 ### What is authoritative
 

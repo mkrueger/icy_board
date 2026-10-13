@@ -79,6 +79,72 @@ fn check_nested_board_area_uses_the_live_database_and_prunes_deleted_files() {
 }
 
 #[test]
+fn default_metadata_is_shared_with_the_bbs_from_an_unrelated_working_directory() {
+    use icy_board_engine::icy_board::{IcyBoard, IcyBoardSerializer, conferences::Conference, file_directory::DirectoryList};
+    use std::{path::PathBuf, sync::Arc};
+
+    for locale in ["en_US", "de_DE"] {
+        let root = TempDir::new().unwrap();
+        let (config, path, _) = nested_area(&root);
+        fs::write(&config, "[[area]]\nname = \"General\"\npath = \"files/general\"\npassword = \"\"\n").unwrap();
+        let mut board = IcyBoard {
+            root_path: root.path().to_path_buf(),
+            ..Default::default()
+        };
+        board.conferences.clear();
+        board.conferences.push(Conference {
+            directories: Some(Arc::new(DirectoryList::load(&config).unwrap())),
+            ..Default::default()
+        });
+        board.resolve_paths();
+        let directory = &board.conferences[0].directories.as_ref().unwrap()[0];
+        assert_eq!(directory.metadata_path, path.join("dir"));
+        fs::write(path.join("pcb154f.zip"), b"archive").unwrap();
+        let mut live = FileBase::open(&directory.path, &directory.metadata_path).unwrap();
+        live.set_description(&path.join("pcb154f.zip"), "Authored description").unwrap();
+        fs::remove_file(path.join("pcb154f.zip")).unwrap();
+
+        let working = TempDir::new().unwrap();
+        let stale_area = working.path().join("old-files");
+        fs::create_dir(&stale_area).unwrap();
+        fs::write(stale_area.join("pcb154f.zip"), b"old archive").unwrap();
+        let old_metadata = working.path().join("dir");
+        let mut stale = FileBase::open(&stale_area, &old_metadata).unwrap();
+        stale.set_description(&stale_area.join("pcb154f.zip"), "Old shared index").unwrap();
+        drop(stale);
+        for args in [
+            vec!["check", config.to_str().unwrap(), "--prune"],
+            vec!["list", config.to_str().unwrap(), "--area", "General"],
+        ] {
+            let output = Command::new(env!("CARGO_BIN_EXE_icbfile"))
+                .args(&args)
+                .current_dir(working.path())
+                .env("LANG", format!("{locale}.UTF-8"))
+                .env("LC_ALL", format!("{locale}.UTF-8"))
+                .env("LANGUAGE", locale)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{}", decoded(&output.stderr));
+            if args[0] == "check" {
+                assert!(decoded(&output.stdout).contains("1 missing (removed)"));
+            }
+        }
+        live.refresh().unwrap();
+        assert!(!live.contains_name("pcb154f.zip"), "maintenance must update the live BBS database");
+        let mut old = FileBase::open(&stale_area, &old_metadata).unwrap();
+        assert_eq!(old.description(&stale_area.join("pcb154f.zip")).unwrap().as_deref(), Some("Old shared index"));
+        assert!(!working.path().join(".icy/.icy").exists());
+        assert!(!root.path().join(".icy").exists());
+        drop(live);
+
+        // Recreating the board's file area must not resurrect working-directory entries.
+        fs::remove_dir_all(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert!(FileBase::open(&path, PathBuf::new()).unwrap().is_empty());
+    }
+}
+
+#[test]
 fn check_unavailable_storage_fails_without_creating_or_pruning_a_database() {
     for locale in ["en_US", "de_DE"] {
         let root = TempDir::new().unwrap();
