@@ -486,7 +486,6 @@ impl IcyBoardState {
                 }
                 result.push(key.ch);
             }
-            log::info!("PPE stuffed input: {result}");
             let result = if display_flags & display_flags::UPCASE != 0 {
                 result.to_uppercase()
             } else {
