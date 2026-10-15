@@ -1,4 +1,4 @@
-//! Classic Kermit: short packets, stop-and-wait, and type-1 block checks.
+//! Kermit: negotiated long packets, stop-and-wait, and type-1 block checks.
 //! Wire format: <https://www.kermitproject.org/kproto.pdf>.
 mod packet;
 
@@ -55,7 +55,7 @@ enum Phase {
 }
 
 /// Binary batch transfers; received files are kept in temporary paths on completion.
-/// Long packets, sliding windows, attributes, and server commands are not advertised.
+/// Falls back to short packets; sliding windows, attributes, and server commands are not advertised.
 pub struct Kermit {
     phase: Phase,
     sending: bool,
@@ -167,7 +167,7 @@ impl Kermit {
             return self.send(com, b'B', Vec::new()).await;
         };
         let name = path.file_name().and_then(|n| n.to_str()).ok_or(KermitError::FileName)?;
-        let (encoded, used) = self.peer.outgoing().encode(name.as_bytes(), self.peer.max_len - 3);
+        let (encoded, used) = self.peer.outgoing().encode(name.as_bytes(), self.peer.data_limit());
         if used != name.len() || name.is_empty() {
             return Err(KermitError::FileName.into());
         }
@@ -185,10 +185,19 @@ impl Kermit {
     async fn next_data(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         if !self.discard {
             let source = self.source.as_mut().ok_or(KermitError::UnexpectedPacket(b'D'))?;
-            let (encoded, count) = self.peer.outgoing().encode(source.fill_buf()?, self.peer.max_len - 3);
-            source.consume(count);
-            self.data_count = count;
-            if count > 0 {
+            let limit = self.peer.data_limit();
+            let mut encoded = Vec::with_capacity(limit);
+            self.data_count = 0;
+            while encoded.len() < limit {
+                let (part, count) = self.peer.outgoing().encode(source.fill_buf()?, limit - encoded.len());
+                if count == 0 {
+                    break;
+                }
+                source.consume(count);
+                self.data_count += count;
+                encoded.extend(part);
+            }
+            if self.data_count > 0 {
                 self.phase = Phase::SendData;
                 return self.send(com, b'D', encoded).await;
             }
@@ -212,7 +221,8 @@ impl Kermit {
         }
         if self.phase == Phase::SendInit {
             self.peer = Parameters::parse(&packet.data, false)?;
-            state.send_state.check_size = format!("Checksum/{}", self.peer.max_len);
+            self.reader.long_packets = self.peer.long_len.is_some();
+            state.send_state.check_size = format!("Checksum/{}", self.peer.long_len.unwrap_or(self.peer.max_len));
         } else if acknowledged && matches!(self.phase, Phase::SendFile | Phase::SendData) {
             let response = self.peer.incoming.decode(&packet.data)?;
             if matches!(response.first(), Some(b'X' | b'Z')) {
@@ -259,7 +269,9 @@ impl Kermit {
         match (self.phase, packet.kind) {
             (Phase::ReceiveInit, b'S') => {
                 self.peer = Parameters::parse(&packet.data, true)?;
+                self.reader.long_packets = self.peer.long_len.is_some();
                 response = self.peer.response();
+                state.recieve_state.check_size = format!("Checksum/{}", if self.reader.long_packets { packet::MAX_LONG_LEN } else { packet::MAX_LEN });
                 self.phase = Phase::ReceiveFile;
             }
             (Phase::ReceiveFile, b'F') => {
@@ -402,7 +414,7 @@ impl Protocol for Kermit {
         if let Err(error) = &result {
             self.info(state).log_error(error.to_string());
             if !matches!(error.downcast_ref::<KermitError>(), Some(KermitError::Remote(_))) {
-                let (message, _) = self.peer.outgoing().encode(b"Transfer failed", self.peer.max_len - 3);
+                let (message, _) = self.peer.outgoing().encode(b"Transfer failed", self.peer.data_limit());
                 if let Err(send_error) = self.send(com, b'E', message).await {
                     self.info(state).log_warning(format!("Could not send Kermit error: {send_error}"));
                 }
@@ -425,7 +437,7 @@ impl Protocol for Kermit {
         if self.phase == Phase::Done {
             return Ok(());
         }
-        let (message, _) = self.peer.outgoing().encode(b"Cancelled", self.peer.max_len - 3);
+        let (message, _) = self.peer.outgoing().encode(b"Cancelled", self.peer.data_limit());
         let result = self.send(com, b'E', message).await;
         self.stop();
         result

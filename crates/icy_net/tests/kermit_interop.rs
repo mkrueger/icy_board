@@ -11,6 +11,9 @@ use tokio::{io::AsyncReadExt, net::TcpListener, process::Command, time::timeout}
 struct Wire {
     connection: RawConnection,
     parity: bool,
+    marker: bool,
+    received_long_packets: usize,
+    sent_long_packets: usize,
 }
 
 #[async_trait]
@@ -27,6 +30,12 @@ impl Connection for Wire {
                 *byte &= 127;
             }
         }
+        for &byte in &buf[..count] {
+            if self.marker && byte == 32 {
+                self.received_long_packets += 1;
+            }
+            self.marker = byte == 1;
+        }
         Ok(count)
     }
 
@@ -38,6 +47,9 @@ impl Connection for Wire {
     }
 
     async fn send(&mut self, buf: &[u8]) -> icy_net::Result<()> {
+        if buf.starts_with(&[1, 32]) {
+            self.sent_long_packets += 1;
+        }
         if self.parity {
             assert!(buf.iter().all(|b| *b < 128), "binary data was not quoted for the seven-bit link");
             let encoded: Vec<u8> = buf.iter().map(|b| b | ((b.count_ones() as u8 & 1) << 7)).collect();
@@ -57,7 +69,7 @@ async fn transfer(executable: &str, receiving: bool, parity: bool, source: &Path
     let binary = source.join("binary.bin");
     let empty = source.join("empty.bin");
     let mut command = Command::new(executable);
-    command.args(["-Y", "-B", "-Q", "-q", "-i", "-P", "-j", "127.0.0.1"]);
+    command.args(["-Y", "-B", "-Q", "-q", "-i", "-P", "-e", "8192", "-j", "127.0.0.1"]);
     command.arg(listener.local_addr().unwrap().port().to_string());
     if parity {
         command.args(["-p", "e"]);
@@ -79,6 +91,9 @@ async fn transfer(executable: &str, receiving: bool, parity: bool, source: &Path
     let mut connection = Wire {
         connection: RawConnection::accept(stream).await.unwrap(),
         parity,
+        marker: false,
+        received_long_packets: 0,
+        sent_long_packets: 0,
     };
     let mut protocol = Kermit::new();
     let mut state = if receiving {
@@ -104,12 +119,16 @@ async fn transfer(executable: &str, receiving: bool, parity: bool, source: &Path
     child.stderr.take().unwrap().read_to_string(&mut diagnostics).await.unwrap();
     assert!(status.success(), "C-Kermit failed: {status}\n{diagnostics}");
     if receiving {
+        assert!(connection.received_long_packets > 0, "C-Kermit must actually send extended packets");
+        assert_eq!(state.recieve_state.check_size, "Checksum/4096");
         assert_eq!(state.recieve_state.finished_files.len(), 2);
         for (name, path) in &state.recieve_state.finished_files {
             assert_eq!(std::fs::read(path).unwrap(), std::fs::read(source.join(name)).unwrap());
             std::fs::remove_file(path).unwrap();
         }
     } else {
+        assert!(connection.sent_long_packets > 0, "Icy Net must actually send extended packets");
+        assert_eq!(state.send_state.check_size, "Checksum/4096");
         assert_eq!(state.send_state.finished_files.len(), 2);
         assert_eq!(std::fs::read(destination.join("binary.bin")).unwrap(), std::fs::read(binary).unwrap());
         assert_eq!(std::fs::metadata(destination.join("empty.bin")).unwrap().len(), 0);
@@ -121,7 +140,7 @@ async fn transfer(executable: &str, receiving: bool, parity: bool, source: &Path
 async fn c_kermit_binary_batches_in_both_directions() {
     let executable = std::env::var("ICY_KERMIT").expect("set ICY_KERMIT to an independent C-Kermit executable");
     let source = tempfile::tempdir().unwrap();
-    let expected: Vec<u8> = (0..16384).map(|n| n as u8).chain(std::iter::repeat_n(0xff, 4096)).collect();
+    let expected: Vec<u8> = (0..262144).map(|n| n as u8).chain(std::iter::repeat_n(0xff, 4096)).collect();
     std::fs::write(source.path().join("binary.bin"), expected).unwrap();
     std::fs::write(source.path().join("empty.bin"), []).unwrap();
     for receiving in [true, false] {

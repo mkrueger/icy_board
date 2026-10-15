@@ -485,18 +485,26 @@ After the final ACK, receivers allow up to eleven seconds for retransmissions.
 Ordinary terminal input ends this grace period early and is preserved for
 the next connection read.
 
-Native Kermit supports binary batch uploads and downloads with short packets
-(12-94 characters negotiated in the length field), stop-and-wait acknowledgements,
-type-1 checksums, control quoting, negotiated eighth-bit quoting and repeat
-decoding. It honors peer padding, terminator and timeout preferences, retries
-up to ten times, and allows eleven seconds to repeat a lost final ACK.
-Long packets, sliding windows, file attributes, text conversion and server
-commands are not supported. Select binary mode in the remote Kermit client.
+Native Kermit supports binary batch uploads and downloads with negotiated long
+packets (up to 4096 bytes of encoded data plus block check) and falls back to
+short packets (12-94 characters in the length field) for classic clients.
+It uses stop-and-wait acknowledgements, type-1 checksums, control quoting,
+negotiated eighth-bit quoting and repeat compression. It honors peer padding,
+terminator and timeout preferences, retries up to ten times, and allows
+eleven seconds to repeat a lost final ACK.
+Enable long packets in the remote client for better throughput: classic
+packets carry at most 91 encoded data bytes and wait for an ACK after every
+packet, so even a fast connection is limited by its round-trip latency.
+Sliding windows, file attributes, text conversion and server commands are
+not supported. Select binary mode in the remote Kermit client.
 Existing boards can add a batch protocol with `char_code = "K"` and both
 commands set to `"@kermit"`; newly generated boards include it automatically.
 PCBoard protocol imports recognize `K` as native Kermit.
 The optional interoperability test can be run against an installed C-Kermit:
 `ICY_KERMIT=/path/to/kermit cargo test-low -p icy_net --test kermit_interop -- --ignored`.
+The deterministic latency regression compares classic Kermit, long-packet Kermit
+and Ymodem at simulated 20 ms and 100 ms RTT:
+`cargo test-low -p icy_net --test kermit_throughput -- --nocapture`.
 
 Standalone protocol file:
 

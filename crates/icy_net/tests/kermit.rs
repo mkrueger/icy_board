@@ -9,6 +9,7 @@ use icy_net::{
 use tempfile::NamedTempFile;
 
 const INIT: &[u8] = b"~% @-#&1~";
+const LONG_INIT: &[u8] = b"~% @-#&1~\" K+";
 
 #[derive(Default)]
 struct Wire {
@@ -57,6 +58,20 @@ fn packet(sequence: u8, kind: u8, data: &[u8]) -> Vec<u8> {
     bytes.extend(data);
     let sum: usize = bytes[1..].iter().map(|b| *b as usize).sum();
     bytes.push(32 + ((sum + (sum / 64 % 4)) % 64) as u8);
+    bytes.push(13);
+    bytes
+}
+
+fn long_packet(sequence: u8, kind: u8, data: &[u8]) -> Vec<u8> {
+    let length = data.len() + 1;
+    let mut bytes = vec![1, 32, sequence + 32, kind, (length / 95) as u8 + 32, (length % 95) as u8 + 32];
+    let check = |bytes: &[u8]| {
+        let sum: usize = bytes.iter().map(|b| *b as usize).sum();
+        32 + ((sum + (sum / 64 % 4)) % 64) as u8
+    };
+    bytes.push(check(&bytes[1..]));
+    bytes.extend(data);
+    bytes.push(check(&bytes[1..]));
     bytes.push(13);
     bytes
 }
@@ -261,7 +276,7 @@ async fn sender_retries_identical_packets_and_counts_only_acknowledged_data() {
     let mut protocol = Kermit::new();
     let mut wire = Wire::default();
     let mut state = protocol.initiate_send(&mut wire, &[file.path().into()]).await.unwrap();
-    assert_eq!(wire.sent[0], packet(0, b'S', INIT));
+    assert_eq!(wire.sent[0], packet(0, b'S', LONG_INIT));
     for _ in 0..6 {
         protocol.update_transfer(&mut wire, &mut state).await.unwrap();
     }
@@ -331,7 +346,7 @@ async fn sender_honors_padding_eol_short_packets_and_remote_cancellation() {
     protocol.update_transfer(&mut wire, &mut state).await.unwrap();
     let frame = wire.sent.last().unwrap();
     assert!(frame[3] <= b',');
-    assert_eq!(&frame[6..frame.len() - 2], b"&#?&#?&#?");
+    assert_eq!(&frame[6..frame.len() - 2], b"~~&#?&#?");
     wire.input.extend(packet(2, b'Y', b"X"));
     protocol.update_transfer(&mut wire, &mut state).await.unwrap();
     let frame = wire.sent.last().unwrap();
@@ -342,11 +357,90 @@ async fn sender_honors_padding_eol_short_packets_and_remote_cancellation() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn long_packets_receive_maximum_payload_retry_and_mix_with_short_packets() {
+    let mut r = Receiver::new().await;
+    r.feed(0, b'S', LONG_INIT).await;
+    assert_eq!(r.wire.sent[0], packet(0, b'Y', LONG_INIT));
+    assert_eq!(r.state.recieve_state.check_size, "Checksum/4096");
+    r.feed(1, b'F', b"long.bin").await;
+    let data = vec![b'z'; 4095];
+    let frame = long_packet(2, b'D', &data);
+    let mut damaged = frame.clone();
+    damaged[100] ^= 1;
+    r.wire.input.extend(damaged);
+    r.protocol.update_transfer(&mut r.wire, &mut r.state).await.unwrap();
+    assert_eq!(r.wire.sent.last().unwrap(), &packet(2, b'N', b""));
+    assert_eq!(r.state.recieve_state.total_bytes_transfered, 0);
+    r.wire.input.extend(&frame[..100]);
+    r.protocol.update_transfer(&mut r.wire, &mut r.state).await.unwrap();
+    r.wire.input.extend(&frame[100..]);
+    r.protocol.update_transfer(&mut r.wire, &mut r.state).await.unwrap();
+    r.wire.input.extend(&frame);
+    r.protocol.update_transfer(&mut r.wire, &mut r.state).await.unwrap();
+    assert_eq!(r.wire.sent.last().unwrap(), &packet(2, b'Y', b""));
+    assert_eq!(r.state.recieve_state.total_bytes_transfered, 4095);
+    r.feed(3, b'D', b"short").await;
+    r.feed(4, b'Z', b"").await;
+    assert_eq!(r.take_file(), [data.as_slice(), b"short"].concat());
+}
+
+#[tokio::test(start_paused = true)]
+async fn long_headers_are_validated_before_reading_the_payload() {
+    for corruption in 0..3 {
+        let mut r = Receiver::new().await;
+        r.feed(0, b'S', if corruption == 0 { INIT } else { LONG_INIT }).await;
+        r.feed(1, b'F', b"bad.bin").await;
+        let mut header = long_packet(2, b'D', &vec![b'A'; if corruption == 2 { 4096 } else { 512 }]);
+        header.truncate(7);
+        if corruption == 1 {
+            header[6] ^= 1;
+        }
+        r.wire.input.extend(header);
+        let start = tokio::time::Instant::now();
+        r.protocol.update_transfer(&mut r.wire, &mut r.state).await.unwrap();
+        assert_eq!(start.elapsed(), Duration::ZERO, "invalid header must not wait for a body");
+        assert_eq!(r.wire.sent.last().unwrap(), &packet(2, b'N', b""));
+        r.feed(2, b'D', b"recovered").await;
+        r.feed(3, b'Z', b"").await;
+        assert_eq!(r.take_file(), b"recovered");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn sender_uses_negotiated_long_length_and_retransmits_identical_data() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("long.bin");
+    let data: Vec<u8> = (0..20000).map(|n| b'A' + (n % 26) as u8).collect();
+    std::fs::write(&path, &data).unwrap();
+    for (parameters, limit) in [(LONG_INIT, 4095), (b"~% @-#&1~\" #4".as_slice(), 304)] {
+        let mut protocol = Kermit::new();
+        let mut wire = Wire::default();
+        let mut state = protocol.initiate_send(&mut wire, std::slice::from_ref(&path)).await.unwrap();
+        wire.input.extend(packet(0, b'Y', parameters));
+        protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+        wire.input.extend(packet(1, b'Y', b""));
+        protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+        assert_eq!(wire.sent.last().unwrap(), &long_packet(2, b'D', &data[..limit]));
+        wire.input.extend(packet(2, b'N', b""));
+        protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+        assert_eq!(wire.sent.last().unwrap(), &long_packet(2, b'D', &data[..limit]));
+        for sequence in 2..5 {
+            wire.input.extend(packet(sequence, b'Y', b""));
+            protocol.update_transfer(&mut wire, &mut state).await.unwrap();
+            let offset = (sequence as usize - 1) * limit;
+            let end = (offset + limit).min(data.len());
+            assert_eq!(wire.sent.last().unwrap(), &long_packet(sequence + 1, b'D', &data[offset..end]));
+        }
+        assert_eq!(state.send_state.total_bytes_transfered, 3 * limit as u64);
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn binary_batch_round_trip_wraps_sequence_and_preserves_empty_files() {
     let directory = tempfile::tempdir().unwrap();
     let binary = directory.path().join("binary.bin");
     let empty = directory.path().join("empty.bin");
-    let expected: Vec<u8> = (0..16384).map(|n| n as u8).collect();
+    let expected: Vec<u8> = (0..262144).map(|n| n as u8).collect();
     std::fs::write(&binary, &expected).unwrap();
     std::fs::write(&empty, []).unwrap();
     let (mut send_wire, mut recv_wire) = ChannelConnection::create_pair();
