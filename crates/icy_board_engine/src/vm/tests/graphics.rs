@@ -550,12 +550,11 @@ fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
 
 #[test]
 fn tetris_initializes_and_renders_without_leaking_call_frames() {
-    let source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
-        .replace("Terminal.Gfx.Init(GfxBackend.Auto)", "Terminal.Gfx.Init(GfxBackend.Sixel)")
-        .replace("running = TRUE", "running = FALSE")
-        .replace("input \"Enter your name:\", name", "name = \"test\"");
-    let output = super::run_ppl_with_files(
+    let source =
+        include_str!("../../../../../ppe/tetris/src/tetris.pps").replace("Terminal.Gfx.Init(GfxBackend.Auto)", "Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)");
+    let output = super::run_ppl_collecting(
         &source,
+        |_| {},
         &[
             ("ui.png", include_bytes!("../../../../../ppe/tetris/ui.png")),
             ("tetris_music.ogg", include_bytes!("../../../../../ppe/tetris/tetris_music.ogg")),
@@ -564,39 +563,273 @@ fn tetris_initializes_and_renders_without_leaking_call_frames() {
             ("line.wav", include_bytes!("../../../../../ppe/tetris/line.wav")),
             ("gameover.wav", include_bytes!("../../../../../ppe/tetris/gameover.wav")),
         ],
-    );
+        Some("ppe/tetris"),
+        b"3x2x4\rpmp q5",
+        false,
+        false,
+    )
+    .1;
 
     assert!(output.contains("Loading assets..."));
-    assert!(output.contains("\x1bP"));
+    assert_eq!(output.matches("\x1bP").count(), 11);
+    assert!(!output.contains("Tetris error:"));
+    let frames = tetris_frames(&output);
+    assert_eq!(frames[0].dimensions(), (480, 348));
+    let pixel = |frame: usize, x: usize, y: usize| {
+        let image = &frames[frame];
+        image.pixels[((y + 56) * image.width + x + 160) * 4..][..3].to_vec()
+    };
+    assert_eq!(pixel(0, 142, 32), pixel(0, 0, 0));
+    assert_eq!(pixel(0, 142, 33), pixel(0, 20, 20));
+    assert_ne!(pixel(0, 142, 32), pixel(0, 142, 33));
+    assert_eq!(pixel(1, 26, 48), pixel(0, 0, 0));
+    assert_eq!(pixel(3, 38, 68), pixel(0, 0, 0));
 }
+
+fn tetris_frames(output: &str) -> Vec<icy_sixel::SixelImage> {
+    output
+        .split("\x1bP")
+        .skip(1)
+        .map(|frame| {
+            let payload = frame.split_once("\x1b\\").unwrap().0;
+            icy_sixel::SixelImage::decode(format!("\x1bP{payload}\x1b\\").as_bytes()).unwrap()
+        })
+        .collect()
+}
+
+fn tetris_source(body: &str) -> String {
+    let source = include_str!("../../../../../ppe/tetris/src/tetris.pps");
+    let declarations = source.split_once("CLS\n").unwrap().0;
+    let routines = source.split_once("PROCEDURE FailGame()").unwrap().1;
+    format!("{declarations}\n{body}\nEXIT\nPROCEDURE FailGame(){routines}")
+}
+
+const TETRIS_GRAPHICS: &str = r#"
+Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+game = Surface.New(GAME_W, GAME_H)
+ui = Surface.Load("./ui.png")
+InitShapes()
+InitColors()
+InitFont()
+input = Terminal.Input
+"#;
+
+const TETRIS_UI: &[(&str, &[u8])] = &[("ui.png", include_bytes!("../../../../../ppe/tetris/ui.png"))];
 
 #[test]
 fn tetris_flashes_a_completed_line_before_compacting_it() {
-    let mut source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
-        .replace("Terminal.Gfx.Init(GfxBackend.Auto)", "Terminal.Gfx.Init(GfxBackend.Sixel)")
-        .replace("running = TRUE", "running = FALSE")
-        .replace("input \"Enter your name:\", name", "name = \"test\"");
-    let mut completed_row = String::new();
-    for column in 0..10 {
-        let _ = writeln!(completed_row, "board[{column}, 19] = 1");
-    }
-    source = source.replace(
-        "SpawnPiece()\nRenderGame()",
-        &format!("SpawnPiece()\n{completed_row}score = ClearLines()\nRenderGame()"),
-    );
-    let output = super::run_ppl_with_files(
-        &source,
-        &[
-            ("ui.png", include_bytes!("../../../../../ppe/tetris/ui.png")),
-            ("tetris_music.ogg", include_bytes!("../../../../../ppe/tetris/tetris_music.ogg")),
-            ("rotate.wav", include_bytes!("../../../../../ppe/tetris/rotate.wav")),
-            ("lock.wav", include_bytes!("../../../../../ppe/tetris/lock.wav")),
-            ("line.wav", include_bytes!("../../../../../ppe/tetris/line.wav")),
-            ("gameover.wav", include_bytes!("../../../../../ppe/tetris/gameover.wav")),
-        ],
-    );
+    let source = tetris_source(&format!(
+        r#"{TETRIS_GRAPHICS}
+INTEGER column
+FOR column = 0 TO 9
+    board[column, 19] = 1
+NEXT column
+board[2, 18] = 3
+boardGroup[2, 18] = 42
+RenderGame()
+score = ClearLines()
+RenderGame()
+PRINTLN "cleared:", score, ":", board[2, 19], ":", boardGroup[2, 19], ":", board[2, 18]
+"#
+    ));
+    let output = super::run_ppl_with_files(&source, TETRIS_UI);
 
-    assert!(output.matches("\x1bP").count() >= 5);
+    assert_eq!(output.matches("\x1bP").count(), 6);
+    assert!(output.ends_with("cleared:1:3:42:0\n"));
+}
+
+#[test]
+fn tetris_pauses_resumes_drops_and_abandons_without_saving() {
+    let source = tetris_source(&format!(
+        r#"{TETRIS_GRAPHICS}
+RunGame()
+PRINTLN "done:", playing, ":", gameOver, ":", pieceSerial, ":", score > 0
+PRINTLN "saved:", EXIST("./tetris-scores.dat")
+"#
+    ));
+    let output = super::run_ppl_with_files_and_input(&source, TETRIS_UI, b"pmp q");
+    assert!(output.ends_with("done:0:0:1:1\nsaved:0\n"), "{output:?}");
+    assert!(output.matches("\x1bP").count() >= 4);
+}
+
+#[test]
+fn tetris_game_over_can_replay_then_return_to_menu() {
+    let source = tetris_source(&format!(
+        r#"{TETRIS_GRAPHICS}
+RunGame()
+ReadKey()
+PRINTLN "after:", key, ":", scoreRank
+LoadHighScores()
+PRINTLN "top:", scores[0].Points, ":", scores[1].Points
+"#
+    ))
+    .replace(
+        "    SpawnPiece()\n    RenderGame()",
+        "    FOR pieceX = 0 TO 9\n        board[pieceX, 0] = 1\n    NEXT pieceX\n    score = 123\n    SpawnPiece()\n    RenderGame()",
+    );
+    let output = super::run_ppl_collecting(&source, |_| {}, TETRIS_UI, Some("ppe/tetris"), b"\rqz", false, false).1;
+    assert_eq!(output.matches("\x1bP").count(), 4);
+    assert!(output.ends_with("after:Z:2\ntop:123:123\n"), "{output:?}");
+}
+
+#[test]
+fn tetris_high_scores_are_sorted_capped_and_survive_new_runs() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("scores.dat");
+    let lock = root.path().join("scores.lock");
+    let temporary = root.path().join("scores.tmp");
+    let source = tetris_source(
+        r#"
+score = 100
+SaveHighScore()
+PRINTLN "first:", scoreRank, ":", scoreMessage
+score = 300
+SaveHighScore()
+score = 100
+SaveHighScore()
+PRINTLN "tie:", scoreRank
+FOR score = 400 TO 1200 STEP 100
+    SaveHighScore()
+NEXT score
+score = 1
+SaveHighScore()
+PRINTLN "low:", scoreRank
+LoadHighScores()
+PRINTLN "loaded:", scoreMessage, ":", scores[0].Player, ":", scores[0].Points, ":", scores[9].Points
+"#,
+    )
+    .replace("PPEPATH() + \"tetris-scores.dat\"", &format!("\"{}\"", path.display()))
+    .replace("PPEPATH() + \"tetris-scores.lock\"", &format!("\"{}\"", lock.display()))
+    .replace("PPEPATH() + \"tetris-scores.tmp\"", &format!("\"{}\"", temporary.display()));
+    let output = run_ppl(&source);
+    assert_eq!(output, "first:1:HIGH SCORE SAVED\ntie:3\nlow:0\nloaded::SYSOP:1200:300\n");
+    assert!(!temporary.exists());
+
+    let source = tetris_source(
+        r#"
+LoadHighScores()
+PRINTLN scores[0].Player, ":", scores[0].Points, ":", scores[9].Points, ":", scoreMessage
+"#,
+    )
+    .replace("PPEPATH() + \"tetris-scores.dat\"", &format!("\"{}\"", path.display()))
+    .replace("PPEPATH() + \"tetris-scores.lock\"", &format!("\"{}\"", lock.display()));
+    assert_eq!(run_ppl(&source), "SYSOP:1200:300:\n");
+}
+
+#[test]
+fn tetris_does_not_replace_corrupt_or_unwritable_high_scores() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("scores.dat");
+    let lock = root.path().join("scores.lock");
+    let temporary = root.path().join("scores.tmp");
+    let source = tetris_source(
+        r#"
+score = 100
+SaveHighScore()
+PRINTLN scoreRank, ":", scoreMessage
+"#,
+    )
+    .replace("PPEPATH() + \"tetris-scores.dat\"", &format!("\"{}\"", path.display()))
+    .replace("PPEPATH() + \"tetris-scores.lock\"", &format!("\"{}\"", lock.display()))
+    .replace("PPEPATH() + \"tetris-scores.tmp\"", &format!("\"{}\"", temporary.display()));
+    assert_eq!(run_ppl(&source), "1:HIGH SCORE SAVED\n");
+    let saved = std::fs::read(&path).unwrap();
+    std::fs::create_dir(&temporary).unwrap();
+    assert_eq!(run_ppl(&source), "0:SCORE NOT SAVED  WRITE ERROR\n");
+    assert_eq!(std::fs::read(&path).unwrap(), saved);
+    std::fs::remove_dir(&temporary).unwrap();
+
+    for corrupt in [
+        b"TETRIS 2\n".as_slice(),
+        b"TETRIS 1\nSYSOP\ninvalid\n0\n0\n",
+        b"TETRIS 1\nSYSOP\n100\n0\n0\n",
+        b"TETRIS 1\nSYSOP\n-1\n0\n0\n",
+        b"TETRIS 1\nSYSOP\n100\n0\n5\n",
+    ] {
+        std::fs::write(&path, corrupt).unwrap();
+        assert_eq!(run_ppl(&source), "0:SCORE NOT SAVED  CANNOT READ TABLE\n");
+        assert_eq!(std::fs::read(&path).unwrap(), corrupt);
+    }
+}
+
+#[test]
+fn tetris_high_score_update_honors_another_nodes_lock() {
+    let source = tetris_source(
+        r#"
+FOPEN 4, PPEPATH() + "tetris-scores.lock", O_RW, S_DB
+score = 100
+SaveHighScore()
+PRINTLN scoreRank, ":", scoreMessage, ":", EXIST("./tetris-scores.dat")
+FCLOSE 4
+SaveHighScore()
+PRINTLN scoreRank, ":", scoreMessage
+"#,
+    );
+    assert_eq!(
+        super::run_ppl_in_ppe_dir(&source, "ppe/tetris", &[]),
+        "0:SCORE NOT SAVED  FILE BUSY OR IO ERROR:0\n1:HIGH SCORE SAVED\n"
+    );
+}
+
+#[test]
+fn tetris_saves_scores_next_to_the_ppe_not_in_the_board_directory() {
+    let source = tetris_source(
+        r#"
+score = 100
+SaveHighScore()
+PRINTLN scoreRank, ":", scoreMessage
+PRINTLN EXIST("ppe/tetris/tetris-scores.dat"), ":", EXIST("ppe/tetris/tetris-scores.lock")
+PRINTLN ReadHighScores(), ":", scores[0].Points
+"#,
+    );
+    let output = super::run_ppl_in_ppe_dir(&source, "ppe/tetris", &[("tetris-scores.dat", b"unrelated board data")]);
+    assert_eq!(output, "1:HIGH SCORE SAVED\n1:1\n1:100\n");
+}
+
+#[test]
+fn tetris_music_toggle_stops_and_restarts_looping_playback() {
+    let source = tetris_source(
+        r#"
+music = Audio.Load("rotate.wav")
+musicOn = TRUE
+music.Play(TRUE)
+ToggleMusic()
+PRINTLN "off:", musicOn, ":", music.Playing
+ToggleMusic()
+PRINTLN "on:", musicOn, ":", music.Playing
+music.Free()
+ToggleMusic()
+PRINTLN "freed:", music.Valid
+"#,
+    );
+    let output = super::run_ppl_with_files_and_input(
+        &source,
+        &[("rotate.wav", include_bytes!("../../../../../ppe/tetris/rotate.wav"))],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
+    );
+    assert!(output.contains("off:0:0\n"), "{output:?}");
+    assert!(output.contains("on:1:1\n"), "{output:?}");
+    assert!(output.ends_with("freed:0\n"), "{output:?}");
+    assert_eq!(output.matches("Queue;C=2;S=2;L").count(), 2);
+}
+
+#[test]
+fn tetris_font_renders_letters_and_handles_unknown_player_characters() {
+    let source = tetris_source(
+        r#"
+Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+game = Surface.New(GAME_W, GAME_H)
+InitFont()
+game.Clear(GB_LIGHTEST)
+DrawText("A?", 10, 10)
+PRINTLN game.GetPixel(11, 10) = GB_DARKEST
+PRINTLN game.GetPixel(10, 10) = GB_LIGHTEST
+PRINTLN game.GetPixel(17, 10) = GB_DARKEST
+DrawText("@", 20, 20)
+PRINTLN game.GetPixel(21, 20) = GB_DARKEST
+"#,
+    );
+    assert_eq!(run_ppl(&source), "1\n1\n1\n1\n");
 }
 
 /// A bright colour that follows a dim one still names bold.

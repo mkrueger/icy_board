@@ -23,6 +23,13 @@ CONST INTEGER BOX_W = 96
 CONST INTEGER FRAME_MS = 55
 CONST INTEGER FLASH_TICKS = 2
 
+TYPE HighScore
+    STRING Player
+    INTEGER Points
+    INTEGER Rows
+    INTEGER Stage
+ENDTYPE
+
 INTEGER board(9, 19)
 INTEGER boardGroup(9, 19)
 INTEGER clearRow(19)
@@ -32,6 +39,12 @@ UNSIGNED pieceAccent(6)
 INTEGER pieceType, nextType, pieceX, pieceY, pieceRot
 INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
+BOOLEAN playing, musicOn, audioAvailable
+HighScore scores[9]
+INTEGER scoreRank
+STRING scoreMessage, failureMessage
+STRING glyphs[36]
+CONST STRING ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?"
 STRING key
 EVENT inputEvent
 TERMINPUT input
@@ -40,12 +53,6 @@ AUDIO music, rotateSound, lockSound, lineSound, gameOverSound
 SURFACE game, ui
 CLS
 PRINTLN "Loading assets..."
-music = Audio.Load("./tetris_music.ogg")
-rotateSound = Audio.Load("./rotate.wav")
-lockSound = Audio.Load("./lock.wav")
-lineSound = Audio.Load("./line.wav")
-gameOverSound = Audio.Load("./gameover.wav")
-
 Terminal.Gfx.Init(GfxBackend.Auto)
 IF Terminal.Gfx.Backend = GfxBackend.None THEN
     CLS
@@ -55,108 +62,478 @@ ENDIF
 
 game = Surface.New(GAME_W, GAME_H)
 ui = Surface.Load("./ui.png")
+IF !game.Valid | !ui.Valid FailGame()
+music = Audio.Load("./tetris_music.ogg")
+rotateSound = Audio.Load("./rotate.wav")
+lockSound = Audio.Load("./lock.wav")
+lineSound = Audio.Load("./line.wav")
+gameOverSound = Audio.Load("./gameover.wav")
+audioAvailable = music.Valid & rotateSound.Valid & lockSound.Valid & lineSound.Valid & gameOverSound.Valid
+musicOn = music.Valid
 InitShapes()
 InitColors()
-ClearBoard()
-
-music.SetVolume(100)
-rotateSound.SetVolume(100)
-lockSound.SetVolume(100)
-lineSound.SetVolume(100)
-gameOverSound.SetVolume(100)
-music.Play(TRUE)
-
-score = 0
-level = 0
-lines = 0
-frame = 0
-pieceSerial = 0
-gameOver = FALSE
-running = TRUE
-nextType = Random(7)
-SpawnPiece()
-RenderGame()
-KeyFlush
+InitFont()
+IF musicOn music.Play(TRUE)
 input = Terminal.Input
-inputEvent = input.Poll()
-nextFrame = inputEvent.Time + FRAME_MS
-
+running = TRUE
 WHILE running DO
-    IF gameOver BREAK
-    changed = FALSE
-    inputEvent = input.Poll()
-    IF inputEvent.Kind = EventKind.None & inputEvent.Time < nextFrame THEN
-        inputEvent = input.Wait(nextFrame - inputEvent.Time)
-    ENDIF
-    key = Upper(inputEvent.Text)
-    IF key = "LEFT" THEN
-        IF CanPlace(pieceX - 1, pieceY, pieceRot) THEN
-            pieceX -= 1
-            changed = TRUE
-        ENDIF
-    ELSEIF (key = "RIGHT") THEN
-        IF CanPlace(pieceX + 1, pieceY, pieceRot) THEN
-            pieceX += 1
-            changed = TRUE
-        ENDIF
-    ELSEIF (key = "UP") THEN
-        changed = RotatePiece()
-    ELSEIF (key = "DOWN") THEN
-        IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
-            pieceY += 1
-            score += 1
-        ELSE
-            LockPiece()
-        ENDIF
-        frame = 0
-        changed = TRUE
-    ELSEIF (key = " ") THEN
-        WHILE CanPlace(pieceX, pieceY + 1, pieceRot) DO
-            pieceY += 1
-            score += 2
-        ENDWHILE
-        LockPiece()
-        frame = 0
-        changed = TRUE
-    ELSEIF (key = "Q") THEN
+    RenderMenu()
+    ReadKey()
+    IF key = "1" | inputEvent.Code = KEY_ENTER THEN
+        RunGame()
+    ELSEIF (key = "2" | key = "H") THEN
+        LoadHighScores()
+        ShowHighScores()
+    ELSEIF (key = "3" | key = "I") THEN
+        ShowInstructions()
+    ELSEIF (key = "4" | key = "M") THEN
+        ToggleMusic()
+    ELSEIF (key = "5" | key = "Q" | inputEvent.Code = KEY_ESCAPE) THEN
         running = FALSE
     ENDIF
+ENDWHILE
+Cleanup()
+EXIT
 
-    IF inputEvent.Time >= nextFrame THEN
-        nextFrame = inputEvent.Time + FRAME_MS
-        frame += 1
-        dropFrames = 12 - level
-        IF dropFrames < 2 dropFrames = 2
-        IF !gameOver THEN
-            IF frame >= dropFrames THEN
+PROCEDURE FailGame()
+    failureMessage = Error.Last().Message
+    Cleanup()
+    PRINTLN "Tetris error: ", failureMessage
+    STOP
+ENDPROC
+
+PROCEDURE Cleanup()
+    IF music.Valid music.Free()
+    IF rotateSound.Valid rotateSound.Free()
+    IF lockSound.Valid lockSound.Free()
+    IF lineSound.Valid lineSound.Free()
+    IF gameOverSound.Valid gameOverSound.Free()
+    IF ui.Valid ui.Free()
+    IF game.Valid game.Free()
+    Terminal.Gfx.Shutdown()
+    input.Release()
+    CLS
+ENDPROC
+
+PROCEDURE ReadKey()
+    key = ""
+    WHILE TRUE DO
+        inputEvent = input.Wait(-1)
+        IF inputEvent.Kind = EventKind.Key THEN
+            key = Upper(inputEvent.Text)
+            RETURN
+        ENDIF
+    ENDWHILE
+ENDPROC
+
+PROCEDURE ToggleMusic()
+    IF !music.Valid RETURN
+    musicOn = !musicOn
+    IF musicOn THEN
+        music.Play(TRUE)
+    ELSE
+        music.Stop()
+    ENDIF
+ENDPROC
+
+PROCEDURE RunGame()
+    BOOLEAN replay
+    replay = TRUE
+    WHILE replay DO
+        StartGame()
+        WHILE playing & !gameOver DO
+            changed = FALSE
+            inputEvent = input.Poll()
+            IF inputEvent.Kind = EventKind.None & inputEvent.Time < nextFrame THEN
+                inputEvent = input.Wait(nextFrame - inputEvent.Time)
+            ENDIF
+            key = ""
+            IF inputEvent.Kind = EventKind.Key key = Upper(inputEvent.Text)
+            IF key = "LEFT" THEN
+                IF CanPlace(pieceX - 1, pieceY, pieceRot) THEN
+                    pieceX -= 1
+                    changed = TRUE
+                ENDIF
+            ELSEIF (key = "RIGHT") THEN
+                IF CanPlace(pieceX + 1, pieceY, pieceRot) THEN
+                    pieceX += 1
+                    changed = TRUE
+                ENDIF
+            ELSEIF (key = "UP") THEN
+                changed = RotatePiece()
+            ELSEIF (key = "DOWN") THEN
                 IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
                     pieceY += 1
+                    score += 1
                 ELSE
                     LockPiece()
                 ENDIF
                 frame = 0
                 changed = TRUE
+            ELSEIF (key = " ") THEN
+                WHILE CanPlace(pieceX, pieceY + 1, pieceRot) DO
+                    pieceY += 1
+                    score += 2
+                ENDWHILE
+                LockPiece()
+                frame = 0
+                changed = TRUE
+            ELSEIF (key = "P" | inputEvent.Code = KEY_ESCAPE) THEN
+                PauseGame()
+            ELSEIF (key = "M") THEN
+                ToggleMusic()
+                changed = TRUE
+            ELSEIF (key = "Q") THEN
+                playing = FALSE
             ENDIF
+
+            IF inputEvent.Time >= nextFrame THEN
+                nextFrame = inputEvent.Time + FRAME_MS
+                frame += 1
+                dropFrames = 12 - level
+                IF dropFrames < 2 dropFrames = 2
+                IF playing & !gameOver & frame >= dropFrames THEN
+                    IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
+                        pieceY += 1
+                    ELSE
+                        LockPiece()
+                    ENDIF
+                    frame = 0
+                    changed = TRUE
+                ENDIF
+            ENDIF
+            IF changed RenderGame()
+        ENDWHILE
+        replay = FALSE
+        IF gameOver THEN
+            SaveHighScore()
+            RenderResults()
+            WHILE TRUE DO
+                ReadKey()
+                IF key = "R" | inputEvent.Code = KEY_ENTER THEN
+                    replay = TRUE
+                    BREAK
+                ENDIF
+                IF key = "Q" | key = "M" | inputEvent.Code = KEY_ESCAPE BREAK
+            ENDWHILE
         ENDIF
-    ENDIF
-    IF changed RenderGame()
-ENDWHILE
-
-IF gameOver THEN
-    RenderGame()
-    key = ""
-    WHILE key = "" DO
-        inputEvent = input.Wait(-1)
-        key = inputEvent.Text
     ENDWHILE
-ENDIF
+ENDPROC
 
-music.Stop()
-ui.Free()
-game.Free()
-Terminal.Gfx.Shutdown()
-input.Release()
-CLS
+PROCEDURE StartGame()
+    ClearBoard()
+    score = 0
+    level = 0
+    lines = 0
+    frame = 0
+    pieceSerial = 0
+    gameOver = FALSE
+    playing = TRUE
+    nextType = Random(7)
+    SpawnPiece()
+    RenderGame()
+    nextFrame = inputEvent.Time + FRAME_MS
+ENDPROC
+
+PROCEDURE PauseGame()
+    DrawBox(30, 84, 260, 116)
+    DrawText("PAUSED", 142, 100)
+    DrawText("P OR ESC  RESUME", 70, 124)
+    DrawText("M  MUSIC", 70, 144)
+    DrawText("Q  ABANDON GAME", 70, 164)
+    PresentGame()
+    WHILE TRUE DO
+        ReadKey()
+        IF key = "M" ToggleMusic()
+        IF key = "Q" THEN
+            playing = FALSE
+            RETURN
+        ENDIF
+        IF key = "P" | inputEvent.Code = KEY_ESCAPE THEN
+            nextFrame = inputEvent.Time + FRAME_MS
+            RenderGame()
+            RETURN
+        ENDIF
+    ENDWHILE
+ENDPROC
+
+PROCEDURE RenderMenu()
+    game.Clear(GB_DARKEST)
+    DrawBox(12, 12, 296, 264)
+    DrawText("TETRIS", 142, 32)
+    DrawText("1  NEW GAME", 76, 76)
+    DrawText("2  HIGH SCORES", 76, 100)
+    DrawText("3  HOW TO PLAY", 76, 124)
+    IF musicOn THEN
+        DrawText("4  MUSIC ON", 76, 148)
+    ELSE
+        DrawText("4  MUSIC OFF", 76, 148)
+    ENDIF
+    DrawText("5  QUIT", 76, 172)
+    DrawText("ENTER TO START", 118, 214)
+    IF !audioAvailable DrawText("AUDIO UNAVAILABLE OR INCOMPLETE", 70, 246)
+    PresentGame()
+ENDPROC
+
+PROCEDURE ShowInstructions()
+    game.Clear(GB_DARKEST)
+    DrawBox(8, 8, 304, 272)
+    DrawText("HOW TO PLAY", 127, 22)
+    DrawText("LEFT RIGHT  MOVE", 26, 48)
+    DrawText("UP          ROTATE", 26, 64)
+    DrawText("DOWN        SOFT DROP", 26, 80)
+    DrawText("SPACE       HARD DROP", 26, 96)
+    DrawText("P OR ESC    PAUSE AND RESUME", 26, 112)
+    DrawText("M           TOGGLE MUSIC", 26, 128)
+    DrawText("Q           ABANDON TO MENU", 26, 144)
+    DrawText("CLEAR 1 2 3 OR 4 LINES FOR", 26, 170)
+    DrawText("40 100 300 OR 1200 X LEVEL PLUS 1", 26, 186)
+    DrawText("SOFT DROP 1 POINT  HARD DROP 2", 26, 202)
+    DrawText("LEVEL UP EVERY 10 LINES", 26, 218)
+    DrawText("TOP 10 SAVED AT GAME OVER ONLY", 26, 234)
+    DrawText("ANY KEY TO RETURN", 109, 258)
+    PresentGame()
+    ReadKey()
+ENDPROC
+
+PROCEDURE RenderResults()
+    game.Clear(GB_DARKEST)
+    DrawBox(12, 12, 296, 264)
+    DrawText("GAME OVER", 133, 34)
+    DrawText("SCORE " + ToString(score), 64, 72)
+    DrawText("LINES " + ToString(lines), 64, 96)
+    DrawText("LEVEL " + ToString(level), 64, 120)
+    IF scoreRank > 0 THEN
+        DrawText("HIGH SCORE RANK " + ToString(scoreRank), 64, 152)
+    ENDIF
+    DrawText(scoreMessage, 28, 176)
+    DrawText("ENTER OR R  PLAY AGAIN", 76, 222)
+    DrawText("M Q OR ESC  MAIN MENU", 76, 246)
+    PresentGame()
+ENDPROC
+
+PROCEDURE ShowHighScores()
+    INTEGER i, y
+    game.Clear(GB_DARKEST)
+    DrawBox(8, 8, 304, 272)
+    DrawText("TOP 10", 142, 24)
+    DrawText("NO", 20, 48)
+    DrawText("PLAYER", 38, 48)
+    DrawText("SCORE", 152, 48)
+    DrawText("LINES", 224, 48)
+    FOR i = 0 TO 9
+        y = 68 + i * 16
+        DrawText(ToString(i + 1), 20, y)
+        IF scores[i].Points > 0 THEN
+            DrawText(Left(scores[i].Player, 16), 38, y)
+            DrawText(Right("          " + ToString(scores[i].Points), 10), 152, y)
+            DrawText(ToString(scores[i].Rows), 224, y)
+        ELSE
+            DrawText("EMPTY", 38, y)
+        ENDIF
+    NEXT i
+    DrawText(scoreMessage, 20, 238)
+    DrawText("ANY KEY TO RETURN", 109, 260)
+    PresentGame()
+    ReadKey()
+ENDPROC
+
+PROCEDURE ResetHighScores()
+    INTEGER i
+    FOR i = 0 TO 9
+        scores[i] = HighScore { Player = "", Points = 0, Rows = 0, Stage = 0 }
+    NEXT i
+ENDPROC
+
+FUNCTION ReadHighScores() BOOLEAN
+    INTEGER i, previous
+    STRING header
+    HighScore candidate
+    ReadHighScores = FALSE
+    ResetHighScores()
+    IF !EXIST(PPEPATH() + "tetris-scores.dat") THEN
+        ReadHighScores = TRUE
+        RETURN
+    ENDIF
+    FOPEN 1, PPEPATH() + "tetris-scores.dat", O_RD, S_DN
+    IF FERR(1) RETURN
+    FGET 1, header
+    IF FERR(1) | header <> "TETRIS 1" THEN
+        FCLOSE 1
+        RETURN
+    ENDIF
+    previous = 2147483647
+    FOR i = 0 TO 9
+        FGETREC 1, candidate
+        IF FERR(1) THEN
+            FCLOSE 1
+            ResetHighScores()
+            RETURN
+        ENDIF
+        IF candidate.Points < 0 | candidate.Points > previous | candidate.Rows < 0 | candidate.Stage <> candidate.Rows / 10 THEN
+            FCLOSE 1
+            ResetHighScores()
+            RETURN
+        ENDIF
+        scores[i] = candidate
+        previous = candidate.Points
+    NEXT i
+    FCLOSE 1
+    ReadHighScores = !FERR(1)
+ENDFUNC
+
+FUNCTION LockScores() BOOLEAN
+    INTEGER attempt
+    LockScores = FALSE
+    FOR attempt = 1 TO 20
+        FOPEN 3, PPEPATH() + "tetris-scores.lock", O_RW, S_DB
+        IF !FERR(3) THEN
+            LockScores = TRUE
+            RETURN
+        ENDIF
+        DELAY 1
+    NEXT attempt
+ENDFUNC
+
+PROCEDURE LoadHighScores()
+    scoreMessage = ""
+    ResetHighScores()
+    IF !LockScores() THEN
+        scoreMessage = "SCORES BUSY OR UNAVAILABLE"
+        RETURN
+    ENDIF
+    IF !ReadHighScores() scoreMessage = "CANNOT READ HIGH SCORES"
+    FCLOSE 3
+ENDPROC
+
+PROCEDURE SaveHighScore()
+    INTEGER i, position
+    HighScore entry
+    scoreRank = 0
+    scoreMessage = ""
+    IF score <= 0 RETURN
+    IF !LockScores() THEN
+        scoreMessage = "SCORE NOT SAVED  FILE BUSY OR IO ERROR"
+        RETURN
+    ENDIF
+    IF !ReadHighScores() THEN
+        scoreMessage = "SCORE NOT SAVED  CANNOT READ TABLE"
+        FCLOSE 3
+        RETURN
+    ENDIF
+    position = 10
+    FOR i = 0 TO 9
+        IF score > scores[i].Points THEN
+            position = i
+            BREAK
+        ENDIF
+    NEXT i
+    IF position = 10 THEN
+        FCLOSE 3
+        RETURN
+    ENDIF
+    entry = HighScore { Player = Session.User.Name, Points = score, Rows = lines, Stage = level }
+    FOR i = 9 TO position + 1 STEP -1
+        scores[i] = scores[i - 1]
+    NEXT i
+    scores[position] = entry
+    IF WriteHighScores() THEN
+        scoreRank = position + 1
+        scoreMessage = "HIGH SCORE SAVED"
+    ELSE
+        scoreMessage = "SCORE NOT SAVED  WRITE ERROR"
+    ENDIF
+    FCLOSE 3
+ENDPROC
+
+FUNCTION WriteHighScores() BOOLEAN
+    INTEGER i
+    WriteHighScores = FALSE
+    FCREATE 2, PPEPATH() + "tetris-scores.tmp", O_WR, S_DB
+    IF FERR(2) RETURN
+    FPUTLN 2, "TETRIS 1"
+    IF FERR(2) THEN
+        FCLOSE 2
+        RETURN
+    ENDIF
+    FOR i = 0 TO 9
+        FPUTREC 2, scores[i]
+        IF FERR(2) THEN
+            FCLOSE 2
+            RETURN
+        ENDIF
+    NEXT i
+    FFLUSH 2
+    IF FERR(2) THEN
+        FCLOSE 2
+        RETURN
+    ENDIF
+    FCLOSE 2
+    IF FERR(2) RETURN
+    RENAME PPEPATH() + "tetris-scores.tmp", PPEPATH() + "tetris-scores.dat"
+    WriteHighScores = Error.Last().OK
+ENDFUNC
+
+PROCEDURE InitFont()
+    glyphs[0] = "01110100011000111111100011000110001"
+    glyphs[1] = "11110100011000111110100011000111110"
+    glyphs[2] = "01111100001000010000100001000001111"
+    glyphs[3] = "11110100011000110001100011000111110"
+    glyphs[4] = "11111100001000011110100001000011111"
+    glyphs[5] = "11111100001000011110100001000010000"
+    glyphs[6] = "01111100001000010111100011000101111"
+    glyphs[7] = "10001100011000111111100011000110001"
+    glyphs[8] = "11111001000010000100001000010011111"
+    glyphs[9] = "00111000100001000010100101001001100"
+    glyphs[10] = "10001100101010011000101001001010001"
+    glyphs[11] = "10000100001000010000100001000011111"
+    glyphs[12] = "10001110111010110101100011000110001"
+    glyphs[13] = "10001110011010110011100011000110001"
+    glyphs[14] = "01110100011000110001100011000101110"
+    glyphs[15] = "11110100011000111110100001000010000"
+    glyphs[16] = "01110100011000110001101011001001101"
+    glyphs[17] = "11110100011000111110101001001010001"
+    glyphs[18] = "01111100001000001110000010000111110"
+    glyphs[19] = "11111001000010000100001000010000100"
+    glyphs[20] = "10001100011000110001100011000101110"
+    glyphs[21] = "10001100011000110001100010101000100"
+    glyphs[22] = "10001100011000110101101011101110001"
+    glyphs[23] = "10001100010101000100010101000110001"
+    glyphs[24] = "10001100010101000100001000010000100"
+    glyphs[25] = "11111000010001000100010001000011111"
+    glyphs[26] = "01110100011001110101110011000101110"
+    glyphs[27] = "00100011000010000100001000010001110"
+    glyphs[28] = "01110100010000100010001000100011111"
+    glyphs[29] = "11110000010000101110000010000111110"
+    glyphs[30] = "00010001100101010010111110001000010"
+    glyphs[31] = "11111100001000011110000010000111110"
+    glyphs[32] = "01110100001000011110100011000101110"
+    glyphs[33] = "11111000010001000100010000100001000"
+    glyphs[34] = "01110100011000101110100011000101110"
+    glyphs[35] = "01110100011000101111000010000101110"
+    glyphs[36] = "01110100010000100010001000000000100"
+ENDPROC
+
+PROCEDURE DrawText(STRING text, INTEGER x, INTEGER y)
+    INTEGER i, index, px, py
+    STRING letter
+    text = Upper(text)
+    FOR i = 1 TO Len(text)
+        letter = Mid(text, i, 1)
+        IF letter <> " " THEN
+            index = InStr(ALPHABET, letter) - 1
+            IF index < 0 index = 36
+            FOR py = 0 TO 6
+                FOR px = 0 TO 4
+                    IF Mid(glyphs[index], py * 5 + px + 1, 1) = "1" THEN
+                        game.SetPixel(x + px, y + py, GB_DARKEST)
+                    ENDIF
+                NEXT px
+            NEXT py
+        ENDIF
+        x += 6
+    NEXT i
+ENDPROC
 
 PROCEDURE InitShapes()
     shapes[0] = "0000111100000000"
@@ -270,7 +647,7 @@ PROCEDURE SpawnPiece()
     pieceRot = 0
     IF !CanPlace(pieceX, pieceY, pieceRot) THEN
         gameOver = TRUE
-        gameOverSound.Play()
+        IF gameOverSound.Valid gameOverSound.Play()
     ENDIF
 ENDPROC
 
@@ -296,7 +673,7 @@ FUNCTION RotatePiece() BOOLEAN
         RotatePiece = FALSE
         RETURN
     ENDIF
-    rotateSound.Play()
+    IF rotateSound.Valid rotateSound.Play()
 ENDFUNC
 
 PROCEDURE LockPiece()
@@ -324,7 +701,7 @@ PROCEDURE LockPiece()
     ENDWHILE
     IF overflow THEN
         gameOver = TRUE
-        gameOverSound.Play()
+        IF gameOverSound.Valid gameOverSound.Play()
         RETURN
     ENDIF
     cleared = ClearLines()
@@ -336,7 +713,7 @@ PROCEDURE LockPiece()
         lines += cleared
         level = lines / 10
     ELSE
-        lockSound.Play()
+        IF lockSound.Valid lockSound.Play()
     ENDIF
     SpawnPiece()
 ENDPROC
@@ -363,7 +740,7 @@ FUNCTION ClearLines() INTEGER
     ENDWHILE
 
     IF cleared > 0 THEN
-        lineSound.Play()
+        IF lineSound.Valid lineSound.Play()
         AnimateClear()
         targetRow = BOARD_H - 1
         sourceRow = BOARD_H - 1
@@ -580,18 +957,39 @@ ENDPROC
 PROCEDURE DrawPanel()
     DrawBox(BOX_X, 20, BOX_W, 34)
     game.BlitRect(ui, 0, 0, 30, 7, BOX_X + 33, 25)
-    DrawNumber(score, BOX_X + 24, 38, 6)
+    IF score <= 999999 THEN
+        DrawNumber(score, BOX_X + 24, 38, 6)
+    ELSE
+        DrawText(ToString(score), BOX_X + 14, 38)
+    ENDIF
 
     DrawBox(BOX_X, 60, BOX_W, 34)
     game.BlitRect(ui, 0, 12, 30, 7, BOX_X + 33, 65)
-    DrawNumber(level, BOX_X + 36, 78, 3)
+    IF level <= 999 THEN
+        DrawNumber(level, BOX_X + 36, 78, 3)
+    ELSE
+        DrawText(ToString(level), BOX_X + 14, 78)
+    ENDIF
 
     DrawBox(BOX_X, 100, BOX_W, 34)
     game.BlitRect(ui, 0, 24, 30, 7, BOX_X + 33, 105)
-    DrawNumber(lines, BOX_X + 32, 118, 4)
+    IF lines <= 9999 THEN
+        DrawNumber(lines, BOX_X + 32, 118, 4)
+    ELSE
+        DrawText(ToString(lines), BOX_X + 14, 118)
+    ENDIF
 
     DrawBox(BOX_X, 140, BOX_W, 72)
     game.BlitRect(ui, 0, 36, 24, 7, BOX_X + 36, 145)
+
+    DrawBox(BOX_X, 220, BOX_W, 48)
+    DrawText("P PAUSE", BOX_X + 12, 228)
+    IF musicOn THEN
+        DrawText("M MUSIC ON", BOX_X + 12, 240)
+    ELSE
+        DrawText("M MUSIC OFF", BOX_X + 12, 240)
+    ENDIF
+    DrawText("Q MENU", BOX_X + 12, 252)
 ENDPROC
 
 PROCEDURE DrawNext()
@@ -644,5 +1042,5 @@ PROCEDURE RenderGame()
 ENDPROC
 
 PROCEDURE PresentGame()
-    game.PresentRect(0, 0, GAME_W, GAME_H, GAME_X, GAME_Y)
+    IF !game.PresentRect(0, 0, GAME_W, GAME_H, GAME_X, GAME_Y) FailGame()
 ENDPROC
