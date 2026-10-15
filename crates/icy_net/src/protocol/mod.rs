@@ -5,6 +5,9 @@ pub mod xymodem;
 use serde::Deserialize;
 pub use xymodem::*;
 
+pub mod kermit;
+pub use kermit::Kermit;
+
 pub mod zmodem;
 pub use zmodem::*;
 
@@ -40,6 +43,7 @@ pub enum TransferProtocolType {
     XModem1kG,
     YModem,
     YModemG,
+    Kermit,
     #[default]
     ZModem,
     ZModem8k,
@@ -79,6 +83,7 @@ impl TransferProtocolType {
             TransferProtocolType::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
             TransferProtocolType::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
             TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
+            TransferProtocolType::Kermit => Box::new(Kermit::new()),
             TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
             TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
             TransferProtocolType::External(_) => Box::new(Empty::default()),
@@ -97,6 +102,7 @@ impl Display for TransferProtocolType {
             TransferProtocolType::XModem1kG => XMODEM1KG_STR,
             TransferProtocolType::YModem => YMODEM_STR,
             TransferProtocolType::YModemG => YMODEMG_STR,
+            TransferProtocolType::Kermit => KERMIT_STR,
             TransferProtocolType::ZModem => ZMODEM_STR,
             TransferProtocolType::ZModem8k => ZMODEM8K_STR,
             TransferProtocolType::External(s) => s,
@@ -120,6 +126,7 @@ impl FromStr for TransferProtocolType {
                 XMODEM1KG_STR => TransferProtocolType::XModem1kG,
                 YMODEM_STR => TransferProtocolType::YModem,
                 YMODEMG_STR => TransferProtocolType::YModemG,
+                KERMIT_STR => TransferProtocolType::Kermit,
                 ZMODEM_STR => TransferProtocolType::ZModem,
                 ZMODEM8K_STR => TransferProtocolType::ZModem8k,
                 _ => TransferProtocolType::None,
@@ -155,6 +162,7 @@ pub const XMODEM1K_STR: &str = "@xmodem1k";
 pub const XMODEM1KG_STR: &str = "@xmodem1kg";
 pub const YMODEM_STR: &str = "@ymodem";
 pub const YMODEMG_STR: &str = "@ymodemg";
+pub const KERMIT_STR: &str = "@kermit";
 pub const ZMODEM_STR: &str = "@zmodem";
 pub const ZMODEM8K_STR: &str = "@zmodem8k";
 
@@ -191,6 +199,7 @@ mod type_tests {
             TransferProtocolType::XModem1kG,
             TransferProtocolType::YModem,
             TransferProtocolType::YModemG,
+            TransferProtocolType::Kermit,
             TransferProtocolType::ZModem,
             TransferProtocolType::ZModem8k,
             TransferProtocolType::External("./transfer --send".into()),

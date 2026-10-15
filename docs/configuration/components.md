@@ -462,7 +462,7 @@ The optional root `protocol` array contains `[[protocol]]` records:
 The protocol type has a custom string serializer, not a tagged enum. Its
 internal values are `"@asc"`, `"@xmodem"`, `"@xmodemcrc"`,
 `"@xmodem1k"`, `"@xmodem1kg"`, `"@ymodem"`, `"@ymodemg"`,
-`"@zmodem"`, and `"@zmodem8k"`. These `@` names are parsed
+`"@kermit"`, `"@zmodem"`, and `"@zmodem8k"`. These `@` names are parsed
 case-insensitively. `""` selects None; an unknown string starting with
 `@` also selects None. Any other string represents an external command.
 In particular, `"ZModem"` is **not** the native spelling of Zmodem.
@@ -473,8 +473,8 @@ mean that the external program will be executed.
 The Rust protocol-type default is Zmodem, but missing `send_command` or
 `recv_command` still fails. `Protocol::default()` has `enabled` false,
 whereas omitted TOML `enabled` is true. Setup's generated list enables
-A/ASCII, X/Xmodem, C/CRC, O/1K, F/1K-G, Y/Ymodem, G/Ymodem-G, Z/Zmodem,
-8/Zmodem-8k and N/None. Y, G, Z, 8 and N are marked batch; none is marked
+A/ASCII, X/Xmodem, C/CRC, O/1K, F/1K-G, Y/Ymodem, G/Ymodem-G, K/Kermit, Z/Zmodem,
+8/Zmodem-8k and N/None. Y, G, K, Z, 8 and N are marked batch; none is marked
 bidirectional. An absent root list simply yields an empty list instead.
 
 Native YMODEM-G uploads request streaming mode with `G`. X/YMODEM senders
@@ -484,6 +484,19 @@ receivers purge incomplete packets before requesting retransmission.
 After the final ACK, receivers allow up to eleven seconds for retransmissions.
 Ordinary terminal input ends this grace period early and is preserved for
 the next connection read.
+
+Native Kermit supports binary batch uploads and downloads with short packets
+(12-94 characters negotiated in the length field), stop-and-wait acknowledgements,
+type-1 checksums, control quoting, negotiated eighth-bit quoting and repeat
+decoding. It honors peer padding, terminator and timeout preferences, retries
+up to ten times, and allows eleven seconds to repeat a lost final ACK.
+Long packets, sliding windows, file attributes, text conversion and server
+commands are not supported. Select binary mode in the remote Kermit client.
+Existing boards can add a batch protocol with `char_code = "K"` and both
+commands set to `"@kermit"`; newly generated boards include it automatically.
+PCBoard protocol imports recognize `K` as native Kermit.
+The optional interoperability test can be run against an installed C-Kermit:
+`ICY_KERMIT=/path/to/kermit cargo test-low -p icy_net --test kermit_interop -- --ignored`.
 
 Standalone protocol file:
 

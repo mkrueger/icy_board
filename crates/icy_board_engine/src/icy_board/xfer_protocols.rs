@@ -142,6 +142,15 @@ impl SupportedProtocols {
                 is_enabled: true,
                 is_batch: true,
                 is_bi_directional: false,
+                char_code: "K".to_string(),
+                description: "Kermit (batch)".to_string(),
+                send_command: TransferProtocolType::Kermit,
+                recv_command: TransferProtocolType::Kermit,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
                 char_code: "Z".to_string(),
                 description: "Zmodem (batch)".to_string(),
                 send_command: TransferProtocolType::ZModem,
@@ -205,6 +214,7 @@ impl PCBoardTextImport for SupportedProtocols {
                 'O' => (true, false, TransferProtocolType::XModem1k),
                 'F' | 'Y' => (true, false, TransferProtocolType::XModem1kG),
                 'G' => (true, true, TransferProtocolType::YModemG),
+                'K' => (true, true, TransferProtocolType::Kermit),
                 'Z' => (true, true, TransferProtocolType::ZModem),
                 _ => (false, true, TransferProtocolType::External("todo".to_string())),
             };
@@ -231,4 +241,26 @@ impl PCBoardImport for SupportedProtocols {
 
 impl IcyBoardSerializer for SupportedProtocols {
     const FILE_TYPE: &'static str = "protocols";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kermit_defaults_and_pcboard_import_use_native_batch_protocol() {
+        for protocols in [
+            SupportedProtocols::generate_pcboard_defaults(),
+            SupportedProtocols::import_data("K,I,94,Kermit,N,N,N\r\n".into()).unwrap(),
+        ] {
+            let kermit = protocols.find_protocol("K").unwrap();
+            assert!(kermit.is_enabled);
+            assert!(kermit.is_batch);
+            assert!(!kermit.is_bi_directional);
+            assert_eq!(kermit.send_command, TransferProtocolType::Kermit);
+            assert_eq!(kermit.recv_command, TransferProtocolType::Kermit);
+            let mut native = crate::icy_board::state::user_commands::pcb::u_upload_file::create_protocol(&kermit.recv_command).unwrap();
+            assert!(native.set_receive_limit(1));
+        }
+    }
 }
