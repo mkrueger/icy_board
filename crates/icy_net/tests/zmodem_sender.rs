@@ -328,6 +328,9 @@ async fn zfin_after_zeof_sends_oo_without_confirming_the_file() {
     assert_eq!(&oo, b"OO");
 }
 
+/// The noise Sz skips before a header before it counts header errors.
+const NOISE_BUDGET: usize = 16 * 1024;
+
 fn corrupt_header(kind: HeaderType) -> Vec<u8> {
     let mut bytes = Header::empty(ZFrameType::Ack).build(kind, false);
     bytes[4] ^= 1; // Alter unescaped body data, not the framing or CRC encoding.
@@ -337,7 +340,6 @@ fn corrupt_header(kind: HeaderType) -> Vec<u8> {
 #[tokio::test]
 async fn malformed_headers_and_crc_errors_have_a_bounded_recovery_budget() {
     let malformed = [
-        vec![b'?'],
         vec![ZPAD, b'?'],
         vec![ZPAD, ZDLE, b'?'],
         corrupt_header(HeaderType::Bin),
@@ -402,7 +404,7 @@ async fn cancel_requires_five_consecutive_can_bytes() {
                 bounded(sz.update_transfer(&mut conn, &mut state)).await.unwrap();
             }
             assert_eq!(state.is_finished, index == bytes.len() - 1);
-            assert_eq!(sz.errors, usize::from(index >= 3), "CAN and flow control must not consume the error budget");
+            assert_eq!(sz.errors, 0, "CAN, flow control and noise must not consume the error budget");
         }
         let mut abort = vec![0; ABORT_SEQ.len()];
         bounded(peer.read_exact(&mut abort)).await.unwrap();
@@ -423,7 +425,7 @@ async fn file_handshake_uses_the_same_flow_crc_and_cancel_policy() {
     sender.step().await;
     assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
 
-    for reply in [vec![ZDLE; 5], vec![0x11; 32], corrupt_header(HeaderType::Bin32).repeat(4)] {
+    for reply in [vec![ZDLE; 5], vec![0x11; 32 + NOISE_BUDGET], corrupt_header(HeaderType::Bin32).repeat(4)] {
         let mut sender = Sender::new(&paths, true).await;
         let result = sender.offer_result(&reply).await;
         if reply == vec![ZDLE; 5] {
@@ -580,4 +582,54 @@ async fn a_zrpos_for_the_next_file_is_not_a_repeat_of_one_for_the_last() {
     }
     assert_eq!(sender.state.send_state.finished_files.len(), 2);
     sender.end_batch().await;
+}
+
+#[tokio::test]
+async fn status_text_before_a_header_is_skipped_within_a_bound() {
+    for blocking in [false, true] {
+        let (mut conn, mut peer) = TestConnection::create_pair();
+        let mut sz = Sz::new(1024);
+        let mut state = TransferState::new("status text".into());
+        // A receiver started under a pty prints its banner into the same stream.
+        let text = b"rz waiting to receive.\r\n";
+        let mut bytes = text.to_vec();
+        bytes.extend(wire(Header::from_number(ZFrameType::Challenge, 42)));
+        peer.send(&bytes).await.unwrap();
+        bounded(async {
+            // One read per skipped byte, then one for the header.
+            for _ in 0..=text.len() {
+                if blocking {
+                    sz.read_next_header(&mut conn, &mut state).await.unwrap();
+                } else {
+                    sz.update_transfer(&mut conn, &mut state).await.unwrap();
+                }
+                assert_eq!(sz.errors, 0, "status text is not a header error");
+                assert!(!state.is_finished);
+            }
+        })
+        .await;
+        let ack = header(&mut peer).await;
+        assert_eq!(ack.frame_type, ZFrameType::Ack, "the header after the text is answered");
+        assert_eq!(ack.number(), 42);
+    }
+
+    // Past the bound, noise is a header error again and the budget applies.
+    let (mut conn, mut peer) = TestConnection::create_pair();
+    let mut sz = Sz::new(1024);
+    let mut state = TransferState::new("endless noise".into());
+    peer.send(&vec![b'?'; NOISE_BUDGET + 4]).await.unwrap();
+    let result = bounded(async {
+        loop {
+            if let Err(err) = sz.update_transfer(&mut conn, &mut state).await {
+                break Err::<(), _>(err);
+            }
+            assert!(!state.is_finished);
+        }
+    })
+    .await;
+    assert!(result.is_err());
+    assert!(state.is_finished);
+    let mut abort = vec![0; ABORT_SEQ.len()];
+    bounded(peer.read_exact(&mut abort)).await.unwrap();
+    assert_eq!(abort, ABORT_SEQ);
 }
