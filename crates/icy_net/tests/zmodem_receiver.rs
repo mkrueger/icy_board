@@ -152,7 +152,7 @@ async fn receiver_accepts_large_streaming_subpackets_independently_of_upload_blo
 }
 
 #[tokio::test]
-async fn receiver_keeps_a_bounded_limit_for_oversized_subpackets() {
+async fn receiver_never_writes_an_oversized_subpacket_and_asks_for_it_again() {
     for block_length in [1024, 8192] {
         for kind in [HeaderType::Bin, HeaderType::Bin32] {
             let (mut protocol, mut state, mut conn, mut peer) = receiver_with_block_length(block_length).await;
@@ -168,22 +168,70 @@ async fn receiver_keeps_a_bounded_limit_for_oversized_subpackets() {
             peer.send(&bytes).await.unwrap();
             bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
             bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+
+            // Text spliced into a subpacket (a program's status output on a pty)
+            // makes it overlong: a damaged subpacket, so ZRPOS, not a fatal error.
             let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
             bytes.extend(encode(ZCRCE, &vec![b'A'; 8193]));
             peer.send(&bytes).await.unwrap();
-            let error = bounded(async {
-                loop {
-                    if let Err(error) = protocol.update_transfer(&mut conn, &mut state).await {
-                        break error;
-                    }
+            bounded(async {
+                while state.recieve_state.warnings == 0 {
+                    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
                 }
             })
             .await;
-            assert_eq!(error.to_string(), "subpacket overflow: length 8193 exceeds max 8192");
+            let rpos = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+            assert_eq!(rpos.frame_type, ZFrameType::RPos);
+            assert_eq!(rpos.number(), 0);
             assert_eq!(state.recieve_state.cur_bytes_transfered, 0, "oversized data is never written");
-            assert!(state.recieve_state.finished_files.is_empty());
+
+            // The resend completes the file.
+            let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+            bytes.extend(encode(ZCRCG, &vec![b'A'; 8192]));
+            bytes.extend(encode(ZCRCE, b"A"));
+            bytes.extend(Header::from_number(ZFrameType::Eof, 8193).build(kind, false));
+            peer.send(&bytes).await.unwrap();
+            bounded(async {
+                while state.recieve_state.finished_files.is_empty() {
+                    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+                }
+            })
+            .await;
+            let path = &state.recieve_state.finished_files[0].1;
+            let received = std::fs::read(path).unwrap();
+            std::fs::remove_file(path).unwrap();
+            assert_eq!(received, vec![b'A'; 8193]);
         }
     }
+}
+
+#[tokio::test]
+async fn an_overlong_zfile_info_block_is_answered_with_znak_and_can_be_resent() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    let mut info = vec![b'n'; 9000];
+    info.extend_from_slice(b"\x00100\x00");
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, &info, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.warnings == 0 {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    let reply = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    assert_eq!(reply.frame_type, ZFrameType::Nak);
+
+    // The sender repeats a ZFILE that fits and the transfer goes on.
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x00100\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.file_name != "name" {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
 }
 
 #[tokio::test]

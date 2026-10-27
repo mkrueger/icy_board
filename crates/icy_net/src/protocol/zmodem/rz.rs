@@ -144,6 +144,9 @@ impl Rz {
                             match zmodem_err {
                                 ZModemError::SubpacketCrcError(_) => (true, "crc"),
                                 ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                // Noise (status text on a pty) can make a subpacket
+                                // overlong: a damaged subpacket, not a fatal one.
+                                ZModemError::SubpacketOverflow(_, _) => (true, "overflow"),
                                 _ => (false, "fatal"),
                             }
                         } else {
@@ -158,6 +161,10 @@ impl Rz {
                                 )),
                                 "decode" => transfer_state.recieve_state.log_warning(format!(
                                     "Invalid byte in subpacket at offset {}, requesting retransmission",
+                                    transfer_state.recieve_state.cur_bytes_transfered
+                                )),
+                                "overflow" => transfer_state.recieve_state.log_warning(format!(
+                                    "Overlong subpacket at offset {}, requesting retransmission",
                                     transfer_state.recieve_state.cur_bytes_transfered
                                 )),
                                 _ => {}
@@ -491,6 +498,9 @@ impl Rz {
                             match zerr {
                                 ZModemError::SubpacketCrcError(_) => (true, "crc"),
                                 ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                // Noise (status text on a pty) can make a subpacket
+                                // overlong: a damaged subpacket, not a fatal one.
+                                ZModemError::SubpacketOverflow(_, _) => (true, "overflow"),
                                 _ => (false, "fatal"),
                             }
                         } else {
@@ -505,6 +515,9 @@ impl Rz {
                                 "decode" => transfer_state
                                     .recieve_state
                                     .log_warning("Decode error in ZFILE info block, requesting retransmission".to_string()),
+                                "overflow" => transfer_state
+                                    .recieve_state
+                                    .log_warning("Overlong ZFILE info block, requesting retransmission".to_string()),
                                 _ => {}
                             }
                             self.errors += 1;
