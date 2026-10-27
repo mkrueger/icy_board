@@ -22,6 +22,25 @@ const ZRINIT_RESEND_INTERVAL: Duration = Duration::from_secs(10);
 /// Silence inside a file after which the sender is taken to be gone.
 const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Where the receiver is in a session, for a host that shares the
+/// connection with a terminal and must tell protocol bytes from screen output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiverPhase {
+    /// ZRINIT is out; nothing has been heard from the sender yet.
+    Handshake,
+    /// Between files: waiting for ZFILE, or for ZFIN to end the session.
+    BetweenFiles,
+    /// Inside a file, from its ZFILE to its ZEOF. The offset is in
+    /// `TransferState::recieve_state.cur_bytes_transfered`.
+    InFile,
+    /// The session is over: ZFIN was answered and the sender's "OO" read
+    /// (or a second passed without it), or the receiver cancelled or was
+    /// aborted. Any further bytes on the connection are the board's again.
+    /// An `Err` from `update_transfer` does not always get here, for example
+    /// a closed connection inside a file, so treat an error as the end too.
+    Done,
+}
+
 #[derive(Debug)]
 pub enum RecvState {
     Idle,
@@ -82,6 +101,15 @@ impl Rz {
 
     pub fn is_active(&self) -> bool {
         !matches!(self.state, RecvState::Idle)
+    }
+
+    pub fn phase(&self) -> ReceiverPhase {
+        match self.state {
+            RecvState::Idle => ReceiverPhase::Done,
+            RecvState::Await => ReceiverPhase::Handshake,
+            RecvState::SendZRINIT => ReceiverPhase::BetweenFiles,
+            RecvState::AwaitZDATA | RecvState::AwaitFileData | RecvState::AwaitEOF => ReceiverPhase::InFile,
+        }
     }
 
     pub fn set_receive_limit(&mut self, limit: usize) {

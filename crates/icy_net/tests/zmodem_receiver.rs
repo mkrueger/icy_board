@@ -3,7 +3,7 @@ use std::{future::Future, time::Duration};
 use icy_net::{
     Connection,
     connection::channel::ChannelConnection,
-    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, constants::ABORT_SEQ},
+    protocol::{Header, HeaderType, Protocol, ReceiverPhase, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, constants::ABORT_SEQ},
 };
 
 async fn bounded<T>(future: impl Future<Output = T>) -> T {
@@ -593,4 +593,51 @@ async fn sender_vanishing_mid_file_ends_the_transfer() {
     let mut tail = [0u8; 64];
     let n = peer.try_read(&mut tail).await.unwrap();
     assert_eq!(&tail[..n], ABORT_SEQ);
+}
+
+#[tokio::test]
+async fn receiver_phase_follows_the_session() {
+    assert_eq!(Zmodem::new(1024).receiver_phase(), None);
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::Handshake));
+
+    peer.send(&Header::empty(ZFrameType::RQInit).build(HeaderType::Hex, false)).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::BetweenFiles));
+
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x005\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::InFile));
+
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    bytes.extend(Header::from_number(ZFrameType::Eof, 5).build(HeaderType::Bin32, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.finished_files.is_empty() {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+            if state.recieve_state.finished_files.is_empty() {
+                assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::InFile));
+            }
+        }
+    })
+    .await;
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::BetweenFiles));
+
+    let mut bytes = Header::empty(ZFrameType::Fin).build(HeaderType::Hex, false);
+    bytes.extend_from_slice(b"OOmenu");
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::Done));
+    // Everything after the session is the board's screen output again.
+    let mut rest = [0u8; 4];
+    bounded(conn.read_exact(&mut rest)).await.unwrap();
+    assert_eq!(&rest, b"menu");
+    for (_, path) in &state.recieve_state.finished_files {
+        std::fs::remove_file(path).unwrap();
+    }
 }
