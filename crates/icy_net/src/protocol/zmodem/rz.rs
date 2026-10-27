@@ -552,6 +552,16 @@ impl Rz {
                 transfer_state.recieve_state.log_info(format!("ZDATA received at offset {}", offset));
 
                 if self.cur_out_file.is_none() {
+                    // After a file was taken, a ZDATA is a late answer to an earlier
+                    // ZRPOS (the sender's resend was still on its way): stale.
+                    // Ignore it and send ZRINIT again, as for the end of that file.
+                    if self.received_files > 0 {
+                        transfer_state
+                            .recieve_state
+                            .log_warning(format!("Stale ZDATA at offset {} after the file ended, ignored", offset));
+                        self.send_zrinit(com).await?;
+                        return Ok(false);
+                    }
                     transfer_state.recieve_state.log_error("ZDATA received before ZFILE".to_string());
                     self.cancel(com).await?;
                     return Err(ZModemError::ZDataBeforeZFILE.into());

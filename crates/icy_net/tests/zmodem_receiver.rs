@@ -488,3 +488,47 @@ async fn can_abort_inside_file_data_ends_the_transfer() {
     );
     assert!(state.recieve_state.finished_files.is_empty());
 }
+
+#[tokio::test]
+async fn stale_zdata_after_a_received_file_is_ignored() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x005\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    bytes.extend(Header::from_number(ZFrameType::Eof, 5).build(HeaderType::Bin32, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.finished_files.is_empty() {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+
+    // A resend answering an earlier ZRPOS arrives after the file was closed.
+    let mut bytes = Header::from_number(ZFrameType::Data, 3).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"lo", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+
+    // The session still ends normally.
+    let mut bytes = Header::empty(ZFrameType::Fin).build(HeaderType::Hex, false);
+    bytes.extend_from_slice(b"OO");
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while !state.is_finished {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    assert_eq!(state.recieve_state.finished_files.len(), 1);
+    let path = &state.recieve_state.finished_files[0].1;
+    assert_eq!(std::fs::read(path).unwrap(), b"hello");
+    std::fs::remove_file(path).unwrap();
+}
