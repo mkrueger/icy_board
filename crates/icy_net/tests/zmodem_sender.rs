@@ -633,3 +633,26 @@ async fn status_text_before_a_header_is_skipped_within_a_bound() {
     bounded(peer.read_exact(&mut abort)).await.unwrap();
     assert_eq!(abort, ABORT_SEQ);
 }
+
+#[tokio::test]
+async fn zfile_carries_the_modification_time_and_what_is_left_of_the_batch() {
+    let files = [file(b"abcdef"), file(b"xyz")];
+    let mtime = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    files[0].as_file().set_modified(mtime).unwrap();
+    let paths: Vec<_> = files.iter().map(|file| file.path().to_path_buf()).collect();
+    let mut sender = Sender::new(&paths, true).await;
+    let peer = &mut sender.peer;
+    let (result, info) = bounded(async {
+        tokio::join!(sender.sz.update_transfer(&mut sender.conn, &mut sender.state), async {
+            assert_eq!(header(peer).await.frame_type, ZFrameType::File);
+            let (info, _, _) = bounded(read_subpacket(peer, 4096, true, false)).await.unwrap();
+            peer.send(&wire(Header::empty(ZFrameType::Skip))).await.unwrap();
+            info
+        })
+    })
+    .await;
+    result.unwrap();
+    let name = paths[0].file_name().unwrap().to_string_lossy();
+    // name NUL length mtime(octal) mode serial files-left bytes-left NUL
+    assert_eq!(String::from_utf8(info).unwrap(), format!("{name}\x006 {:o} 0 0 2 9\x00", 1_700_000_000u64));
+}

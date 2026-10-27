@@ -5,7 +5,7 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    time::{Duration, Instant},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use tokio::time::sleep;
@@ -105,6 +105,23 @@ impl Sz {
             Zmodem::encode_subpacket_crc16(zcrc_byte, data, self.can_esc_control())
         }
     }
+    /// The rest of the ZFILE info after the length: the modification time
+    /// (octal seconds since 1970, 0 if unknown), the file mode and serial
+    /// number (0: none), and the files and bytes left in the batch, this file
+    /// included. Without a date receivers make one up.
+    fn zfile_info(&self, file_size: u64) -> String {
+        let mtime = self
+            .cur_file
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_secs());
+        let files_left = self.file_queue.len() + 1;
+        let bytes_left = file_size + self.file_queue.iter().filter_map(|f| f.metadata().ok()).map(|m| m.len()).sum::<u64>();
+        format!(" {mtime:o} 0 0 {files_left} {bytes_left}")
+    }
+
     fn next_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<bool> {
         if let Some(next_file) = self.file_queue.pop_front() {
             transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
@@ -535,7 +552,15 @@ impl Sz {
             let mut b =
                 Header::from_flags(ZFrameType::File, 0, 0, zfile_flag::ZMNEW, zfile_flag::ZCRESUM).build(self.get_header_type(), self.can_esc_control());
 
-            let data = { format!("{}\0{}\0", transfer_state.send_state.file_name, transfer_state.send_state.file_size).into_bytes() };
+            let data = {
+                format!(
+                    "{}\0{}{}\0",
+                    transfer_state.send_state.file_name,
+                    transfer_state.send_state.file_size,
+                    self.zfile_info(transfer_state.send_state.file_size)
+                )
+                .into_bytes()
+            };
 
             b.extend_from_slice(&self.encode_subpacket(ZCRCW, &data));
             com.send(&b).await?;
