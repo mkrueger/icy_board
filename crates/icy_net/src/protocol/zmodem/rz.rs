@@ -799,10 +799,20 @@ pub async fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -
         let c = com.read_u8().await?;
         match c {
             ZDLE => {
+                // ZDLE is CAN: ZDLE followed by four more CANs is the abort sequence
+                // (lrzsz zdlread() GOTCAN). Data never carries an unescaped CAN.
+                let mut cans = 1;
                 loop {
                     let c = com.read_u8().await?;
                     match c {
-                        XON | XON_0X80 | XOFF | XOFF_0X80 | ZDLE => {
+                        ZDLE => {
+                            cans += 1;
+                            if cans >= 5 {
+                                return Err(ZModemError::GenericError("Received 5 CAN bytes, transfer cancelled by remote".to_string()).into());
+                            }
+                            continue;
+                        }
+                        XON | XON_0X80 | XOFF | XOFF_0X80 => {
                             continue;
                         }
                         ZRUB0 => return Ok(ZModemResult::Ok(0x7F)),

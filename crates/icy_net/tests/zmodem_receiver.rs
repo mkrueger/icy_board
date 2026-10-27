@@ -454,3 +454,37 @@ async fn flow_control_bytes_before_a_header_are_not_errors() {
     assert_eq!(state.recieve_state.errors, 0, "{:?}", state.recieve_state.output_log);
     assert_eq!(state.recieve_state.warnings, 0, "{:?}", state.recieve_state.output_log);
 }
+
+#[tokio::test]
+async fn can_abort_inside_file_data_ends_the_transfer() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x00100\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    let reply = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    assert_eq!(reply.frame_type, ZFrameType::RPos);
+
+    // ZDATA, part of a subpacket, then the abort a sender such as lrzsz sz
+    // sends when it is interrupted: 8 CAN followed by 10 backspaces.
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend_from_slice(b"partial data");
+    bytes.extend_from_slice(&[0x18; 8]);
+    bytes.extend_from_slice(&[0x08; 10]);
+    peer.send(&bytes).await.unwrap();
+    let result: icy_net::Result<()> = bounded(async {
+        loop {
+            protocol.update_transfer(&mut conn, &mut state).await?;
+            if state.is_finished || state.recieve_state.warnings > 0 {
+                return Ok(());
+            }
+        }
+    })
+    .await;
+    assert!(
+        result.is_err(),
+        "a CAN abort inside a subpacket must end the transfer: {:?}",
+        state.recieve_state.output_log
+    );
+    assert!(state.recieve_state.finished_files.is_empty());
+}
