@@ -5,7 +5,7 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use tokio::time::sleep;
@@ -42,6 +42,7 @@ pub struct Sz {
     can_count: usize,
     receiver_capabilities: u8,
     nonstop: bool,
+    last_rpos: Option<(u64, Instant)>,
 }
 
 impl Sz {
@@ -58,6 +59,7 @@ impl Sz {
             can_count: 0,
             package_len: block_length,
             nonstop: true,
+            last_rpos: None,
         }
     }
 
@@ -110,6 +112,8 @@ impl Sz {
             ));
 
             self.cur_file = next_file.clone();
+            // A ZRPOS for offset 0 of this file is not a repeat of one for the last file.
+            self.last_rpos = None;
             let reader = BufReader::new(File::open(next_file)?);
             self.cur_buf = Some(reader);
             Ok(true)
@@ -427,6 +431,19 @@ impl Sz {
 
             ZFrameType::RPos => {
                 let new_pos = res.number() as u64;
+                // A receiver skipping our stale in-flight stream after its ZRPOS repeats
+                // the ZRPOS (lrzsz: "Garbage count exceeded"). Restarting again for a late
+                // repeat puts a ZDATA header for an old offset into a stream the receiver
+                // has already resynchronised on, and the two sides ping-pong until the
+                // receiver gives up. Honour one ZRPOS per offset per second.
+                if self
+                    .last_rpos
+                    .is_some_and(|(pos, at)| pos == new_pos && at.elapsed() < Duration::from_millis(1000))
+                {
+                    transfer_state.send_state.log_info(format!("Ignoring repeated RPOS for offset {}", new_pos));
+                    return Ok(());
+                }
+                self.last_rpos = Some((new_pos, Instant::now()));
                 transfer_state
                     .send_state
                     .log_info(format!("RPOS received, repositioning to offset {}", new_pos));

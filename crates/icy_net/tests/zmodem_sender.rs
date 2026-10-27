@@ -524,3 +524,60 @@ async fn real_sender_and_receiver_complete_an_empty_file_batch() {
         assert_eq!(std::fs::read(&received).unwrap(), std::fs::read(original.path()).unwrap());
     }
 }
+
+#[tokio::test]
+async fn a_repeated_zrpos_for_the_same_offset_does_not_restart_again() {
+    let file = file(b"abcdef");
+    let mut sender = Sender::new(&[file.path().to_path_buf()], true).await;
+    sender.offer(0).await;
+    sender.step().await;
+    assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"ab".to_vec(), false, false));
+
+    // The receiver asks for offset 2 and, while it skips the data still in
+    // flight, repeats that ZRPOS (lrzsz rz does). Only the first restarts.
+    sender.inject(Header::from_number(ZFrameType::RPos, 2)).await;
+    sender.step().await;
+    let data = header(&mut sender.peer).await;
+    assert_eq!(data.frame_type, ZFrameType::Data);
+    assert_eq!(data.number(), 2);
+    sender.inject(Header::from_number(ZFrameType::RPos, 2)).await;
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"cd".to_vec(), false, false), "the repeat must not send another ZDATA");
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"ef".to_vec(), true, false));
+    assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Eof);
+    sender.inject(Header::empty(ZFrameType::RIinit)).await;
+    assert_eq!(sender.state.send_state.finished_files.len(), 1);
+    sender.end_batch().await;
+}
+
+#[tokio::test]
+async fn a_zrpos_for_the_next_file_is_not_a_repeat_of_one_for_the_last() {
+    let files = [file(b"abcd"), file(b"efgh")];
+    let paths: Vec<_> = files.iter().map(|file| file.path().to_path_buf()).collect();
+    let mut sender = Sender::new(&paths, true).await;
+    for (first, second) in [(b"ab", b"cd"), (b"ef", b"gh")] {
+        sender.offer(0).await;
+        sender.step().await;
+        assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
+        sender.step().await;
+        assert_eq!(sender.packet().await, (first.to_vec(), false, false));
+
+        // Damage at the very start of each file: ZRPOS 0, well within a second
+        // of the one for the previous file.
+        sender.inject(Header::from_number(ZFrameType::RPos, 0)).await;
+        sender.step().await;
+        let data = header(&mut sender.peer).await;
+        assert_eq!((data.frame_type, data.number()), (ZFrameType::Data, 0));
+        sender.step().await;
+        assert_eq!(sender.packet().await, (first.to_vec(), false, false));
+        sender.step().await;
+        assert_eq!(sender.packet().await, (second.to_vec(), true, false));
+        assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Eof);
+        sender.inject(Header::empty(ZFrameType::RIinit)).await;
+    }
+    assert_eq!(sender.state.send_state.finished_files.len(), 2);
+    sender.end_batch().await;
+}
