@@ -473,8 +473,9 @@ mean that the external program will be executed.
 The Rust protocol-type default is Zmodem, but missing `send_command` or
 `recv_command` still fails. `Protocol::default()` has `enabled` false,
 whereas omitted TOML `enabled` is true. Setup's generated list enables
-A/ASCII, X/Xmodem, C/CRC, O/1K, F/1K-G, Y/Ymodem, G/Ymodem-G, K/Kermit, Z/Zmodem,
-8/Zmodem-8k and N/None. Y, G, K, Z, 8 and N are marked batch; none is marked
+A/ASCII, X/Xmodem, C/CRC, O/1K, F/1K-G, Y/Ymodem, G/Ymodem-G, Z/Zmodem,
+8/Zmodem-8k and N/None. K/Kermit is included but disabled by default.
+Y, G, K, Z, 8 and N are marked batch; none is marked
 bidirectional. An absent root list simply yields an empty list instead.
 
 Native YMODEM-G uploads request streaming mode with `G`. X/YMODEM senders
@@ -498,7 +499,8 @@ packet, so even a fast connection is limited by its round-trip latency.
 Sliding windows, file attributes, text conversion and server commands are
 not supported. Select binary mode in the remote Kermit client.
 Existing boards can add a batch protocol with `char_code = "K"` and both
-commands set to `"@kermit"`; newly generated boards include it automatically.
+commands set to `"@kermit"`; newly generated boards include it with
+`enabled = false`. Set `enabled = true` to offer it to callers.
 PCBoard protocol imports recognize `K` as native Kermit.
 The optional interoperability test can be run against an installed C-Kermit:
 `ICY_KERMIT=/path/to/kermit cargo test-low -p icy_net --test kermit_interop -- --ignored`.

@@ -139,7 +139,7 @@ impl SupportedProtocols {
                 recv_command: TransferProtocolType::YModemG,
             },
             Protocol {
-                is_enabled: true,
+                is_enabled: false,
                 is_batch: true,
                 is_bi_directional: false,
                 char_code: "K".to_string(),
@@ -249,12 +249,12 @@ mod tests {
 
     #[test]
     fn kermit_defaults_and_pcboard_import_use_native_batch_protocol() {
-        for protocols in [
-            SupportedProtocols::generate_pcboard_defaults(),
-            SupportedProtocols::import_data("K,I,94,Kermit,N,N,N\r\n".into()).unwrap(),
+        for (protocols, enabled) in [
+            (SupportedProtocols::generate_pcboard_defaults(), false),
+            (SupportedProtocols::import_data("K,I,94,Kermit,N,N,N\r\n".into()).unwrap(), true),
         ] {
             let kermit = protocols.find_protocol("K").unwrap();
-            assert!(kermit.is_enabled);
+            assert_eq!(kermit.is_enabled, enabled);
             assert!(kermit.is_batch);
             assert!(!kermit.is_bi_directional);
             assert_eq!(kermit.send_command, TransferProtocolType::Kermit);
@@ -262,5 +262,15 @@ mod tests {
             let mut native = crate::icy_board::state::user_commands::pcb::u_upload_file::create_protocol(&kermit.recv_command).unwrap();
             assert!(native.set_receive_limit(1));
         }
+    }
+
+    #[test]
+    fn default_protocols_keep_kermit_disabled_after_serialization() {
+        let protocols = SupportedProtocols::generate_pcboard_defaults();
+        let serialized = toml::to_string(&protocols).unwrap();
+        let restored: SupportedProtocols = toml::from_str(&serialized).unwrap();
+
+        assert!(!restored.find_protocol("K").unwrap().is_enabled);
+        assert!(restored.iter().filter(|protocol| protocol.char_code != "K").all(|protocol| protocol.is_enabled));
     }
 }
