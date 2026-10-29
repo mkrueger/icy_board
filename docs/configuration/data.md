@@ -58,7 +58,7 @@ can disappear on the next save.
 | `custom_comment1`, `custom_comment2`, `custom_comment3`, `custom_comment4`, `custom_comment5` | Strings / `""` | Five independent custom notes. |
 | `security_level`, `exp_security_level` | `u8`; required | Current and expired-account security levels. Zero is accepted, not an implicit omission default. |
 | `protocol` | String; required | Transfer-protocol selection (normally a configured single-letter code). The serializer does not restrict this to A–Z. |
-| `page_len` | `u16`; required | Screen page length in lines. |
+| `page_len` | `u16`; required | Screen page length in lines. New users start at 23; `0` disables paging. Existing users keep their saved value. |
 | `last_conference` | `u16` / `0` | Last conference number/index. |
 | `elapsed_time_on` | `u16` / `0` | Stored elapsed online minutes (legacy field). |
 | `chat_status` | String / `"Available"` | Exactly `"Available"` or `"Unavailable"`. |

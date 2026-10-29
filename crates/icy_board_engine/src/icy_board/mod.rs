@@ -170,6 +170,7 @@ impl IcyBoard {
         let subscription = &self.config.subscription_info;
         let mut user = user_base::User::default();
         user.set_name(name.to_string());
+        user.page_len = 23;
         user.security_level = settings.sec_level;
         user.exp_security_level = subscription.default_expired_level;
         user.expiration_date = subscription::new_user_expiration(subscription.is_enabled, subscription.subscription_length, now);
@@ -202,7 +203,6 @@ impl IcyBoard {
         let mut new_user = board.lock().await.new_user_record(&name, now);
         // Login registration asks for these instead.
         new_user.protocol = "N".to_string();
-        new_user.page_len = 23;
         new_user.stats.last_on = now;
         let live_board = board.clone();
         IcyBoard::write_users(board, move |board| {
@@ -1306,6 +1306,13 @@ pub trait PCBoardTextImport: PCBoardImport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_user_record_defaults_to_a_23_line_page() {
+        let board = IcyBoard::new();
+        let user = board.new_user_record("New Caller", chrono::Utc::now());
+        assert_eq!(user.page_len, 23);
+    }
 
     #[test]
     fn file_metadata_paths_resolve_per_area_and_upload_location() {

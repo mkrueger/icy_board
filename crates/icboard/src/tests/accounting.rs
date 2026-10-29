@@ -712,6 +712,9 @@ async fn accounting_registration_grants_opening_credit_only_once() {
     session.expect(COMMAND).await;
     let output = session.bye().await;
     assert_login_display(&output, "40/3/3/37");
+    let users = UserBase::load(&dir.path().join("users.toml")).unwrap();
+    assert_eq!(users[1].page_len, 23);
+    assert_eq!(users[0].page_len, 0);
     assert_eq!(account(dir.path(), 1).starting_balance, 40.0);
     assert_eq!(account(dir.path(), 1).balance(false, 0.0), 37.0);
     assert_eq!(account(dir.path(), 0).debit_call, 0.0);
