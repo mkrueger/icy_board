@@ -1541,20 +1541,30 @@ pub async fn i2s(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_string(s))
 }
 
-/// Parses `src` in the given `base` (2..=36); stops at the first non-digit and returns 0 for an invalid base or empty input.
+/// PCBoard's S2I: C `strtoul()` with the base clamped to 2..=36.
 fn parse_radix(src: &str, base: i32) -> i32 {
-    let base = base as u32;
-    if !(2..=36).contains(&base) || src.is_empty() {
-        return 0;
+    let base = base.clamp(2, 36) as u32;
+    let mut text = src.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '\x0b');
+    let negative = text.starts_with('-');
+    if let Some(rest) = text.strip_prefix(['-', '+']) {
+        text = rest;
+    }
+    if base == 16
+        && let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
+    {
+        text = rest;
     }
     let mut acc: u32 = 0;
-    for ch in src.chars() {
-        match ch.to_digit(base) {
-            Some(d) => acc = acc.wrapping_mul(base).wrapping_add(d),
-            None => break,
-        }
+    for ch in text.chars() {
+        let Some(digit) = ch.to_digit(base) else {
+            break;
+        };
+        let Some(next) = acc.checked_mul(base).and_then(|value| value.checked_add(digit)) else {
+            return -1;
+        };
+        acc = next;
     }
-    acc as i32
+    (if negative { acc.wrapping_neg() } else { acc }) as i32
 }
 
 /// Convert a string in a specified number base to an integer.

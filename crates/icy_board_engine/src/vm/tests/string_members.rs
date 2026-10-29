@@ -109,6 +109,19 @@ PRINTLN "".ToInt()
 }
 
 #[test]
+fn ppl400_string_to_int_matches_s2i_and_accepts_a_sign() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+STRING s = "-1"
+PRINTLN s.ToInt(), " ", TOINTEGER(s), " ", S2I(s, 10)
+PRINTLN " 7".ToInt(), " ", "+5x".ToInt(), " ", "-12abc".ToInt()
+PRINTLN "-ff".ToInt(16), " ", "-".ToInt(), " ", "--1".ToInt()
+"#,
+    );
+    assert_eq!(output, "-1 -1 -1\n7 5 -12\n-255 0 0\n");
+}
+
+#[test]
 fn ppl400_string_to_mixed_case_title_cases_words() {
     let output = run_ppl(
         r#";$LANGVERSION 400
