@@ -33,6 +33,9 @@ pub enum ZModemError {
     #[error("invalid ZFILE metadata: {0}")]
     InvalidFileInfo(&'static str),
 
+    #[error("nothing received for {0} s")]
+    Timeout(u64),
+
     #[error("subpacket overflow: length {0} exceeds max {1}")]
     SubpacketOverflow(usize, usize),
 }

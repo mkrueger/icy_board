@@ -328,6 +328,9 @@ async fn zfin_after_zeof_sends_oo_without_confirming_the_file() {
     assert_eq!(&oo, b"OO");
 }
 
+/// The noise Sz skips before a header before it counts header errors.
+const NOISE_BUDGET: usize = 16 * 1024;
+
 fn corrupt_header(kind: HeaderType) -> Vec<u8> {
     let mut bytes = Header::empty(ZFrameType::Ack).build(kind, false);
     bytes[4] ^= 1; // Alter unescaped body data, not the framing or CRC encoding.
@@ -337,7 +340,6 @@ fn corrupt_header(kind: HeaderType) -> Vec<u8> {
 #[tokio::test]
 async fn malformed_headers_and_crc_errors_have_a_bounded_recovery_budget() {
     let malformed = [
-        vec![b'?'],
         vec![ZPAD, b'?'],
         vec![ZPAD, ZDLE, b'?'],
         corrupt_header(HeaderType::Bin),
@@ -402,7 +404,7 @@ async fn cancel_requires_five_consecutive_can_bytes() {
                 bounded(sz.update_transfer(&mut conn, &mut state)).await.unwrap();
             }
             assert_eq!(state.is_finished, index == bytes.len() - 1);
-            assert_eq!(sz.errors, usize::from(index >= 3), "CAN and flow control must not consume the error budget");
+            assert_eq!(sz.errors, 0, "CAN, flow control and noise must not consume the error budget");
         }
         let mut abort = vec![0; ABORT_SEQ.len()];
         bounded(peer.read_exact(&mut abort)).await.unwrap();
@@ -423,7 +425,7 @@ async fn file_handshake_uses_the_same_flow_crc_and_cancel_policy() {
     sender.step().await;
     assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
 
-    for reply in [vec![ZDLE; 5], vec![0x11; 32], corrupt_header(HeaderType::Bin32).repeat(4)] {
+    for reply in [vec![ZDLE; 5], vec![0x11; 32 + NOISE_BUDGET], corrupt_header(HeaderType::Bin32).repeat(4)] {
         let mut sender = Sender::new(&paths, true).await;
         let result = sender.offer_result(&reply).await;
         if reply == vec![ZDLE; 5] {
@@ -523,4 +525,134 @@ async fn real_sender_and_receiver_complete_an_empty_file_batch() {
         let received = tempfile::TempPath::try_from_path(received).unwrap();
         assert_eq!(std::fs::read(&received).unwrap(), std::fs::read(original.path()).unwrap());
     }
+}
+
+#[tokio::test]
+async fn a_repeated_zrpos_for_the_same_offset_does_not_restart_again() {
+    let file = file(b"abcdef");
+    let mut sender = Sender::new(&[file.path().to_path_buf()], true).await;
+    sender.offer(0).await;
+    sender.step().await;
+    assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"ab".to_vec(), false, false));
+
+    // The receiver asks for offset 2 and, while it skips the data still in
+    // flight, repeats that ZRPOS (lrzsz rz does). Only the first restarts.
+    sender.inject(Header::from_number(ZFrameType::RPos, 2)).await;
+    sender.step().await;
+    let data = header(&mut sender.peer).await;
+    assert_eq!(data.frame_type, ZFrameType::Data);
+    assert_eq!(data.number(), 2);
+    sender.inject(Header::from_number(ZFrameType::RPos, 2)).await;
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"cd".to_vec(), false, false), "the repeat must not send another ZDATA");
+    sender.step().await;
+    assert_eq!(sender.packet().await, (b"ef".to_vec(), true, false));
+    assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Eof);
+    sender.inject(Header::empty(ZFrameType::RIinit)).await;
+    assert_eq!(sender.state.send_state.finished_files.len(), 1);
+    sender.end_batch().await;
+}
+
+#[tokio::test]
+async fn a_zrpos_for_the_next_file_is_not_a_repeat_of_one_for_the_last() {
+    let files = [file(b"abcd"), file(b"efgh")];
+    let paths: Vec<_> = files.iter().map(|file| file.path().to_path_buf()).collect();
+    let mut sender = Sender::new(&paths, true).await;
+    for (first, second) in [(b"ab", b"cd"), (b"ef", b"gh")] {
+        sender.offer(0).await;
+        sender.step().await;
+        assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Data);
+        sender.step().await;
+        assert_eq!(sender.packet().await, (first.to_vec(), false, false));
+
+        // Damage at the very start of each file: ZRPOS 0, well within a second
+        // of the one for the previous file.
+        sender.inject(Header::from_number(ZFrameType::RPos, 0)).await;
+        sender.step().await;
+        let data = header(&mut sender.peer).await;
+        assert_eq!((data.frame_type, data.number()), (ZFrameType::Data, 0));
+        sender.step().await;
+        assert_eq!(sender.packet().await, (first.to_vec(), false, false));
+        sender.step().await;
+        assert_eq!(sender.packet().await, (second.to_vec(), true, false));
+        assert_eq!(header(&mut sender.peer).await.frame_type, ZFrameType::Eof);
+        sender.inject(Header::empty(ZFrameType::RIinit)).await;
+    }
+    assert_eq!(sender.state.send_state.finished_files.len(), 2);
+    sender.end_batch().await;
+}
+
+#[tokio::test]
+async fn status_text_before_a_header_is_skipped_within_a_bound() {
+    for blocking in [false, true] {
+        let (mut conn, mut peer) = TestConnection::create_pair();
+        let mut sz = Sz::new(1024);
+        let mut state = TransferState::new("status text".into());
+        // A receiver started under a pty prints its banner into the same stream.
+        let text = b"rz waiting to receive.\r\n";
+        let mut bytes = text.to_vec();
+        bytes.extend(wire(Header::from_number(ZFrameType::Challenge, 42)));
+        peer.send(&bytes).await.unwrap();
+        bounded(async {
+            // One read per skipped byte, then one for the header.
+            for _ in 0..=text.len() {
+                if blocking {
+                    sz.read_next_header(&mut conn, &mut state).await.unwrap();
+                } else {
+                    sz.update_transfer(&mut conn, &mut state).await.unwrap();
+                }
+                assert_eq!(sz.errors, 0, "status text is not a header error");
+                assert!(!state.is_finished);
+            }
+        })
+        .await;
+        let ack = header(&mut peer).await;
+        assert_eq!(ack.frame_type, ZFrameType::Ack, "the header after the text is answered");
+        assert_eq!(ack.number(), 42);
+    }
+
+    // Past the bound, noise is a header error again and the budget applies.
+    let (mut conn, mut peer) = TestConnection::create_pair();
+    let mut sz = Sz::new(1024);
+    let mut state = TransferState::new("endless noise".into());
+    peer.send(&vec![b'?'; NOISE_BUDGET + 4]).await.unwrap();
+    let result = bounded(async {
+        loop {
+            if let Err(err) = sz.update_transfer(&mut conn, &mut state).await {
+                break Err::<(), _>(err);
+            }
+            assert!(!state.is_finished);
+        }
+    })
+    .await;
+    assert!(result.is_err());
+    assert!(state.is_finished);
+    let mut abort = vec![0; ABORT_SEQ.len()];
+    bounded(peer.read_exact(&mut abort)).await.unwrap();
+    assert_eq!(abort, ABORT_SEQ);
+}
+
+#[tokio::test]
+async fn zfile_carries_the_modification_time_and_what_is_left_of_the_batch() {
+    let files = [file(b"abcdef"), file(b"xyz")];
+    let mtime = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    files[0].as_file().set_modified(mtime).unwrap();
+    let paths: Vec<_> = files.iter().map(|file| file.path().to_path_buf()).collect();
+    let mut sender = Sender::new(&paths, true).await;
+    let peer = &mut sender.peer;
+    let (result, info) = bounded(async {
+        tokio::join!(sender.sz.update_transfer(&mut sender.conn, &mut sender.state), async {
+            assert_eq!(header(peer).await.frame_type, ZFrameType::File);
+            let (info, _, _) = bounded(read_subpacket(peer, 4096, true, false)).await.unwrap();
+            peer.send(&wire(Header::empty(ZFrameType::Skip))).await.unwrap();
+            info
+        })
+    })
+    .await;
+    result.unwrap();
+    let name = paths[0].file_name().unwrap().to_string_lossy();
+    // name NUL length mtime(octal) mode serial files-left bytes-left NUL
+    assert_eq!(String::from_utf8(info).unwrap(), format!("{name}\x006 {:o} 0 0 2 9\x00", 1_700_000_000u64));
 }

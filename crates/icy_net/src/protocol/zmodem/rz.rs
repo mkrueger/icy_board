@@ -1,4 +1,5 @@
 #![allow(clippy::unused_self, clippy::wildcard_imports)]
+use async_trait::async_trait;
 use std::{
     cmp::Ordering,
     io::Write,
@@ -7,12 +8,38 @@ use std::{
 use tempfile::NamedTempFile;
 
 use crate::{
-    Connection,
+    Connection, ConnectionState, ConnectionType,
     crc::{get_crc16_buggy, get_crc16_buggy_zlde, get_crc32, update_crc32},
     protocol::{Header, HeaderType, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, str_from_null_terminated_utf8_unchecked},
 };
 
 use super::{ZBIN, ZBIN32, ZDLE, ZHEX, ZPAD, constants::*, err::ZModemError, frame_types, from_hex, read_zdle_bytes, zrinit_flag::CANFDX};
+
+/// Silence while waiting for ZRQINIT, ZFILE or ZFIN after which ZRINIT is
+/// sent again (lrzsz's rz also waits 10 s per read by default).
+const ZRINIT_RESEND_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Silence inside a file after which the sender is taken to be gone.
+const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Where the receiver is in a session, for a host that shares the
+/// connection with a terminal and must tell protocol bytes from screen output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiverPhase {
+    /// ZRINIT is out; nothing has been heard from the sender yet.
+    Handshake,
+    /// Between files: waiting for ZFILE, or for ZFIN to end the session.
+    BetweenFiles,
+    /// Inside a file, from its ZFILE to its ZEOF. The offset is in
+    /// `TransferState::recieve_state.cur_bytes_transfered`.
+    InFile,
+    /// The session is over: ZFIN was answered and the sender's "OO" read
+    /// (or a second passed without it), or the receiver cancelled or was
+    /// aborted. Any further bytes on the connection are the board's again.
+    /// An `Err` from `update_transfer` does not always get here, for example
+    /// a closed connection inside a file, so treat an error as the end too.
+    Done,
+}
 
 #[derive(Debug)]
 pub enum RecvState {
@@ -76,6 +103,15 @@ impl Rz {
         !matches!(self.state, RecvState::Idle)
     }
 
+    pub fn phase(&self) -> ReceiverPhase {
+        match self.state {
+            RecvState::Idle => ReceiverPhase::Done,
+            RecvState::Await => ReceiverPhase::Handshake,
+            RecvState::SendZRINIT => ReceiverPhase::BetweenFiles,
+            RecvState::AwaitZDATA | RecvState::AwaitFileData | RecvState::AwaitEOF => ReceiverPhase::InFile,
+        }
+    }
+
     pub fn set_receive_limit(&mut self, limit: usize) {
         self.receive_limit = limit;
     }
@@ -89,6 +125,35 @@ impl Rz {
         if let RecvState::Idle = self.state {
             return Ok(());
         }
+        let awaiting_file = matches!(self.state, RecvState::Await | RecvState::SendZRINIT);
+        let limit = if awaiting_file { ZRINIT_RESEND_INTERVAL } else { INACTIVITY_TIMEOUT };
+        let mut watched = Watchdog {
+            com: &mut *com,
+            limit,
+            expired: false,
+        };
+        let result = self.step(&mut watched, transfer_state).await;
+        if !watched.expired {
+            return result;
+        }
+        if awaiting_file && matches!(self.state, RecvState::Await | RecvState::SendZRINIT) {
+            // A lost ZRQINIT or ZRINIT leaves both sides waiting; the retry
+            // limit at the top of step() ends the session if this repeats.
+            self.retries += 1;
+            transfer_state
+                .recieve_state
+                .log_warning(format!("No reply for {} s, resending ZRINIT ({})", limit.as_secs(), self.retries));
+            self.send_zrinit(com).await?;
+            return Ok(());
+        }
+        transfer_state
+            .recieve_state
+            .log_error(format!("Nothing received for {} s, cancelling transfer", limit.as_secs()));
+        self.cancel(com).await?;
+        Err(ZModemError::Timeout(limit.as_secs()).into())
+    }
+
+    async fn step(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if self.retries > 5 {
             transfer_state
                 .recieve_state
@@ -100,15 +165,8 @@ impl Rz {
         transfer_info.check_size = if self.use_crc32 { "CRC32" } else { "CRC16" }.to_string();
         match self.state {
             RecvState::SendZRINIT => {
-                if self.read_header(com, transfer_state).await? {
-                    return Ok(());
-                }
-                /*  let now = Instant::now();
-                 if now.duration_since(self.last_send).unwrap().as_millis() > 3000 {
-                    self.send_zrinit(com)?;
-                    self.retries += 1;
-                    self.last_send = Instant::now();
-                }*/
+                // update_transfer() resends ZRINIT when this read times out.
+                self.read_header(com, transfer_state).await?;
             }
             /*     RecvState::AwaitZDATA => {
                 self.read_header(com, storage_handler, transfer_state)?;
@@ -144,6 +202,9 @@ impl Rz {
                             match zmodem_err {
                                 ZModemError::SubpacketCrcError(_) => (true, "crc"),
                                 ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                // Noise (status text on a pty) can make a subpacket
+                                // overlong: a damaged subpacket, not a fatal one.
+                                ZModemError::SubpacketOverflow(_, _) => (true, "overflow"),
                                 _ => (false, "fatal"),
                             }
                         } else {
@@ -158,6 +219,10 @@ impl Rz {
                                 )),
                                 "decode" => transfer_state.recieve_state.log_warning(format!(
                                     "Invalid byte in subpacket at offset {}, requesting retransmission",
+                                    transfer_state.recieve_state.cur_bytes_transfered
+                                )),
+                                "overflow" => transfer_state.recieve_state.log_warning(format!(
+                                    "Overlong subpacket at offset {}, requesting retransmission",
                                     transfer_state.recieve_state.cur_bytes_transfered
                                 )),
                                 _ => {}
@@ -242,6 +307,7 @@ impl Rz {
         match result {
             Ok(Some(header)) => {
                 self.can_count = 0;
+                self.retries = 0;
 
                 return self.handle_header(com, transfer_state, header).await;
             }
@@ -250,6 +316,9 @@ impl Rz {
             Ok(None) => Ok(false),
 
             Err(err) => {
+                if matches!(err.downcast_ref::<ZModemError>(), Some(ZModemError::Timeout(_))) {
+                    return Err(err);
+                }
                 // A transport EOF/error cannot be repaired by reading another
                 // header. In particular, do not spin after read_u8 reports EOF.
                 if err.downcast_ref::<ZModemError>().is_none() {
@@ -491,6 +560,9 @@ impl Rz {
                             match zerr {
                                 ZModemError::SubpacketCrcError(_) => (true, "crc"),
                                 ZModemError::InvalidSubpacket(_) => (true, "decode"),
+                                // Noise (status text on a pty) can make a subpacket
+                                // overlong: a damaged subpacket, not a fatal one.
+                                ZModemError::SubpacketOverflow(_, _) => (true, "overflow"),
                                 _ => (false, "fatal"),
                             }
                         } else {
@@ -505,6 +577,9 @@ impl Rz {
                                 "decode" => transfer_state
                                     .recieve_state
                                     .log_warning("Decode error in ZFILE info block, requesting retransmission".to_string()),
+                                "overflow" => transfer_state
+                                    .recieve_state
+                                    .log_warning("Overlong ZFILE info block, requesting retransmission".to_string()),
                                 _ => {}
                             }
                             self.errors += 1;
@@ -539,6 +614,16 @@ impl Rz {
                 transfer_state.recieve_state.log_info(format!("ZDATA received at offset {}", offset));
 
                 if self.cur_out_file.is_none() {
+                    // After a file was taken, a ZDATA is a late answer to an earlier
+                    // ZRPOS (the sender's resend was still on its way): stale.
+                    // Ignore it and send ZRINIT again, as for the end of that file.
+                    if self.received_files > 0 {
+                        transfer_state
+                            .recieve_state
+                            .log_warning(format!("Stale ZDATA at offset {} after the file ended, ignored", offset));
+                        self.send_zrinit(com).await?;
+                        return Ok(false);
+                    }
                     transfer_state.recieve_state.log_error("ZDATA received before ZFILE".to_string());
                     self.cancel(com).await?;
                     return Err(ZModemError::ZDataBeforeZFILE.into());
@@ -721,6 +806,55 @@ impl Rz {
     }
 }
 
+/// Bounds each read by `limit`, so a sender that disappears without
+/// cancelling cannot leave the receiver waiting forever.
+struct Watchdog<'a> {
+    com: &'a mut dyn Connection,
+    limit: Duration,
+    expired: bool,
+}
+
+#[async_trait]
+impl Connection for Watchdog<'_> {
+    fn get_connection_type(&self) -> ConnectionType {
+        self.com.get_connection_type()
+    }
+
+    fn take_terminal_size_change(&mut self) -> Option<(u16, u16)> {
+        self.com.take_terminal_size_change()
+    }
+
+    async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        match tokio::time::timeout(self.limit, self.com.read(buf)).await {
+            Ok(result) => result,
+            Err(_) => {
+                self.expired = true;
+                Err(ZModemError::Timeout(self.limit.as_secs()).into())
+            }
+        }
+    }
+
+    async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        self.com.try_read(buf).await
+    }
+
+    async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.com.send(buf).await
+    }
+
+    fn unread(&mut self, buf: &[u8]) -> crate::Result<()> {
+        self.com.unread(buf)
+    }
+
+    async fn poll(&mut self) -> crate::Result<ConnectionState> {
+        self.com.poll().await
+    }
+
+    async fn shutdown(&mut self) -> crate::Result<()> {
+        self.com.shutdown().await
+    }
+}
+
 fn parse_file_info(block: &[u8]) -> Result<(String, u64), ZModemError> {
     // Locate the terminator in the wire bytes, never in the decoded UTF-8
     // string: legacy 8-bit filenames can expand while decoding.
@@ -786,10 +920,20 @@ pub async fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -
         let c = com.read_u8().await?;
         match c {
             ZDLE => {
+                // ZDLE is CAN: ZDLE followed by four more CANs is the abort sequence
+                // (lrzsz zdlread() GOTCAN). Data never carries an unescaped CAN.
+                let mut cans = 1;
                 loop {
                     let c = com.read_u8().await?;
                     match c {
-                        XON | XON_0X80 | XOFF | XOFF_0X80 | ZDLE => {
+                        ZDLE => {
+                            cans += 1;
+                            if cans >= 5 {
+                                return Err(ZModemError::GenericError("Received 5 CAN bytes, transfer cancelled by remote".to_string()).into());
+                            }
+                            continue;
+                        }
+                        XON | XON_0X80 | XOFF | XOFF_0X80 => {
                             continue;
                         }
                         ZRUB0 => return Ok(ZModemResult::Ok(0x7F)),

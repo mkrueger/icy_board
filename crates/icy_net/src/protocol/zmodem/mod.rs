@@ -14,6 +14,7 @@ pub mod sz;
 use sz::Sz;
 
 pub mod rz;
+pub use rz::ReceiverPhase;
 use rz::Rz;
 
 mod err;
@@ -41,6 +42,11 @@ impl Zmodem {
             sz: None,
             rz: None,
         }
+    }
+
+    /// The receiver's phase, or `None` when no receive was started.
+    pub fn receiver_phase(&self) -> Option<rz::ReceiverPhase> {
+        self.rz.as_ref().map(rz::Rz::phase)
     }
 
     fn get_name(&self) -> &str {

@@ -3,7 +3,7 @@ use std::{future::Future, time::Duration};
 use icy_net::{
     Connection,
     connection::channel::ChannelConnection,
-    protocol::{Header, HeaderType, Protocol, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem},
+    protocol::{Header, HeaderType, Protocol, ReceiverPhase, TransferState, ZCRCE, ZCRCG, ZCRCW, ZFrameType, Zmodem, constants::ABORT_SEQ},
 };
 
 async fn bounded<T>(future: impl Future<Output = T>) -> T {
@@ -152,7 +152,7 @@ async fn receiver_accepts_large_streaming_subpackets_independently_of_upload_blo
 }
 
 #[tokio::test]
-async fn receiver_keeps_a_bounded_limit_for_oversized_subpackets() {
+async fn receiver_never_writes_an_oversized_subpacket_and_asks_for_it_again() {
     for block_length in [1024, 8192] {
         for kind in [HeaderType::Bin, HeaderType::Bin32] {
             let (mut protocol, mut state, mut conn, mut peer) = receiver_with_block_length(block_length).await;
@@ -168,22 +168,70 @@ async fn receiver_keeps_a_bounded_limit_for_oversized_subpackets() {
             peer.send(&bytes).await.unwrap();
             bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
             bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+
+            // Text spliced into a subpacket (a program's status output on a pty)
+            // makes it overlong: a damaged subpacket, so ZRPOS, not a fatal error.
             let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
             bytes.extend(encode(ZCRCE, &vec![b'A'; 8193]));
             peer.send(&bytes).await.unwrap();
-            let error = bounded(async {
-                loop {
-                    if let Err(error) = protocol.update_transfer(&mut conn, &mut state).await {
-                        break error;
-                    }
+            bounded(async {
+                while state.recieve_state.warnings == 0 {
+                    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
                 }
             })
             .await;
-            assert_eq!(error.to_string(), "subpacket overflow: length 8193 exceeds max 8192");
+            let rpos = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+            assert_eq!(rpos.frame_type, ZFrameType::RPos);
+            assert_eq!(rpos.number(), 0);
             assert_eq!(state.recieve_state.cur_bytes_transfered, 0, "oversized data is never written");
-            assert!(state.recieve_state.finished_files.is_empty());
+
+            // The resend completes the file.
+            let mut bytes = Header::from_number(ZFrameType::Data, 0).build(kind, false);
+            bytes.extend(encode(ZCRCG, &vec![b'A'; 8192]));
+            bytes.extend(encode(ZCRCE, b"A"));
+            bytes.extend(Header::from_number(ZFrameType::Eof, 8193).build(kind, false));
+            peer.send(&bytes).await.unwrap();
+            bounded(async {
+                while state.recieve_state.finished_files.is_empty() {
+                    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+                }
+            })
+            .await;
+            let path = &state.recieve_state.finished_files[0].1;
+            let received = std::fs::read(path).unwrap();
+            std::fs::remove_file(path).unwrap();
+            assert_eq!(received, vec![b'A'; 8193]);
         }
     }
+}
+
+#[tokio::test]
+async fn an_overlong_zfile_info_block_is_answered_with_znak_and_can_be_resent() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    let mut info = vec![b'n'; 9000];
+    info.extend_from_slice(b"\x00100\x00");
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, &info, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.warnings == 0 {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    let reply = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    assert_eq!(reply.frame_type, ZFrameType::Nak);
+
+    // The sender repeats a ZFILE that fits and the transfer goes on.
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x00100\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.file_name != "name" {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -405,4 +453,191 @@ async fn flow_control_bytes_before_a_header_are_not_errors() {
     .await;
     assert_eq!(state.recieve_state.errors, 0, "{:?}", state.recieve_state.output_log);
     assert_eq!(state.recieve_state.warnings, 0, "{:?}", state.recieve_state.output_log);
+}
+
+#[tokio::test]
+async fn can_abort_inside_file_data_ends_the_transfer() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x00100\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    let reply = bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap();
+    assert_eq!(reply.frame_type, ZFrameType::RPos);
+
+    // ZDATA, part of a subpacket, then the abort a sender such as lrzsz sz
+    // sends when it is interrupted: 8 CAN followed by 10 backspaces.
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend_from_slice(b"partial data");
+    bytes.extend_from_slice(&[0x18; 8]);
+    bytes.extend_from_slice(&[0x08; 10]);
+    peer.send(&bytes).await.unwrap();
+    let result: icy_net::Result<()> = bounded(async {
+        loop {
+            protocol.update_transfer(&mut conn, &mut state).await?;
+            if state.is_finished || state.recieve_state.warnings > 0 {
+                return Ok(());
+            }
+        }
+    })
+    .await;
+    assert!(
+        result.is_err(),
+        "a CAN abort inside a subpacket must end the transfer: {:?}",
+        state.recieve_state.output_log
+    );
+    assert!(state.recieve_state.finished_files.is_empty());
+}
+
+#[tokio::test]
+async fn stale_zdata_after_a_received_file_is_ignored() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x005\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    bytes.extend(Header::from_number(ZFrameType::Eof, 5).build(HeaderType::Bin32, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.finished_files.is_empty() {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+
+    // A resend answering an earlier ZRPOS arrives after the file was closed.
+    let mut bytes = Header::from_number(ZFrameType::Data, 3).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"lo", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+
+    // The session still ends normally.
+    let mut bytes = Header::empty(ZFrameType::Fin).build(HeaderType::Hex, false);
+    bytes.extend_from_slice(b"OO");
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while !state.is_finished {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await;
+    assert_eq!(state.recieve_state.finished_files.len(), 1);
+    let path = &state.recieve_state.finished_files[0].1;
+    assert_eq!(std::fs::read(path).unwrap(), b"hello");
+    std::fs::remove_file(path).unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn silent_sender_gets_zrinit_again_and_then_a_cancel() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let start = tokio::time::Instant::now();
+    let mut sent = Vec::new();
+    // The clock is paused and only advances while every task waits, so this
+    // bound is virtual time; without a receiver timeout it is what fires.
+    tokio::time::timeout(Duration::from_secs(300), async {
+        while !state.is_finished {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+        }
+    })
+    .await
+    .expect("receiver waited forever for a silent sender");
+    assert!(start.elapsed() >= Duration::from_secs(60));
+    let mut buf = [0u8; 256];
+    loop {
+        let n = peer.try_read(&mut buf).await.unwrap();
+        if n == 0 {
+            break;
+        }
+        sent.extend_from_slice(&buf[..n]);
+    }
+    let resends = sent.windows(6).filter(|w| *w == b"**\x18B01").count();
+    assert_eq!(resends, 6);
+    assert!(sent.ends_with(&ABORT_SEQ), "expected a cancel, got {sent:?}");
+}
+
+#[tokio::test(start_paused = true)]
+async fn sender_vanishing_mid_file_ends_the_transfer() {
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"file\x00100\x00", false));
+    peer.send(&bytes).await.unwrap();
+    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+    assert_eq!(Header::read(&mut peer, &mut 0).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+
+    // ZDATA and half a subpacket, then nothing: no ZEOF, no CAN.
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend_from_slice(&Zmodem::encode_subpacket_crc32(ZCRCG, &[b'x'; 100], false)[..50]);
+    peer.send(&bytes).await.unwrap();
+
+    let start = tokio::time::Instant::now();
+    let result = tokio::time::timeout(Duration::from_secs(300), async {
+        loop {
+            if let Err(err) = protocol.update_transfer(&mut conn, &mut state).await {
+                return err;
+            }
+        }
+    })
+    .await
+    .expect("receiver waited forever for a vanished sender");
+    assert!(result.to_string().contains("nothing received"), "{result}");
+    assert!(start.elapsed() >= Duration::from_secs(60));
+    // A later call is a no-op: the receiver is idle.
+    protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+    assert!(state.is_finished);
+    let mut tail = [0u8; 64];
+    let n = peer.try_read(&mut tail).await.unwrap();
+    assert_eq!(&tail[..n], ABORT_SEQ);
+}
+
+#[tokio::test]
+async fn receiver_phase_follows_the_session() {
+    assert_eq!(Zmodem::new(1024).receiver_phase(), None);
+    let (mut protocol, mut state, mut conn, mut peer) = receiver().await;
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::Handshake));
+
+    peer.send(&Header::empty(ZFrameType::RQInit).build(HeaderType::Hex, false)).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RIinit);
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::BetweenFiles));
+
+    let mut bytes = Header::empty(ZFrameType::File).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCW, b"name\x005\x00", false));
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(bounded(Header::read(&mut peer, &mut 0)).await.unwrap().unwrap().frame_type, ZFrameType::RPos);
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::InFile));
+
+    let mut bytes = Header::from_number(ZFrameType::Data, 0).build(HeaderType::Bin32, false);
+    bytes.extend(Zmodem::encode_subpacket_crc32(ZCRCE, b"hello", false));
+    bytes.extend(Header::from_number(ZFrameType::Eof, 5).build(HeaderType::Bin32, false));
+    peer.send(&bytes).await.unwrap();
+    bounded(async {
+        while state.recieve_state.finished_files.is_empty() {
+            protocol.update_transfer(&mut conn, &mut state).await.unwrap();
+            if state.recieve_state.finished_files.is_empty() {
+                assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::InFile));
+            }
+        }
+    })
+    .await;
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::BetweenFiles));
+
+    let mut bytes = Header::empty(ZFrameType::Fin).build(HeaderType::Hex, false);
+    bytes.extend_from_slice(b"OOmenu");
+    peer.send(&bytes).await.unwrap();
+    bounded(protocol.update_transfer(&mut conn, &mut state)).await.unwrap();
+    assert_eq!(protocol.receiver_phase(), Some(ReceiverPhase::Done));
+    // Everything after the session is the board's screen output again.
+    let mut rest = [0u8; 4];
+    bounded(conn.read_exact(&mut rest)).await.unwrap();
+    assert_eq!(&rest, b"menu");
+    for (_, path) in &state.recieve_state.finished_files {
+        std::fs::remove_file(path).unwrap();
+    }
 }

@@ -5,7 +5,7 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek},
     path::PathBuf,
-    time::Duration,
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 use tokio::time::sleep;
@@ -42,7 +42,13 @@ pub struct Sz {
     can_count: usize,
     receiver_capabilities: u8,
     nonstop: bool,
+    last_rpos: Option<(u64, Instant)>,
+    noise: usize,
 }
+
+/// Bytes skipped as noise before a header (status text the receiving
+/// program writes into the same pty) before they count as header errors.
+const MAX_NOISE: usize = 16 * 1024;
 
 impl Sz {
     pub fn new(block_length: usize) -> Self {
@@ -58,6 +64,8 @@ impl Sz {
             can_count: 0,
             package_len: block_length,
             nonstop: true,
+            last_rpos: None,
+            noise: 0,
         }
     }
 
@@ -97,6 +105,23 @@ impl Sz {
             Zmodem::encode_subpacket_crc16(zcrc_byte, data, self.can_esc_control())
         }
     }
+    /// The rest of the ZFILE info after the length: the modification time
+    /// (octal seconds since 1970, 0 if unknown), the file mode and serial
+    /// number (0: none), and the files and bytes left in the batch, this file
+    /// included. Without a date receivers make one up.
+    fn zfile_info(&self, file_size: u64) -> String {
+        let mtime = self
+            .cur_file
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_secs());
+        let files_left = self.file_queue.len() + 1;
+        let bytes_left = file_size + self.file_queue.iter().filter_map(|f| f.metadata().ok()).map(|m| m.len()).sum::<u64>();
+        format!(" {mtime:o} 0 0 {files_left} {bytes_left}")
+    }
+
     fn next_file(&mut self, transfer_state: &mut TransferState) -> crate::Result<bool> {
         if let Some(next_file) = self.file_queue.pop_front() {
             transfer_state.send_state.file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
@@ -110,6 +135,8 @@ impl Sz {
             ));
 
             self.cur_file = next_file.clone();
+            // A ZRPOS for offset 0 of this file is not a repeat of one for the last file.
+            self.last_rpos = None;
             let reader = BufReader::new(File::open(next_file)?);
             self.cur_buf = Some(reader);
             Ok(true)
@@ -288,6 +315,13 @@ impl Sz {
                     // Header, not as a header error: otherwise the error budget
                     // would abort before the fifth consecutive CAN is seen.
                     Some(ZModemError::ZPADExected(0x11 | 0x91 | 0x13 | 0x93 | 0x18)) => return Ok(None),
+                    // Anything else before a ZPAD is noise between frames (such as the
+                    // receiver's status text on a pty): skip it, as receivers skip
+                    // garbage, within a bound.
+                    Some(ZModemError::ZPADExected(_)) if self.noise < MAX_NOISE => {
+                        self.noise += 1;
+                        return Ok(None);
+                    }
                     Some(
                         ZModemError::ZPADExected(_)
                         | ZModemError::ZLDEExected(_)
@@ -316,6 +350,7 @@ impl Sz {
             Ok(header) => {
                 if header.is_some() {
                     self.errors = 0;
+                    self.noise = 0;
                 }
                 Ok(header)
             }
@@ -325,7 +360,7 @@ impl Sz {
     /// Handshakes already wait for a response. Skip boundary flow control and
     /// stale ZRINIT there too, but bound the amount of noise consumed per call.
     async fn read_handshake_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<Option<Header>> {
-        for _ in 0..32 {
+        for _ in 0..(32 + MAX_NOISE) {
             let result = Header::read(com, &mut self.can_count).await;
             if let Some(header) = self.process_header_read(com, transfer_state, result).await? {
                 if header.frame_type != ZFrameType::RIinit {
@@ -427,6 +462,19 @@ impl Sz {
 
             ZFrameType::RPos => {
                 let new_pos = res.number() as u64;
+                // A receiver skipping our stale in-flight stream after its ZRPOS repeats
+                // the ZRPOS (lrzsz: "Garbage count exceeded"). Restarting again for a late
+                // repeat puts a ZDATA header for an old offset into a stream the receiver
+                // has already resynchronised on, and the two sides ping-pong until the
+                // receiver gives up. Honour one ZRPOS per offset per second.
+                if self
+                    .last_rpos
+                    .is_some_and(|(pos, at)| pos == new_pos && at.elapsed() < Duration::from_millis(1000))
+                {
+                    transfer_state.send_state.log_info(format!("Ignoring repeated RPOS for offset {}", new_pos));
+                    return Ok(());
+                }
+                self.last_rpos = Some((new_pos, Instant::now()));
                 transfer_state
                     .send_state
                     .log_info(format!("RPOS received, repositioning to offset {}", new_pos));
@@ -504,7 +552,15 @@ impl Sz {
             let mut b =
                 Header::from_flags(ZFrameType::File, 0, 0, zfile_flag::ZMNEW, zfile_flag::ZCRESUM).build(self.get_header_type(), self.can_esc_control());
 
-            let data = { format!("{}\0{}\0", transfer_state.send_state.file_name, transfer_state.send_state.file_size).into_bytes() };
+            let data = {
+                format!(
+                    "{}\0{}{}\0",
+                    transfer_state.send_state.file_name,
+                    transfer_state.send_state.file_size,
+                    self.zfile_info(transfer_state.send_state.file_size)
+                )
+                .into_bytes()
+            };
 
             b.extend_from_slice(&self.encode_subpacket(ZCRCW, &data));
             com.send(&b).await?;
