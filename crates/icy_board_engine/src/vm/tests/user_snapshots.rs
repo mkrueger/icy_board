@@ -120,8 +120,7 @@ PRINTLN U_CITY, "|", U_ADDR[2]
 }
 
 #[test]
-fn compiled_file_description_flag_round_trips_through_both_of_its_variables() {
-    // U_LONGHDR is the inverse of the stored flag, U_SHORTDESC states it directly.
+fn compiled_long_header_and_short_description_flags_are_independent() {
     let output = tests::run_ppl_on(
         r#"
 GETUSER
@@ -130,6 +129,11 @@ U_LONGHDR = FALSE
 PUTUSER
 GETUSER
 PRINTLN U_LONGHDR, "|", U_SHORTDESC
+U_SHORTDESC = TRUE
+PUTUSER
+GETUSER
+PRINTLN U_LONGHDR, "|", U_SHORTDESC
+U_LONGHDR = TRUE
 U_SHORTDESC = FALSE
 PUTUSER
 GETUSER
@@ -137,10 +141,11 @@ PRINTLN U_LONGHDR, "|", U_SHORTDESC
 "#,
         |board| {
             board.config.paths.user_file = board.root_path.join("users.toml");
+            board.users[0].flags.long_msg_header = true;
             board.users[0].flags.use_short_filedescr = false;
         },
     );
-    assert_eq!(output, "1|0\n0|1\n1|0\n");
+    assert_eq!(output, "1|0\n0|0\n0|1\n1|0\n");
 }
 
 #[tokio::test]

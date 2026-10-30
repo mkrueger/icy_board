@@ -220,6 +220,30 @@ async fn pcboard_users_sys_matches_the_fixed_record_contract() {
 }
 
 #[tokio::test]
+async fn pcboard_users_sys_keeps_message_header_and_file_description_flags_apart() {
+    use crate::icy_board::doors::pcboard::{create_pcboard, read_user_sys};
+    for (long_header, short_descr) in [(true, false), (false, false), (true, true), (false, true)] {
+        let (root, mut state, _peer) = fixture(false).await;
+        let user = state.session.current_user.as_mut().unwrap();
+        user.flags.long_msg_header = long_header;
+        user.flags.use_short_filedescr = short_descr;
+        create_pcboard(&state, root.path()).await.unwrap();
+        let bytes = std::fs::read(root.path().join("USERS.SYS")).unwrap();
+        let record = &bytes[40..];
+        // PackedFlags bit 6 is ShortHeader; Flags (packedbyte2) bit 1 is SingleLines.
+        assert_eq!(record[102] & (1 << 6) != 0, !long_header);
+        assert_eq!(record[201], if short_descr { 1 << 1 } else { 0 });
+
+        let mut returned = User::default();
+        returned.flags.long_msg_header = !long_header;
+        returned.flags.use_short_filedescr = !short_descr;
+        read_user_sys(&mut returned, root.path()).unwrap();
+        assert_eq!(returned.flags.long_msg_header, long_header);
+        assert_eq!(returned.flags.use_short_filedescr, short_descr);
+    }
+}
+
+#[tokio::test]
 #[ignore = "downloads the pinned FreeDOS/BIOS assets and boots the native emulator"]
 async fn dos_first_launch_downloads_assets_and_runs_door() {
     let (root, mut state, mut peer) = fixture(false).await;

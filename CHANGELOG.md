@@ -10,6 +10,10 @@ releases.
 
 ### Fixed
 
+- PPL `U_LONGHDR` and the message-header and file-description flags in door
+  `USERS.SYS` files no longer swap the long message header and short file
+  description settings. `U_LONGHDR` reads and writes the long-header setting,
+  and `USERS.SYS` stores short descriptions in PCBoard's `SingleLines` bit.
 - Conference joins show updated bulletin numbers under one heading instead of
   repeating the notification for each bulletin. Match PCBoard's timestamp
   comparison and skip bulletin lists already scanned in another conference.

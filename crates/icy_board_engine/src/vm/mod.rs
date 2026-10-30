@@ -329,7 +329,7 @@ impl VirtualMachine<'_> {
         self.variable_table
             .set_value(U_SCROLL, VariableValue::new_bool(cur_user.flags.scroll_msg_body))?;
         self.variable_table
-            .set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.use_short_filedescr))?;
+            .set_value(U_LONGHDR, VariableValue::new_bool(cur_user.flags.long_msg_header))?;
 
         self.variable_table.set_value(U_DEF79, VariableValue::new_bool(cur_user.flags.wide_editor))?;
         self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.clone()))?;
@@ -492,11 +492,7 @@ impl VirtualMachine<'_> {
         }
 
         boolean!(U_SCROLL, cur_user.flags.scroll_msg_body);
-        field!(
-            U_LONGHDR,
-            cur_user.flags.use_short_filedescr,
-            !self.variable_table.get_value(U_LONGHDR).as_bool()
-        );
+        boolean!(U_LONGHDR, cur_user.flags.long_msg_header);
         boolean!(U_DEF79, cur_user.flags.wide_editor);
         string!(U_ALIAS, cur_user.alias);
         string!(U_VER, cur_user.verify_answer);

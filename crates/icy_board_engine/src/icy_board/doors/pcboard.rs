@@ -153,7 +153,7 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         if user.flags.scroll_msg_body {
             packet_flag |= 1 << 5;
         }
-        if user.flags.use_short_filedescr {
+        if !user.flags.long_msg_header {
             packet_flag |= 1 << 6;
         }
         if user.flags.wide_editor {
@@ -180,7 +180,8 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
         contents.extend(u32::to_le_bytes(user.stats.total_upld_bytes as u32));
         contents.push(0); //1=delete this record, 0=keep
         contents.extend(u32::to_le_bytes(record_number)); // Record Number in USERS.INF file
-        contents.push(0);
+        // packedbyte2: bit 0 unavailable for chat, bit 1 single-line file descriptions
+        contents.push(if user.flags.use_short_filedescr { 1 << 1 } else { 0 });
         contents.extend(&[0; 8]); // Reserved
         contents.extend(u32::to_le_bytes(user.stats.messages_read as u32));
         contents.extend(u32::to_le_bytes(user.stats.messages_left as u32));
@@ -287,7 +288,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
         FSEMode::No
     };
     user.flags.scroll_msg_body = packet_flag & (1 << 5) != 0;
-    user.flags.use_short_filedescr = packet_flag & (1 << 6) != 0;
+    user.flags.long_msg_header = packet_flag & (1 << 6) == 0;
     user.flags.wide_editor = packet_flag & (1 << 7) != 0;
 
     r.skip(2); // last DIR scan date
@@ -311,7 +312,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     }
     r.skip(1); // delete this record
     r.skip(4); // record number
-    r.skip(1);
+    user.flags.use_short_filedescr = r.u8() & (1 << 1) != 0;
     r.skip(8); // reserved
     user.stats.messages_read = r.u32() as u64;
     user.stats.messages_left = r.u32() as u64;
