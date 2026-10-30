@@ -145,6 +145,130 @@ fn body_lines(raw: &[u8]) -> Vec<usize> {
         .collect()
 }
 
+async fn bulletin_state(local: bool) -> (IcyBoardState, ChannelConnection, tempfile::TempDir) {
+    use crate::icy_board::bulletins::{Bullettin, BullettinList};
+
+    let (mut state, peer) = paging_state(0, local).await;
+    let dir = tempfile::tempdir().unwrap();
+    let mut bulletins = BullettinList::default();
+    let modified = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+    for number in 1..=3 {
+        let path = dir.path().join(format!("blt{number}"));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_times(std::fs::FileTimes::new().set_modified(modified)).unwrap();
+        bulletins.push(Bullettin::new(&path));
+    }
+    let user = state.session.current_user.as_mut().unwrap();
+    user.name = "Ada".into();
+    user.stats.last_on = std::fs::metadata(&bulletins[0].path).unwrap().modified().unwrap().into();
+    state.session.user_name = "Ada".into();
+    state.session.user_command_level.cmd_b = SecurityExpression::default();
+    state.session.current_conference = Conference {
+        name: "ANSI".into(),
+        blt_file: dir.path().join("bulletins.toml"),
+        bulletins: Some(bulletins),
+        ..Default::default()
+    };
+    state.session.current_conference_number = 2;
+    (state, peer, dir)
+}
+
+#[tokio::test]
+async fn bulletin_scan_renders_one_heading_and_one_number_line() {
+    for local in [false, true] {
+        for german in [false, true] {
+            for main_board in [false, true] {
+                let (mut state, mut peer, _dir) = bulletin_state(local).await;
+                let (heading, label, conference, main) = if german {
+                    (
+                        "Neue Bulletins seit dem letzten Anruf, @FIRST@.",
+                        "Neue Bulletins:",
+                        " Konferenz",
+                        "Hauptbereich",
+                    )
+                } else {
+                    (
+                        "Bulletins have been updated since last time on, @FIRST@.",
+                        "New Bulletin(s):",
+                        " Conference",
+                        "Main Board",
+                    )
+                };
+                for (id, text) in [
+                    (IceText::BulletinsUpdated, heading),
+                    (IceText::NewBulletins, label),
+                    (IceText::Conference, conference),
+                    (IceText::Mainboard, main),
+                ] {
+                    state.display_text.update_record_number(id as usize, text).unwrap();
+                }
+                if main_board {
+                    state.session.current_conference_number = 0;
+                }
+                let output = exchange(&mut state, &mut peer, &[], async |state| {
+                    state.scan_new_bulletins().await.unwrap();
+                })
+                .await;
+                let rendered = screen(&output.raw, 25);
+                let rows: Vec<_> = (0..25).map(|y| row(&rendered, y)).collect();
+                let prefix = if main_board { format!("{main} ") } else { format!("ANSI (2){conference} ") };
+                let expected_heading = format!("{prefix}{}", heading.replace("@FIRST@", "Ada"));
+                assert_eq!(rows.iter().filter(|line| **line == expected_heading).count(), 1, "{rows:?}");
+                let heading_row = rows.iter().position(|line| *line == expected_heading).unwrap();
+                assert_eq!(rows[heading_row + 1], format!("{label} 1 2 3"), "{rows:?}");
+                assert_eq!(output.text().matches(label).count(), 1);
+                assert_eq!(rendered.caret.y, heading_row as i32 + 2);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn bulletin_scan_filters_old_missing_and_inaccessible_entries() {
+    let (mut state, mut peer, _dir) = bulletin_state(false).await;
+    let bulletins = state.session.current_conference.bulletins.as_mut().unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&bulletins[0].path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(std::time::UNIX_EPOCH))
+        .unwrap();
+    std::fs::remove_file(&bulletins[1].path).unwrap();
+    bulletins[2].required_security = "FALSE".parse().unwrap();
+    let output = exchange(&mut state, &mut peer, &[], async |state| {
+        state.scan_new_bulletins().await.unwrap();
+    })
+    .await;
+    assert!(!output.text().contains("New Bulletin(s):"));
+    let rendered = screen(&output.raw, 25);
+    assert_eq!(rendered.caret.y, 2, "only the scan's leading and trailing newlines should be emitted");
+}
+
+#[tokio::test]
+async fn bulletin_scan_skips_only_lists_shared_with_other_joined_conferences() {
+    for (joined, same_list, expected) in [(true, true, false), (false, true, true), (true, false, true)] {
+        let (mut state, mut peer, dir) = bulletin_state(false).await;
+        let list = if same_list {
+            state.session.current_conference.blt_file.clone()
+        } else {
+            dir.path().join("other.toml")
+        };
+        state.get_board().await.conferences.push(Conference {
+            blt_file: list,
+            ..Default::default()
+        });
+        state.session.joined_conferences.insert(2);
+        if joined {
+            state.session.joined_conferences.insert(0);
+        }
+        let output = exchange(&mut state, &mut peer, &[], async |state| {
+            state.scan_new_bulletins().await.unwrap();
+        })
+        .await;
+        assert_eq!(output.text().contains("New Bulletin(s): 1 2 3"), expected);
+    }
+}
+
 async fn select_state(local: bool, conferences: usize) -> (IcyBoardState, ChannelConnection) {
     let (mut state, peer) = paging_state(23, local).await;
     state.display_text.update_record_number(IceText::ConferenceNumbers as usize, ENTER).unwrap();

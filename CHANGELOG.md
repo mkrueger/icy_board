@@ -8,6 +8,12 @@ releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Conference joins show updated bulletin numbers under one heading instead of
+  repeating the notification for each bulletin. Match PCBoard's timestamp
+  comparison and skip bulletin lists already scanned in another conference.
+
 ## [0.2.3] - 2026-10-10
 
 Fourth public beta. This release includes the Windows board-creation fix and

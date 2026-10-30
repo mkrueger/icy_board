@@ -2850,6 +2850,30 @@ impl IcyBoardState {
             return Ok(());
         }
 
+        let Some(bulletins) = self.session.current_conference.bulletins.clone() else {
+            return Ok(());
+        };
+        if bulletins.is_empty() {
+            return Ok(());
+        }
+        {
+            let board = self.get_board().await;
+            let list = &self.session.current_conference.blt_file;
+            if !list.as_os_str().is_empty() {
+                let resolved = board.resolve_file(list);
+                if self
+                    .session
+                    .joined_conferences
+                    .iter()
+                    .filter(|number| **number != self.session.current_conference_number)
+                    .filter_map(|number| board.conferences.get(*number as usize))
+                    .any(|conference| !conference.blt_file.as_os_str().is_empty() && board.resolve_file(&conference.blt_file) == resolved)
+                {
+                    return Ok(());
+                }
+            }
+        }
+
         self.reset_color(TerminalTarget::Both).await?;
         self.display_text(IceText::ScanningBulletins, display_flags::LFBEFORE).await?;
 
@@ -2859,10 +2883,7 @@ impl IcyBoardState {
             // If no user context, use a very old date so nothing is considered new
             Utc::now() - chrono::Duration::days(365 * 50)
         };
-        let Some(bulletins) = self.session.current_conference.bulletins.clone() else {
-            return Ok(());
-        };
-
+        let mut displayed = false;
         for (i, b) in bulletins.iter().enumerate() {
             // Skip if bulletin requires higher security
             if !b.required_security.session_can_access(&self.session) {
@@ -2883,28 +2904,24 @@ impl IcyBoardState {
             // Convert SystemTime → DateTime<Utc>
             let modified: chrono::DateTime<Utc> = modified_sys.into();
 
-            // Only list bulletins modified after the previous login
-            if modified > prev_login {
-                /*
-                                let name = path
-                                    .file_name()
-                                    .map(|s| s.to_string_lossy().to_string())
-                                    .unwrap_or_else(|| path.to_string_lossy().to_string());
-                */
-
-                self.backupcleareol(TerminalTarget::Both, self.user_screen.buffer.caret.x as usize).await?;
-                self.new_line().await?;
-                self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
-                self.display_text(IceText::BulletinsUpdated, display_flags::NEWLINE).await?;
-                self.display_text(IceText::NewBulletins, display_flags::DEFAULT).await?;
-                self.println(TerminalTarget::Both, &format!("{}", i + 1)).await?;
+            if modified >= prev_login {
+                if !displayed {
+                    self.backupcleareol(TerminalTarget::Both, self.user_screen.buffer.caret.x as usize).await?;
+                    self.new_line().await?;
+                    self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
+                    self.print(TerminalTarget::Both, "@INCONF@").await?;
+                    self.display_text(IceText::BulletinsUpdated, display_flags::NEWLINE).await?;
+                    self.display_text(IceText::NewBulletins, display_flags::DEFAULT).await?;
+                    displayed = true;
+                }
+                self.print(TerminalTarget::Both, &format!(" {}", i + 1)).await?;
             }
             if self.session.disp_options.abort_printout {
                 break;
             }
-            self.new_line().await?;
         }
         self.session.disp_options.check_display_status();
+        self.new_line().await?;
         Ok(())
     }
 
