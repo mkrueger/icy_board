@@ -10,6 +10,9 @@ releases.
 
 ### Fixed
 
+- The message reader honors the user's long-header preference; `LONG` and
+  `SHORT` still override it for the current reader invocation. New users default
+  to long message headers, matching PCBoard; existing preferences are preserved.
 - PPL `U_LONGHDR` and the message-header and file-description flags in door
   `USERS.SYS` files no longer swap the long message header and short file
   description settings. `U_LONGHDR` reads and writes the long-header setting,

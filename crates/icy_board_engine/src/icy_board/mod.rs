@@ -171,6 +171,7 @@ impl IcyBoard {
         let mut user = user_base::User::default();
         user.set_name(name.to_string());
         user.page_len = 23;
+        user.flags.long_msg_header = true;
         user.security_level = settings.sec_level;
         user.exp_security_level = subscription.default_expired_level;
         user.expiration_date = subscription::new_user_expiration(subscription.is_enabled, subscription.subscription_length, now);
@@ -1312,6 +1313,13 @@ mod tests {
         let board = IcyBoard::new();
         let user = board.new_user_record("New Caller", chrono::Utc::now());
         assert_eq!(user.page_len, 23);
+    }
+
+    #[test]
+    fn new_user_record_defaults_to_long_message_headers() {
+        let board = IcyBoard::new();
+        let user = board.new_user_record("New Caller", chrono::Utc::now());
+        assert!(user.flags.long_msg_header);
     }
 
     #[test]

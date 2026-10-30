@@ -389,7 +389,7 @@ impl MessageViewer {
     }
 
     pub async fn display_header(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader) -> Res<()> {
-        self.display_header_length(state, msg_base, header, HeaderLength::Long).await
+        self.display_header_length(state, msg_base, header, state.message_header_length()).await
     }
 
     async fn display_header_length(&self, state: &mut IcyBoardState, msg_base: &JamMessageBase, header: &JamMessageHeader, length: HeaderLength) -> Res<()> {
@@ -509,6 +509,14 @@ impl MessageViewer {
 }
 
 impl IcyBoardState {
+    fn message_header_length(&self) -> HeaderLength {
+        if self.session.current_user.as_ref().is_none_or(|user| user.flags.long_msg_header) {
+            HeaderLength::Long
+        } else {
+            HeaderLength::Short
+        }
+    }
+
     pub async fn read_msgs_from_base(&mut self, message_base: JamMessageBase, only_personal: bool) -> Res<()> {
         let saved_search = self.session.search_pattern.clone();
         let result = self.read_messages_loop(message_base, only_personal).await;
@@ -518,7 +526,10 @@ impl IcyBoardState {
 
     async fn read_messages_loop(&mut self, mut message_base: JamMessageBase, only_personal: bool) -> Res<()> {
         let viewer = MessageViewer::load(&self.display_text)?;
-        let mut options = ReaderOptions::default();
+        let mut options = ReaderOptions {
+            header: self.message_header_length(),
+            ..Default::default()
+        };
         let mut pending = None;
         while !self.session.disp_options.abort_printout && !self.session.is_logoff_requested() {
             message_base.read_jhr_header()?;
@@ -878,7 +889,10 @@ impl IcyBoardState {
         };
         let saved_search = self.session.search_pattern.clone();
         let result = async {
-            let mut options = ReaderOptions::default();
+            let mut options = ReaderOptions {
+                header: self.message_header_length(),
+                ..Default::default()
+            };
             let mut exit = self
                 .read_command_from_base(message_base, viewer, cmd, &mut options, Some(filter.clone()), false)
                 .await?;

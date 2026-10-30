@@ -269,6 +269,96 @@ async fn bulletin_scan_skips_only_lists_shared_with_other_joined_conferences() {
     }
 }
 
+#[tokio::test]
+async fn message_header_setting_controls_rendered_header_height() {
+    use super::user_commands::messagereader::{MessageViewer, message_filter::MessageFilter};
+    use jamjam::jam::{JamMessage, JamMessageBase};
+
+    for path in ["header", "number", "reader", "reader-long", "reader-short"] {
+        for long in [false, true] {
+            for german in [false, true] {
+                let (mut state, mut peer) = paging_state(0, false).await;
+                state.session.current_user.as_mut().unwrap().flags.long_msg_header = long;
+                if german {
+                    for (id, text) in [
+                        (IceText::MessageDateNumber, "  Datum:                          Nummer:"),
+                        (IceText::MessageToLine, "     An:"),
+                        (IceText::MessageFrom, "    Von:"),
+                        (IceText::MessageSubjectLine, "Betreff:"),
+                    ] {
+                        state.display_text.update_record_number(id as usize, text).unwrap();
+                    }
+                }
+                for (id, text) in [
+                    (IceText::MessageRead, if german { "Gelesen:" } else { "Read:" }),
+                    (
+                        IceText::MessagesConfArea,
+                        if german {
+                            "Konf:                                    Bereich:"
+                        } else {
+                            "Conf:                                    Area:"
+                        },
+                    ),
+                    (IceText::EndOfMessage, ENTER),
+                    (IceText::EndOfMessageExpertmode, ENTER),
+                ] {
+                    state.display_text.update_record_number(id as usize, text).unwrap();
+                }
+                let dir = tempfile::tempdir().unwrap();
+                let mut base = JamMessageBase::create(dir.path().join("mail")).unwrap();
+                base.write_message(
+                    &JamMessage::default()
+                        .with_from("SENDER".into())
+                        .with_to("ALL".into())
+                        .with_subject("SUBJECT".into())
+                        .with_text("[message-body]".into()),
+                )
+                .unwrap();
+                base.write_jhr_header().unwrap();
+                let viewer = MessageViewer::load(&state.display_text).unwrap();
+                let replies = if path == "header" { vec![] } else { vec![(Prompt::Enter, "N\r")] };
+                let output = exchange(&mut state, &mut peer, &replies, async |state| match path {
+                    "header" => {
+                        viewer.display_header(state, &base, &base.read_header(1).unwrap()).await.unwrap();
+                        state.print(TerminalTarget::Both, "[message-body]").await.unwrap();
+                    }
+                    "number" => {
+                        state
+                            .read_message_number(&mut base, &viewer, 1, 1, false, &MessageFilter::default())
+                            .await
+                            .unwrap();
+                    }
+                    "reader" | "reader-long" | "reader-short" => {
+                        state.session.push_tokens(match path {
+                            "reader-long" => "LONG 1",
+                            "reader-short" => "SHORT 1",
+                            _ => "1",
+                        });
+                        state.read_msgs_from_base(base, false).await.unwrap();
+                    }
+                    _ => unreachable!(),
+                })
+                .await;
+                let rendered = screen(&output.raw, 25);
+                let rows: Vec<_> = (0..25).map(|y| row(&rendered, y)).collect();
+                let expected_long = match path {
+                    "reader-long" => true,
+                    "reader-short" => false,
+                    _ => long,
+                };
+                let height = if expected_long { 6 } else { 4 };
+                assert!(rows[height].starts_with("[message-body]"), "{path}, long={long}, german={german}: {rows:?}");
+                assert_eq!(
+                    rows.iter().any(|line| line.starts_with(if german { "Gelesen:" } else { "Read:" })),
+                    expected_long,
+                    "{rows:?}"
+                );
+                assert_eq!(state.session.current_user.as_ref().unwrap().flags.long_msg_header, long);
+            }
+        }
+    }
+}
+
 async fn select_state(local: bool, conferences: usize) -> (IcyBoardState, ChannelConnection) {
     let (mut state, peer) = paging_state(23, local).await;
     state.display_text.update_record_number(IceText::ConferenceNumbers as usize, ENTER).unwrap();
