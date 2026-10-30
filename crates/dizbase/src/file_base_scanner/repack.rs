@@ -228,6 +228,7 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         let Some(name) = member_name(entry.name()) else {
             continue;
         };
+        let is_directory = entry.is_directory();
         // Losing a member to a gap in a decoder would be worse than leaving the archive alone.
         let content = archive.read(&entry)?;
         if content.len() as u64 > options.max_member_size || content.len() as u64 > entry.original_size() {
@@ -235,11 +236,11 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
                 reason: format!("member '{}' expanded beyond its declared size", entry.name()),
             });
         }
-        if options.remove_advertisements && fingerprints.is_match(&name, &content) {
+        if !is_directory && options.remove_advertisements && fingerprints.is_match(&name, &content) {
             removed.push(name);
             continue;
         }
-        if options.remove_advertisements {
+        if !is_directory && options.remove_advertisements {
             let matches = fingerprints.match_text_member(&name, &content);
             if matches.len() > 1 || matches.iter().any(|m| m.action == RuleAction::Review) {
                 return Ok(Repacked::NeedsReview {
@@ -263,7 +264,7 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
                 }
             }
         }
-        let description_result = if options.remove_advertisements {
+        let description_result = if !is_directory && options.remove_advertisements {
             fingerprints.clean_description(&name, &content, MAX_DESCRIPTION_CLEAN_PASSES)
         } else {
             super::description_cleaner::DescriptionCleanResult {
@@ -300,8 +301,12 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         {
             file_options = file_options.last_modified_time(time);
         }
-        zip.start_file(name, file_options)?;
-        zip.write_all(content)?;
+        if is_directory {
+            zip.add_directory(name, file_options)?;
+        } else {
+            zip.start_file(name, file_options)?;
+            zip.write_all(content)?;
+        }
     }
     for addition in additions.into_values() {
         let name = member_name(&addition.name).expect("addition names were validated");
@@ -535,6 +540,83 @@ mod tests {
             assert_eq!(!enabled, archive.by_name("VARIANT.AD").is_ok());
             assert!(archive.by_name("PROGRAM.TXT").is_ok());
         }
+    }
+
+    #[test]
+    fn repack_preserves_directories_and_empty_files() {
+        for add_advertisement in [false, true] {
+            for recompress in [false, true] {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("upload.zip");
+                let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+                let modified = zip::DateTime::from_date_and_time(2026, 10, 30, 11, 42, 0).unwrap();
+                let options = zip::write::SimpleFileOptions::default().last_modified_time(modified);
+                for name in ["test/", "test/empty/", "empty/"] {
+                    zip.add_directory(name, options).unwrap();
+                }
+                zip.start_file("test/test.zip", options).unwrap();
+                zip.write_all(b"\0\xfforiginal payload").unwrap();
+                zip.start_file("zero", options).unwrap();
+                zip.finish().unwrap();
+                let before = fs::read(&path).unwrap();
+                let result = repack_file(
+                    &path,
+                    &FingerprintData::default(),
+                    &RepackOptions {
+                        recompress,
+                        additions: if add_advertisement {
+                            vec![ArchiveAddition {
+                                name: "own.nfo".into(),
+                                content: b"own advertisement".to_vec(),
+                            }]
+                        } else {
+                            Vec::new()
+                        },
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+                if add_advertisement || recompress {
+                    assert!(matches!(result, Repacked::Converted { .. }));
+                } else {
+                    assert!(matches!(result, Repacked::Unchanged));
+                    assert_eq!(before, fs::read(&path).unwrap());
+                }
+                let mut archive = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
+                for name in ["test/", "test/empty/", "empty/"] {
+                    let entry = archive.by_name(name).unwrap();
+                    assert!(entry.is_dir(), "{name}");
+                    assert_eq!(entry.last_modified(), Some(modified));
+                }
+                assert!(archive.by_name("zero").unwrap().is_file());
+                let extracted = tempfile::tempdir().unwrap();
+                archive.extract(extracted.path()).unwrap();
+                assert!(extracted.path().join("test/empty").is_dir());
+                assert!(extracted.path().join("empty").is_dir());
+                assert_eq!(fs::read(extracted.path().join("test/test.zip")).unwrap(), b"\0\xfforiginal payload");
+                assert_eq!(fs::read(extracted.path().join("zero")).unwrap(), b"");
+                assert_eq!(extracted.path().join("own.nfo").is_file(), add_advertisement);
+            }
+        }
+    }
+
+    #[test]
+    fn file_rules_do_not_remove_directories() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("upload.zip");
+        let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+        zip.add_directory("empty/", zip::write::SimpleFileOptions::default()).unwrap();
+        zip.start_file("empty.nfo", zip::write::SimpleFileOptions::default()).unwrap();
+        zip.finish().unwrap();
+        let fingerprints = rules("[[fingerprint]]\npattern = '.*'\nkeywords = ['']\n");
+        let result = repack_file(&path, &fingerprints, &RepackOptions::default()).unwrap();
+        let Repacked::Converted { removed, .. } = result else {
+            panic!("expected repacked archive");
+        };
+        assert_eq!(removed, ["empty.nfo"]);
+        let mut archive = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
+        assert_eq!(archive.len(), 1);
+        assert!(archive.by_name("empty/").unwrap().is_dir());
     }
 
     #[test]

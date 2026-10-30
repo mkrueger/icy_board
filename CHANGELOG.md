@@ -10,6 +10,9 @@ releases.
 
 ### Fixed
 
+- Upload processing preserves directory entries when rewriting archives, including
+  when adding an own advertisement. Subdirectories no longer become empty files
+  that prevent extraction of their contents (#37).
 - The message reader honors the user's long-header preference; `LONG` and
   `SHORT` still override it for the current reader invocation. New users default
   to long message headers, matching PCBoard; existing preferences are preserved.

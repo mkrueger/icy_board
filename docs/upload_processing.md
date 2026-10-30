@@ -138,6 +138,9 @@ uses the ZIP writer, so a supported non-ZIP archive is converted to ZIP even
 when unconditional ZIP repacking is disabled. Unsupported non-archive uploads
 are not wrapped in ZIP merely to add advertising.
 
+ZIP rewrites preserve directory entries, including empty directories.
+Advertisement-removal rules apply to files, not directory entries.
+
 ## PPE invocation contract
 
 The generator runs once per processing attempt, in a separate headless

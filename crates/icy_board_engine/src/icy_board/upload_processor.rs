@@ -388,6 +388,38 @@ mod tests {
         (quarantine, record)
     }
 
+    #[tokio::test]
+    async fn upload_advertisement_preserves_extractable_subdirectories() {
+        for repack in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let advertisement = root.path().join("own.nfo");
+            std::fs::write(&advertisement, b"own advertisement").unwrap();
+            let config = UploadProcessingConfig {
+                publish_policy: UploadPublishPolicy::AfterProcessing,
+                quarantine_path: root.path().join("quarantine"),
+                remove_advertisements: false,
+                repack_to_zip: repack,
+                advertisement_file: advertisement,
+                ..Default::default()
+            };
+            let (quarantine, record) = queued_zip(root.path(), &config, false);
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(quarantine.payload_path(&record)).unwrap());
+            zip.add_directory("test/", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.add_directory("test/empty/", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.start_file("test/payload.bin", zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(b"\0\xfforiginal payload").unwrap();
+            zip.finish().unwrap();
+            let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+            assert_eq!(processed.status, QuarantineStatus::ReadyToPublish, "{:?}", processed.processing_report);
+            let mut archive = zip::ZipArchive::new(std::fs::File::open(quarantine.payload_path(&processed)).unwrap()).unwrap();
+            let extracted = tempfile::tempdir().unwrap();
+            archive.extract(extracted.path()).unwrap();
+            assert!(extracted.path().join("test/empty").is_dir());
+            assert_eq!(std::fs::read(extracted.path().join("test/payload.bin")).unwrap(), b"\0\xfforiginal payload");
+            assert_eq!(std::fs::read(extracted.path().join("own.nfo")).unwrap(), b"own advertisement");
+        }
+    }
+
     #[test]
     fn upload_log_message_escapes_all_untrusted_fields() {
         let message = upload_log_message("UPLOAD\n\r\x1b[31m.ZIP", "id\nforged", "removed member: ad\n.txt\r\0\x1b[2J");
