@@ -55,7 +55,7 @@ impl IcyBoardCreator {
         fs::create_dir_all(self.destination.join("main"))?;
         fs::create_dir_all(self.destination.join("art/help"))?;
 
-        self.logger.start_action("Creating main configuration… at {}".to_string());
+        self.logger.start_action("Creating main configuration…".to_string());
 
         let mut config = IcbConfig::new();
         config.board.allow_iemsi = false;

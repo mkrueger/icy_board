@@ -517,9 +517,11 @@ fn tree_snapshot(root: &std::path::Path) -> Vec<(std::path::PathBuf, Option<Vec<
         .into_iter()
         .map(|entry| {
             let entry = entry.unwrap();
+            // Windows denies reads of the byte-range-locked board lock file while it is held.
+            let readable = entry.file_type().is_file() && entry.file_name() != icy_board_engine::icy_board::lock::LOCK_FILE_NAME;
             (
                 entry.path().strip_prefix(root).unwrap().to_path_buf(),
-                entry.file_type().is_file().then(|| fs::read(entry.path()).unwrap()),
+                readable.then(|| fs::read(entry.path()).unwrap()),
             )
         })
         .collect::<Vec<_>>();

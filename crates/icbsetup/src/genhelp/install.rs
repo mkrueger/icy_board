@@ -244,6 +244,10 @@ fn resolve_directory(base: &Path, path: &Path) -> Res<PathBuf> {
             }
             _ => result.push(part.as_os_str()),
         }
+        // A bare Windows drive prefix such as `\\?\C:` is not a directory that can be inspected.
+        if matches!(part, Component::Prefix(_)) {
+            continue;
+        }
         if let Some(meta) = metadata(&result)? {
             if !meta.is_dir() {
                 return Err(format!("Not a directory: {}", result.display()).into());
@@ -316,8 +320,17 @@ fn durable_write(path: &Path, bytes: &[u8], permissions: Option<&Permissions>) -
     if let Some(permissions) = permissions {
         permissions.apply(path)?;
     }
-    fs::File::open(path)?.sync_all()?;
+    sync_file(path)?;
     sync_directory(path.parent().ok_or("Missing file parent")?)
+}
+
+fn sync_file(path: &Path) -> Res<()> {
+    #[cfg(unix)]
+    fs::File::open(path)?.sync_all()?;
+    // FlushFileBuffers needs write access, which read-only targets deny; write_atomic already flushed the data.
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
 }
 
 fn durable_remove(path: &Path) -> Res<()> {
@@ -808,7 +821,12 @@ mod tests {
         let path = root.join("help/hlpa.pcb");
         let stamp = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
         for file in [&path, &root.join("main").join(LEDGER)] {
-            fs::File::open(file).unwrap().set_times(fs::FileTimes::new().set_modified(stamp)).unwrap();
+            fs::OpenOptions::new()
+                .write(true)
+                .open(file)
+                .unwrap()
+                .set_times(fs::FileTimes::new().set_modified(stamp))
+                .unwrap();
         }
         let modified = fs::metadata(&path).unwrap().modified().unwrap();
         let old_ledger = fs::read(root.join("main").join(LEDGER)).unwrap();

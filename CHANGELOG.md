@@ -8,6 +8,22 @@ releases.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-01
+
+### Fixed
+
+- `icbsetup create` no longer fails with "Access is denied" when installing
+  default help on Windows.
+- `icbsetup genhelp` handles Windows verbatim drive prefixes when resolving
+  help installation paths.
+- Release builds install the required system dependencies.
+- Ubuntu font lookup recognizes the symbols font family name.
+
+### Changed
+
+- Windows CI runs the `icbsetup` unit and CLI tests in addition to embedded help
+  tests.
+
 ## [0.3.0] - 2026-10-31
 
 This beta release adds Kermit transfers and a searchable reference guide, and
@@ -1002,7 +1018,8 @@ First public beta of IcyBoard 0.2.
 Last release before the 0.2 beta series. Earlier release history is available
 from the repository tags and GitHub Releases.
 
-[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/mkrueger/icy_board/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/mkrueger/icy_board/compare/0.2.3...0.3.0
 [0.2.3]: https://github.com/mkrueger/icy_board/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/mkrueger/icy_board/compare/0.2.1...0.2.2

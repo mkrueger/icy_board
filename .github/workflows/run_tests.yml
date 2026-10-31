@@ -51,6 +51,8 @@ jobs:
         fi
     - name: Run the embedded help tests
       run: cargo test -p icy_board_help --locked
+    - name: Run the setup tests
+      run: cargo test -p icbsetup --locked
 
   # macOS is a release target as well, and its default filesystem is case
   # insensitive, which no other runner would show.
