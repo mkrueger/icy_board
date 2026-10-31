@@ -216,7 +216,9 @@ latex_elements = {
 \setmainfont{DejaVu Sans}
 \setsansfont{DejaVu Sans}
 \setmonofont{DejaVu Sans Mono}[Scale=0.85]
-\newfontfamily\icbsymbols{Noto Sans Symbols 2}
+\IfFontExistsTF{Noto Sans Symbols 2}
+  {\newfontfamily\icbsymbols{Noto Sans Symbols 2}}
+  {\newfontfamily\icbsymbols{Noto Sans Symbols2}}
 \newfontfamily\icbcjk{Droid Sans Fallback}
 \newunicodechar{⎀}{{\ttfamily\symbol{"2380}}}
 \newunicodechar{␛}{{\icbsymbols\symbol{"241B}}}

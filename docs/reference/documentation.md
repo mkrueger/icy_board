@@ -59,6 +59,8 @@ Fallback and the `newunicodechar` LaTeX package. Installing the Python
 requirements alone is not enough. On distributions with split TeX packages,
 install `newunicodechar` through the distribution package manager; it is part
 of `texlive-latex-extra` in the Ubuntu release build.
+The symbols font family may be `Noto Sans Symbols 2` or `Noto Sans Symbols2`;
+the LaTeX configuration supports both packaged names.
 PDF output is useful for printing; HTML is preferable for searching large
 function tables and following cross-references.
 
