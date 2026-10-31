@@ -140,15 +140,11 @@ pub async fn create_user_sys(state: &IcyBoardState, path: &std::path::Path, tpa_
             packet_flag |= 1 << 1;
         }
 
-        match user.flags.fse_mode {
-            FSEMode::Yes => {
-                packet_flag |= 1 << 3;
-                packet_flag |= 1 << 4;
-            }
-            FSEMode::No => {
-                packet_flag |= 1 << 3;
-            }
-            FSEMode::Ask => {}
+        if !matches!(user.flags.fse_mode, FSEMode::Ask) {
+            packet_flag |= 1 << 3;
+        }
+        if user.flags.pcboard_fse_default() {
+            packet_flag |= 1 << 4;
         }
         if user.flags.scroll_msg_body {
             packet_flag |= 1 << 5;
@@ -280,13 +276,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     }
     let packet_flag = r.u8();
     user.flags.msg_clear = packet_flag & (1 << 1) != 0;
-    user.flags.fse_mode = if packet_flag & (1 << 3) == 0 {
-        FSEMode::Ask
-    } else if packet_flag & (1 << 4) != 0 {
-        FSEMode::Yes
-    } else {
-        FSEMode::No
-    };
+    user.flags.set_pcboard_fse_flags(packet_flag & (1 << 3) != 0, packet_flag & (1 << 4) != 0);
     user.flags.scroll_msg_body = packet_flag & (1 << 5) != 0;
     user.flags.long_msg_header = packet_flag & (1 << 6) == 0;
     user.flags.wide_editor = packet_flag & (1 << 7) != 0;

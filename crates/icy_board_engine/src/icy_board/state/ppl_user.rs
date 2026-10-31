@@ -585,7 +585,7 @@ impl UserDataValue for PplUser {
         } else if *name == *EXPERT_MODE {
             user.flags.expert_mode = val.as_bool();
         } else if *name == *EDITOR_MODE {
-            user.flags.fse_mode = editor_mode_from_int(val.as_int());
+            user.flags.set_fse_mode(editor_mode_from_int(val.as_int()));
         } else if *name == *CLEAR_SCREEN {
             user.flags.msg_clear = val.as_bool();
         } else if *name == *SCROLL_MESSAGE_BODY {

@@ -195,13 +195,13 @@ impl IcyBoardState {
                 .await?;
             match fse_default.as_str() {
                 "Y" => {
-                    new_user.flags.fse_mode = FSEMode::Yes;
+                    new_user.flags.set_fse_mode(FSEMode::Yes);
                 }
                 "N" => {
-                    new_user.flags.fse_mode = FSEMode::No;
+                    new_user.flags.set_fse_mode(FSEMode::No);
                 }
                 "A" => {
-                    new_user.flags.fse_mode = FSEMode::Ask;
+                    new_user.flags.set_fse_mode(FSEMode::Ask);
                 }
                 _ => {}
             }

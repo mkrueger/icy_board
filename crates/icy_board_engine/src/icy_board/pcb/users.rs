@@ -117,7 +117,8 @@ pub struct PcbUserRecord {
     pub exp_date: IcbDate,
     // unsigned short LastConference;     ///  Number of the conference the caller was in
     pub delete_flag: bool,
-    pub rec_num: u32,
+    /// Zero-based USERS.INF index; None means the source has no extended record.
+    pub rec_num: Option<u32>,
 
     pub last_conference: u16,
 
@@ -137,11 +138,18 @@ pub struct PcbUserRecord {
 impl PcbUserRecord {
     pub const RECORD_SIZE: u64 = 0x190;
 
+    pub fn inf_record<'a>(&self, records: &'a [super::user_inf::PcbUserInf]) -> Option<&'a super::user_inf::PcbUserInf> {
+        self.rec_num.and_then(|index| records.get(index as usize))
+    }
+
     /// # Errors
     pub fn read_users(path: &Path) -> Res<Vec<PcbUserRecord>> {
         let mut users = Vec::new();
 
         let data = fs::read(path)?;
+        if data.len() % Self::RECORD_SIZE as usize != 0 {
+            return Err("Truncated PCBoard USERS record".into());
+        }
 
         let mut data = &data[..];
         while !data.is_empty() {
@@ -257,7 +265,7 @@ impl PcbUserRecord {
             }
 
             // The pointer is 1-based; 0 marks a record without a USERS.INF entry.
-            let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]).saturating_sub(1);
+            let rec_num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]).checked_sub(1);
             data = &data[4..];
 
             // flags 2
@@ -458,7 +466,11 @@ impl PcbUserRecord {
         }
 
         // Record number - 4 bytes (little endian, 1-based)
-        writer.write_all(&(self.rec_num + 1).to_le_bytes())?;
+        let rec_num = match self.rec_num {
+            Some(index) => index.checked_add(1).ok_or("Invalid USERS.INF index")?,
+            None => 0,
+        };
+        writer.write_all(&rec_num.to_le_bytes())?;
 
         // Flags2 - 1 byte
         let mut flags2 = 0u8;

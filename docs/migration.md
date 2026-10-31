@@ -66,6 +66,23 @@ Configured source paths that do not exist are retained rather than guessed or
 deleted. The importer warns with both the original value and the location it
 searched, and lists the original path under `Unresolved paths` for manual review.
 
+### User records
+
+The importer uses each `USERS` record's one-based pointer to join its matching
+`USERS.INF` record. A zero or out-of-range pointer imports only the basic record,
+never another user's extended information. If `USERS.INF` is missing or not configured, basic
+users are still imported with warnings; the report counts users whose extended
+information could not be recovered.
+
+Editor prompting and its default answer are preserved independently. Conference
+registration, expiry, scan selection and read pointers include conferences above
+39; mail-waiting and conference-sysop flags are also retained. Unknown application
+allocations, and supported allocations with per-conference data, are preserved
+in the user's [third-party records](configuration/data.md#third-party-application-records).
+An application without a keyword is stored under its application name, with a
+warning. This preserves its bytes but cannot infer how its PPE expects to be
+invoked.
+
 ## 4. Validate paths
 
 Icy Board is designed around paths relative to `icboard.toml`. Relative paths

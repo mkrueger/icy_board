@@ -283,22 +283,10 @@ impl VirtualMachine<'_> {
         }
         let cur_user = &self.user;
         self.variable_table.set_value(U_EXPERT, VariableValue::new_bool(cur_user.flags.expert_mode))?;
-        match cur_user.flags.fse_mode {
-            FSEMode::Yes => {
-                // U_FSE = FSEDefault, U_FSEP = !DontAskFSE. "Yes" means always use the
-                // full screen editor without asking, so U_FSEP (ask) must be false.
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(true))?;
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false))?;
-            }
-            FSEMode::Ask => {
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false))?;
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(true))?;
-            }
-            FSEMode::No => {
-                self.variable_table.set_value(U_FSE, VariableValue::new_bool(false))?;
-                self.variable_table.set_value(U_FSEP, VariableValue::new_bool(false))?;
-            }
-        }
+        self.variable_table
+            .set_value(U_FSE, VariableValue::new_bool(cur_user.flags.pcboard_fse_default()))?;
+        self.variable_table
+            .set_value(U_FSEP, VariableValue::new_bool(matches!(cur_user.flags.fse_mode, FSEMode::Ask)))?;
         self.variable_table.set_value(U_CLS, VariableValue::new_bool(cur_user.flags.msg_clear))?;
 
         self.variable_table.set_value(
@@ -443,13 +431,9 @@ impl VirtualMachine<'_> {
         }
         boolean!(U_EXPERT, cur_user.flags.expert_mode);
         if self.user_variable_changed(U_FSE, None) || self.user_variable_changed(U_FSEP, None) {
-            cur_user.flags.fse_mode = if self.variable_table.get_value(U_FSE).as_bool() {
-                FSEMode::Yes
-            } else if self.variable_table.get_value(U_FSEP).as_bool() {
-                FSEMode::Ask
-            } else {
-                FSEMode::No
-            };
+            cur_user
+                .flags
+                .set_pcboard_fse_flags(!self.variable_table.get_value(U_FSEP).as_bool(), self.variable_table.get_value(U_FSE).as_bool());
         }
         boolean!(U_CLS, cur_user.flags.msg_clear);
         field!(

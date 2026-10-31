@@ -98,6 +98,42 @@ PRINTLN U_CITY, "|", U_CMNT1, "|", U_NOTES[0], "|", U_NOTES[1], "|", U_ALIAS, "|
 }
 
 #[test]
+fn compiled_user_variables_preserve_independent_fse_prompt_and_default_flags() {
+    for dont_ask in [false, true] {
+        for default in [false, true] {
+            let output = tests::run_ppl_on(
+                r#"
+GETUSER
+PRINTLN U_FSE, "|", U_FSEP
+U_CITY = "Hamburg"
+PUTUSER
+GETUSER
+PRINTLN U_FSE, "|", U_FSEP
+U_FSE = !U_FSE
+U_FSEP = TRUE
+PUTUSER
+GETUSER
+PRINT U_FSE, "|", U_FSEP, "|", Session.User.EditorMode
+"#,
+                |board| {
+                    board.config.paths.user_file = board.root_path.join("users.toml");
+                    board.users[0].flags.set_pcboard_fse_flags(dont_ask, default);
+                },
+            );
+            let expected = format!(
+                "{}|{}\n{}|{}\n{}|1|2",
+                u8::from(default),
+                u8::from(!dont_ask),
+                u8::from(default),
+                u8::from(!dont_ask),
+                u8::from(!default)
+            );
+            assert_eq!(output, expected, "dont_ask={dont_ask}, default={default}");
+        }
+    }
+}
+
+#[test]
 fn compiled_city_writes_back_through_either_of_its_two_variables() {
     let output = tests::run_ppl_on(
         r#"

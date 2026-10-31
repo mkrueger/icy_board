@@ -237,7 +237,7 @@ impl UserEditor {
                             .with_edit_width(1)
                             .with_update_text_value(&|board: &Arc<Mutex<User>>, value: String| {
                                 let mut user = board.lock().unwrap();
-                                user.flags.fse_mode = FSEMode::from_pcboard(&value);
+                                user.flags.set_fse_mode(FSEMode::from_pcboard(&value));
                             }),
                         ),
                         ConfigEntry::Item(

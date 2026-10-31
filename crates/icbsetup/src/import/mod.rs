@@ -1627,13 +1627,19 @@ impl PCBoardImporter {
             self.logger.log(&format!("Can't find user file {}", usr_file.display()));
             UserBase::default()
         } else {
+            let inf_configured = !inf_file.is_empty();
             let inf_file = self.resolve_file(inf_file);
-            if !inf_file.exists() {
+            let user_inf = if inf_configured && inf_file.exists() {
+                PcbUserInf::read_users(&inf_file)?
+            } else {
                 self.logger.log(&format!("Can't find user information file {}", inf_file.display()));
-                return Ok(PathBuf::new());
-            }
+                self.output.warning(format!(
+                    "Can't find user information file {} - importing USERS with defaults.",
+                    inf_file.display()
+                ));
+                Vec::new()
+            };
             let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
-            let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 
             let mut missing_inf = 0;
             let pcb_users = users
@@ -1641,7 +1647,7 @@ impl PCBoardImporter {
                 .map(|u| PcbUser {
                     user: u.clone(),
                     // A packed or crashed board can leave USERS.INF shorter than USERS.
-                    inf: user_inf.get(u.rec_num as usize).cloned().unwrap_or_else(|| {
+                    inf: u.inf_record(&user_inf).cloned().unwrap_or_else(|| {
                         missing_inf += 1;
                         PcbUserInf::default()
                     }),

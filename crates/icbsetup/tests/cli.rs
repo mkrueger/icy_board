@@ -11,6 +11,9 @@ use icy_board_engine::icy_board::{
     lock::BoardLock,
 };
 
+#[path = "../../icy_board_engine/tests/fixtures/pcboard_users.rs"]
+mod pcboard_users;
+
 fn temp_dir(name: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
     std::env::temp_dir().join(format!("icbsetup-{name}-{}-{nonce}", std::process::id()))
@@ -321,6 +324,124 @@ fn import_refuses_an_existing_destination() {
     assert!(!status.success());
     assert_eq!(fs::read(output.join("keep")).unwrap(), b"untouched");
     fs::remove_dir_all(output).unwrap();
+}
+
+fn pcboard_user_source(root: &std::path::Path, users: Vec<u8>, inf: Option<Vec<u8>>) -> std::path::PathBuf {
+    use icy_board_engine::{
+        icy_board::{
+            icb_text::IcbTextFile,
+            pcb::{pcbconferences::PcbConferenceHeader, pcboard_data::PcbBoardData},
+        },
+        parser::Encoding,
+    };
+    let source = root.join("source");
+    fs::create_dir_all(source.join("HELP")).unwrap();
+    let mut data = PcbBoardData::default();
+    data.num_conf = 49;
+    data.path.help_loc = "HELP".into();
+    data.path.text_loc = ".".into();
+    data.path.usr_file = "USERS".into();
+    data.path.inf_file = "USERS.INF".into();
+    data.path.conference_file = "CNAMES".into();
+    data.path.protocol_data_file = "PROTOCOL.MISSING".into();
+    data.path.pcml_dat_file = "LANGUAGE.MISSING".into();
+    data.path.pwrd_file = "PWRD.MISSING".into();
+    data.path.stats_file = "STATS.MISSING".into();
+    data.path.color_file = "COLOR.MISSING".into();
+    fs::write(source.join("PCBOARD.DAT"), data.serialize(Encoding::CP437)).unwrap();
+    let mut conferences = Vec::new();
+    for conference in 0..50 {
+        conferences.extend(
+            PcbConferenceHeader {
+                name: format!("Conference {conference}"),
+                public_conference: true,
+                ..Default::default()
+            }
+            .serialize(),
+        );
+    }
+    fs::write(source.join("CNAMES"), conferences).unwrap();
+    IcbTextFile::default().export_pcboard_format(&source.join("PCBTEXT")).unwrap();
+    fs::write(source.join("USERS"), users).unwrap();
+    if let Some(inf) = inf {
+        fs::write(source.join("USERS.INF"), inf).unwrap();
+    }
+    source.join("PCBOARD.DAT")
+}
+
+#[test]
+fn pcboard_import_preserves_basic_users_without_borrowing_other_inf_records() {
+    use icy_board_engine::icy_board::user_base::FSEMode;
+    for locale in ["en", "de"] {
+        for case in ["zero", "out-of-range", "max-pointer", "missing-file", "unconfigured-inf", "healthy", "extended"] {
+            let root = tempfile::tempdir().unwrap();
+            let (users, inf) = match case {
+                "zero" | "out-of-range" | "max-pointer" => {
+                    let pointer = match case {
+                        "zero" => 0,
+                        "max-pointer" => u32::MAX,
+                        _ => 2,
+                    };
+                    let mut users = pcboard_users::users_record("FIRST", pointer);
+                    users.extend(pcboard_users::users_record("SECOND", 1));
+                    (users, Some(pcboard_users::basic_inf("SECOND", "SECONDALIAS")))
+                }
+                "missing-file" | "unconfigured-inf" => (pcboard_users::users_record("FIRST", 1), None),
+                "healthy" => (pcboard_users::users_record("FIRST", 1), Some(pcboard_users::basic_inf("FIRST", "FIRSTALIAS"))),
+                "extended" => (pcboard_users::users_record("EXTENDED", 1), Some(pcboard_users::extended_inf())),
+                _ => unreachable!(),
+            };
+            let source = pcboard_user_source(root.path(), users, inf);
+            if case == "unconfigured-inf" {
+                let mut data = icy_board_engine::icy_board::pcb::pcboard_data::PcbBoardData::import_pcboard(&source).unwrap();
+                data.path.inf_file.clear();
+                fs::write(&source, data.serialize(icy_board_engine::parser::Encoding::CP437)).unwrap();
+            }
+            let destination = root.path().join("migrated");
+            let output = icbsetup()
+                .env("LANG", locale)
+                .env("LC_ALL", locale)
+                .env("LANGUAGE", locale)
+                .arg("import")
+                .arg(&source)
+                .arg(&destination)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{locale}/{case}: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let board = IcyBoard::load(&destination.join("icboard.toml")).unwrap();
+            assert_eq!(board.users[0].security_level, 42, "{locale}/{case}");
+            assert!(board.users[0].password.password.is_valid("SECRET"));
+            assert_eq!(board.users[0].flags.fse_mode, FSEMode::Ask);
+            assert_eq!(board.users[0].flags.fse_default, Some(true));
+            if matches!(case, "zero" | "out-of-range" | "max-pointer" | "missing-file" | "unconfigured-inf") {
+                assert!(board.users[0].alias.is_empty(), "{locale}/{case}");
+                assert_eq!(board.users[0].stats.messages_read, 0);
+                let report = fs::read_to_string(destination.join("import_report.txt")).unwrap();
+                assert!(report.contains("Users without USERS.INF record 1"), "{report}");
+            }
+            if matches!(case, "zero" | "out-of-range" | "max-pointer") {
+                assert_eq!(board.users.len(), 2);
+                assert_eq!(board.users[1].alias, "SECONDALIAS");
+                assert_eq!(board.users[1].stats.messages_read, 4321);
+            } else {
+                assert_eq!(board.users.len(), 1);
+            }
+            if case == "healthy" {
+                assert_eq!(board.users[0].alias, "FIRSTALIAS");
+            }
+            if case == "extended" {
+                assert_eq!(board.users[0].lastread_ptr_flags[&(49, 0)].last_read, (u32::MAX - 1) as usize);
+                assert_eq!(board.users[0].get_tpa("AUDIT").chars().count(), 256);
+                assert_eq!(board.users[0].get_conference_tpa("QWKCFG", 49), "1");
+                assert_eq!(board.users[0].qwk_config.as_ref().unwrap().max_msgs, 800);
+            }
+        }
+    }
 }
 
 #[test]

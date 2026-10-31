@@ -104,7 +104,7 @@ pub fn merge_user(baseline: &User, edited: &User, latest: &User, mode: UserUpdat
         let latest = &latest.flags;
         let mut flags = latest.clone();
         fields!(flags, baseline, edited, latest, mode, "flags.";
-            expert_mode, is_dirty, msg_clear, has_mail, fse_mode, scroll_msg_body,
+            expert_mode, is_dirty, msg_clear, has_mail, fse_mode, fse_default, scroll_msg_body,
             use_short_filedescr, long_msg_header, wide_editor, use_graphics, use_alias,
         );
         merged.flags = flags;

@@ -3,9 +3,12 @@ use std::collections::HashMap;
 use chrono::{DateTime, NaiveDate};
 use icy_board_engine::{
     datetime::*,
-    icy_board::{PcbUser, icb_config::*, user_base::*, user_inf::*, users::*},
+    icy_board::{IcyBoardSerializer, PcbUser, icb_config::*, user_base::*, user_inf::*, users::*},
 };
 use tempfile::TempDir;
+
+#[path = "fixtures/pcboard_users.rs"]
+mod pcboard_users;
 
 fn create_test_user(name: &str, idx: u8) -> User {
     let mut user = User {
@@ -62,6 +65,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
                 1 => FSEMode::No,
                 _ => FSEMode::Ask,
             },
+            fse_default: None,
             scroll_msg_body: idx % 2 == 1,
             use_short_filedescr: idx % 3 == 1,
             long_msg_header: idx % 4 == 1,
@@ -293,6 +297,7 @@ fn test_export_import_single_user() {
     assert_eq!(imported_user.web, user.web);
     assert_eq!(imported_user.security_level, user.security_level);
     assert_eq!(imported_user.exp_security_level, user.exp_security_level);
+    assert_eq!(imported_user.qwk_config, user.qwk_config);
 
     // Verify password info
     assert_eq!(imported_user.password.password.to_string(), user.password.password.to_string());
@@ -595,7 +600,7 @@ fn test_missing_users_inf_pointer_is_tolerated() {
     let temp_dir = TempDir::new().unwrap();
     let users_file = temp_dir.path().join("USERS");
     std::fs::write(&users_file, vec![0; PcbUserRecord::RECORD_SIZE as usize]).unwrap();
-    assert_eq!(PcbUserRecord::read_users(&users_file).unwrap()[0].rec_num, 0);
+    assert_eq!(PcbUserRecord::read_users(&users_file).unwrap()[0].rec_num, None);
 }
 
 /// The optional USERS.INF sections are written whenever any of their fields is
@@ -629,4 +634,200 @@ fn test_optional_inf_sections_keep_their_dates() {
     assert_eq!(imported[0].birth_date, user.birth_date);
     assert_eq!(imported[0].password.expire_date.date_naive(), user.password.expire_date.date_naive());
     assert_eq!(imported[0].password.last_change.date_naive(), user.password.last_change.date_naive());
+}
+
+#[test]
+fn test_zero_pointer_does_not_attach_the_first_inf_record() {
+    let root = TempDir::new().unwrap();
+    let users_path = root.path().join("USERS");
+    let inf_path = root.path().join("USERS.INF");
+    let mut data = pcboard_users::users_record("NO INF", 0);
+    data.extend(pcboard_users::users_record("SECOND", 1));
+    std::fs::write(&users_path, data).unwrap();
+    std::fs::write(&inf_path, pcboard_users::basic_inf("SECOND", "SECONDALIAS")).unwrap();
+    let users = PcbUserRecord::read_users(&users_path).unwrap();
+    let inf = PcbUserInf::read_users(&inf_path).unwrap();
+    assert_eq!(users[0].rec_num, None);
+    assert!(users[0].inf_record(&inf).is_none());
+    assert_eq!(users[1].rec_num, Some(0));
+    assert_eq!(users[1].inf_record(&inf).unwrap().alias.as_ref().unwrap().alias, "SECONDALIAS");
+}
+
+#[test]
+fn test_persistent_conference_flags_keep_sysop_and_mail_but_not_runtime_net_status() {
+    let root = TempDir::new().unwrap();
+    let mut user = create_test_user("FLAGS", 1);
+    user.conference_flags
+        .insert(49, ConferenceFlags::Sysop | ConferenceFlags::MailWaiting | ConferenceFlags::NetStatus);
+    let mut users = UserBase::default();
+    users.new_user(user);
+    let path = root.path().join("users.toml");
+    users.save(&path).unwrap();
+    assert_eq!(
+        UserBase::load(&path).unwrap()[0].conference_flags[&49],
+        ConferenceFlags::Sysop | ConferenceFlags::MailWaiting
+    );
+}
+
+#[test]
+fn test_all_four_editor_flag_combinations_survive_import_storage_and_export() {
+    let root = TempDir::new().unwrap();
+    let users_path = root.path().join("USERS");
+    let inf_path = root.path().join("USERS.INF");
+    for (bits, mode, default) in [
+        (0, FSEMode::Ask, Some(false)),
+        (8, FSEMode::No, None),
+        (16, FSEMode::Ask, Some(true)),
+        (24, FSEMode::Yes, None),
+    ] {
+        let mut bytes = pcboard_users::users_record("EDITOR", 0);
+        bytes[100] = bits;
+        std::fs::write(&users_path, bytes).unwrap();
+        let record = PcbUserRecord::read_users(&users_path).unwrap().remove(0);
+        let users = UserBase::import_pcboard(&[PcbUser {
+            user: record,
+            inf: PcbUserInf::default(),
+        }]);
+        let path = root.path().join("users.toml");
+        users.save(&path).unwrap();
+        let stored = UserBase::load(&path).unwrap();
+        assert_eq!(stored[0].flags.fse_mode, mode);
+        assert_eq!(stored[0].flags.fse_default, default);
+        stored.export_pcboard(&users_path, &inf_path).unwrap();
+        assert_eq!(std::fs::read(&users_path).unwrap()[100] & 24, bits);
+    }
+}
+
+#[test]
+fn test_extended_conferences_qwk_and_binary_allocations_survive_import_and_export() {
+    let root = TempDir::new().unwrap();
+    let users_path = root.path().join("USERS");
+    let inf_path = root.path().join("USERS.INF");
+    std::fs::write(&users_path, pcboard_users::users_record("EXTENDED", 1)).unwrap();
+    std::fs::write(&inf_path, pcboard_users::extended_inf()).unwrap();
+    let record = PcbUserRecord::read_users(&users_path).unwrap().remove(0);
+    let source = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    let users = UserBase::import_pcboard(&[PcbUser {
+        user: record,
+        inf: source.clone(),
+    }]);
+    assert_eq!(users[0].alias, "EXTENDEDALIAS");
+    assert_eq!(users[0].conference_flags[&0], ConferenceFlags::Registered | ConferenceFlags::Sysop);
+    assert_eq!(users[0].conference_flags[&40], ConferenceFlags::Registered | ConferenceFlags::Sysop);
+    assert_eq!(users[0].conference_flags[&41], ConferenceFlags::Expired);
+    assert_eq!(users[0].conference_flags[&42], ConferenceFlags::Selected);
+    assert_eq!(
+        users[0].conference_flags[&49],
+        ConferenceFlags::Registered | ConferenceFlags::Expired | ConferenceFlags::Selected | ConferenceFlags::MailWaiting
+    );
+    assert_eq!(users[0].lastread_ptr_flags[&(40, 0)].last_read, 11);
+    assert_eq!(users[0].lastread_ptr_flags[&(49, 0)].last_read, (u32::MAX - 1) as usize);
+    assert_eq!(users[0].get_tpa("audit").chars().count(), 256);
+    assert_eq!(users[0].get_conference_tpa("audit", 49), "1\u{c7}");
+    assert_eq!(users[0].get_conference_tpa("QWKCFG", 49), "1");
+    assert_eq!(
+        users[0].qwk_config,
+        Some(QwkConfigUserInf {
+            max_msgs: 800,
+            max_msgs_per_conf: 65,
+            personal_attach_limit: 40,
+            public_attach_limit: 70,
+            new_blt_limit: 12,
+            new_files: true,
+        })
+    );
+
+    let path = root.path().join("users.toml");
+    users.save(&path).unwrap();
+    let stored = UserBase::load(&path).unwrap();
+    assert!(stored[0] == users[0]);
+    stored.export_pcboard(&users_path, &inf_path).unwrap();
+    let exported = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    assert_eq!(exported.qwk_config, source.qwk_config);
+    assert_eq!(exported.conference_flags, source.conference_flags);
+    assert_eq!(exported.lastread_ptrs, source.lastread_ptrs);
+    for tpa in &source.tpa_records {
+        let copy = exported.tpa_records.iter().find(|copy| copy.info.name == tpa.info.name).unwrap();
+        assert_eq!(copy.info, tpa.info);
+        assert_eq!(copy.keyword, tpa.keyword);
+        assert_eq!(copy.data, tpa.data);
+        assert_eq!(copy.conferences, tpa.conferences);
+    }
+}
+
+#[test]
+fn test_malformed_user_files_return_errors() {
+    let root = TempDir::new().unwrap();
+    let path = root.path().join("USERS.INF");
+    let valid = pcboard_users::extended_inf();
+    let mut zero_size = valid.clone();
+    zero_size[12..16].fill(0);
+    let mut bad_offset = valid.clone();
+    bad_offset[46..50].copy_from_slice(&u32::MAX.to_le_bytes());
+    let mut short_conferences = valid.clone();
+    short_conferences[6..10].copy_from_slice(&1u32.to_le_bytes());
+    let mut bad_conference_allocation = valid.clone();
+    bad_conference_allocation[35..37].copy_from_slice(&u16::MAX.to_le_bytes());
+    for data in [
+        zero_size,
+        bad_offset,
+        short_conferences,
+        bad_conference_allocation,
+        valid[..valid.len() - 1].to_vec(),
+    ] {
+        std::fs::write(&path, data).unwrap();
+        assert!(PcbUserInf::read_users(&path).is_err());
+    }
+    std::fs::write(&path, vec![0; 399]).unwrap();
+    assert!(PcbUserRecord::read_users(&path).is_err());
+}
+
+#[test]
+fn test_application_conference_allocations_below_forty_keep_their_exact_length() {
+    let root = TempDir::new().unwrap();
+    let users_path = root.path().join("USERS");
+    let inf_path = root.path().join("USERS.INF");
+    let mut data = pcboard_users::basic_inf("SMALL", "SETTINGS");
+    data[12..16].copy_from_slice(&47u32.to_le_bytes());
+    data[16..31].fill(0);
+    data[16..24].copy_from_slice(b"SMALLAPP");
+    data[31..33].copy_from_slice(&7u16.to_le_bytes());
+    data[33..35].copy_from_slice(&8u16.to_le_bytes());
+    data[35..37].copy_from_slice(&2u16.to_le_bytes());
+    data[37..46].fill(0);
+    data[37..42].copy_from_slice(b"SMALL");
+    data.truncate(50 + 33);
+    data.extend(b"SETTINGS");
+    data.extend([1, 0x80, 2, 0, 3, 0x1a]);
+    let mut blank_keyword = data.clone();
+    blank_keyword[37..46].fill(0);
+    std::fs::write(&inf_path, data).unwrap();
+    let mut data = pcboard_users::users_record("SMALL", 1);
+    data[398..400].copy_from_slice(&2u16.to_le_bytes());
+    std::fs::write(&users_path, data).unwrap();
+    let inf = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    assert_eq!(inf.tpa_records[0].conferences, vec![vec![1, 0x80], vec![2, 0], vec![3, 0x1a]]);
+    let record = PcbUserRecord::read_users(&users_path).unwrap().remove(0);
+    let users = UserBase::import_pcboard(&[PcbUser {
+        user: record,
+        inf: inf.clone(),
+    }]);
+    let path = root.path().join("users.toml");
+    users.save(&path).unwrap();
+    UserBase::load(&path).unwrap().export_pcboard(&users_path, &inf_path).unwrap();
+    let exported = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    assert_eq!(exported.tpa_records[0].data, inf.tpa_records[0].data);
+    assert_eq!(exported.tpa_records[0].conferences, inf.tpa_records[0].conferences);
+
+    std::fs::write(&inf_path, blank_keyword).unwrap();
+    let source = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    assert_eq!(source.tpa_records[0].keyword, "SMALLAPP");
+    assert!(source.tpa_records[0].info.keyword.is_empty());
+    let record = PcbUserRecord::read_users(&users_path).unwrap().remove(0);
+    UserBase::import_pcboard(&[PcbUser { user: record, inf: source }])
+        .export_pcboard(&users_path, &inf_path)
+        .unwrap();
+    let exported = PcbUserInf::read_users(&inf_path).unwrap().remove(0);
+    assert!(exported.tpa_records[0].info.keyword.is_empty());
+    assert_eq!(exported.tpa_records[0].conferences, inf.tpa_records[0].conferences);
 }

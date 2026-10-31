@@ -352,11 +352,13 @@ impl IcyBoardState {
     /// preference is "ask".
     async fn prompt_use_fse(&mut self) -> Res<bool> {
         let ansi = self.session.disp_options.grapics_mode != GraphicsMode::Ctty;
-        let default = if self.session.expert_mode() && ansi {
-            self.session.yes_char
-        } else {
-            self.session.no_char
-        };
+        let prefer_fse = self
+            .session
+            .current_user
+            .as_ref()
+            .and_then(|user| user.flags.fse_default)
+            .unwrap_or_else(|| self.session.expert_mode());
+        let default = if prefer_fse && ansi { self.session.yes_char } else { self.session.no_char };
         let mut answer = self
             .input_field(
                 IceText::UseFullScreen,
@@ -391,7 +393,107 @@ impl IcyBoardState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::icy_board::{
+        IcyBoard,
+        bbs::BBS,
+        doors::pcboard::{create_user_sys, read_user_sys},
+        icb_text::DEFAULT_DISPLAY_TEXT,
+        state::{KeyChar, KeySource},
+        user_base::User,
+    };
+    use icy_engine::{Position, TextPane};
+    use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
     use jamjam::jam::JamMessageBase;
+    use std::{sync::Arc, time::Duration};
+
+    async fn editor_state(preference: Option<bool>, expert: bool, prompt: &str, yes: char) -> (IcyBoardState, ChannelConnection) {
+        let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (peer, connection) = ChannelConnection::create_pair();
+        let mut board = IcyBoard::new();
+        board.default_display_text = DEFAULT_DISPLAY_TEXT.clone();
+        board
+            .default_display_text
+            .update_record_number(IceText::UseFullScreen as usize, prompt)
+            .unwrap();
+        let mut user = User {
+            name: "EDITOR".into(),
+            ..Default::default()
+        };
+        user.flags.fse_mode = FSEMode::Ask;
+        user.flags.fse_default = preference;
+        user.flags.expert_mode = expert;
+        board.users.new_user(user.clone());
+        let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+        state.session.current_user = Some(user);
+        state.session.cur_user_id = 0;
+        state.session.time_limit = 30;
+        state.session.fse_mode = FSEMode::Ask;
+        state.session.disp_options.grapics_mode = GraphicsMode::Graphics;
+        state.session.page_len = 0;
+        state.session.yes_char = yes;
+        state.session.no_char = 'N';
+        state.char_buffer.push_back(KeyChar::new(KeySource::User, '\r'));
+        (state, peer)
+    }
+
+    #[tokio::test]
+    async fn imported_fse_defaults_are_used_by_the_rendered_english_and_german_prompt() {
+        for (prompt, yes) in [("Use full screen editor", 'Y'), ("Vollbildeditor verwenden", 'J')] {
+            for (preference, expert, ansi, expected) in [
+                (Some(true), false, true, true),
+                (Some(false), true, true, false),
+                (None, true, true, true),
+                (None, false, true, false),
+                (Some(true), true, false, false),
+            ] {
+                let (mut state, mut peer) = editor_state(preference, expert, prompt, yes).await;
+                if !ansi {
+                    state.session.disp_options.grapics_mode = GraphicsMode::Ctty;
+                }
+                assert_eq!(
+                    tokio::time::timeout(Duration::from_secs(2), state.prompt_use_fse()).await.unwrap().unwrap(),
+                    expected
+                );
+                let mut screen = crate::icy_board::state::virtual_screen::VirtualScreen::new(icy_engine::parsers::ansi::default());
+                let mut bytes = [0; 4096];
+                while let Ok(result) = tokio::time::timeout(Duration::from_millis(20), peer.read(&mut bytes)).await {
+                    let count = result.unwrap();
+                    if count == 0 {
+                        break;
+                    }
+                    screen.write_bytes(&bytes[..count]);
+                }
+                let rendered = (0..25)
+                    .map(|row| (0..80).map(|column| screen.buffer.char_at(Position::new(column, row)).ch).collect::<String>())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert!(rendered.contains(prompt), "{rendered:?}");
+                let answer = if expected { yes } else { 'N' };
+                assert!(rendered.contains(&format!("{prompt}? ({answer})")), "{rendered:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn users_sys_preserves_all_four_fse_flag_combinations() {
+        let root = tempfile::tempdir().unwrap();
+        for dont_ask in [false, true] {
+            for default in [false, true] {
+                let (mut state, _peer) = editor_state(Some(default), false, "Editor?", 'Y').await;
+                state.session.current_user.as_mut().unwrap().flags.set_pcboard_fse_flags(dont_ask, default);
+                create_user_sys(&state, root.path(), "").await.unwrap();
+                let bytes = std::fs::read(root.path().join("USERS.SYS")).unwrap();
+                assert_eq!(bytes[40 + 102] & 24, u8::from(dont_ask) * 8 + u8::from(default) * 16);
+                let mut user = User::default();
+                read_user_sys(&mut user, root.path()).unwrap();
+                assert_eq!(user.flags.fse_mode, FSEMode::from_pcboard_flags(dont_ask, default));
+                assert_eq!(user.flags.pcboard_fse_default(), default);
+                assert_eq!(user.flags.fse_default, (!dont_ask).then_some(default));
+            }
+        }
+    }
 
     #[test]
     fn escape_codes_are_removed_when_disabled() {

@@ -3,25 +3,28 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use codepages::tables::CP437_TO_UNICODE;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
     io::{Cursor, Read},
     path::Path,
 };
 
 use crate::icy_board::IcyBoardError;
+use crate::icy_board::user_base::ConferenceFlags;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct UserInfApplication {
     /// Name of application
     pub name: String,
     /// Version number
-    pub _version: u16,
+    pub version: u16,
     /// Size of application record in bytes
     pub size_of_rec: u16,
     /// Size of each application conference record
-    pub _size_of_conf_rec: u16,
+    pub size_of_conf_rec: u16,
+    pub conference_count: usize,
     /// Keyword for executing the application
-    pub _keyword: String,
+    pub keyword: String,
     /// Offset in user record where the data is stored
     pub offset: u32,
 }
@@ -31,24 +34,43 @@ impl UserInfApplication {
         let mut buf = [0; 15];
         cursor.read_exact(&mut buf)?;
         let name = convert_str(&buf);
-        let _version = cursor.read_u16::<LittleEndian>()?;
+        let version = cursor.read_u16::<LittleEndian>()?;
         let size_of_rec = cursor.read_u16::<LittleEndian>()?;
-        let _size_of_conf_rec = cursor.read_u16::<LittleEndian>()?;
+        let size_of_conf_rec = cursor.read_u16::<LittleEndian>()?;
 
         let mut buf = [0; 9];
         cursor.read_exact(&mut buf)?;
-        let _keyword = convert_str(&buf);
+        let keyword = convert_str(&buf);
         let offset = cursor.read_u32::<LittleEndian>()?;
 
         Ok(UserInfApplication {
             name,
-            _version,
+            version,
             size_of_rec,
-            _size_of_conf_rec,
-            _keyword,
+            size_of_conf_rec,
+            conference_count: 0,
+            keyword,
             offset,
         })
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct PcbTpaInfo {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub keyword: String,
+    pub version: u16,
+    pub record_size: u16,
+    pub conference_record_size: u16,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct PcbTpaRecord {
+    pub info: PcbTpaInfo,
+    pub keyword: String,
+    pub data: Vec<u8>,
+    pub conferences: Vec<Vec<u8>>,
 }
 
 fn convert_str(buf: &[u8]) -> String {
@@ -81,12 +103,15 @@ pub struct PcbUserInf {
     pub account: Option<AccountUserInf>,
     pub personal: Option<PersonalUserInf>,
     pub bank: Option<BankUserInf>,
+    pub conference_flags: HashMap<usize, ConferenceFlags>,
+    pub lastread_ptrs: HashMap<usize, u32>,
+    pub tpa_records: Vec<PcbTpaRecord>,
 }
 
 impl PcbUserInf {
     const REC_SIZE: usize = 33;
     fn read(data: &[u8]) -> Res<Self> {
-        if Self::REC_SIZE != data.len() {
+        if data.len() < Self::REC_SIZE {
             return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize("USER.INF", Self::REC_SIZE, data.len())));
         }
         let mut i = 0;
@@ -111,11 +136,11 @@ impl PcbUserInf {
         let mut cursor = Cursor::new(data);
 
         let _version = cursor.read_u16::<LittleEndian>()?;
-        let _num_conf = cursor.read_u16::<LittleEndian>()?;
+        let num_ext_conf = cursor.read_u16::<LittleEndian>()? as usize;
         let size_of_rec = cursor.read_u16::<LittleEndian>()? as usize;
-        let _conf_size = cursor.read_u32::<LittleEndian>()?;
+        let conf_size = cursor.read_u32::<LittleEndian>()? as usize;
         let app_num = cursor.read_u16::<LittleEndian>()?;
-        let rec_size = cursor.read_u32::<LittleEndian>()? as u64;
+        let rec_size = cursor.read_u32::<LittleEndian>()? as usize;
 
         let mut apps = Vec::new();
         for _ in 0..app_num {
@@ -123,13 +148,63 @@ impl PcbUserInf {
             apps.push(inf);
         }
 
-        let mut record = vec![0; rec_size as usize];
-        while cursor.position() + rec_size <= cursor.get_ref().len() as u64 {
-            cursor.read_exact(&mut record)?;
-            let mut user = PcbUserInf::read(&record[0..size_of_rec])?;
+        let records = &cursor.get_ref()[cursor.position() as usize..];
+        if rec_size == 0 || size_of_rec < Self::REC_SIZE || size_of_rec > rec_size || records.len() % rec_size != 0 {
+            return Err("Invalid USERS.INF record sizes or truncated user record".into());
+        }
+        let num_areas = 40 + num_ext_conf;
+        let conference_end = size_of_rec.checked_add(conf_size).ok_or("Invalid USERS.INF conference size")?;
+        if conference_end > rec_size {
+            return Err("Truncated USERS.INF conference data".into());
+        }
+        for record in records.chunks_exact(rec_size) {
+            let mut user = PcbUserInf::read(&record[..size_of_rec])?;
+            let conference_data = &record[size_of_rec..conference_end];
+            user.read_conferences(conference_data, num_ext_conf)?;
 
             for app in &apps {
-                let data = &record[app.offset as usize..app.offset as usize + app.size_of_rec as usize];
+                let start = app.offset as usize;
+                if start < conference_end {
+                    return Err(format!("USERS.INF application {} overlaps the PCBoard record", app.name).into());
+                }
+                let end = start.checked_add(app.size_of_rec as usize).ok_or("Invalid USERS.INF application size")?;
+                let data = record.get(start..end).ok_or_else(|| format!("Truncated USERS.INF application {}", app.name))?;
+                let boundary = apps
+                    .iter()
+                    .filter(|other| other.offset > app.offset)
+                    .map(|other| other.offset as usize)
+                    .min()
+                    .unwrap_or(rec_size);
+                let allocation_size = boundary
+                    .checked_sub(end)
+                    .ok_or_else(|| format!("Overlapping USERS.INF application {}", app.name))?;
+                // Below 40 conferences, only allocation offsets expose the TPA conference count.
+                let allocation_end = if app.size_of_conf_rec == 0 {
+                    end
+                } else {
+                    let size = app.size_of_conf_rec as usize;
+                    let count = allocation_size / size;
+                    if allocation_size % size != 0 || count > num_areas || (num_ext_conf != 0 && count != num_areas) {
+                        return Err(format!("Invalid USERS.INF conference allocation for {}", app.name).into());
+                    }
+                    boundary
+                };
+                let conference_data = record
+                    .get(end..allocation_end)
+                    .ok_or_else(|| format!("Truncated USERS.INF conference allocation for {}", app.name))?;
+                let is_tpa = !matches!(
+                    app.name.as_str(),
+                    AliasUserInf::NAME
+                        | VerifyUserInf::NAME
+                        | AddressUserInf::NAME
+                        | PasswordUserInf::NAME
+                        | CallStatsUserInf::NAME
+                        | NotesUserInf::NAME
+                        | QwkConfigUserInf::NAME
+                        | AccountUserInf::NAME
+                        | PersonalUserInf::NAME
+                        | BankUserInf::NAME
+                );
                 match app.name.as_str() {
                     AliasUserInf::NAME => {
                         user.alias = Some(AliasUserInf::read(data)?);
@@ -161,9 +236,31 @@ impl PcbUserInf {
                     BankUserInf::NAME => {
                         user.bank = Some(BankUserInf::read(data)?);
                     }
-                    unkown => {
-                        log::error!("Unknown user.inf app: {unkown}");
-                    }
+                    _ => {}
+                }
+                if is_tpa || app.size_of_conf_rec != 0 {
+                    let keyword = if app.keyword.is_empty() {
+                        log::warn!("USERS.INF application {} has no keyword; preserving it under its application name", app.name);
+                        app.name.clone()
+                    } else {
+                        app.keyword.clone()
+                    };
+                    user.tpa_records.push(PcbTpaRecord {
+                        info: PcbTpaInfo {
+                            name: app.name.clone(),
+                            keyword: app.keyword.clone(),
+                            version: app.version,
+                            record_size: app.size_of_rec,
+                            conference_record_size: app.size_of_conf_rec,
+                        },
+                        keyword,
+                        data: data.to_vec(),
+                        conferences: if app.size_of_conf_rec == 0 {
+                            Vec::new()
+                        } else {
+                            conference_data.chunks_exact(app.size_of_conf_rec as usize).map(<[u8]>::to_vec).collect()
+                        },
+                    });
                 }
             }
             users.push(user);
@@ -172,7 +269,51 @@ impl PcbUserInf {
         Ok(users)
     }
 
-    pub(crate) fn write_with_apps(&self, writer: &mut impl std::io::Write, apps: &[(String, usize, u32)]) -> Res<()> {
+    fn read_conferences(&mut self, data: &[u8], num_ext_conf: usize) -> Res<()> {
+        if data.is_empty() && num_ext_conf == 0 {
+            return Ok(());
+        }
+        let num_areas = 40 + num_ext_conf;
+        let bitmap_size = num_areas.div_ceil(8);
+        let extended_size = bitmap_size - 5;
+        let pointers_start = 2 * bitmap_size + 3 * extended_size;
+        if data.len() < pointers_start + 4 * num_ext_conf {
+            return Err("Truncated USERS.INF conference bitmaps or last-read pointers".into());
+        }
+        // USERSYS.DOC: full mail/sysop bitmaps, extended registration/expiry/scan bitmaps, then longs.
+        for conference in 0..num_areas {
+            let byte = conference / 8;
+            let bit = 1 << (conference % 8);
+            let mut flags = ConferenceFlags::None;
+            if data[byte] & bit != 0 {
+                flags |= ConferenceFlags::MailWaiting;
+            }
+            if data[bitmap_size + byte] & bit != 0 {
+                flags |= ConferenceFlags::Sysop;
+            }
+            if conference >= 40 {
+                for (index, flag) in [ConferenceFlags::Registered, ConferenceFlags::Expired, ConferenceFlags::Selected]
+                    .into_iter()
+                    .enumerate()
+                {
+                    if data[2 * bitmap_size + index * extended_size + byte - 5] & bit != 0 {
+                        flags |= flag;
+                    }
+                }
+                let offset = pointers_start + 4 * (conference - 40);
+                let pointer = u32::from_le_bytes(data[offset..offset + 4].try_into()?);
+                if pointer != 0 {
+                    self.lastread_ptrs.insert(conference, pointer);
+                }
+            }
+            if !flags.is_empty() {
+                self.conference_flags.insert(conference, flags);
+            }
+        }
+        Ok(())
+    }
+
+    fn write_with_apps(&self, writer: &mut impl std::io::Write, apps: &[UserInfApplication], num_ext_conf: usize) -> Res<()> {
         use crate::tables::export_cp437_string;
         use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -180,84 +321,121 @@ impl PcbUserInf {
         writer.write_all(&export_cp437_string(&self.name, 25, b' '))?;
         writer.write_u32::<LittleEndian>(self.messages_read as u32)?;
         writer.write_u32::<LittleEndian>(self.messages_left as u32)?;
+        let bitmap_size = (40 + num_ext_conf).div_ceil(8);
+        let extended_size = bitmap_size - 5;
+        let mut conferences = vec![0; 2 * bitmap_size + 3 * extended_size];
+        for (&conference, flags) in &self.conference_flags {
+            let byte = conference / 8;
+            let bit = 1 << (conference % 8);
+            for (index, flag) in [ConferenceFlags::MailWaiting, ConferenceFlags::Sysop].into_iter().enumerate() {
+                if flags.contains(flag) {
+                    conferences[index * bitmap_size + byte] |= bit;
+                }
+            }
+            if conference >= 40 {
+                for (index, flag) in [ConferenceFlags::Registered, ConferenceFlags::Expired, ConferenceFlags::Selected]
+                    .into_iter()
+                    .enumerate()
+                {
+                    if flags.contains(flag) {
+                        conferences[2 * bitmap_size + index * extended_size + byte - 5] |= bit;
+                    }
+                }
+            }
+        }
+        writer.write_all(&conferences)?;
+        for conference in 40..40 + num_ext_conf {
+            writer.write_u32::<LittleEndian>(*self.lastread_ptrs.get(&conference).unwrap_or(&0))?;
+        }
 
         // Write application sections in the order declared in the header
-        for (app_name, app_size, _) in apps {
-            match app_name.as_str() {
+        for app in apps {
+            let app_size = app.size_of_rec as usize;
+            match app.name.as_str() {
                 "PCBALIAS" => {
                     if let Some(alias) = &self.alias {
                         alias.write(writer)?;
                     } else {
                         // Write empty alias record
-                        writer.write_all(&vec![b' '; *app_size])?;
+                        writer.write_all(&vec![b' '; app_size])?;
                     }
                 }
                 "PCBVERIFY" => {
                     if let Some(verify) = &self.verify {
                         verify.write(writer)?;
                     } else {
-                        writer.write_all(&vec![b' '; *app_size])?;
+                        writer.write_all(&vec![b' '; app_size])?;
                     }
                 }
                 "PCBADDRESS" => {
                     if let Some(address) = &self.address {
                         address.write(writer)?;
                     } else {
-                        writer.write_all(&vec![b' '; *app_size])?;
+                        writer.write_all(&vec![b' '; app_size])?;
                     }
                 }
                 "PCBPASSWORD" => {
                     if let Some(password) = &self.password {
                         password.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 "PCBSTATS" => {
                     if let Some(call_stats) = &self.call_stats {
                         call_stats.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 "PCBNOTES" => {
                     if let Some(notes) = &self.notes {
                         notes.write(writer)?;
                     } else {
-                        writer.write_all(&vec![b' '; *app_size])?;
+                        writer.write_all(&vec![b' '; app_size])?;
                     }
                 }
-                "PCBQWKCONFIG" => {
+                QwkConfigUserInf::NAME => {
                     if let Some(qwk_config) = &self.qwk_config {
                         qwk_config.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 "PCBACCOUNT" => {
                     if let Some(account) = &self.account {
                         account.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 "PCBPERSONAL" => {
                     if let Some(personal) = &self.personal {
                         personal.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 "PCBBANK" => {
                     if let Some(bank) = &self.bank {
                         bank.write(writer)?;
                     } else {
-                        writer.write_all(&vec![0u8; *app_size])?;
+                        writer.write_all(&vec![0u8; app_size])?;
                     }
                 }
                 _ => {
-                    // Unknown app, write zeros
-                    writer.write_all(&vec![0u8; *app_size])?;
+                    let tpa = self.tpa_records.iter().find(|tpa| tpa.info.name == app.name);
+                    let mut data = tpa.map_or_else(Vec::new, |tpa| tpa.data.clone());
+                    data.resize(app_size, 0);
+                    writer.write_all(&data)?;
+                }
+            }
+            if app.size_of_conf_rec != 0 {
+                let tpa = self.tpa_records.iter().find(|tpa| tpa.info.name == app.name);
+                for conference in 0..app.conference_count {
+                    let mut data = tpa.and_then(|tpa| tpa.conferences.get(conference)).cloned().unwrap_or_default();
+                    data.resize(app.size_of_conf_rec as usize, 0);
+                    writer.write_all(&data)?;
                 }
             }
         }
@@ -270,8 +448,23 @@ impl PcbUserInf {
         use byteorder::{LittleEndian, WriteBytesExt};
 
         // Determine which applications are present across all users
+        let mut num_areas = 40;
+        for user in users {
+            for conference in user.conference_flags.keys().chain(user.lastread_ptrs.keys()) {
+                num_areas = num_areas.max(conference.checked_add(1).ok_or("Invalid PCBoard conference number")?);
+            }
+            for tpa in &user.tpa_records {
+                num_areas = num_areas.max(tpa.conferences.len());
+            }
+        }
+        if num_areas > u16::MAX as usize {
+            return Err("Too many conferences for a PCBoard user file".into());
+        }
+        let num_ext_conf = num_areas - 40;
+        let bitmap_size = num_areas.div_ceil(8);
+        let conf_size = 2 * bitmap_size + 3 * (bitmap_size - 5) + 4 * num_ext_conf;
         let mut apps = Vec::new();
-        let mut offset = Self::REC_SIZE as u32;
+        let mut offset = (Self::REC_SIZE + conf_size) as u32;
 
         // Check if any user has each application type and build app list
         if users.iter().any(|u| u.alias.is_some()) {
@@ -312,32 +505,97 @@ impl PcbUserInf {
         }
         if users.iter().any(|u| u.bank.is_some()) {
             apps.push((BankUserInf::NAME.to_string(), BankUserInf::REC_SIZE, offset));
-            offset += BankUserInf::REC_SIZE as u32;
         }
 
+        let mut apps: Vec<_> = apps
+            .into_iter()
+            .map(|(name, size, offset)| UserInfApplication {
+                name,
+                version: 1,
+                size_of_rec: size as u16,
+                size_of_conf_rec: 0,
+                conference_count: 0,
+                keyword: String::new(),
+                offset,
+            })
+            .collect();
+        let psa_count = apps.len();
+        for user in users {
+            for tpa in &user.tpa_records {
+                if tpa.info.name.chars().count() > 15 || tpa.keyword.chars().count() > 9 {
+                    return Err("PCBoard application name or keyword is too long".into());
+                }
+                let size_of_rec = tpa.info.record_size.max(u16::try_from(tpa.data.len())?);
+                let mut size_of_conf_rec = tpa.info.conference_record_size;
+                for data in &tpa.conferences {
+                    size_of_conf_rec = size_of_conf_rec.max(u16::try_from(data.len())?);
+                }
+                if let Some(index) = apps.iter().position(|app| app.name == tpa.info.name) {
+                    let app = &mut apps[index];
+                    if index < psa_count && size_of_rec != app.size_of_rec {
+                        return Err(format!("Invalid fixed record size for supported allocation {}", tpa.info.name).into());
+                    }
+                    if index >= psa_count && (app.version != tpa.info.version || app.keyword != tpa.keyword) {
+                        return Err(format!("Conflicting USERS.INF allocation for {}", tpa.info.name).into());
+                    }
+                    app.version = tpa.info.version;
+                    app.keyword.clone_from(&tpa.keyword);
+                    app.size_of_rec = app.size_of_rec.max(size_of_rec);
+                    app.size_of_conf_rec = app.size_of_conf_rec.max(size_of_conf_rec);
+                } else {
+                    apps.push(UserInfApplication {
+                        name: tpa.info.name.clone(),
+                        version: tpa.info.version,
+                        size_of_rec,
+                        size_of_conf_rec,
+                        conference_count: 0,
+                        keyword: tpa.keyword.clone(),
+                        offset: 0,
+                    });
+                }
+            }
+        }
+        offset = (Self::REC_SIZE + conf_size) as u32;
+        for app in &mut apps {
+            app.conference_count = if num_ext_conf == 0 {
+                users
+                    .iter()
+                    .flat_map(|user| &user.tpa_records)
+                    .filter(|tpa| tpa.info.name == app.name)
+                    .map(|tpa| tpa.conferences.len())
+                    .max()
+                    .unwrap_or(0)
+            } else {
+                num_areas
+            };
+            app.offset = offset;
+            offset = offset
+                .checked_add(u32::from(app.size_of_rec) + u32::from(app.size_of_conf_rec) * app.conference_count as u32)
+                .ok_or("USERS.INF record is too large")?;
+        }
         let total_record_size = offset;
 
         // Write header (16 bytes)
         writer.write_u16::<LittleEndian>(6)?; // version
-        writer.write_u16::<LittleEndian>(0)?; // num_conf
+        writer.write_u16::<LittleEndian>(num_ext_conf as u16)?;
         writer.write_u16::<LittleEndian>(Self::REC_SIZE as u16)?; // base record size
-        writer.write_u32::<LittleEndian>(0)?; // conf_size
-        writer.write_u16::<LittleEndian>(apps.len() as u16)?; // number of applications
+        writer.write_u32::<LittleEndian>(conf_size as u32)?;
+        writer.write_u16::<LittleEndian>(u16::try_from(apps.len())?)?;
         writer.write_u32::<LittleEndian>(total_record_size)?; // total record size
 
-        // Write application headers (32 bytes each)
-        for (name, size, offset) in &apps {
-            writer.write_all(&export_cp437_string(name, 15, 0))?; // app name
-            writer.write_u16::<LittleEndian>(1)?; // version
-            writer.write_u16::<LittleEndian>(*size as u16)?; // record size
-            writer.write_u16::<LittleEndian>(0)?; // conf record size
-            writer.write_all(&[0u8; 9])?; // keyword (unused)
-            writer.write_u32::<LittleEndian>(*offset)?; // offset
+        // Application descriptors are 34 bytes, including the conference allocation.
+        for app in &apps {
+            writer.write_all(&export_cp437_string(&app.name, 15, 0))?;
+            writer.write_u16::<LittleEndian>(app.version)?;
+            writer.write_u16::<LittleEndian>(app.size_of_rec)?;
+            writer.write_u16::<LittleEndian>(app.size_of_conf_rec)?;
+            writer.write_all(&export_cp437_string(&app.keyword, 9, 0))?;
+            writer.write_u32::<LittleEndian>(app.offset)?;
         }
 
         // Write user records
         for user in users {
-            user.write_with_apps(writer, &apps)?;
+            user.write_with_apps(writer, &apps, num_ext_conf)?;
         }
 
         Ok(())

@@ -136,9 +136,18 @@ impl PcbBoard {
         let users = PcbUserRecord::read_users(&PathBuf::from(&r))?;
 
         let r = res.resolve_file(&res.data.path.inf_file);
-        let user_inf = PcbUserInf::read_users(&PathBuf::from(&r))?;
+        let inf_path = PathBuf::from(&r);
+        let user_inf = if !res.data.path.inf_file.is_empty() && inf_path.exists() {
+            PcbUserInf::read_users(&inf_path)?
+        } else {
+            log::warn!("Can't find user information file {} - importing USERS with defaults", inf_path.display());
+            Vec::new()
+        };
         for user in users {
-            let inf = user_inf[user.rec_num as usize].clone();
+            let inf = user.inf_record(&user_inf).cloned().unwrap_or_else(|| {
+                log::warn!("PCBoard user {} has no USERS.INF record - importing with defaults", user.name);
+                PcbUserInf::default()
+            });
             res.users.push(PcbUser { user, inf });
         }
 

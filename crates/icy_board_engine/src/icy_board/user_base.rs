@@ -22,7 +22,7 @@ use super::{
     icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
     is_false, is_null_16, is_null_64, is_null_i64,
     snapshot::Snapshot,
-    user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
+    user_inf::{AccountUserInf, BankUserInf, PcbTpaInfo, PcbTpaRecord, QwkConfigUserInf},
 };
 
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -226,6 +226,16 @@ pub enum FSEMode {
 }
 
 impl FSEMode {
+    pub fn from_pcboard_flags(dont_ask: bool, default: bool) -> Self {
+        if !dont_ask {
+            Self::Ask
+        } else if default {
+            Self::Yes
+        } else {
+            Self::No
+        }
+    }
+
     pub fn from_pcboard(s: &str) -> Self {
         match s {
             "Y" => FSEMode::Yes,
@@ -287,6 +297,9 @@ pub struct UserFlags {
     #[serde(default)]
     pub fse_mode: FSEMode,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fse_default: Option<bool>,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub scroll_msg_body: bool,
@@ -318,6 +331,28 @@ pub struct UserFlags {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub use_alias: bool,
+}
+
+impl UserFlags {
+    pub fn pcboard_fse_default(&self) -> bool {
+        match self.fse_mode {
+            FSEMode::Yes => true,
+            FSEMode::No => false,
+            FSEMode::Ask => self.fse_default.unwrap_or(false),
+        }
+    }
+
+    pub fn set_pcboard_fse_flags(&mut self, dont_ask: bool, default: bool) {
+        self.fse_mode = FSEMode::from_pcboard_flags(dont_ask, default);
+        self.fse_default = (!dont_ask).then_some(default);
+    }
+
+    pub fn set_fse_mode(&mut self, mode: FSEMode) {
+        if self.fse_mode != mode {
+            self.fse_default = None;
+        }
+        self.fse_mode = mode;
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -533,6 +568,9 @@ pub struct TpaRecord {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub conferences: Vec<TpaConferenceRecord>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pcboard: Option<PcbTpaInfo>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -641,8 +679,8 @@ mod conference_flags_format {
             if v.is_empty() {
                 continue;
             }
-            // Only these flags get stored in PCBoard - rest is for use at runtime.
-            let v = *v & (ConferenceFlags::Selected | ConferenceFlags::Registered | ConferenceFlags::Expired);
+            let v = *v
+                & (ConferenceFlags::Registered | ConferenceFlags::Expired | ConferenceFlags::Selected | ConferenceFlags::Sysop | ConferenceFlags::MailWaiting);
             let _ = write!(s, "{}:{};", k, v.bits());
         }
         serializer.serialize_str(&s)
@@ -813,7 +851,17 @@ impl User {
             )
         } else {
             // Fake creation date. IcyBoard sorts users by this date. This should mimic the order from pcboard.
-            (IcbDate::new(1, 1, 1980 + u.user.rec_num as u16), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            let year = u
+                .user
+                .rec_num
+                .unwrap_or_default()
+                .checked_add(1980)
+                .and_then(|year| u16::try_from(year).ok())
+                .unwrap_or_else(|| {
+                    log::warn!("USERS.INF index is too large for a synthetic creation date - using 1980");
+                    1980
+                });
+            (IcbDate::new(1, 1, year), 0, 0, 0, 0, 0, 0, 0, 0, 0)
         };
         let mut custom_comment1 = String::new();
         let mut custom_comment2 = String::new();
@@ -858,6 +906,10 @@ impl User {
             }
         }
 
+        for (&conference, &flags) in &u.inf.conference_flags {
+            *conference_flags.entry(conference).or_insert(ConferenceFlags::None) |= flags;
+        }
+
         let mut lastread_ptr_flags = HashMap::new();
         for (i, lmr) in u.user.last_message_read_ptr.iter().enumerate() {
             if *lmr == 0 {
@@ -873,7 +925,16 @@ impl User {
             );
         }
 
-        // for x in 0..u.user.
+        for (&conference, &pointer) in &u.inf.lastread_ptrs {
+            lastread_ptr_flags.insert(
+                (conference, 0),
+                LastReadStatus {
+                    last_read: pointer as usize,
+                    highest_msg_read: pointer as usize,
+                    include_qwk: true,
+                },
+            );
+        }
 
         Self {
             path: None,
@@ -917,7 +978,25 @@ impl User {
             qwk_config,
             account,
             bank,
-            tpa_records: Vec::new(),
+            tpa_records: u
+                .inf
+                .tpa_records
+                .iter()
+                .map(|tpa| TpaRecord {
+                    keyword: tpa.keyword.clone(),
+                    data: tpa.data.iter().map(|&byte| codepages::tables::CP437_TO_UNICODE[byte as usize]).collect(),
+                    conferences: tpa
+                        .conferences
+                        .iter()
+                        .enumerate()
+                        .map(|(conference, data)| TpaConferenceRecord {
+                            conference,
+                            data: data.iter().map(|&byte| codepages::tables::CP437_TO_UNICODE[byte as usize]).collect(),
+                        })
+                        .collect(),
+                    pcboard: Some(tpa.info.clone()),
+                })
+                .collect(),
 
             bus_data_phone: u.user.bus_data_phone.clone(),
             home_voice_phone: u.user.home_voice_phone.clone(),
@@ -931,13 +1010,8 @@ impl User {
                 is_dirty: u.user.is_dirty,
                 msg_clear: u.user.msg_clear,
                 has_mail: u.user.has_mail,
-                fse_mode: if u.user.use_fsedefault {
-                    FSEMode::Yes
-                } else if u.user.dont_ask_fse {
-                    FSEMode::No
-                } else {
-                    FSEMode::Ask
-                },
+                fse_mode: FSEMode::from_pcboard_flags(u.user.dont_ask_fse, u.user.use_fsedefault),
+                fse_default: (!u.user.dont_ask_fse).then_some(u.user.use_fsedefault),
                 scroll_msg_body: u.user.scroll_msg_body,
                 use_short_filedescr: u.user.short_file_descr,
                 long_msg_header: u.user.long_msg_header,
@@ -1006,7 +1080,7 @@ impl User {
         Ok(())
     }
 
-    fn to_pcboard(&self) -> PcbUser {
+    fn to_pcboard(&self) -> Res<PcbUser> {
         // Build base PCBoard user record
         let mut rec = PcbUserRecord {
             name: self.name.clone(),
@@ -1023,8 +1097,8 @@ impl User {
             is_dirty: self.flags.is_dirty,
             msg_clear: self.flags.msg_clear,
             has_mail: self.flags.has_mail,
-            use_fsedefault: matches!(self.flags.fse_mode, FSEMode::Yes),
-            dont_ask_fse: matches!(self.flags.fse_mode, FSEMode::No),
+            use_fsedefault: self.flags.pcboard_fse_default(),
+            dont_ask_fse: !matches!(self.flags.fse_mode, FSEMode::Ask),
             scroll_msg_body: self.flags.scroll_msg_body,
             short_file_descr: self.flags.use_short_filedescr,
             long_msg_header: self.flags.long_msg_header,
@@ -1184,8 +1258,54 @@ impl User {
         inf.qwk_config.clone_from(&self.qwk_config);
         inf.account.clone_from(&self.account);
         inf.bank.clone_from(&self.bank);
+        inf.conference_flags.clone_from(&self.conference_flags);
+        for (&(conference, area), status) in &self.lastread_ptr_flags {
+            if conference >= 40 && area == 0 {
+                inf.lastread_ptrs.insert(conference, u32::try_from(status.last_read)?);
+            }
+        }
+        for tpa in &self.tpa_records {
+            let bytes = |data: &str| -> Res<Vec<u8>> {
+                data.chars()
+                    .map(|character| {
+                        codepages::tables::UNICODE_TO_CP437
+                            .get(&character)
+                            .copied()
+                            .ok_or_else(|| "TPA data is not representable in CP437".into())
+                    })
+                    .collect()
+            };
+            let mut conferences = Vec::new();
+            for record in &tpa.conferences {
+                if record.conference >= u16::MAX as usize {
+                    return Err("Invalid PCBoard TPA conference number".into());
+                }
+                conferences.resize_with(conferences.len().max(record.conference + 1), Vec::new);
+                conferences[record.conference] = bytes(&record.data)?;
+            }
+            let data = bytes(&tpa.data)?;
+            let mut info = tpa.pcboard.clone().unwrap_or(PcbTpaInfo {
+                name: tpa.keyword.clone(),
+                keyword: tpa.keyword.clone(),
+                version: 1,
+                record_size: u16::try_from(data.len())?,
+                conference_record_size: 0,
+            });
+            let keyword = if info.keyword.is_empty() && tpa.keyword == info.name {
+                String::new()
+            } else {
+                tpa.keyword.clone()
+            };
+            info.keyword.clone_from(&keyword);
+            inf.tpa_records.push(PcbTpaRecord {
+                info,
+                keyword,
+                data,
+                conferences,
+            });
+        }
 
-        PcbUser { user: rec, inf }
+        Ok(PcbUser { user: rec, inf })
     }
 }
 
@@ -1240,9 +1360,8 @@ impl UserBase {
         let mut pcb_infs = Vec::new();
 
         for (idx, user) in self.users.iter().enumerate() {
-            let mut pcb = user.to_pcboard();
-            // Set record number based on position in the database (1-based)
-            pcb.user.rec_num = idx as u32;
+            let mut pcb = user.to_pcboard()?;
+            pcb.user.rec_num = Some(u32::try_from(idx)?);
 
             // Also set the name in the inf structure
             pcb.inf.name.clone_from(&pcb.user.name);
@@ -1463,7 +1582,7 @@ mod snapshot_tests {
 
     #[test]
     fn imported_user_base_uses_snapshot_storage() {
-        let users = UserBase::import_pcboard(&[user().to_pcboard()]);
+        let users = UserBase::import_pcboard(&[user().to_pcboard().unwrap()]);
         let mut edited = users.clone();
         assert!(users.users.ptr_eq(&edited.users));
         edited[0].name = "Edited import".into();
@@ -1507,12 +1626,12 @@ mod birth_date_tests {
     #[test]
     fn a_missing_birth_date_stays_out_of_the_pcboard_record() {
         let mut user = User::default();
-        assert!(user.to_pcboard().inf.personal.is_none());
+        assert!(user.to_pcboard().unwrap().inf.personal.is_none());
 
         user.birth_date = NaiveDate::from_ymd_opt(1974, 3, 8);
-        let personal = user.to_pcboard().inf.personal.expect("a birth date is personal information");
+        let personal = user.to_pcboard().unwrap().inf.personal.expect("a birth date is personal information");
         assert_eq!(personal.birth_date, IcbDate::new(3, 8, 1974));
-        assert_eq!(User::import_pcb(&user.to_pcboard()).birth_date, user.birth_date);
+        assert_eq!(User::import_pcb(&user.to_pcboard().unwrap()).birth_date, user.birth_date);
     }
 }
 

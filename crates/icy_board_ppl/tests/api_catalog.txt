@@ -321,8 +321,9 @@ TYPE Msg (49)
    13 getter IsEcho: Boolean
    14 getter NeedsPassword: Boolean
    15 func   Text() -> UnboundedString
-   16 getter Header: MSGHEADER
-   17 getter WrittenAt: Timestamp
+   16 func   MarkRead() -> Boolean
+   17 getter Header: MSGHEADER
+   18 getter WrittenAt: Timestamp
 
 TYPE Http (50)
     0 func   static Get(url: UnboundedString) -> HttpResponse

@@ -110,7 +110,11 @@ not lowercase existing plaintext.
 
 The required `[users.flags]` table may be empty. `fse_mode` defaults to
 `"Yes"` and accepts exactly `"Yes"`, `"No"` or `"Ask"`. It is written
-even at its default. The following twelve booleans all default to `false` and
+even at its default. Optional boolean `fse_default` selects the answer offered
+when `fse_mode = "Ask"` in an ANSI terminal. PCBoard imports preserve its independent editor-default
+flag here. When absent, the existing expert-mode/ANSI default is used. Switching
+editor modes clears this override; keeping the same mode preserves it.
+The following twelve booleans all default to `false` and
 are omitted when false:
 
 **Boolean user flags**
@@ -162,8 +166,9 @@ Neither field is a nested TOML map. They are custom strings:
 * `conference_flags = "0:5;2:1;"`: semicolon-separated
   `conference:decimal_bits` records. The conference is `usize` and the bits
   parse as `u8`. Flags are Registered=1, Expired=2, Selected=4, Sysop=8,
-  MailWaiting=16 and NetStatus=32. The writer persists **only bits 1, 2 and 4**;
-  the other flags may be accepted on read but are removed on rewrite. Empty
+  MailWaiting=16 and NetStatus=32. The writer preserves the first five flags;
+  runtime-only NetStatus is removed on rewrite. Bits outside this set are
+  discarded on read. Empty
   entries are skipped, and a wholly empty map writes `""`.
 * `lastread_ptr_flags = "0,0,10,12,1;"`: semicolon-separated
   `conference,area,last_read,highest_msg_read,include_qwk` records. The first
@@ -254,6 +259,14 @@ requires `conference` (`usize` conference index) and `data` (string).
 Application data is stored as text, not interpreted as a nested TOML document.
 The mutation API organizes records by keyword/conference, but Serde does not
 validate uniqueness during loading.
+
+PCBoard imports convert allocation bytes directly to CP437 characters, including
+NULs and other control bytes, without trimming or newline conversion. Optional
+`[users.tpa_records.pcboard]` retains the original allocation's `name` and
+`keyword` (strings; an absent keyword means empty),
+`version`, `record_size` and `conference_record_size` (all `u16`). This metadata
+allows PCBoard export to preserve fixed-size binary and per-conference records.
+Data containing characters outside CP437 cannot be exported to PCBoard.
 
 ### Minimal valid user-database example
 
