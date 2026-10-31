@@ -3661,7 +3661,7 @@ dependencies = [
 
 [[package]]
 name = "icbadmin"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3679,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "icbfile"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3695,7 +3695,7 @@ dependencies = [
 
 [[package]]
 name = "icbmailer"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3711,7 +3711,7 @@ dependencies = [
 
 [[package]]
 name = "icboard"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "async-recursion",
@@ -3767,7 +3767,7 @@ dependencies = [
 
 [[package]]
 name = "icbsetup"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "bstr",
@@ -3813,7 +3813,7 @@ dependencies = [
 
 [[package]]
 name = "icbsm"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "bstr",
@@ -3931,11 +3931,11 @@ dependencies = [
 
 [[package]]
 name = "icy_board_buildinfo"
-version = "0.2.3"
+version = "0.3.0"
 
 [[package]]
 name = "icy_board_cli"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "clap",
  "clap-i18n-richformatter",
@@ -3947,7 +3947,7 @@ dependencies = [
 
 [[package]]
 name = "icy_board_engine"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -4014,7 +4014,7 @@ dependencies = [
 
 [[package]]
 name = "icy_board_help"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "codepages",
  "hex",
@@ -4029,7 +4029,7 @@ dependencies = [
 
 [[package]]
 name = "icy_board_ppl"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "bcrypt",
@@ -4193,7 +4193,7 @@ dependencies = [
 
 [[package]]
 name = "icy_net"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -4280,7 +4280,7 @@ dependencies = [
 
 [[package]]
 name = "icy_terminal_emulation"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "serde",
 ]
@@ -5808,7 +5808,7 @@ dependencies = [
 
 [[package]]
 name = "mkicbmnu"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "chrono",
@@ -5837,7 +5837,7 @@ dependencies = [
 
 [[package]]
 name = "mkicbtxt"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "chrono",
@@ -7434,7 +7434,7 @@ checksum = "4a6394b9e965e73d0a289ee54f589087e2c676aedf60885baf52c76b771e4958"
 
 [[package]]
 name = "ppl-lsp"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "dashmap 6.2.1",
  "env_logger",
@@ -7456,7 +7456,7 @@ dependencies = [
 
 [[package]]
 name = "pplc"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "ariadne",
  "clap",
@@ -7480,7 +7480,7 @@ dependencies = [
 
 [[package]]
 name = "ppld"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "clap",
  "codepages",

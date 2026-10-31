@@ -8,8 +8,68 @@ releases.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
+This beta release adds Kermit transfers and a searchable reference guide, and
+fixes PCBoard user migration, archive rewriting and file-transfer recovery.
+
+### Added
+
+- Native `@kermit` uploads and downloads, including negotiated packets up to
+  4096 bytes, control and eighth-bit quoting, repeat compression and bounded
+  retries. Classic short packets remain supported; sliding windows are not.
+- PPL 4.00 `Msg.MarkRead()` lets custom message readers mark the current caller's
+  personal mail as read, including received timestamps and requested return
+  receipts. It does not advance last-read pointers or charge for reading.
+- A searchable reference guide covering board operation, configuration and PPL,
+  with offline HTML/PDF packaging and generated object, record and enum API
+  references.
+- A menu, pause/resume, music controls, replay and persistent top-ten high scores
+  for the Tetris PPE.
+- ZMODEM receiver-phase APIs let terminal hosts distinguish handshake, file
+  transfer and completion without consuming the board's subsequent output.
+
+### Changed
+
+- New boards list Kermit but leave it disabled until the sysop enables it.
+  Existing configurations and PCBoard imports preserve their saved setting.
+- Update Rust dependencies, including ZIP 9 archive APIs.
+
 ### Fixed
 
+- PCBoard user imports correctly distinguish absent, one-based and out-of-range
+  `USERS.INF` pointers, never attaching another user's extended record for a
+  missing pointer. Missing or unconfigured information files still allow basic
+  users to be imported, with warnings.
+- PCBoard editor prompting and its default answer are preserved independently
+  through import, user storage, editor prompts, PPL user variables and door
+  `USERS.SYS` exchange.
+- PCBoard imports retain extended conference registration, expiry, scan
+  selection and last-read pointers, plus conference-sysop and mail-waiting flags.
+  Third-party allocations retain binary and per-conference data and metadata;
+  malformed records fail explicitly. QWK settings now survive PCBoard export.
+- File metadata indexes default to each file area's own directory, and explicit
+  upload prefixes resolve against the board root. Maintenance, duplicate checks,
+  public listings and admin edits use the same indexes (#33). See the
+  [recovery guide](docs/icbfile.md) for stale working-directory databases.
+- ZMODEM transfers recover from oversized subpackets, repeated position requests
+  and stale data between files, tolerate status text before headers, and
+  recognize cancellation inside file data. Silent senders now time out instead
+  of leaving transfers blocked (#34).
+- ZMODEM sends file modification times and remaining batch file/byte counts,
+  avoiding incorrect timestamps in receiving clients.
+- PPL `S2I` and string `ToInt()` accept signs and leading whitespace, support
+  hexadecimal prefixes in base 16, and return `-1` on overflow (#35).
+- New users default to a page length of 23 instead of disabling paging;
+  existing users retain their saved setting (#36).
+- PPL parses complete parenthesized conditions, supports member access on record
+  literals, and retains record types during decompilation. Documentation
+  attachment no longer panics at Unicode boundaries and honors blank lines.
+- PPL member receivers named like built-in types or functions resolve to
+  declared variables and constants. Incorrect string/byte member argument
+  counts are reported at compile time instead of producing invalid PPEs.
+- PPE stuffed input is no longer logged.
+- Builds support CMake 4 when compiling the bundled Opus library.
 - Upload processing preserves directory entries when rewriting archives, including
   when adding an own advertisement. Subdirectories no longer become empty files
   that prevent extraction of their contents (#37).
@@ -942,7 +1002,8 @@ First public beta of IcyBoard 0.2.
 Last release before the 0.2 beta series. Earlier release history is available
 from the repository tags and GitHub Releases.
 
-[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.3...HEAD
+[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/mkrueger/icy_board/compare/0.2.3...0.3.0
 [0.2.3]: https://github.com/mkrueger/icy_board/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/mkrueger/icy_board/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-beta.1...0.2.1
