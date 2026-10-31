@@ -7,12 +7,15 @@ on:
       - completed
 env:
   CARGO_TERM_COLOR: always
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 jobs:
   build_linux:
    runs-on: ubuntu-latest
    if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
+   - name: Install system dependencies
+     run: sudo apt-get update && sudo apt-get install -y libasound2-dev
    - name: Get version
      run: |
        export version=$(python3 tools/prep_diz.py "file_id.diz")
@@ -246,9 +249,11 @@ jobs:
         echo "Version: $version"
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
+        cache: pip
+        cache-dependency-path: docs/requirements.txt
     
     - name: Install dependencies
       run: |
@@ -260,11 +265,11 @@ jobs:
           texlive-fonts-recommended \
           texlive-fonts-extra \
           texlive-xetex \
+          fonts-dejavu-core \
+          fonts-noto-core \
+          fonts-droid-fallback \
           xindy
-        pip install --upgrade pip
-        pip install sphinx sphinx_rtd_theme
-        # Install any other Sphinx extensions if needed
-        # pip install sphinx-autodoc-typehints sphinxcontrib-bibtex etc.
+        pip install -r docs/requirements.txt
     
     - name: Build PDF documentation
       run: |
