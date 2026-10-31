@@ -289,9 +289,7 @@ pub fn toss(config: &QwkNetworkConfig, board_root: &Path, hub_id: &str, packet: 
     config.validate()?;
     let hub = config.hub(hub_id).ok_or_else(|| format!("No QWKnet hub named {hub_id} is configured"))?;
     let mut archive = zip::ZipArchive::new(fs::File::open(packet)?)?;
-    let entry = (0..archive.len())
-        .find(|index| archive.by_index(*index).is_ok_and(|file| file.name().eq_ignore_ascii_case("messages.dat")))
-        .ok_or_else(|| format!("{} contains no MESSAGES.DAT", packet.display()))?;
+    let entry = messages_entry_index(&mut archive)?.ok_or_else(|| format!("{} contains no MESSAGES.DAT", packet.display()))?;
     let mut data = Vec::new();
     archive.by_index(entry)?.read_to_end(&mut data)?;
     if data.len() < QwkMessage::HEADER_SIZE {
@@ -384,9 +382,18 @@ fn write_rep(path: &Path, hub_id: &str, messages: &[QwkMessage]) -> Res<()> {
     Ok(())
 }
 
+fn messages_entry_index<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Res<Option<usize>> {
+    for index in 0..archive.len() {
+        if archive.by_index(index)?.name()?.eq_ignore_ascii_case("messages.dat") {
+            return Ok(Some(index));
+        }
+    }
+    Ok(None)
+}
+
 fn validate_qwk_archive(data: &[u8], hub_id: &str) -> Res<()> {
     let mut archive = zip::ZipArchive::new(Cursor::new(data))?;
-    if !(0..archive.len()).any(|index| archive.by_index(index).is_ok_and(|file| file.name().eq_ignore_ascii_case("messages.dat"))) {
+    if messages_entry_index(&mut archive)?.is_none() {
         return Err(format!("QWKnet hub {hub_id} returned a packet without MESSAGES.DAT").into());
     }
     Ok(())
@@ -514,6 +521,35 @@ fn route(hub: &QwkHub, via: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn qwk_archive_finds_mixed_case_messages_and_reports_encrypted_entries() {
+        let mut packet = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        packet.start_file("notes.txt", SimpleFileOptions::default()).unwrap();
+        packet.start_file("mEsSaGeS.dAt", SimpleFileOptions::default()).unwrap();
+        let data = packet.finish().unwrap().into_inner();
+        let mut archive = zip::ZipArchive::new(Cursor::new(&data)).unwrap();
+        assert_eq!(messages_entry_index(&mut archive).unwrap(), Some(1));
+        validate_qwk_archive(&data, "VERT").unwrap();
+
+        let mut packet = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        packet
+            .start_file(
+                "notes.txt",
+                SimpleFileOptions::default().with_aes_encryption(zip::AesMode::Aes256, "test-password"),
+            )
+            .unwrap();
+        packet.start_file("MESSAGES.DAT", SimpleFileOptions::default()).unwrap();
+        let data = packet.finish().unwrap().into_inner();
+        let error = validate_qwk_archive(&data, "VERT").unwrap_err();
+        assert!(error.downcast_ref::<zip::result::ZipError>().is_some(), "{error}");
+
+        let mut packet = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        packet.start_file("notes.txt", SimpleFileOptions::default()).unwrap();
+        let data = packet.finish().unwrap().into_inner();
+        let error = validate_qwk_archive(&data, "VERT").unwrap_err().to_string();
+        assert!(error.contains("without MESSAGES.DAT"), "{error}");
+    }
 
     #[test]
     fn metadata_is_removed_and_a_return_route_is_kept() {

@@ -128,10 +128,13 @@ pub fn unpack(bundle: &Path, into: &Path) -> Res<Vec<PathBuf>> {
         if entry.is_dir() {
             continue;
         }
-        let Some(name) = safe_name(entry.name()) else {
+        let entry_name = entry
+            .name()
+            .context(|| format!("Cannot decode the name of entry {} of the bundle {}", index + 1, bundle.display()))?;
+        let Some(name) = safe_name(&entry_name) else {
             log::warn!(
                 "Refusing {} out of {}: an entry naming a directory would be unpacked outside the inbound",
-                entry.name(),
+                entry_name,
                 bundle.display()
             );
             continue;

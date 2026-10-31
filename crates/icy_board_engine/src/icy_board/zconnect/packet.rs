@@ -607,11 +607,12 @@ fn parse_archive(bytes: &[u8]) -> Res<Vec<WireMessage>> {
     let mut messages = Vec::new();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
+        let name = entry.name()?;
         if entry.enclosed_name().is_none()
-            || entry.name().starts_with('/')
-            || entry.name().contains(['\\', ':'])
-            || entry.name().split('/').any(|s| s == ".." || s == ".")
-            || !names.insert(entry.name().to_ascii_lowercase())
+            || name.starts_with('/')
+            || name.contains(['\\', ':'])
+            || name.split('/').any(|s| s == ".." || s == ".")
+            || !names.insert(name.to_ascii_lowercase())
             || entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
         {
             return Err("Unsafe or duplicate ZCONNECT ZIP member".into());

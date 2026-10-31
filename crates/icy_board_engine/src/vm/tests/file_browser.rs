@@ -828,10 +828,12 @@ async fn e1_file_browser_pages_search_and_descriptions() {
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);
                     assert!(rows[4].starts_with(" >file0015.txt"), "{rows:?}");
-                    peer.send(b"\x1b[6~".repeat(15).as_slice()).await.unwrap();
-                    let rows = read_frame(&mut peer, &mut screen).await;
-                    assert_frame(&rows, language, scenario);
-                    assert!(rows[4].starts_with(" >file0240.txt"), "{rows:?}");
+                    for page in 2..=16 {
+                        peer.send(b"\x1b[6~").await.unwrap();
+                        let rows = read_frame(&mut peer, &mut screen).await;
+                        assert_frame(&rows, language, scenario);
+                        assert!(rows[4].starts_with(&format!(" >file{:04}.txt", page * 15)), "{rows:?}");
+                    }
                     peer.send(b"\x1b[5~").await.unwrap();
                     let rows = read_frame(&mut peer, &mut screen).await;
                     assert_frame(&rows, language, scenario);

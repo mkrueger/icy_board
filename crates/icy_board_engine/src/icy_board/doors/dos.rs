@@ -287,7 +287,7 @@ pub fn install_x00_fossil(image: &Path, archive: &Path) -> Res<std::path::PathBu
     let mut total_size = 0;
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index)?;
-        let name = entry.name().to_ascii_uppercase();
+        let name = entry.name()?.to_ascii_uppercase();
         if name.is_empty() || name == "." || name == ".." || !name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte)) || entry.is_dir()
         {
             return Err(format!("Expected an original, flat X00 ZIP archive with DOS filenames; invalid entry: {name}").into());

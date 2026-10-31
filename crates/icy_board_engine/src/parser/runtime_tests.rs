@@ -32,7 +32,7 @@ fn runtime_registry_preserves_core_type_identity_and_metadata() {
         (BOARD_ID, 9),
         (SESSION_ID, 18),
         (USER_ID, 60),
-        (MSG_ID, 18),
+        (MSG_ID, 19),
         (HTTP_ID, 7),
         (HTTP_REQUEST_ID, 8),
         (HTTP_RESPONSE_ID, 10),

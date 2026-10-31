@@ -414,7 +414,13 @@ impl Audit {
                     self.count("directories");
                     continue;
                 }
-                let name = entry.name().to_owned();
+                let name = match entry.name() {
+                    Ok(name) => name.into_owned(),
+                    Err(e) => {
+                        self.failure(&indexed, "zip-name", e)?;
+                        continue;
+                    }
+                };
                 let member_origin = format!("{indexed}:{}", esc(&name));
                 let size = entry.size();
                 let data = self.selected_read(&member_origin, &mut used, 0, |sink| {

@@ -32,7 +32,7 @@ authors = ["Mike Krüger <mkrueger@posteo.de>"]
 [workspace.dependencies]
 codepages = { path = "crates/codepages" }
 dizbase = { path = "crates/dizbase" }
-unarc-rs = "0.7.2"
+unarc-rs = "0.8.1"
 jamjam = { git = "https://github.com/mkrueger/jamjam", branch = "main" }
 icy_board_tui = { path = "crates/icy_board_tui" }
 icy_board_buildinfo = { path = "crates/icy_board_buildinfo" }
@@ -52,7 +52,7 @@ jxl-oxide = { version = "0.12.6", features = ["image"] }
 zune-jpegxl = "0.5.2"
 zune-core = "0.5.3"
 
-lazy_static = "1.5.0"
+lazy_static = "1.5.1"
 semver = { version = "1.0.28", features = ["serde"] }
 thiserror = "2.0.21"
 clap = { version = "4.5", features = ["derive", "string"] }
@@ -62,7 +62,7 @@ ratatui = "0.30.2"
 terminfo = "0.9.0"
 ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm", "image-defaults"] }
 rodio = { version = "0.22.2", features = ["tracing"] }
-log = "0.4.34"
+log = "0.4.35"
 chrono = { version = "0.4.45", features = ["serde"] }
 bstr = "1.13.1"
 base64 = "0.23.1"
@@ -75,10 +75,10 @@ bitflag = "0.10.1"
 async-trait = "0.1.92"
 async-recursion = "1.1.1"
 rand = "0.10.3"
-zip = "8.6.0"
+zip = "9.1.3"
 fatfs = "0.3.6"
 x86-native = { git = "https://github.com/mkrueger/x86", rev = "0f580368f6e5144e220c176cdde218f991479f06" }
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 hex = "0.4.3"
 
 walkdir = "2.2.6"

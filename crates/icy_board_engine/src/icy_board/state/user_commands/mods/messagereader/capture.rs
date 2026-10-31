@@ -1386,7 +1386,7 @@ mod tests {
         let packet = capture.packet().unwrap();
         let mut archive = zip::ZipArchive::new(std::fs::File::open(&packet.path).unwrap()).unwrap();
         assert_eq!(
-            archive.file_names().collect::<Vec<_>>(),
+            archive.file_names().collect::<zip::result::ZipResult<Vec<_>>>().unwrap(),
             ["CONTROL.DAT", "MESSAGES.DAT", "300.NDX", "PERSONAL.NDX"]
         );
         let mut control = Vec::new();

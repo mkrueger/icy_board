@@ -43,7 +43,7 @@ fn inspect(data: &[u8], origin: &str, output: &Path, depth: usize, audit: &mut A
     }
     for index in 0..zip.len() {
         let mut entry = zip.by_index(index)?;
-        let name = entry.name().to_owned();
+        let name = entry.name()?.into_owned();
         let base = name.rsplit(['/', '\\']).next().unwrap().to_lowercase();
         let is_diz = base.ends_with(".diz") || matches!(base.as_str(), "desc.sdi" | "file_id.ans" | "file_id.pcb");
         let nested = base.ends_with(".zip");
