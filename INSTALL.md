@@ -47,13 +47,10 @@ decompiler and language server, without the board's audio dependencies, use:
 cargo build --release -p pplc -p ppld -p ppl-lsp
 ```
 
-With CMake 4, a full build may fail in the bundled Opus library with a
-`cmake_minimum_required` compatibility error. The release builds use CMake's
-policy compatibility setting for that dependency:
-
-```sh
-CMAKE_POLICY_VERSION_MINIMUM=3.5 cargo build --release
-```
+The repository's Cargo configuration defaults `CMAKE_POLICY_VERSION_MINIMUM`
+to `3.5` so the bundled Opus library builds with CMake 4. Plain `cargo build`
+works without setting this variable manually. An explicitly set environment
+value takes precedence over the repository default.
 
 On a Raspberry Pi the OpenSSL development package has to be there as well:
 `sudo apt-get install libssl-dev`.
@@ -67,12 +64,11 @@ Install them with [Homebrew](https://brew.sh):
 brew install cmake pkg-config
 ```
 
-The Opus source shipped with the `audiopus_sys` crate still declares an old
-`cmake_minimum_required`, which recent CMake (4.x) rejects. Build with the
-compatibility flag set:
+The repository's Cargo configuration supplies the CMake 4 compatibility setting
+for the bundled Opus library automatically:
 
 ```sh
-CMAKE_POLICY_VERSION_MINIMUM=3.5 cargo build --release
+cargo build --release
 ```
 
 ## Your first board

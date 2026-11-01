@@ -1,5 +1,7 @@
 [env]
 RUST_TEST_THREADS = { value = "4", force = false }
+# The bundled Opus library declares a minimum version that CMake 4 no longer accepts.
+CMAKE_POLICY_VERSION_MINIMUM = { value = "3.5", force = false }
 
 [alias]
 test-low = ["test", "--jobs", "4"]

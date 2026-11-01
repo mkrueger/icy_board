@@ -50,6 +50,10 @@ systems the OpenSSL development package may be required as well.
 
 The programs are written to ``target/release/``.
 
+The repository's Cargo configuration defaults ``CMAKE_POLICY_VERSION_MINIMUM``
+to ``3.5`` for the bundled Opus library's compatibility with CMake 4. No manual
+environment setting is needed; an explicitly set value takes precedence.
+
 .. _Rust toolchain: https://rustup.rs
 
 Creating the first board
